@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>エーテルアーキ | デザインとアプリ開発</title>
+  <meta name="description" content="エーテルアーキは、デザインとアプリ開発を軸に、アイデアをかたちにするクリエイティブスタジオです。UI/UXデザイン、ブランディング、Web・モバイルアプリ開発までワンストップで提供します。">
+  <meta property="og:title" content="エーテルアーキ | デザインとアプリ開発">
+  <meta property="og:description" content="アイデアに、かたちと体験を。デザインとアプリ開発のクリエイティブスタジオ。">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- 背景のオーロラ -->
+  <div class="aurora" aria-hidden="true">
+    <div class="aurora__blob aurora__blob--1"></div>
+    <div class="aurora__blob aurora__blob--2"></div>
+    <div class="aurora__blob aurora__blob--3"></div>
+  </div>
+
+  <!-- ヘッダー -->
+  <header class="header" id="header">
+    <div class="header__inner">
+      <a href="#top" class="logo">
+        <span class="logo__mark">✦</span>
+        <span class="logo__text">エーテルアーキ<small>Ether Archi</small></span>
+      </a>
+      <nav class="nav" id="nav">
+        <a href="#about">私たちについて</a>
+        <a href="#services">サービス</a>
+        <a href="#strengths">強み</a>
+        <a href="#flow">制作の流れ</a>
+        <a href="#contact" class="nav__cta">お問い合わせ</a>
+      </nav>
+      <button class="menu-btn" id="menuBtn" aria-label="メニューを開く" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ヒーロー -->
+    <section class="hero">
+      <div class="hero__inner">
+        <p class="hero__eyebrow reveal">DESIGN &amp; APP DEVELOPMENT STUDIO</p>
+        <h1 class="hero__title reveal">
+          アイデアに、<br>
+          <span class="gradient-text">かたち</span>と<span class="gradient-text">体験</span>を。
+        </h1>
+        <p class="hero__lead reveal">
+          エーテルアーキは、デザインとアプリ開発を軸にした<br class="pc-only">
+          クリエイティブスタジオです。<br>
+          構想の段階から、デザイン・開発・リリース後の運用まで、<br class="pc-only">
+          ワンストップで伴走します。
+        </p>
+        <div class="hero__actions reveal">
+          <a href="#contact" class="btn btn--primary">無料で相談する</a>
+          <a href="#services" class="btn btn--ghost">サービスを見る</a>
+        </div>
+      </div>
+      <div class="hero__scroll" aria-hidden="true">
+        <span>SCROLL</span>
+        <div class="hero__scroll-line"></div>
+      </div>
+    </section>
+
+    <!-- 私たちについて -->
+    <section class="section" id="about">
+      <div class="section__inner">
+        <div class="section__head reveal">
+          <p class="section__label">ABOUT</p>
+          <h2 class="section__title">私たちについて</h2>
+        </div>
+        <div class="about">
+          <div class="about__text reveal">
+            <h3>「エーテル」のように、<br>あらゆる領域を満たすものづくりを。</h3>
+            <p>
+              かつて宇宙を満たすと考えられた物質「エーテル」と、設計を意味する「アーキテクチャ」。
+              エーテルアーキという名前には、デザインと技術のあいだを自由に行き来しながら、
+              プロダクトの隅々まで一貫した思想で設計する、という私たちの姿勢を込めています。
+            </p>
+            <p>
+              見た目の美しさだけのデザインでも、動くだけの開発でもなく。
+              「誰の、どんな課題を解決するのか」から一緒に考え、
+              使う人の日常に自然と溶け込むプロダクトをつくります。
+            </p>
+          </div>
+          <div class="about__stats reveal">
+            <div class="stat">
+              <span class="stat__num gradient-text">One
+                Stop</span>
+              <span class="stat__label">企画から運用まで一気通貫</span>
+            </div>
+            <div class="stat">
+              <span class="stat__num gradient-text">Design
+                × Dev</span>
+              <span class="stat__label">デザインと開発を分断しない体制</span>
+            </div>
+            <div class="stat">
+              <span class="stat__num gradient-text">Agile</span>
+              <span class="stat__label">小さく作り、素早く改善</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- サービス -->
+    <section class="section" id="services">
+      <div class="section__inner">
+        <div class="section__head reveal">
+          <p class="section__label">SERVICES</p>
+          <h2 class="section__title">サービス</h2>
+          <p class="section__lead">デザインと開発、2つの軸でプロダクトづくりを支えます。</p>
+        </div>
+        <div class="cards">
+          <article class="card reveal">
+            <div class="card__icon">◇</div>
+            <h3 class="card__title">UI/UXデザイン</h3>
+            <p class="card__text">
+              ユーザーリサーチから情報設計、プロトタイピング、ビジュアルデザインまで。
+              「使いやすく、また使いたくなる」体験を設計します。
+            </p>
+            <ul class="card__tags">
+              <li>UXリサーチ</li><li>ワイヤーフレーム</li><li>プロトタイプ</li><li>デザインシステム</li>
+            </ul>
+          </article>
+          <article class="card reveal">
+            <div class="card__icon">✦</div>
+            <h3 class="card__title">Webデザイン / ブランディング</h3>
+            <p class="card__text">
+              コーポレートサイト、LP、サービスサイトの制作から、
+              ロゴ・VI設計などのブランディングまで。伝わるデザインで事業を後押しします。
+            </p>
+            <ul class="card__tags">
+              <li>Webサイト制作</li><li>LP制作</li><li>ロゴ / VI</li><li>グラフィック</li>
+            </ul>
+          </article>
+          <article class="card reveal">
+            <div class="card__icon">▣</div>
+            <h3 class="card__title">アプリ開発</h3>
+            <p class="card__text">
+              iOS / Android のモバイルアプリからWebアプリケーションまで。
+              モダンな技術スタックで、スケールするプロダクトを開発します。
+            </p>
+            <ul class="card__tags">
+              <li>iOS / Android</li><li>Webアプリ</li><li>API設計</li><li>クラウド構築</li>
+            </ul>
+          </article>
+          <article class="card reveal">
+            <div class="card__icon">↻</div>
+            <h3 class="card__title">保守・グロース支援</h3>
+            <p class="card__text">
+              リリースはゴールではなくスタート。データをもとにした継続的な改善、
+              機能追加、運用保守まで長期的に伴走します。
+            </p>
+            <ul class="card__tags">
+              <li>運用保守</li><li>分析 / 改善</li><li>機能拡張</li><li>技術顧問</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 強み -->
+    <section class="section" id="strengths">
+      <div class="section__inner">
+        <div class="section__head reveal">
+          <p class="section__label">STRENGTHS</p>
+          <h2 class="section__title">エーテルアーキの強み</h2>
+        </div>
+        <div class="strengths">
+          <div class="strength reveal">
+            <span class="strength__num">01</span>
+            <h3>デザインと開発の垣根がない</h3>
+            <p>
+              デザイナーとエンジニアが同じチームで動くため、「デザインはきれいだが実装できない」
+              「実装したらデザインが崩れた」というすれ違いが起きません。
+            </p>
+          </div>
+          <div class="strength reveal">
+            <span class="strength__num">02</span>
+            <h3>小さく始めて、大きく育てる</h3>
+            <p>
+              最初から完璧を目指すのではなく、まず価値の核となるMVPを素早く形にし、
+              ユーザーの反応を見ながら育てていく進め方を得意としています。
+            </p>
+          </div>
+          <div class="strength reveal">
+            <span class="strength__num">03</span>
+            <h3>ビジネス視点での提案</h3>
+            <p>
+              言われたものをそのまま作るのではなく、事業の目的から逆算して
+              「本当に作るべきもの」を一緒に定義するところから関わります。
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 制作の流れ -->
+    <section class="section" id="flow">
+      <div class="section__inner">
+        <div class="section__head reveal">
+          <p class="section__label">FLOW</p>
+          <h2 class="section__title">制作の流れ</h2>
+        </div>
+        <ol class="flow">
+          <li class="flow__step reveal">
+            <span class="flow__num">1</span>
+            <h3>ヒアリング</h3>
+            <p>課題や目的、理想の状態を丁寧にお伺いします。相談は無料です。</p>
+          </li>
+          <li class="flow__step reveal">
+            <span class="flow__num">2</span>
+            <h3>ご提案・お見積り</h3>
+            <p>最適な進め方・スコープ・概算費用をご提案します。</p>
+          </li>
+          <li class="flow__step reveal">
+            <span class="flow__num">3</span>
+            <h3>デザイン</h3>
+            <p>情報設計からビジュアルまで、確認を重ねながら形にします。</p>
+          </li>
+          <li class="flow__step reveal">
+            <span class="flow__num">4</span>
+            <h3>開発</h3>
+            <p>短いサイクルで動くものをお見せしながら開発を進めます。</p>
+          </li>
+          <li class="flow__step reveal">
+            <span class="flow__num">5</span>
+            <h3>リリース・運用</h3>
+            <p>公開後も改善と保守で、プロダクトの成長を支え続けます。</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- お問い合わせ -->
+    <section class="section section--contact" id="contact">
+      <div class="section__inner">
+        <div class="contact reveal">
+          <p class="section__label">CONTACT</p>
+          <h2 class="section__title">お問い合わせ</h2>
+          <p class="contact__lead">
+            「まだ構想段階」「何から相談すればいいか分からない」という状態でも大丈夫です。<br>
+            まずはお気軽にご連絡ください。
+          </p>
+          <a class="btn btn--primary btn--large" href="mailto:contact@example.com?subject=%E3%81%8A%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B%EF%BC%88%E3%82%A8%E3%83%BC%E3%83%86%E3%83%AB%E3%82%A2%E3%83%BC%E3%82%AD%EF%BC%89">
+              メールで相談する
+          </a>
+          <p class="contact__note">contact@example.com <span>※ 正式なアドレスに差し替えてください</span></p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- フッター -->
+  <footer class="footer">
+    <div class="footer__inner">
+      <a href="#top" class="logo logo--footer">
+        <span class="logo__mark">✦</span>
+        <span class="logo__text">エーテルアーキ<small>Ether Archi</small></span>
+      </a>
+      <nav class="footer__nav">
+        <a href="#about">私たちについて</a>
+        <a href="#services">サービス</a>
+        <a href="#strengths">強み</a>
+        <a href="#flow">制作の流れ</a>
+        <a href="#contact">お問い合わせ</a>
+      </nav>
+      <p class="footer__copy">&copy; <span id="year">2026</span> Ether Archi. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
