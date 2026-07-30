@@ -21,20 +21,31 @@
 | 欧文見出し | Archivo |
 | 番号・ラベル・注記 | IBM Plex Mono |
 
-Google Fonts から読み込みます。読み込みに失敗した場合も崩れないよう、
-`css/style.css` の `--ja` / `--en` / `--mo` にフォールバックを併記しています。
+**フォントはセルフホストしています**（`fonts/` 以下、`css/fonts.css` で定義）。
+外部CDNを使わないため、訪問者のIPアドレスが第三者へ送信されません。
+日本語は `unicode-range` で分割されており、ブラウザはページに必要な範囲だけを取得します
+（実測: 500ファイル中56ファイル・約540KB）。
+
+読み込みに失敗した場合も崩れないよう、`css/style.css` の
+`--ja` / `--en` / `--mo` にフォールバックを併記しています。
+
+`css/fonts.css` は生成物です。書体や字幅を変更する場合は、
+Google Fonts の配信CSSを取得し直して `fonts/` ごと作り直してください。
 
 ## 構成
 
 ```
 .
 ├── index.html                        # トップページ（ワンページ構成）
+├── SECURITY.md                       # セキュリティ方針・脆弱性の報告先
 ├── css/
-│   └── style.css                     # スタイルシート
+│   ├── style.css                     # スタイルシート
+│   └── fonts.css                     # @font-face 定義（生成物）
+├── fonts/                            # セルフホストしたwoff2（500ファイル）
 ├── js/
 │   └── main.js                       # 方眼描画・ヘッダー・メニュー・出現演出
 └── .github/workflows/
-    └── deploy-pages.yml              # GitHub Pages への自動デプロイ
+    └── static.yml                    # GitHub Pages への自動デプロイ
 ```
 
 ## セクション

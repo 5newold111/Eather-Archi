@@ -9,10 +9,13 @@
   <meta property="og:description" content="アイデアに、かたちと体験を。デザインとアプリ開発のクリエイティブスタジオ。">
   <meta property="og:type" content="website">
   <meta name="theme-color" content="#EDEDEA">
+  <!-- 多層防御。GitHub Pages はカスタムHTTPヘッダーに対応しないため meta で宣言する。
+       外部リソースを一切読まない構成のため 'self' のみで完結する。
+       なお frame-ancestors は仕様上 meta では無効で、ヘッダーでしか指定できない。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2316171A'/%3E%3Crect x='7.5' y='7.5' width='17' height='17' fill='none' stroke='%23EDEDEA' stroke-width='2'/%3E%3Cpath d='M7.5 24.5 L24.5 7.5' stroke='%23EDEDEA' stroke-width='2'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
