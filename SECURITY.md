@@ -5,9 +5,12 @@
 ## 脆弱性の報告
 
 このサイトに関する脆弱性を見つけた場合は、公開の Issue ではなく
-**メールでご連絡ください**。
+**GitHub の非公開報告機能でご連絡ください**。
 
-- 連絡先: `contact@example.com` ← 正式なアドレスに差し替えてください
+- 報告フォーム: <https://github.com/5newold111/Eather-Arch/security/advisories/new>
+
+リポジトリの **Security** タブ → **Report a vulnerability** からも同じ画面を開けます。
+やり取りは修正が公開されるまで非公開に保たれます。
 
 報告の際は、可能な範囲で以下をお知らせいただけると助かります。
 
@@ -40,6 +43,9 @@
 | Webフォントのセルフホスト | 訪問者のIPアドレスが第三者に送信されない |
 | GitHub Actions の SHA 固定 | タグの差し替えによるサプライチェーン攻撃を防ぐ |
 | ワークフローの最小権限 | `contents: read` / `pages: write` / `id-token: write` のみ |
+| 非公開の脆弱性報告 | GitHub の Private vulnerability reporting を有効化 |
+| Secret scanning / Push protection | 認証情報の誤コミットを検知・ブロック |
+| ブランチ保護 | デフォルトブランチへの直接pushを制限 |
 
 ## 既知の制約
 
