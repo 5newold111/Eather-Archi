@@ -474,13 +474,18 @@ h1, h2, h3 { font-feature-settings: "palt" 1; font-weight: 700; }
   border: 1px solid var(--rule);
   background: #fff;
 }
-/* フォームの高さは中身によって変わるが、iframe は自動で伸縮しないため
-   ビューポート基準で確保し、あふれた分は iframe 内でスクロールさせる。 */
+/* クロスオリジンの iframe は中身の高さを取得できず自動伸縮しないため、
+   固定値で確保するしかない。項目5件程度が収まる高さを取り、
+   あふれた分は iframe 内でスクロールさせる。
+   画面が狭いほど入力欄が折り返して縦に伸びるため、スマホでは多めに取る。 */
 .contact__form iframe {
   display: block;
   width: 100%;
-  height: clamp(560px, 85vh, 1000px);
+  height: clamp(620px, 95vh, 1250px);
   border: 0;
+}
+@media (max-width: 640px) {
+  .contact__form iframe { height: clamp(620px, 130vh, 1450px); }
 }
 .contact__note {
   font-size: 0.72rem;
