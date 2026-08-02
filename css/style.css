@@ -67,7 +67,7 @@ a { color: inherit; text-decoration: none; }
 
 /* モノスペースの注記ラベル */
 .anno, .sec__n, .sec__en, .cell__n, .cell__m, .nav__n,
-.mark__en, .scroll, .foot__c, .spec dt, .contact__note, .dim__label {
+.mark__en, .scroll, .foot__c, .spec dt, .dim__label {
   font-family: var(--mo);
   font-weight: 400;
   letter-spacing: 0.16em;
@@ -469,16 +469,26 @@ h1, h2, h3 { font-feature-settings: "palt" 1; font-weight: 700; }
   padding: clamp(2.5rem, 5vw, 4rem) 0 1rem;
 }
 .contact__lead { color: var(--ink-2); font-size: 0.98rem; }
+.contact__form {
+  width: 100%;
+  border: 1px solid var(--rule);
+  background: #fff;
+}
+/* フォームの高さは中身によって変わるが、iframe は自動で伸縮しないため
+   ビューポート基準で確保し、あふれた分は iframe 内でスクロールさせる。 */
+.contact__form iframe {
+  display: block;
+  width: 100%;
+  height: clamp(560px, 85vh, 1000px);
+  border: 0;
+}
 .contact__note {
   font-size: 0.72rem;
   color: var(--ink-3);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.9rem;
-  text-transform: none;
+  letter-spacing: 0.02em;
 }
-.contact__note span { font-family: var(--ja); font-size: 0.7rem; letter-spacing: 0.02em; }
+.contact__note a { color: var(--ink-2); text-underline-offset: 0.25em; }
+.contact__note a:hover { color: var(--ink); }
 
 /* フッター -------------------------------------------------- */
 .foot {

@@ -81,6 +81,9 @@ Settings → Pages で `Source` を **GitHub Actions** に切り替えてくだ�
 
 ## カスタマイズのポイント
 
-- **お問い合わせ先**: `index.html` の `contact@example.com` を実際のメールアドレスに差し替えてください（`mailto:` と表示テキストの 2 箇所）
+- **お問い合わせフォーム**: `index.html` の `.contact__form` 内の `iframe` に Google フォームの公開用 URL を指定しています。差し替えるときは以下に注意してください
+  - フォーム編集画面の「公開」（旧 UI では「送信」）から取得したリンクを使う。編集用 URL（末尾が `/edit`）は訪問者が開けないため使えません
+  - 同じ URL を、直下のフォールバック用リンクと `<meta http-equiv="Content-Security-Policy">` の `frame-src` にも反映する。`frame-src` に無いドメインは表示されません
+  - 表示の高さは `css/style.css` の `.contact__form iframe` の `height` で調整します
 - **配色**: `css/style.css` 冒頭の `:root` で定義しています
 - **方眼の密度**: `js/main.js` の `step`（既定 32px）と `major`（既定 5 本ごと）で調整できます
