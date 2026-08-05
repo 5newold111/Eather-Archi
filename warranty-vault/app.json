@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "保証書Vault",
+    "slug": "warranty-vault",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.eatherarch.warrantyvault",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "ja",
+        "NSCameraUsageDescription": "保証書やレシートを撮影して、内容を自動で読み取るためにカメラを使用します。",
+        "NSPhotoLibraryUsageDescription": "保証書やレシートの写真を選んで、内容を自動で読み取るためにフォトライブラリを使用します。",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.eatherarch.warrantyvault",
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F5F7",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "保証書やレシートの写真を選ぶためにフォトライブラリを使用します。",
+          "cameraPermission": "保証書やレシートを撮影するためにカメラを使用します。"
+        }
+      ],
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
