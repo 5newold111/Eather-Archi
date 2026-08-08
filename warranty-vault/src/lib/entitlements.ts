@@ -1,4 +1,5 @@
 import Storage from 'expo-sqlite/kv-store';
+import { PAYWALL_ENABLED } from '../config';
 
 /**
  * 無料版 / Pro版のエンタイトルメント管理。
@@ -24,6 +25,19 @@ export function isPro(): boolean {
   return Storage.getItemSync(PRO_KEY) === '1';
 }
 
+/**
+ * Pro向け機能（通知・CSV等）が使えるか。
+ * 課金導線がオフの間（初回リリース）は全員が使える。
+ */
+export function hasProFeatures(): boolean {
+  return !PAYWALL_ENABLED || isPro();
+}
+
+/** 制限表示・ペイウォール導線を出すべきか */
+export function paywallEnabled(): boolean {
+  return PAYWALL_ENABLED;
+}
+
 /** 開発ビルド・審査前の動作確認用。本番では課金SDKの購入結果で設定する。 */
 export function setPro(value: boolean): void {
   Storage.setItemSync(PRO_KEY, value ? '1' : '0');
@@ -39,15 +53,17 @@ export function recordAiScan(): void {
 }
 
 export function canUseAiScan(): boolean {
+  if (!PAYWALL_ENABLED) return true;
   return isPro() || aiScansUsedThisMonth() < FREE_AI_SCANS_PER_MONTH;
 }
 
 export function remainingAiScans(): number | null {
-  if (isPro()) return null; // 無制限
+  if (!PAYWALL_ENABLED || isPro()) return null; // 無制限
   return Math.max(0, FREE_AI_SCANS_PER_MONTH - aiScansUsedThisMonth());
 }
 
 export function canAddItem(currentCount: number): boolean {
+  if (!PAYWALL_ENABLED) return true;
   return isPro() || currentCount < FREE_MAX_ITEMS;
 }
 

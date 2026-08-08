@@ -14,7 +14,7 @@ import { useRecords } from '../state/RecordsContext';
 import { radius, useTheme } from '../theme';
 import { RecordCard } from '../components/RecordCard';
 import { PrimaryButton } from '../components/Buttons';
-import { canAddItem, FREE_MAX_ITEMS, isPro } from '../lib/entitlements';
+import { canAddItem, FREE_MAX_ITEMS, isPro, paywallEnabled } from '../lib/entitlements';
 import type { ApplianceRecord } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -82,7 +82,7 @@ export function HomeScreen({ navigation }: Props) {
         ]}
       />
 
-      {!isPro() && (
+      {paywallEnabled() && !isPro() && (
         <Text style={[styles.limitNote, { color: theme.tertiaryText }]}>
           無料版: {records.length} / {FREE_MAX_ITEMS} 台登録済み
         </Text>

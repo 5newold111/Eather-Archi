@@ -10,13 +10,19 @@ Content-Type: application/json
 { "image": "<base64>", "mediaType": "image/jpeg" }
 ```
 
-## デプロイ手順
+## デプロイ手順（クリックだけ・CLI不要）
 
-1. Vercel で新規プロジェクトを作成し、この `server/` ディレクトリをルートに指定
-   （既存の Mesh-Order 用プロジェクトへ相乗りする場合は `api/extract-warranty.ts` をコピー）
-2. 環境変数 `ANTHROPIC_API_KEY` を Production / Preview に設定
-3. デプロイ後のURL `https://<project>.vercel.app/api/extract-warranty` を
-   アプリ側の `EXPO_PUBLIC_EXTRACT_API_URL`（`eas.json` の env）に設定
+1. https://vercel.com/new で `Eather-Arch` リポジトリを Import
+2. **Root Directory** を「Edit」から `warranty-vault/server` に変更
+3. **Environment Variables** に `ANTHROPIC_API_KEY` を追加して Deploy
+4. 発行されたURLをアプリ側に設定: `cd warranty-vault && npm run setup` で
+   URLを貼り付けると `eas.json` へ自動書き込みされる
+
+詳しいクリック手順は `../docs/APP_STORE_RELEASE.md` の STEP 2 を参照。
+（既存の Mesh-Order 用プロジェクトへ相乗りする場合は `api/extract-warranty.ts` をコピー）
+
+動作確認: ブラウザで `https://<URL>/api/extract-warranty` を開いて
+`{"error":"Method Not Allowed"}` が出れば正常。
 
 ## セキュリティ方針
 

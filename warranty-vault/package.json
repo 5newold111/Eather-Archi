@@ -25,7 +25,11 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "setup": "node scripts/setup.mjs",
+    "build:ios": "npx eas-cli build --profile production --platform ios",
+    "submit": "npx eas-cli submit --platform ios",
+    "typecheck": "tsc --noEmit"
   },
   "private": true
 }

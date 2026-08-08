@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import type { ApplianceRecord } from '../types';
-import { expiryNotificationsEnabled, isPro } from './entitlements';
+import { expiryNotificationsEnabled, hasProFeatures } from './entitlements';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -24,7 +24,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
  */
 export async function syncExpiryNotifications(records: ApplianceRecord[]): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
-  if (!isPro() || !expiryNotificationsEnabled()) return;
+  if (!hasProFeatures() || !expiryNotificationsEnabled()) return;
 
   const now = Date.now();
   for (const record of records) {

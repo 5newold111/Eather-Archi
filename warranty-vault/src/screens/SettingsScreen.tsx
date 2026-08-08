@@ -14,7 +14,9 @@ import { radius, useTheme } from '../theme';
 import { useRecords } from '../state/RecordsContext';
 import {
   expiryNotificationsEnabled,
+  hasProFeatures,
   isPro,
+  paywallEnabled,
   setExpiryNotificationsEnabled,
 } from '../lib/entitlements';
 import {
@@ -30,10 +32,11 @@ export function SettingsScreen({ navigation }: Props) {
   const theme = useTheme();
   const { records, removeAll } = useRecords();
   const pro = isPro();
+  const proFeatures = hasProFeatures();
   const [notify, setNotify] = useState(expiryNotificationsEnabled());
 
   const toggleNotify = async (value: boolean) => {
-    if (!pro) {
+    if (!proFeatures) {
       navigation.navigate('Paywall');
       return;
     }
@@ -50,7 +53,7 @@ export function SettingsScreen({ navigation }: Props) {
   };
 
   const exportCsv = async () => {
-    if (!pro) {
+    if (!proFeatures) {
       navigation.navigate('Paywall');
       return;
     }
@@ -81,36 +84,38 @@ export function SettingsScreen({ navigation }: Props) {
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.content}
     >
-      <View style={[styles.card, { backgroundColor: theme.card }]}>
-        <View style={styles.rowBetween}>
-          <View style={styles.rowText}>
-            <Text style={[styles.rowTitle, { color: theme.text }]}>
-              プラン: {pro ? 'Pro' : '無料版'}
-            </Text>
-            <Text style={[styles.rowDesc, { color: theme.secondaryText }]}>
-              {pro
-                ? 'すべての機能が利用できます。'
-                : '登録台数・AI読み取りに上限があります。'}
-            </Text>
+      {paywallEnabled() && (
+        <View style={[styles.card, { backgroundColor: theme.card }]}>
+          <View style={styles.rowBetween}>
+            <View style={styles.rowText}>
+              <Text style={[styles.rowTitle, { color: theme.text }]}>
+                プラン: {pro ? 'Pro' : '無料版'}
+              </Text>
+              <Text style={[styles.rowDesc, { color: theme.secondaryText }]}>
+                {pro
+                  ? 'すべての機能が利用できます。'
+                  : '登録台数・AI読み取りに上限があります。'}
+              </Text>
+            </View>
+            {!pro && (
+              <SecondaryButton title="Pro版を見る" onPress={() => navigation.navigate('Paywall')} />
+            )}
           </View>
-          {!pro && (
-            <SecondaryButton title="Pro版を見る" onPress={() => navigation.navigate('Paywall')} />
-          )}
         </View>
-      </View>
+      )}
 
       <View style={[styles.card, { backgroundColor: theme.card }]}>
         <View style={styles.rowBetween}>
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: theme.text }]}>
-              保証期限のお知らせ {pro ? '' : '（Pro）'}
+              保証期限のお知らせ {proFeatures ? '' : '（Pro）'}
             </Text>
             <Text style={[styles.rowDesc, { color: theme.secondaryText }]}>
               期限の30日前・7日前に通知します。
             </Text>
           </View>
           <Switch
-            value={pro && notify}
+            value={proFeatures && notify}
             onValueChange={toggleNotify}
             trackColor={{ true: theme.accent }}
           />
@@ -121,7 +126,7 @@ export function SettingsScreen({ navigation }: Props) {
         <View style={styles.rowBetween}>
           <View style={styles.rowText}>
             <Text style={[styles.rowTitle, { color: theme.text }]}>
-              CSVエクスポート {pro ? '' : '（Pro）'}
+              CSVエクスポート {proFeatures ? '' : '（Pro）'}
             </Text>
             <Text style={[styles.rowDesc, { color: theme.secondaryText }]}>
               登録内容をCSVで書き出して共有できます。
