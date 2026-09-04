@@ -87,3 +87,7 @@ Settings → Pages で `Source` を **GitHub Actions** に切り替えてくだ�
   - 表示の高さは `css/style.css` の `.contact__form iframe` の `height` で調整します
 - **配色**: `css/style.css` 冒頭の `:root` で定義しています
 - **方眼の密度**: `js/main.js` の `step`（既定 32px）と `major`（既定 5 本ごと）で調整できます
+
+## 企画中のプロダクト
+
+- [うに習慣アプリ](./docs/uni-app/README.md) — シーズーの「うに」を相棒にした習慣管理アプリ。企画書・設計資料は `docs/uni-app/` にまとめています
