@@ -1,0 +1,11 @@
+# Xcode の生成物・個人設定
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+.DS_Store
+
+# 実写写真などの非公開素材
+reference/
