@@ -197,23 +197,27 @@ def save_gif(frames, durations, path, colors=255):
 
 
 def verify(path):
+    """GIFを読み直して、サイズ・コマ数・長さ・透過を確かめる。"""
     im = Image.open(path)
-    frames = list(ImageSequence.Iterator(im))
-    total = sum(f.info.get("duration", 0) for f in frames)
-    corners_clear = all(
-        all(f.convert("RGBA").getpixel(p)[3] == 0 for p in [(0, 0), (im.width - 1, 0), (0, im.height - 1), (im.width - 1, im.height - 1)])
-        for f in frames
-    )
-    rgba0 = np.array(frames[0].convert("RGBA"))
+    has_index = im.info.get("transparency") is not None  # 1コマ目で「透明色」が登録されているか
+    durs, clear = [], []
+    for i in range(im.n_frames):
+        im.seek(i)
+        durs.append(im.info.get("duration", 0))
+        clear.append(float((np.array(im.convert("RGBA"))[..., 3] == 0).mean()))
     return {
         "path": path,
         "bytes": os.path.getsize(path),
+        "kb": round(os.path.getsize(path) / 1024, 1),
         "size": im.size,
-        "frames": len(frames),
-        "total_ms": total,
-        "loop": im.info.get("loop"),
-        "transparent_corners_all_frames": corners_clear,
-        "transparent_ratio_frame0": round(float((rgba0[..., 3] == 0).mean()), 3),
+        "frames": im.n_frames,
+        "durations_ms": durs,
+        "total_ms": sum(durs),
+        "loop": im.info.get("loop"),  # 0 = 無限ループ
+        "has_transparency_index": has_index,
+        # 全コマに透明な部分があるか（最小・最大の割合）
+        "transparent_all_frames": min(clear) > 0,
+        "transparent_ratio_min_max": [round(min(clear), 3), round(max(clear), 3)],
     }
 
 
