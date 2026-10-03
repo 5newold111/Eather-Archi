@@ -53,6 +53,7 @@ music-label/
 │       └── move.json                ← 歩く・走る
 └── scripts/
     ├── select_references.py      ← 参考曲を枠ごとに自動で割り当てる（1 曲 1 枠を機械的に守る）。設定書の癖・声の仕様をブリーフに固定で入れる
+    ├── write_brief.py            ← 骨組みに Suno 用の指示文・歌詞・タイトル候補を Claude が書き足す（鍵が無ければ指示文だけ書き出す）
     ├── analyze_growth.py         ← 成績から「伸びている組・曲・要素」を分析し、重みとヒント、方針転換の提案を返す
     ├── generate_visuals.py       ← ロゴ・写真・ジャケットの候補を生成し採点。最初の 5 回はオーナーに聞いて基準を学ぶ
     └── check_names.py            ← 名前の重複確認（デビュー処理の最初に自動実行。checked でないとロゴ・写真を作らない）
@@ -88,4 +89,4 @@ music-label/
 3. `docs/03_artists.md` を見ながら、`templates/artists/_template.json` をコピーして 5 組の設定書を書く
 4. `docs/02_analysis_sheet.md` を見ながら、参考曲を 1 曲だけ試しに分析してみる
 5. `docs/05_storage.md` に沿って Supabase を用意し、`supabase/schema.sql` → `supabase/storage.sql` を流す
-6. `scripts/select_references.py --demo` を動かして、枠の割り当てがどう出るか確かめる
+6. `pip install -r requirements.txt` のあと `scripts/select_references.py --demo` → `scripts/write_brief.py out/briefs/<週>_demo.json` で、骨組み → ブリーフの流れを確かめる
