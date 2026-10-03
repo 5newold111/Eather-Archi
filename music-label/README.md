@@ -40,8 +40,9 @@ music-label/
 │   ├── analysis_sheet.example.json  ← 架空の曲での記入例
 │   ├── artist_sheet.schema.json     ← アーティスト設定書の型定義
 │   ├── brief.schema.json            ← ブリーフの型定義
-│   ├── artists/
-│   │   └── _template.json           ← 本体レーベル（ドライブ）の設定書テンプレ（5 組ぶんコピーして使う）
+│   ├── artists/                     ← 本体レーベル（ドライブ）の 5 組（光・時・形・質・自）。下書き済み
+│   │   ├── _template.json           ← 新しい組を足すときのテンプレ
+│   │   └── light.json / time.json / shape.json / quality.json / self.json
 │   └── labels/                      ← 子レーベル（場面ごと）。代表アーティスト 3 組の下書きを内包
 │       ├── _template.json
 │       ├── sleep.json               ← 眠り
@@ -55,7 +56,7 @@ music-label/
 
 ## 決まっていること（設計の前提）
 
-- **アーティスト**：5 組。中身（軸の割り当て・編成・声・世界観・名前）は**オーナーが決める**。`templates/artists/_template.json` をコピーして 1 組 1 ファイルで記入する
+- **アーティスト**：本体 5 組（光・時・形・質・自）は `templates/artists/` に下書き済み。最終決定と名前はオーナーが行う
 - **配信**：毎週水曜 17:00 ET（米国東部時間）に 5 アーティスト × 1 曲 ＝ 5 曲
 - **仕込み期間**：2 週間（火曜に作った曲は、2 週間後の水曜に配信）
 - **コラボ**：A と B が組む週は「A feat. B」「B feat. A」の **別々の 2 曲**を、それぞれの名義で配信

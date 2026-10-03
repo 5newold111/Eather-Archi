@@ -1,0 +1,123 @@
+{
+  "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
+  "slug": "shape",
+  "axis": "shape",
+  "name": "SHAPE_TBD",
+  "name_status": "draft",
+  "name_candidates": [],
+  "formation": "band",
+  "cadence": "weekly",
+  "debut_week": "",
+
+  "persona": {
+    "members": [
+      { "role": "vocal / guitar", "description": "男性。よく通る中音域。歯切れがよく、笑いながら歌うような明るさ" },
+      { "role": "bass", "description": "指弾き。うねるシンコペーションのライン" },
+      { "role": "drums", "description": "生ドラム。跳ねるグルーヴ、タンバリン兼任" },
+      { "role": "keys", "description": "エレピとシンセブラス。合いの手担当" }
+    ],
+    "age_feel": "20 代後半の 4 人",
+    "story": "ワゴン 1 台で移動しながら、昼のハイウェイとサービスエリアで曲を作るバンド。橋・トンネル・標識の形を歌にする",
+    "drive_scene": "昼のハイウェイ、開放感、サービスエリア",
+    "origin": {
+      "birthplace": "湾岸の工業地帯と埋立地の町",
+      "upbringing": "巨大な橋脚と高架の下で育ち、構造物の幾何学を遊び場にしていた",
+      "landscape_words": ["真上からの太陽に短くなる影", "白いコンクリートの橋脚", "入道雲", "標識の緑"]
+    },
+    "influences": [
+      { "name": "（bio のみ）", "era": "1980s", "genre": "シティポップ", "what_was_taken": "跳ねる 16 ビートと、シンセブラスの合いの手", "reference_id": null },
+      { "name": "（bio のみ）", "era": "2000s〜2010s", "genre": "インディーロック / ファンクポップ", "what_was_taken": "カッティングギターと、全員コーラスの開放感", "reference_id": null }
+    ]
+  },
+
+  "vocal": {
+    "sex": "male",
+    "range": "mid",
+    "fixed_timbre": true,
+    "suno_persona_id": null,
+    "voice_spec": {
+      "comfortable_low": "A2",
+      "comfortable_high": "F#4",
+      "chest_voice_top": "G4",
+      "falsetto_switch_point": "A4",
+      "falsetto_quality": "明るく軽い。コーラスの最上段でだけ使う",
+      "strength": "言葉を刻むリズム感と、よく通る中音域。コーラスで厚く重なる",
+      "weakness": "ロングトーン。静かな曲"
+    },
+    "signature_techniques": {
+      "primary": "言葉を刻む（スタッカート。拍の前に突っ込む）",
+      "secondary": ["全員コーラス（ユニゾン → 3 度に開く）", "掛け合いの合いの手（Hey! / Alright）", "裏声でコーラスの最上段"],
+      "avoid": ["囁くようなウィスパー", "語尾のフォール", "ハミング", "シャウト（歪ませる）"],
+      "wordless_style": "全員で「Hey!」「Oh-oh」",
+      "tics": [
+        { "technique": "全員の「Hey!」", "where": "サビ前の 1 拍", "frequency": "every_song" },
+        { "technique": "シンセブラスとボーカルの掛け合い（1 小節ずつ）", "where": "2 番の後の間奏", "frequency": "every_song" },
+        { "technique": "歌詞に構造物の形（橋 / トンネル / 標識 / 曲線）を 1 つ", "where": "どこか", "frequency": "every_song" }
+      ]
+    },
+    "melodic_tendency": {
+      "motion": "ペンタトニックの跳躍が多い。同音連打でリズムを作る",
+      "chorus_peak": "切り替え点（A4）の下（G4）で地声を張る。頂点は 1 拍だけ",
+      "verse_register": "中音域（C3〜E4）で刻む"
+    },
+    "timbre_blend": {
+      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
+      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "synthesized": "（参考曲 DB が 10 曲以上たまったら、male・mid の 3 曲から 6:2:2 で合成）"
+    },
+    "guest_description": "よく通る中音域の男性ボイス。言葉を刻み、拍の前に突っ込む。コーラスで厚く重なる"
+  },
+
+  "composition_habits": {
+    "modulation": "ブリッジで 4 度上へ転調し、ラスサビで元に戻る",
+    "intro": "カッティングギターのリフ 2 小節 → ドラムのフィル → 全員（4 小節以内に歌）",
+    "outro": "全員が同じ 1 音を「Hey!」で止める。フェードしない",
+    "phrase_endings": "切る（スタッカート）",
+    "structure": "Riff → Verse → Pre → Chorus × 2 → 間奏（掛け合い）→ Bridge（転調）→ ラスサビ → Hey! で終わり",
+    "instruments_rule": "生ドラム・指弾きベース・カッティングギター・シンセブラスの 4 点を必ず",
+    "rhythm": "跳ねる 16 ビート。ベースはシンコペーション。タンバリンはサビだけ",
+    "lyrics_tic": "毎曲、構造物の形を 1 つ歌う",
+    "always": ["25 秒以内にサビの要素", "全員コーラス"],
+    "never": ["打ち込みだけの質感", "急な無音", "ダークな展開", "バラード"]
+  },
+
+  "sound": {
+    "genres": ["city pop", "indie rock", "funk pop"],
+    "palette": ["生ドラム", "指弾きエレキベース", "カッティングギター", "エレピ", "シンセブラス", "タンバリン"],
+    "bpm_min": 115,
+    "bpm_max": 125,
+    "energy_curve_type": "5-6-8-6-8-5-10-5",
+    "dna_tags": ["day", "highway", "groove", "band", "bright", "funk"],
+    "forbidden": ["打ち込みだけの質感", "急な無音", "ダークな展開"],
+    "drive_spec": { "hook_within_sec": 25, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": true }
+  },
+
+  "lyrics": {
+    "themes": ["仲間との移動", "風景の形", "直線と曲線", "今日という日", "サービスエリア"],
+    "point_of_view": "私たち",
+    "primary_language": "en",
+    "trend_language_ok": false,
+    "trend_language_max_ratio": 0.0,
+    "tone": "軽やか。ユーモアあり",
+    "forbidden_topics": ["宗教", "政治", "特定の人物"]
+  },
+
+  "visual": {
+    "space": "昼のハイウェイを走るワゴンの車内と、サービスエリアの屋外",
+    "light": "真上からの太陽光。影が短い",
+    "materials": ["コンクリート", "金属", "白い雲"],
+    "palette": ["白", "スカイブルー", "コンクリートグレー", "差し色にオレンジ"],
+    "camera": "広角。構造物の幾何学を強調",
+    "cover_series_rule": "毎回『形』が主役（橋 / トンネル / 標識 / 高架）。写真風ではなく図面風",
+    "blend_file": null
+  },
+
+  "distribution": {
+    "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null,
+    "youtube_channel": null, "instagram": null, "tiktok": null,
+    "bio_en": "A virtual band from EtherArchi, a label where AI-generated music meets spatial design. Daylight highways, concrete and sky, four voices shouting Hey."
+  },
+
+  "collab": { "preferred_partners": ["light", "self"], "collab_style": "feat. で客演。光 の高い ooh とバンドの Hey! の掛け合い" }
+}

@@ -1,0 +1,121 @@
+{
+  "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
+  "slug": "quality",
+  "axis": "quality",
+  "name": "QUALITY_TBD",
+  "name_status": "draft",
+  "name_candidates": [],
+  "formation": "duo",
+  "cadence": "weekly",
+  "debut_week": "",
+
+  "persona": {
+    "members": [
+      { "role": "vocal / acoustic guitar", "description": "女性。温かい中音域。息を混ぜたウィスパーから、自然に声が開く" },
+      { "role": "vocal / keys", "description": "男性。低めのハーモニー担当。前に出ない" }
+    ],
+    "age_feel": "30 代の 2 人",
+    "story": "雨の日に海岸線を走るのが好きな 2 人。車内で録った雨音やテープの質感をそのまま曲にする。旅先で覚えた言葉を歌に混ぜる癖がある",
+    "drive_scene": "雨の海岸線、郊外、県道",
+    "origin": {
+      "birthplace": "半島の先の漁村と、山あいの製材所の町（2 人で別）",
+      "upbringing": "一人は潮と木の匂いの中で、一人は紙とテープの匂いの中で育った",
+      "landscape_words": ["雨の軒先", "濡れた県道の黒", "無垢の木目", "テープのヒス", "曇天の拡散光"]
+    },
+    "influences": [
+      { "name": "（bio のみ）", "era": "1970s", "genre": "フォーク / シンガーソングライター", "what_was_taken": "指弾きのギターと、息の多い小さな声で語る歌", "reference_id": null },
+      { "name": "（bio のみ）", "era": "2010s", "genre": "インディーフォーク", "what_was_taken": "男女の 3 度ハーモニーと、テープの質感", "reference_id": null }
+    ]
+  },
+
+  "vocal": {
+    "sex": "mixed",
+    "range": "mid",
+    "fixed_timbre": true,
+    "suno_persona_id": null,
+    "voice_spec": {
+      "comfortable_low": "A3（女）/ G2（男）",
+      "comfortable_high": "C5（女）/ D4（男）",
+      "chest_voice_top": "B4 / E4",
+      "falsetto_switch_point": "C5 / F4",
+      "falsetto_quality": "女：息多めで柔らかい。男：ほぼ使わない",
+      "strength": "3 度のハーモニーの溶け方。ウィスパーから開くときの温度の変化",
+      "weakness": "大きな声量。速いテンポ"
+    },
+    "signature_techniques": {
+      "primary": "息を混ぜたウィスパーから、サビで自然に声が開く",
+      "secondary": ["男女の 3 度ハーモニー", "語尾を柔らかく伸ばす", "旅先の言葉を 1 行だけ混ぜる"],
+      "avoid": ["シャウト／ラウド", "ベルティング", "言葉を刻む", "ピッチ補正の強い声"],
+      "wordless_style": "ハミング（2 声で）",
+      "tics": [
+        { "technique": "2 声のハミング", "where": "イントロ（雨音の上）", "frequency": "every_song" },
+        { "technique": "トレンド言語か旅先の言葉を 1 行", "where": "サビの決め台詞", "frequency": "most" },
+        { "technique": "男声だけが 1 行ソロで歌う", "where": "ブリッジ", "frequency": "every_song" }
+      ]
+    },
+    "melodic_tendency": {
+      "motion": "順次進行。3 度以内の動き。サビで女声が 1 オクターブ上に開く",
+      "chorus_peak": "女声は切り替え点（C5）のすぐ下（B4）で地声のまま開く。男声は下で支える",
+      "verse_register": "女：中音域（A3〜E4）をウィスパーで。男：低音でユニゾンかオクターブ下"
+    },
+    "timbre_blend": {
+      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
+      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "synthesized": "（参考曲 DB が 10 曲以上たまったら、男女ハーモニー主体の 3 曲から 6:2:2 で合成）"
+    },
+    "guest_description": "温かい女性の中音域（息混じり）と、低めの男性ハーモニー。3 度のハーモニーが基本。囁きから自然に開く"
+  },
+
+  "composition_habits": {
+    "modulation": "転調しない。ブリッジで一度だけ借用和音",
+    "intro": "雨音かテープノイズ → 指弾きギター 4 小節 → 2 声のハミング 4 小節 → 歌",
+    "outro": "ギターのコード 1 つを残して、環境音だけが 20 秒残る",
+    "phrase_endings": "柔らかく伸ばす",
+    "structure": "Intro → Verse → Chorus → Verse → Chorus → Bridge（男声ソロ）→ ラスサビ（2 声が開く）→ Outro",
+    "instruments_rule": "指弾きアコースティックギターと、環境音（雨 / 波 / テープ）を必ず",
+    "rhythm": "ブラシのドラムか、ドラムなし。少し後ろにもたれる",
+    "lyrics_tic": "毎曲、素材の手ざわり（木 / 紙 / 布 / 雨）を 1 つ歌う",
+    "always": ["本物の環境音の層", "2 声"],
+    "never": ["強いピッチ補正", "急な無音", "派手なシンセ", "四つ打ち"]
+  },
+
+  "sound": {
+    "genres": ["acoustic pop", "folk pop", "organic"],
+    "palette": ["アコースティックギター（指弾き）", "アップライトピアノ", "ブラシのドラム", "ウッドベース", "テープのヒス", "雨音"],
+    "bpm_min": 90,
+    "bpm_max": 100,
+    "energy_curve_type": "3-4-6-5-7-4-8-3",
+    "dna_tags": ["rain", "coast", "acoustic", "warm", "harmony", "texture"],
+    "forbidden": ["強いピッチ補正", "急な無音", "派手なシンセ"],
+    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 160, "length_sec_max": 220, "no_sudden_silence": true }
+  },
+
+  "lyrics": {
+    "themes": ["雨", "海岸線", "手ざわり", "旅先で覚えた言葉", "2 人の沈黙"],
+    "point_of_view": "私たち / あなたへ",
+    "primary_language": "en",
+    "trend_language_ok": true,
+    "trend_language_max_ratio": 0.2,
+    "tone": "穏やか。少し懐かしい",
+    "forbidden_topics": ["宗教", "政治", "特定の人物", "トレンド言語の文化的に敏感な語"]
+  },
+
+  "visual": {
+    "space": "雨の海岸線を走る車内と、窓の外の灰色の海",
+    "light": "曇天の拡散光。影がない",
+    "materials": ["無垢の木", "紙", "テープ", "濡れたガラス"],
+    "palette": ["グレー", "生成り", "木の茶", "海の緑青"],
+    "camera": "窓越し。雨粒にピント",
+    "cover_series_rule": "毎回『質感』が主役（木目 / 紙の繊維 / テープ / 水滴）。接写",
+    "blend_file": null
+  },
+
+  "distribution": {
+    "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null,
+    "youtube_channel": null, "instagram": null, "tiktok": null,
+    "bio_en": "A virtual duo from EtherArchi, a label where AI-generated music meets spatial design. Rainy coastlines, wood, paper and tape, two voices in thirds."
+  },
+
+  "collab": { "preferred_partners": ["time", "self"], "collab_style": "feat. で客演。時 の低いハミングを 3 声目として迎える" }
+}

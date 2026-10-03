@@ -1,0 +1,118 @@
+{
+  "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
+  "slug": "light",
+  "axis": "light",
+  "name": "LIGHT_TBD",
+  "name_status": "draft",
+  "name_candidates": [],
+  "formation": "solo",
+  "cadence": "weekly",
+  "debut_week": "",
+
+  "persona": {
+    "members": [{ "role": "vocal / keys", "description": "女性。澄んだ高音。朝に強く、言葉の輪郭がはっきりした人" }],
+    "age_feel": "20 代半ば",
+    "story": "日の出前に家を出て、誰もいない高速を東へ走るのが日課。曲はその車内の 40 分で生まれる",
+    "drive_scene": "朝の高速、日の出",
+    "origin": {
+      "birthplace": "内陸の盆地の町",
+      "upbringing": "東向きの窓の部屋で育ち、朝日が壁に届く角度で季節を覚えた",
+      "landscape_words": ["盆地の朝霧", "東向きの窓に差す低い光", "霜の降りた駐車場", "ガードレールの白"]
+    },
+    "influences": [
+      { "name": "（bio のみ）", "era": "2010s", "genre": "シンセポップ", "what_was_taken": "明るいパッドの上に、言葉を一音一音はっきり置く歌", "reference_id": null },
+      { "name": "（bio のみ）", "era": "1980s", "genre": "ニューウェーブ", "what_was_taken": "ベル系の高い音色と、サビで一気に開く構成", "reference_id": null }
+    ]
+  },
+
+  "vocal": {
+    "sex": "female",
+    "range": "high",
+    "fixed_timbre": true,
+    "suno_persona_id": null,
+    "voice_spec": {
+      "comfortable_low": "G3",
+      "comfortable_high": "E5",
+      "chest_voice_top": "C#5",
+      "falsetto_switch_point": "D5",
+      "falsetto_quality": "細く透明。息は少なく、ガラスのように硬い",
+      "strength": "高音のロングトーンが揺れずに伸びる。言葉の輪郭がはっきりしている",
+      "weakness": "低音が薄い。語りに近い歌い方は不得意"
+    },
+    "signature_techniques": {
+      "primary": "裏声で頂点を抜く（サビの最高音を切り替え点の上で、細く透明に）",
+      "secondary": ["語尾を伸ばして浅いビブラート", "ooh のコーラスを高く重ねる", "サビ頭の 5 度跳躍"],
+      "avoid": ["囁くようなウィスパー", "シャウト／ラウド", "しゃくり上げ", "拍の後ろにもたれる"],
+      "wordless_style": "ooh / ah のコーラス（高く、透明に）",
+      "tics": [
+        { "technique": "裏声の ooh を 1 本だけ重ねる", "where": "イントロの最後の 2 小節", "frequency": "every_song" },
+        { "technique": "サビの最後の語を切り替え点の上で伸ばす", "where": "各サビ末", "frequency": "every_song" },
+        { "technique": "歌詞に『光』『窓』『東』のどれかを 1 回", "where": "どこか", "frequency": "most" }
+      ]
+    },
+    "melodic_tendency": {
+      "motion": "A メロは順次進行で上がり続け、サビ頭で 5 度跳躍",
+      "chorus_peak": "切り替え点（D5）を越えて裏声で頂点を取る",
+      "verse_register": "中音域（A3〜C4）で明るく、低音には降りない"
+    },
+    "timbre_blend": {
+      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
+      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "synthesized": "（参考曲 DB が 10 曲以上たまったら、female・high の 3 曲から 6:2:2 で合成）"
+    },
+    "guest_description": "澄んだ高音の女性ボイス。息は少なく、言葉の輪郭がはっきりしている。頂点は細い裏声で抜ける"
+  },
+
+  "composition_habits": {
+    "modulation": "ラスサビで半音上げ。それ以外は転調しない",
+    "intro": "ベル系のアルペジオ 4 小節 → 裏声の ooh 2 小節 → 歌",
+    "outro": "サビの最後の音をアルペジオだけが引き継いで 8 小節、きれいに終わる（フェードしない）",
+    "phrase_endings": "伸ばして浅いビブラート",
+    "structure": "Verse → Pre → Chorus × 2 → Bridge（短い）→ ラスサビ（半音上げ）",
+    "instruments_rule": "ベル系（グロッケン / シンセベル）を必ず 1 つ。重い低音は使わない",
+    "rhythm": "真っすぐ。ハイハットは 8 分、サビで 16 分",
+    "lyrics_tic": "毎曲、時刻か光の角度を 1 回だけ具体的に言う",
+    "always": ["30 秒以内にサビの要素", "明るい結末"],
+    "never": ["悲しい結末", "急な無音", "長いサブベース", "ラップ"]
+  },
+
+  "sound": {
+    "genres": ["synth-pop", "indie pop"],
+    "palette": ["明るいシンセパッド", "ベル系アルペジオ", "クリーンなエレキギター", "軽いキック", "手拍子"],
+    "bpm_min": 110,
+    "bpm_max": 120,
+    "energy_curve_type": "4-5-8-6-8-5-9-4",
+    "dna_tags": ["morning", "bright", "synth", "drive", "uplift", "highway"],
+    "forbidden": ["悲しい結末", "急な無音", "重い低音の長い持続"],
+    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": true }
+  },
+
+  "lyrics": {
+    "themes": ["出発", "朝", "まだ誰にも会っていない時間", "光が差す瞬間", "東へ向かう"],
+    "point_of_view": "私（現在形）",
+    "primary_language": "en",
+    "trend_language_ok": false,
+    "trend_language_max_ratio": 0.0,
+    "tone": "前向き。ただし押しつけない",
+    "forbidden_topics": ["宗教", "政治", "特定の人物", "別れの悲しみ"]
+  },
+
+  "visual": {
+    "space": "東向きの窓がある 6 畳の部屋。朝日が床に斜めに差す。窓の外に高速の防音壁",
+    "light": "低い角度の自然光。長い影",
+    "materials": ["白い壁", "明るい木の床", "リネン"],
+    "palette": ["オフホワイト", "淡いイエロー", "薄いブルー"],
+    "camera": "床の高さから窓を見上げる",
+    "cover_series_rule": "毎回同じ部屋。朝日の角度（＝季節と時刻）だけ変える",
+    "blend_file": null
+  },
+
+  "distribution": {
+    "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null,
+    "youtube_channel": null, "instagram": null, "tiktok": null,
+    "bio_en": "A virtual artist from EtherArchi, a label where AI-generated music meets spatial design. Morning highways, first light, a voice that opens like a window."
+  },
+
+  "collab": { "preferred_partners": ["shape", "self"], "collab_style": "feat. で客演。形 の昼のグルーヴに高い ooh を乗せる" }
+}
