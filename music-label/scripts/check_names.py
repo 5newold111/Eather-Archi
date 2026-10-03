@@ -29,6 +29,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 UA = "EtherArchi-label-namecheck/1.0 (contact: see repository)"
 
+def load_dotenv(path: Path) -> None:
+    """music-label/.env があれば読み込んで環境変数にする（既に設定済みのものは上書きしない）"""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+load_dotenv(ROOT / ".env")
+
+
 
 def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())

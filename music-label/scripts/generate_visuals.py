@@ -29,6 +29,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CRITERIA_PATH = ROOT / "templates" / "visual_criteria.json"
 
+def load_dotenv(path: Path) -> None:
+    """music-label/.env があれば読み込んで環境変数にする（既に設定済みのものは上書きしない）"""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+
+
+load_dotenv(ROOT / ".env")
+
+
 # 候補の枚数
 N_LOGO, N_PHOTO, N_COVER = 6, 8, 6
 
