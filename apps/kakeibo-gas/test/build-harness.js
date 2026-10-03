@@ -4,7 +4,7 @@ const path = require('path');
 const dir = path.join(__dirname, '..') + '/';
 const html = fs.readFileSync(dir + 'index.html', 'utf8');
 const inject = '<script>' + fs.readFileSync(dir + 'test/gas-stub.js', 'utf8') + '</script>\n'
-  + '<script>' + fs.readFileSync(dir + 'コード.gs', 'utf8') + '\nwindow.__gas = { addEntries, getMonth, getConfig, deleteEntry, getSheet_ };</script>\n'
+  + '<script>' + fs.readFileSync(dir + 'コード.gs', 'utf8') + '\nwindow.__gas = { addEntries, getMonth, getConfig, deleteEntry, getSheet_, getFixedCosts, saveFixedCost, deleteFixedCost, registerFixedCosts };</script>\n'
   + `<script>
   // google.script.run の代役。本物と同じく非同期で、値はJSONとして受け渡す
   window.google = { script: { get run() {

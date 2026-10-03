@@ -75,14 +75,17 @@ require('./build-harness')(path.join(S, 'harness.html'));
     assert.strictEqual(await page.textContent('#sExpense'), '¥19,120');
     assert.strictEqual(await page.textContent('#sIncome'), '¥0');
     assert.match(await page.textContent('#sBusiness'), /¥3,600/);
+    assert.strictEqual(await page.textContent('#sFixed'), '¥12,000');
+    assert.strictEqual(await page.textContent('#sVariable'), '¥7,120');
+    assert.deepStrictEqual((await page.locator('#bars h3').allTextContents()).map((t) => t.replace(/¥.*/, '')), ['固定費', '変動費']);
     assert.strictEqual(await page.locator('#list tbody tr').count(), 5);
-    await page.screenshot({ path: `${S}/03-month-${label}.png`, fullPage: true });
+    await page.screenshot({ path: `${S}/04-month-before-${label}.png`, fullPage: true });
 
     // CSV
     const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#csvSave')]);
     const csv = require('fs').readFileSync(await dl.path(), 'utf8');
-    assert.ok(csv.startsWith('﻿日付,区分,金額'));
-    assert.ok(csv.includes('2026-10-01,支出,12000,水道光熱,口座振替,電気代,30,チャット'));
+    assert.ok(csv.startsWith('\uFEFF日付,区分,固定/変動,金額'));
+    assert.ok(csv.includes('2026-10-01,支出,固定,12000,水道光熱,口座振替,電気代,30,チャット'));
     await page.click('#csvShow');
     assert.ok((await page.inputValue('#csvText')).includes('タクシー'));
 
@@ -94,6 +97,48 @@ require('./build-harness')(path.join(S, 'harness.html'));
     page.once('dialog', (d) => d.accept());
     await page.click('#list tbody tr button');
     await page.waitForFunction(() => document.querySelectorAll('#list tbody tr').length === 0);
+
+    // 03 固定費: リストに追加 → 月を選んで登録 → もう一度押しても二重にならない
+    await page.click('nav button[data-tab=fixed]');
+    await page.waitForFunction(() => /まだ登録されていません/.test(document.querySelector('#fixedList tbody').textContent));
+    assert.ok(await page.isDisabled('#registerFixed'));
+    assert.ok((await page.locator('#xCategory option').allTextContents()).includes('保険（固定）'));
+    for (const [name, amount, day, cat, method] of [['家賃', '85,000', '27', '住居', '口座振替'], ['動画配信', '990', '31', '趣味娯楽', 'クレジット'], ['医療保険', '3200', '5', '保険', '口座振替']]) {
+      await page.fill('#xName', name);
+      await page.fill('#xAmount', amount);
+      await page.fill('#xDay', day);
+      await page.selectOption('#xCategory', cat);
+      await page.selectOption('#xMethod', method);
+      await page.click('#addFixed');
+      await page.waitForFunction((n) => document.querySelector('#fixedList tbody').textContent.includes(n), name);
+    }
+    await page.fill('#xName', '');
+    await page.click('#addFixed');
+    await page.waitForSelector('#fixedMsg.err');
+    assert.strictEqual(await page.textContent('#fixedTotal'), '¥89,190');
+    assert.strictEqual(await page.locator('#fixedList tbody tr').first().locator('td').nth(1).textContent(), '医療保険');
+    await page.click('#fixedNext');
+    await page.click('#fixedNext');
+    await page.waitForFunction(() => document.querySelector('#registerFixed').textContent === '2026年12月分の固定費を登録');
+    await page.click('#registerFixed');
+    await page.waitForFunction(() => /3件登録しました/.test(document.querySelector('#fixedMsg').textContent));
+    await page.click('#registerFixed');
+    await page.waitForFunction(() => /3件はこの月に登録済み/.test(document.querySelector('#fixedMsg').textContent));
+    await page.screenshot({ path: `${S}/03-fixed-${label}.png`, fullPage: true });
+
+    // 集計: 12月は固定費 85,000 + 3,200、変動費 990（動画配信は趣味娯楽）。31日は12月なのでそのまま
+    await page.click('nav button[data-tab=month]');
+    await page.waitForFunction(() => document.querySelector('#monthLabel').textContent === '2026.12' && document.querySelector('#sFixed').textContent === '¥88,200');
+    assert.strictEqual(await page.textContent('#sVariable'), '¥990');
+    assert.ok((await page.locator('#list tbody td').allTextContents()).includes('12/31'));
+    await page.screenshot({ path: `${S}/04-month-${label}.png`, fullPage: true });
+
+    // 固定費をリストから外す
+    await page.click('nav button[data-tab=fixed]');
+    await page.waitForFunction(() => document.querySelectorAll('#fixedList tbody tr').length === 3);
+    page.once('dialog', (d) => d.accept());
+    await page.locator('#fixedList tbody tr button').first().click();
+    await page.waitForFunction(() => document.querySelectorAll('#fixedList tbody tr').length === 2);
 
     // 読み取れない貼り付け
     await page.click('nav button[data-tab=import]');

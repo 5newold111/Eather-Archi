@@ -110,5 +110,99 @@ test('2回目以降は同じスプレッドシートを使う', () => {
   assert.strictEqual(Object.keys(run('SpreadsheetApp._files')).length, 1);
 });
 
+// ───── 固定費と変動費 ─────
+const json = (code) => JSON.parse(JSON.stringify(run(code)));
+const saveFixed = (item) => { ctx.item = item; return json('saveFixedCost(item)'); };
+
+test('固定費より前に作られたシート（列Kなし）にも見出しを足し、既存の行を読める', () => {
+  const ss = run('openSpreadsheet_()');
+  const old = ss.insertSheet('家計簿_旧');
+  // 10列だけの旧形式の行を用意して、シート名を差し替える
+  old.rows.push(['ID', '日付', '区分', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元', '登録日時']);
+  old.rows.push(['old1', '2026-08-01', '支出', 900, '通信', '口座振替', '', 0, '手入力', run('new Date()')]);
+  const current = ss.sheets['家計簿'];
+  ss.sheets['家計簿'] = old;
+  run('getSheet_()');
+  assert.strictEqual(old.rows[0][10], '固定費ID');
+  assert.strictEqual(old.rows[1][4], '通信');
+  const m = json("getMonth('2026-08')");
+  assert.strictEqual(m.entries[0].fixedId, '');
+  assert.strictEqual(m.summary.fixed, 900);
+  ss.sheets['家計簿'] = current;
+});
+
+test('設定に固定費カテゴリと「保険」が入っている', () => {
+  const c = json('getConfig()');
+  assert.deepStrictEqual(c.fixedCategories, ['住居', '水道光熱', '通信', '保険']);
+  assert.ok(c.categories['支出'].includes('保険'));
+});
+
+test('集計で固定費と変動費に分かれる', () => {
+  add([
+    { date: '2027-03-01', type: '支出', amount: 80000, category: '住居', method: '口座振替' },
+    { date: '2027-03-02', type: '支出', amount: 3000, category: '保険', method: 'クレジット' },
+    { date: '2027-03-03', type: '支出', amount: 1500, category: '食費', method: '現金' },
+    { date: '2027-03-25', type: '収入', amount: 250000, category: '給与', method: '口座振替' },
+  ]);
+  const s = json("getMonth('2027-03')").summary;
+  assert.strictEqual(s.fixed, 83000);
+  assert.strictEqual(s.variable, 1500);
+  assert.strictEqual(s.fixed + s.variable, s.expense);
+});
+
+test('固定費リストの追加と不正な入力の拒否', () => {
+  assert.deepStrictEqual(json('getFixedCosts()'), []);
+  const r = saveFixed({ name: '家賃', amount: 85000, category: '住居', method: '口座振替', day: 27 });
+  assert.ok(r.item && r.item.id);
+  saveFixed({ name: '動画配信', amount: 990, category: '趣味娯楽', method: 'クレジット', day: 31 });
+  assert.strictEqual(json('getFixedCosts()').length, 2);
+  [
+    { name: '', amount: 1, category: '住居', method: '現金', day: 1 },
+    { name: 'x', amount: 0, category: '住居', method: '現金', day: 1 },
+    { name: 'x', amount: 1, category: '給与', method: '現金', day: 1 },
+    { name: 'x', amount: 1, category: '住居', method: 'ツケ', day: 1 },
+    { name: 'x', amount: 1, category: '住居', method: '現金', day: 32 },
+    { name: 'x', amount: 1, category: '住居', method: '現金', day: 0 },
+  ].forEach((b) => assert.ok(saveFixed(b).error, JSON.stringify(b)));
+  assert.strictEqual(json('getFixedCosts()').length, 2);
+});
+
+test('固定費を月ごとにまとめて登録し、2回目は二重にしない', () => {
+  assert.deepStrictEqual(json("registerFixedCosts('2027-04')"), { added: 2, skipped: 0 });
+  assert.deepStrictEqual(json("registerFixedCosts('2027-04')"), { added: 0, skipped: 2 });
+  const m = json("getMonth('2027-04')");
+  const rent = m.entries.find((e) => e.memo === '家賃');
+  assert.strictEqual(rent.date, '2027-04-27');
+  assert.strictEqual(rent.source, '固定費');
+  assert.strictEqual(m.entries.find((e) => e.memo === '動画配信').date, '2027-04-30');
+  assert.strictEqual(m.summary.fixed, 85000);
+  assert.strictEqual(m.summary.variable, 990);
+  // 別の月は別に登録できる
+  assert.deepStrictEqual(json("registerFixedCosts('2027-05')"), { added: 2, skipped: 0 });
+});
+
+test('引落日31日は2月末に寄せる（うるう年も）', () => {
+  json("registerFixedCosts('2027-02')");
+  json("registerFixedCosts('2028-02')");
+  assert.ok(json("getMonth('2027-02')").entries.some((e) => e.date === '2027-02-28'));
+  assert.ok(json("getMonth('2028-02')").entries.some((e) => e.date === '2028-02-29'));
+});
+
+test('登録済みの明細を消すと、その固定費はもう一度登録できる', () => {
+  const rent = json("getMonth('2027-04')").entries.find((e) => e.memo === '家賃');
+  ctx.id = rent.id;
+  run('deleteEntry(id)');
+  assert.deepStrictEqual(json("registerFixedCosts('2027-04')"), { added: 1, skipped: 1 });
+});
+
+test('固定費をリストから外しても登録済みの明細は残る', () => {
+  const id = json('getFixedCosts()').find((f) => f.name === '動画配信').id;
+  ctx.id = id;
+  assert.strictEqual(run('deleteFixedCost(id)'), true);
+  assert.strictEqual(json('getFixedCosts()').length, 1);
+  assert.ok(json("getMonth('2027-04')").entries.some((e) => e.memo === '動画配信'));
+  assert.throws(() => run("registerFixedCosts('2027-4')"));
+});
+
 console.log(failed ? '\n' + failed + '件失敗' : '\nすべて成功');
 process.exit(failed ? 1 : 0);

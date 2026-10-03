@@ -11,12 +11,16 @@
 const SPREADSHEET_ID = '';
 
 const SHEET_NAME = '家計簿';
-const HEADERS = ['ID', '日付', '区分', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元', '登録日時'];
+const HEADERS = ['ID', '日付', '区分', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元', '登録日時', '固定費ID'];
+const FIXED_SHEET_NAME = '固定費';
+const FIXED_HEADERS = ['ID', '名前', '金額', 'カテゴリ', '支払方法', '引落日'];
 
 const CATEGORIES = {
-  '支出': ['食費', '日用品', '住居', '水道光熱', '通信', '交通', '趣味娯楽', '衣服美容', '医療', '教育', '交際', 'その他'],
+  '支出': ['食費', '日用品', '住居', '水道光熱', '通信', '保険', '交通', '趣味娯楽', '衣服美容', '医療', '教育', '交際', 'その他'],
   '収入': ['給与', '事業', 'その他'],
 };
+// 集計で「固定費」として扱う支出カテゴリ。これ以外の支出は「変動費」になります
+const FIXED_CATEGORIES = ['住居', '水道光熱', '通信', '保険'];
 const METHODS = ['現金', 'クレジット', '電子マネー', '口座振替', 'その他'];
 const SOURCES = ['手入力', 'チャット'];
 
@@ -33,7 +37,7 @@ function doGet() {
 
 /** 画面の選択肢（カテゴリ・支払方法）を返す */
 function getConfig() {
-  return { categories: CATEGORIES, methods: METHODS, today: today_() };
+  return { categories: CATEGORIES, fixedCategories: FIXED_CATEGORIES, methods: METHODS, today: today_() };
 }
 
 /**
@@ -60,7 +64,7 @@ function addEntries(entries) {
       return;
     }
     const e = result.entry;
-    rows.push([Utilities.getUuid(), e.date, e.type, e.amount, e.category, e.method, e.memo, e.business_ratio, e.source, now]);
+    rows.push([Utilities.getUuid(), e.date, e.type, e.amount, e.category, e.method, e.memo, e.business_ratio, e.source, now, '']);
   });
   if (errors.length) return { added: 0, errors: errors };
 
@@ -103,17 +107,97 @@ function deleteEntry(id) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    const sheet = getSheet_();
-    const last = sheet.getLastRow();
-    if (last < 2) return false;
-    const ids = sheet.getRange(2, 1, last - 1, 1).getValues();
-    for (let i = 0; i < ids.length; i++) {
-      if (ids[i][0] === id) {
-        sheet.deleteRow(i + 2);
-        return true;
-      }
+    return deleteRowById_(getSheet_(), id);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** 固定費リスト（毎月決まって出ていく支出）を返す */
+function getFixedCosts() {
+  const sheet = getFixedSheet_();
+  const last = sheet.getLastRow();
+  if (last < 2) return [];
+  return sheet.getRange(2, 1, last - 1, FIXED_HEADERS.length).getValues()
+    .filter(function (r) { return r[0]; })
+    .map(function (r) {
+      return { id: String(r[0]), name: String(r[1]).replace(/^'/, ''), amount: Number(r[2]) || 0, category: String(r[3]), method: String(r[4]), day: Number(r[5]) || 1 };
+    });
+}
+
+/**
+ * 固定費を1件追加する。
+ * @param {Object} item {name, amount, category, method, day}
+ * @return {{error: string}|{item: Object}}
+ */
+function saveFixedCost(item) {
+  if (!item || typeof item !== 'object') return { error: 'データの形式が正しくありません' };
+  let name = String(item.name == null ? '' : item.name).trim().slice(0, 50);
+  if (!name) return { error: '名前を入力してください（例: 家賃）' };
+  if (/^[=+\-@]/.test(name)) name = "'" + name;
+  const amount = Number(item.amount);
+  if (!Number.isInteger(amount) || amount < 1 || amount > MAX_AMOUNT) return { error: '金額は1円以上の整数で入力してください' };
+  const category = String(item.category || '').trim();
+  if (CATEGORIES['支出'].indexOf(category) < 0) return { error: '支出のカテゴリ「' + category + '」はありません' };
+  const method = String(item.method || 'その他').trim();
+  if (METHODS.indexOf(method) < 0) return { error: '支払方法「' + method + '」はありません' };
+  const day = Number(item.day);
+  if (!Number.isInteger(day) || day < 1 || day > 31) return { error: '引落日は1〜31の整数で入力してください' };
+
+  const row = [Utilities.getUuid(), name, amount, category, method, day];
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = getFixedSheet_();
+    sheet.getRange(sheet.getLastRow() + 1, 1, 1, FIXED_HEADERS.length).setValues([row]);
+  } finally {
+    lock.releaseLock();
+  }
+  return { item: { id: row[0], name: name.replace(/^'/, ''), amount: amount, category: category, method: method, day: day } };
+}
+
+/** 固定費を1件リストから外す（登録済みの明細は消えません） */
+function deleteFixedCost(id) {
+  if (!id) throw new Error('IDがありません');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    return deleteRowById_(getFixedSheet_(), id);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * 固定費リストの全件を、指定月の明細としてまとめて登録する。
+ * 同じ月に同じ固定費が登録済みなら、二重にならないよう飛ばす。
+ * @param {string} yyyyMm 例: '2026-10'
+ * @return {{added: number, skipped: number}}
+ */
+function registerFixedCosts(yyyyMm) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(yyyyMm))) throw new Error('月の指定が正しくありません: ' + yyyyMm);
+  const items = getFixedCosts();
+  const lastDay = new Date(Number(yyyyMm.slice(0, 4)), Number(yyyyMm.slice(5, 7)), 0).getDate();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const done = {};
+    readAll_().forEach(function (e) { if (e.fixedId && e.date.indexOf(yyyyMm) === 0) done[e.fixedId] = true; });
+    const now = new Date();
+    const rows = [];
+    let skipped = 0;
+    items.forEach(function (f) {
+      if (done[f.id]) { skipped++; return; }
+      // 引落日がその月に無い日（31日など）は月末に寄せる
+      const date = yyyyMm + '-' + ('0' + Math.min(f.day, lastDay)).slice(-2);
+      const memo = /^[=+\-@]/.test(f.name) ? "'" + f.name : f.name;
+      rows.push([Utilities.getUuid(), date, '支出', f.amount, f.category, f.method, memo, 0, '固定費', now, f.id]);
+    });
+    if (rows.length) {
+      const sheet = getSheet_();
+      sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, HEADERS.length).setValues(rows);
     }
-    return false;
+    return { added: rows.length, skipped: skipped };
   } finally {
     lock.releaseLock();
   }
@@ -157,6 +241,20 @@ function validateEntry_(raw) {
   return { entry: { date: date, type: type, amount: amount, category: category, method: method, memo: memo, business_ratio: ratio, source: source } };
 }
 
+/** 1列目（ID）が一致する行を削除する */
+function deleteRowById_(sheet, id) {
+  const last = sheet.getLastRow();
+  if (last < 2) return false;
+  const ids = sheet.getRange(2, 1, last - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === id) {
+      sheet.deleteRow(i + 2);
+      return true;
+    }
+  }
+  return false;
+}
+
 function isValidDate_(s) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (!m) return false;
@@ -175,6 +273,23 @@ function getSheet_() {
     // 日付列は文字として保存する（自動で日付型に変換されて時差でずれるのを防ぐ）
     sheet.getRange('B:B').setNumberFormat('@');
     sheet.getRange('D:D').setNumberFormat('#,##0');
+    sheet.hideColumns(1);
+  } else if (sheet.getRange(1, HEADERS.length, 1, 1).getValues()[0][0] !== HEADERS[HEADERS.length - 1]) {
+    // 固定費の機能より前に作られたシートには「固定費ID」列の見出しが無いので足す（既存の行はそのまま）
+    sheet.getRange(1, HEADERS.length, 1, 1).setValues([[HEADERS[HEADERS.length - 1]]]).setFontWeight('bold');
+  }
+  return sheet;
+}
+
+/** 固定費リストのシートを取得する。無ければ作る */
+function getFixedSheet_() {
+  const ss = openSpreadsheet_();
+  let sheet = ss.getSheetByName(FIXED_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(FIXED_SHEET_NAME);
+    sheet.getRange(1, 1, 1, FIXED_HEADERS.length).setValues([FIXED_HEADERS]).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.getRange('C:C').setNumberFormat('#,##0');
     sheet.hideColumns(1);
   }
   return sheet;
@@ -211,18 +326,21 @@ function readAll_() {
         business_ratio: Number(r[7]) || 0,
         source: String(r[8]),
         createdAt: r[9] instanceof Date ? r[9].getTime() : 0,
+        fixedId: r[10] ? String(r[10]) : '',
+        fixed: r[2] !== '収入' && FIXED_CATEGORIES.indexOf(String(r[4])) >= 0,
       };
     });
 }
 
 /** 収入・支出・差額とカテゴリ別合計を計算する */
 function summarize_(entries) {
-  const s = { income: 0, expense: 0, balance: 0, business: 0, byCategory: {} };
+  const s = { income: 0, expense: 0, fixed: 0, variable: 0, balance: 0, business: 0, byCategory: {} };
   entries.forEach(function (e) {
     if (e.type === '収入') {
       s.income += e.amount;
     } else {
       s.expense += e.amount;
+      if (e.fixed) s.fixed += e.amount; else s.variable += e.amount;
       s.byCategory[e.category] = (s.byCategory[e.category] || 0) + e.amount;
       s.business += Math.round(e.amount * e.business_ratio / 100);
     }

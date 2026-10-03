@@ -16,7 +16,11 @@
           setNumberFormat: () => range,
           setValues: (vals) => {
             if (vals.length !== nr || vals.some((v) => v.length !== nc)) throw new Error('範囲と値の大きさが合いません');
-            vals.forEach((v, i) => { rows[r - 1 + i] = v.slice(); });
+            // 指定した列の位置に書き込む（既存の行の他の列は残す）
+            vals.forEach((v, i) => {
+              const row = rows[r - 1 + i] || (rows[r - 1 + i] = []);
+              v.forEach((x, j) => { row[c - 1 + j] = x; });
+            });
             return range;
           },
           getValues: () => rows.slice(r - 1, r - 1 + nr).map((row) => row.slice(c - 1, c - 1 + nc)),
