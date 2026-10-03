@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "artist_sheet.schema.json",
+  "title": "アーティスト設定書（1 組ぶん）",
+  "description": "artists テーブルの sheet 列に入れる JSON。名前は配信登録後に変えない。",
+  "type": "object",
+  "required": ["slug", "axis", "name", "formation", "vocal", "sound", "lyrics", "visual", "distribution"],
+  "properties": {
+    "slug": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$", "description": "フォルダ名などに使う英小文字" },
+    "axis": { "type": "string", "enum": ["shape", "quality", "light", "time", "self"], "description": "形 / 質 / 光 / 時 / 自" },
+    "name": { "type": "string", "description": "配信名。登録前に Spotify / Apple Music / YouTube / Instagram / TikTok / 商標 を検索して重複がないこと" },
+    "name_status": { "type": "string", "enum": ["draft", "checked", "registered"], "description": "draft：仮 / checked：重複確認済み / registered：配信登録済み" },
+    "name_candidates": { "type": "array", "items": { "type": "string" } },
+    "formation": { "type": "string", "enum": ["solo", "duo", "band", "producer"] },
+
+    "persona": {
+      "type": "object",
+      "description": "人物像・物語",
+      "properties": {
+        "members": { "type": "array", "items": { "type": "object", "properties": { "role": { "type": "string" }, "description": { "type": "string" } } } },
+        "age_feel": { "type": "string" },
+        "story": { "type": "string" },
+        "background": { "type": "string" },
+        "drive_scene": { "type": "string", "description": "このアーティストが担当するドライブの場面" }
+      }
+    },
+
+    "vocal": {
+      "type": "object",
+      "description": "声の設定。二層運用の『声質（固定）』をここに置く",
+      "required": ["sex", "fixed_timbre"],
+      "properties": {
+        "sex": { "type": "string", "enum": ["female", "male", "mixed", "none"] },
+        "range": { "type": "string", "enum": ["low", "mid", "high"] },
+        "fixed_timbre": { "type": "boolean", "description": "true：声質を Persona で固定 / false：曲ごとに声質も変える（自 など）" },
+        "suno_persona_id": { "type": ["string", "null"], "description": "Suno の Persona ID。声の試作が終わったら記入" },
+        "timbre_blend": {
+          "type": "object",
+          "description": "声質の 6:2:2 配合。参考曲の解析シートから形容詞を合成する。実在アーティスト名は書かない",
+          "properties": {
+            "main":  { "type": "object", "properties": { "reference_id": { "type": ["string", "null"] }, "weight": { "const": 0.6 }, "traits": { "type": "array", "items": { "type": "string" } } } },
+            "sub1":  { "type": "object", "properties": { "reference_id": { "type": ["string", "null"] }, "weight": { "const": 0.2 }, "traits": { "type": "array", "items": { "type": "string" } } } },
+            "sub2":  { "type": "object", "properties": { "reference_id": { "type": ["string", "null"] }, "weight": { "const": 0.2 }, "traits": { "type": "array", "items": { "type": "string" } } } },
+            "synthesized": { "type": "string", "description": "合成した声質の説明文（Suno の Persona 作成時の指示に使う）" }
+          }
+        },
+        "guest_description": { "type": "string", "description": "他アーティストの曲に客演するときに、相手のブリーフへそのまま貼る声の描写" }
+      }
+    },
+
+    "sound": {
+      "type": "object",
+      "required": ["bpm_min", "bpm_max"],
+      "properties": {
+        "genres": { "type": "array", "items": { "type": "string" } },
+        "palette": { "type": "array", "items": { "type": "string" }, "description": "楽器パレット" },
+        "bpm_min": { "type": "integer" },
+        "bpm_max": { "type": "integer" },
+        "energy_curve_type": { "type": "string", "description": "例：3-5-8-5-8-4-10-3（セクションごとの 10 段階）" },
+        "dna_tags": { "type": "array", "items": { "type": "string" }, "description": "参考曲を絞るタグ。reference_tracks.tags と照合" },
+        "forbidden": { "type": "array", "items": { "type": "string" }, "description": "禁止事項（例：悲しい結末、急な無音）" },
+        "drive_spec": {
+          "type": "object",
+          "description": "ドライブ向けの共通仕様",
+          "properties": {
+            "hook_within_sec": { "type": "integer", "default": 30 },
+            "length_sec_min": { "type": "integer", "default": 150 },
+            "length_sec_max": { "type": "integer", "default": 210 },
+            "no_sudden_silence": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+
+    "lyrics": {
+      "type": "object",
+      "properties": {
+        "themes": { "type": "array", "items": { "type": "string" } },
+        "point_of_view": { "type": "string" },
+        "primary_language": { "type": "string", "default": "en" },
+        "trend_language_ok": { "type": "boolean", "description": "トレンド言語のフレーズを混ぜてよいか（質 だけ true）" },
+        "trend_language_max_ratio": { "type": "number", "default": 0.2 },
+        "tone": { "type": "string" },
+        "forbidden_topics": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "visual": {
+      "type": "object",
+      "description": "Blender で作る『そのアーティストの空間』。ジャケットも SNS 動画もここから生成する",
+      "properties": {
+        "space": { "type": "string", "description": "例：朝日の差す 6 畳の部屋、夜の車内" },
+        "light": { "type": "string" },
+        "materials": { "type": "array", "items": { "type": "string" } },
+        "palette": { "type": "array", "items": { "type": "string" } },
+        "camera": { "type": "string" },
+        "cover_series_rule": { "type": "string", "description": "ジャケットをシリーズとして統一するルール" },
+        "blend_file": { "type": ["string", "null"], "description": "covers/{slug}/scene.blend" }
+      }
+    },
+
+    "distribution": {
+      "type": "object",
+      "properties": {
+        "spotify_uri": { "type": ["string", "null"] },
+        "apple_artist_id": { "type": ["string", "null"] },
+        "distrokid_artist_id": { "type": ["string", "null"] },
+        "youtube_channel": { "type": ["string", "null"] },
+        "instagram": { "type": ["string", "null"] },
+        "tiktok": { "type": ["string", "null"] },
+        "bio_en": { "type": "string", "description": "各ストアのプロフィール用。AI と空間デザインで作っていることを明記" }
+      }
+    },
+
+    "collab": {
+      "type": "object",
+      "properties": {
+        "preferred_partners": { "type": "array", "items": { "type": "string" }, "description": "slug の配列" },
+        "collab_style": { "type": "string", "description": "feat. で客演 / remix で再構築 など" }
+      }
+    }
+  }
+}

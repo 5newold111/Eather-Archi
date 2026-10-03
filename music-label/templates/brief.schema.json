@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "brief.schema.json",
+  "title": "ブリーフ（1 曲ぶんの作曲の指示書）",
+  "description": "火曜朝に自動生成される。briefs / brief_sources テーブルに対応。",
+  "type": "object",
+  "required": ["week_start", "artist_slug", "release_at", "slots", "vocal_blend", "phrase_transform"],
+  "properties": {
+    "week_start": { "type": "string", "format": "date", "description": "制作週の月曜" },
+    "artist_slug": { "type": "string" },
+    "featured_artist_slug": { "type": ["string", "null"], "description": "コラボ曲なら客演側" },
+    "release_at": { "type": "string", "format": "date-time", "description": "2 週間後の水曜 17:00 ET（UTC で記録）" },
+    "trend_language": { "type": ["string", "null"], "description": "この曲で混ぜる言語。質 以外は null" },
+
+    "slots": {
+      "type": "object",
+      "description": "枠 → 参考曲。同じ参考曲を 2 枠に使ってはいけない（1 曲 1 枠）",
+      "required": ["lyrics", "worldview", "instruments", "performance", "structure", "harmony", "groove", "phrase", "vocal_main", "vocal_sub1", "vocal_sub2"],
+      "additionalProperties": false,
+      "properties": {
+        "lyrics":      { "$ref": "#/definitions/slot" },
+        "worldview":   { "$ref": "#/definitions/slot" },
+        "instruments": { "$ref": "#/definitions/slot" },
+        "performance": { "$ref": "#/definitions/slot" },
+        "structure":   { "$ref": "#/definitions/slot" },
+        "harmony":     { "$ref": "#/definitions/slot" },
+        "groove":      { "$ref": "#/definitions/slot" },
+        "phrase":      { "$ref": "#/definitions/slot" },
+        "vocal_main":  { "$ref": "#/definitions/slot" },
+        "vocal_sub1":  { "$ref": "#/definitions/slot" },
+        "vocal_sub2":  { "$ref": "#/definitions/slot" }
+      }
+    },
+
+    "vocal_blend": {
+      "type": "object",
+      "description": "表現層の 6:2:2 合成結果",
+      "properties": {
+        "main_traits": { "type": "array", "items": { "type": "string" } },
+        "sub1_traits": { "type": "array", "items": { "type": "string" } },
+        "sub2_traits": { "type": "array", "items": { "type": "string" } },
+        "synthesized_instruction": { "type": "string", "description": "Suno に渡す歌唱指示の文章" }
+      }
+    },
+
+    "phrase_transform": {
+      "type": "object",
+      "description": "フレーズ変形ルール。kept は最大 2 要素、words は常に含めない",
+      "required": ["kept"],
+      "properties": {
+        "source_phrase_name": { "type": "string" },
+        "kept": {
+          "type": "array",
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["rhythm", "contour", "instrument", "position"] },
+          "description": "残した要素。words（言葉）は選択肢に含めない"
+        },
+        "changed": { "type": "array", "items": { "type": "string" } },
+        "contour_interval_changed": { "type": "boolean", "description": "輪郭を残したときは必ず true" },
+        "description": { "type": "string" }
+      }
+    },
+
+    "title_candidates": { "type": "array", "items": { "type": "string" } },
+    "suno_style_prompt": { "type": "string", "description": "Suno のスタイル指示文。実在アーティスト名を含めない" },
+    "suno_lyrics": { "type": "string" },
+    "cover_prompt_seed": { "type": "string", "description": "ジャケット生成の種（アーティストの visual と、worldview 枠の visual_web を合成）" },
+    "generated_by": { "type": "string" }
+  },
+
+  "definitions": {
+    "slot": {
+      "type": "object",
+      "required": ["reference_id", "title"],
+      "properties": {
+        "reference_id": { "type": "string" },
+        "title": { "type": "string" },
+        "artist_name": { "type": "string" },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1, "description": "ボーカル枠は 0.6 / 0.2 / 0.2、他は 1.0" },
+        "borrowed_summary": { "type": "string", "description": "この枠で何を借りたかの一文" }
+      }
+    }
+  }
+}

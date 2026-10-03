@@ -1,0 +1,94 @@
+{
+  "_使い方": "このファイルをコピーして「<slug>.json」という名前で同じフォルダに置き、5 組ぶん作ります（例：light.json）。_ で始まる項目は説明なので消してかまいません。配信名（name）は登録後に変えられないので、docs/03_artists.md の重複確認を終えてから name_status を checked にしてください。",
+
+  "slug": "",
+  "_slug": "フォルダ名などに使う英小文字（例：light）。半角英数字とハイフンだけ",
+
+  "axis": "",
+  "_axis": "担当する軸。shape（形）/ quality（質）/ light（光）/ time（時）/ self（自）のどれか 1 つ。1 軸に 1 組",
+
+  "name": "",
+  "name_status": "draft",
+  "name_candidates": [],
+  "_name": "配信名。name_status は draft（仮）→ checked（重複確認済み）→ registered（配信登録済み）",
+
+  "formation": "",
+  "_formation": "solo（ソロ）/ duo（デュオ）/ band（バンド）/ producer（プロデューサー）",
+
+  "persona": {
+    "members": [
+      { "role": "", "description": "" }
+    ],
+    "age_feel": "",
+    "story": "",
+    "background": "",
+    "drive_scene": "",
+    "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）"
+  },
+
+  "vocal": {
+    "sex": "",
+    "range": "",
+    "fixed_timbre": true,
+    "suno_persona_id": null,
+    "timbre_blend": {
+      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
+      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "synthesized": ""
+    },
+    "guest_description": "",
+    "_説明": "sex は female / male / mixed（男女）/ none（歌なし）。range は low / mid / high。fixed_timbre は true で声質を Persona に固定（二層運用）、false で曲ごとに声質も変える。timbre_blend は参考曲 DB がたまったあと、音域・性別の合う 3 曲から 6:2:2 で合成して埋める。guest_description は他の組の曲に客演するとき相手のブリーフへ貼る声の描写（形容詞だけ。実在アーティスト名は書かない）"
+  },
+
+  "sound": {
+    "genres": [],
+    "palette": [],
+    "bpm_min": 0,
+    "bpm_max": 0,
+    "energy_curve_type": "",
+    "dna_tags": [],
+    "forbidden": ["急な無音"],
+    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": true },
+    "_説明": "palette は楽器パレット。energy_curve_type は各セクションの盛り上がりを 10 段階で（例：3-5-8-5-8-4-10-3）。dna_tags は参考曲を絞るためのタグで、参考曲側の tags と照合する（例：night, synth, retro, drive）。drive_spec はドライブ向けの共通仕様（30 秒以内にサビ要素、2:30〜3:30、急な無音なし）"
+  },
+
+  "lyrics": {
+    "themes": [],
+    "point_of_view": "",
+    "primary_language": "en",
+    "trend_language_ok": false,
+    "trend_language_max_ratio": 0.2,
+    "tone": "",
+    "forbidden_topics": ["宗教", "政治", "特定の人物"],
+    "_説明": "trend_language_ok を true にした組だけが、世界チャートで伸びている言語のフレーズをサビの決め台詞などに混ぜる（全体の 20% まで）。基本は 1 組だけ true にする"
+  },
+
+  "visual": {
+    "space": "",
+    "light": "",
+    "materials": [],
+    "palette": [],
+    "camera": "",
+    "cover_series_rule": "",
+    "blend_file": null,
+    "_説明": "Blender で作る『この組の空間』。ジャケットも SNS 動画もここから生成する。cover_series_rule はジャケットをシリーズとして統一するルール（例：毎回同じ部屋で、朝日の角度だけ変える）"
+  },
+
+  "distribution": {
+    "spotify_uri": null,
+    "apple_artist_id": null,
+    "distrokid_artist_id": null,
+    "youtube_channel": null,
+    "instagram": null,
+    "tiktok": null,
+    "bio_en": "",
+    "_説明": "配信登録後に各 ID を埋める。bio_en は各ストアのプロフィール文（英語）。AI と空間デザインで作っていることを明記する"
+  },
+
+  "collab": {
+    "preferred_partners": [],
+    "collab_style": "",
+    "_説明": "preferred_partners は相性のよい組の slug。collab_style は『feat. で客演』『remix で再構築』など"
+  }
+}

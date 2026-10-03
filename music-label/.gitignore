@@ -1,0 +1,18 @@
+# 鍵・接続情報（絶対に Git に入れない）
+.env
+.env.*
+!.env.example
+
+# 音源・画像・Blender ファイルは Supabase / R2 に置く。Git には入れない
+*.wav
+*.mp3
+*.flac
+*.blend
+*.blend1
+*.png
+*.jpg
+*.jpeg
+
+# 作業中の出力
+out/
+__pycache__/
