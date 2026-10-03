@@ -11,7 +11,7 @@
   ],
   "formation": "duo",
   "cadence": "weekly",
-  "debut_week": "",
+  "debut_week": "LAUNCH_WEEK",
   "persona": {
     "members": [
       {
@@ -226,7 +226,35 @@
     ],
     "camera": "窓越し。雨粒にピント",
     "cover_series_rule": "毎回『質感』が主役（木目 / 紙の繊維 / テープ / 水滴）。接写",
-    "blend_file": null
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "窓・雨のフィルター（濡れたガラス越し）",
+      "secondary": [
+        "物で隠す（リネンの布）",
+        "手だけ写す（ギターの手元）"
+      ],
+      "never": [
+        "被り物",
+        "俯瞰"
+      ]
+    },
+    "logo": {
+      "concept": "織り目の線。& を糸のように",
+      "mark_type": "文字＋記号",
+      "color_rule": "生成り地に木の茶",
+      "typography": "セリフ体、小文字、字間詰め"
+    },
+    "photo_direction": {
+      "taste": "フィルム、粒子多め、低彩度",
+      "composition": "三分割、2 人を左、右は海",
+      "location_type": "車内（海岸線）",
+      "brightness": "中",
+      "contrast": "低",
+      "color_temperature": "中〜寒",
+      "background": "ボケ（雨粒にピント）",
+      "positioning": "2 人が肩を寄せて座る、カメラは窓の外",
+      "gesture": "片方がギターを抱く、もう片方は窓を見る"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -243,5 +271,40 @@
       "self"
     ],
     "collab_style": "feat. で客演。時 の低いハミングを 3 声目として迎える"
-  }
+  },
+  "profile": {
+    "hometown": "石川県・能登の漁村（女）／岐阜県・飛騨の製材所の町（男）",
+    "height_cm": [
+      160,
+      176
+    ],
+    "weight_kg": [
+      49,
+      63
+    ],
+    "likes": [
+      "雨の日の運転",
+      "無垢材の手ざわり",
+      "旅先で言葉を覚えること"
+    ],
+    "favorite_food": "炊き込みご飯と味噌汁（女）／手打ちの蕎麦（男）",
+    "dislikes": [
+      "ピッチ補正の強い声",
+      "晴れすぎた日",
+      "急いだ食事"
+    ],
+    "favorite_artists_real": [
+      "Bon Iver",
+      "The Civil Wars",
+      "ハンバート ハンバート",
+      "Iron & Wine"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
 }

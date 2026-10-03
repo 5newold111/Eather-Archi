@@ -11,7 +11,7 @@
   ],
   "formation": "band",
   "cadence": "weekly",
-  "debut_week": "",
+  "debut_week": "LAUNCH_WEEK",
   "persona": {
     "members": [
       {
@@ -231,7 +231,35 @@
     ],
     "camera": "広角。構造物の幾何学を強調",
     "cover_series_rule": "毎回『形』が主役（橋 / トンネル / 標識 / 高架）。写真風ではなく図面風",
-    "blend_file": null
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "俯瞰（真上から、帽子とヘルメットの影）",
+      "secondary": [
+        "被り物（幾何学的な工事用ヘルメットの抽象化）",
+        "動きのブレ"
+      ],
+      "never": [
+        "逆光",
+        "窓フィルター"
+      ]
+    },
+    "logo": {
+      "concept": "橋の桁の断面（H 形）を単純化。文字は太い",
+      "mark_type": "文字＋記号",
+      "color_rule": "白地にスカイブルー、差し色オレンジ",
+      "typography": "太いジオメトリックサンセリフ、全部大文字"
+    },
+    "photo_direction": {
+      "taste": "デジタル、彩度高め、硬い光",
+      "composition": "対称、4 人を等間隔に",
+      "location_type": "屋外（橋脚の下・サービスエリア）",
+      "brightness": "明",
+      "contrast": "高",
+      "color_temperature": "中",
+      "background": "情報量多い（構造物）",
+      "positioning": "4 人横並び、カメラは真上",
+      "gesture": "歩いている、手はポケット"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -248,5 +276,44 @@
       "self"
     ],
     "collab_style": "feat. で客演。光 の高い ooh とバンドの Hey! の掛け合い"
-  }
+  },
+  "profile": {
+    "hometown": "千葉県・湾岸の工業地帯（4 人とも）",
+    "height_cm": [
+      175,
+      181,
+      170,
+      172
+    ],
+    "weight_kg": [
+      64,
+      72,
+      60,
+      68
+    ],
+    "likes": [
+      "橋の図面",
+      "サービスエリアの食堂",
+      "高架の下での練習"
+    ],
+    "favorite_food": "サービスエリアの唐揚げ定食",
+    "dislikes": [
+      "渋滞の無音",
+      "打ち込みだけの音",
+      "暗い曲"
+    ],
+    "favorite_artists_real": [
+      "山下達郎",
+      "Vulfpeck",
+      "Phoenix",
+      "Tom Misch"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
 }

@@ -203,7 +203,35 @@
         ],
         "camera": "低い位置から空を見上げる",
         "cover_series_rule": "空の比率と地面の素材だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "動きのブレ（走る）",
+          "secondary": [
+            "逆光（朝日）",
+            "帽子の影"
+          ],
+          "never": [
+            "後ろ姿のみ",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "1 km の目盛り線",
+          "mark_type": "文字＋記号",
+          "color_rule": "白に蛍光オレンジ",
+          "typography": "太い斜体の大文字"
+        },
+        "photo_direction": {
+          "taste": "デジタル、高彩度、硬い光",
+          "composition": "空 7 割、人物は小さく下",
+          "location_type": "屋外（河川敷）",
+          "brightness": "明",
+          "contrast": "高",
+          "color_temperature": "中",
+          "background": "情報量少ない（空）",
+          "positioning": "遠い、低いカメラ",
+          "gesture": "走っている、ブレ"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -220,7 +248,39 @@
       "name_candidates": [
         "KILO VERA",
         "Vera Kilo"
-      ]
+      ],
+      "profile": {
+        "hometown": "埼玉県・荒川の河川敷の近く",
+        "height_cm": [
+          170
+        ],
+        "weight_kg": [
+          57
+        ],
+        "likes": [
+          "朝の河川敷",
+          "ラスト 1 キロ",
+          "声を張ること"
+        ],
+        "favorite_food": "走ったあとのバナナとプロテイン",
+        "dislikes": [
+          "小さな声で歌うこと",
+          "フェードアウト",
+          "遅いテンポ"
+        ],
+        "favorite_artists_real": [
+          "Sia",
+          "Dua Lipa",
+          "Superfly",
+          "Florence + The Machine"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "move_electro",
@@ -381,7 +441,35 @@
         ],
         "camera": "歩く目線",
         "cover_series_rule": "階段の段数と反射の角度だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "俯瞰（横断歩道の上）",
+          "secondary": [
+            "動きのブレ",
+            "後ろ姿（階段を上る）"
+          ],
+          "never": [
+            "逆光",
+            "被り物"
+          ]
+        },
+        "logo": {
+          "concept": "横断歩道の白線 4 本",
+          "mark_type": "記号のみ",
+          "color_rule": "白にグレー、蛍光イエロー",
+          "typography": "太いサンセリフ"
+        },
+        "photo_direction": {
+          "taste": "デジタル、硬い昼の光",
+          "composition": "真上、白線を対角に",
+          "location_type": "屋外（街）",
+          "brightness": "明",
+          "contrast": "高",
+          "color_temperature": "中",
+          "background": "情報量多い（街）",
+          "positioning": "2 人が白線の上、真上から",
+          "gesture": "歩く"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -399,7 +487,41 @@
       "name_candidates": [
         "CROSSWALK",
         "Crosswalk Duo"
-      ]
+      ],
+      "profile": {
+        "hometown": "東京都・同じ駅の東口と西口",
+        "height_cm": [
+          180,
+          166
+        ],
+        "weight_kg": [
+          68,
+          53
+        ],
+        "likes": [
+          "駅の階段",
+          "信号待ち",
+          "短い会話"
+        ],
+        "favorite_food": "駅の立ち食いそば（男）／コンビニのサラダチキン（女）",
+        "dislikes": [
+          "深いリバーブ",
+          "ロングトーン",
+          "遅刻"
+        ],
+        "favorite_artists_real": [
+          "LCD Soundsystem",
+          "Hot Chip",
+          "Sylvan Esso",
+          "Metronomy"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "move_loud",
@@ -566,7 +688,35 @@
         ],
         "camera": "坂の上",
         "cover_series_rule": "坂の角度だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "逆光のシルエット（坂の上、太陽を背に）",
+          "secondary": [
+            "被り物（幾何学的なフード）",
+            "動きのブレ"
+          ],
+          "never": [
+            "俯瞰",
+            "窓フィルター"
+          ]
+        },
+        "logo": {
+          "concept": "坂の斜線",
+          "mark_type": "文字＋記号",
+          "color_rule": "白に蛍光レッド",
+          "typography": "太く荒い大文字"
+        },
+        "photo_direction": {
+          "taste": "フィルム、粗い粒子、高コントラスト",
+          "composition": "4 人を坂の頂点に、空を背に",
+          "location_type": "屋外（坂道）",
+          "brightness": "明（逆光）",
+          "contrast": "高",
+          "color_temperature": "暖",
+          "background": "均一（空）",
+          "positioning": "遠い、坂の下から",
+          "gesture": "立つ、腕を上げる"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -583,7 +733,45 @@
       "name_candidates": [
         "LAST HILL",
         "The Last Hill"
-      ]
+      ],
+      "profile": {
+        "hometown": "神奈川県・地下スタジオの多い街（4 人とも）",
+        "height_cm": [
+          176,
+          183,
+          171,
+          178
+        ],
+        "weight_kg": [
+          70,
+          78,
+          63,
+          72
+        ],
+        "likes": [
+          "坂道ダッシュ",
+          "ジム",
+          "全員で叫ぶこと"
+        ],
+        "favorite_food": "ジム帰りの牛丼大盛り",
+        "dislikes": [
+          "シンセ",
+          "フェードアウト",
+          "静かな曲"
+        ],
+        "favorite_artists_real": [
+          "Foo Fighters",
+          "Paramore",
+          "ELLEGARDEN",
+          "Jimmy Eat World"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     }
   ],
   "name_candidates": [

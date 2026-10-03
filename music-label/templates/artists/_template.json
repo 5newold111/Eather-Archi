@@ -190,7 +190,31 @@
     "camera": "",
     "cover_series_rule": "",
     "blend_file": null,
-    "_説明": "Blender で作る『この組の空間』。ジャケットも SNS 動画もここから生成する。cover_series_rule はジャケットをシリーズとして統一するルール（例：毎回同じ部屋で、朝日の角度だけ変える）"
+    "_説明": "Blender で作る『この組の空間』。ジャケットも SNS 動画もここから生成する。cover_series_rule はジャケットをシリーズとして統一するルール（例：毎回同じ部屋で、朝日の角度だけ変える）",
+    "face_concealment": {
+      "primary": "",
+      "secondary": [],
+      "never": [],
+      "_説明": "顔を見せない方法。docs/08_visuals.md のカタログから主 1・副 2。never はこの組でやらない方法"
+    },
+    "logo": {
+      "concept": "",
+      "mark_type": "",
+      "color_rule": "",
+      "typography": "",
+      "_説明": "ロゴの方針。mark_type は『文字のみ / 文字＋記号 / 記号のみ』。既存ロゴの参照は禁止。文字から起こす"
+    },
+    "photo_direction": {
+      "taste": "",
+      "composition": "",
+      "location_type": "",
+      "brightness": "",
+      "contrast": "",
+      "background": "",
+      "positioning": "",
+      "gesture": "",
+      "_説明": "参考アーティストの写真分析（解析シート I 欄 artist_photo）から、手法だけを自分の組の言葉で"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -206,5 +230,20 @@
     "preferred_partners": [],
     "collab_style": "",
     "_説明": "preferred_partners は相性のよい組の slug。collab_style は『feat. で客演』『remix で再構築』など"
+  },
+  "profile": {
+    "hometown": "",
+    "height_cm": [],
+    "weight_kg": [],
+    "likes": [],
+    "favorite_food": "",
+    "dislikes": [],
+    "favorite_artists_real": [],
+    "_説明": "出身・身長・体重（編成の人数ぶんの配列）・好きなこと・好きな食べ物・嫌いなもの・好きな実在アーティスト。favorite_artists_real は bio と SNS 用で、Suno・画像の指示文には渡さない"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
   }
 }

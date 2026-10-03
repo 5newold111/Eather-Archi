@@ -11,7 +11,7 @@
   ],
   "formation": "solo",
   "cadence": "weekly",
-  "debut_week": "",
+  "debut_week": "LAUNCH_WEEK",
   "persona": {
     "members": [
       {
@@ -218,7 +218,35 @@
     ],
     "camera": "助手席から前方。固定",
     "cover_series_rule": "毎回同じ車内。外の景色（街灯 / トンネル / 橋 / 雨）だけ変える",
-    "blend_file": null
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "後ろ姿（運転席、振り返らない）",
+      "secondary": [
+        "物で隠す（カセットを顔の前に）",
+        "窓・雨のフィルター"
+      ],
+      "never": [
+        "俯瞰",
+        "イラスト化"
+      ]
+    },
+    "logo": {
+      "concept": "カセットの窓の長方形 2 つ。文字は横長",
+      "mark_type": "文字＋記号",
+      "color_rule": "群青地にアンバー 1 色",
+      "typography": "横長のジオメトリックなサンセリフ"
+    },
+    "photo_direction": {
+      "taste": "デジタル、粒子少なめ、ハイライトに滲み",
+      "composition": "中央、ダッシュボード越し",
+      "location_type": "車内",
+      "brightness": "暗",
+      "contrast": "高",
+      "color_temperature": "寒（点光源だけ暖）",
+      "background": "情報量少ない（街灯の点）",
+      "positioning": "助手席から運転者を後ろ斜め",
+      "gesture": "ハンドルに片手、視線は前"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -235,5 +263,38 @@
       "self"
     ],
     "collab_style": "feat. で客演。質 の雨の海岸線に低いハミングを添える"
-  }
+  },
+  "profile": {
+    "hometown": "神奈川県・横浜港の近く",
+    "height_cm": [
+      178
+    ],
+    "weight_kg": [
+      66
+    ],
+    "likes": [
+      "環状線を一周すること",
+      "カセットの巻き戻し音",
+      "深夜ラジオ"
+    ],
+    "favorite_food": "深夜のドライブインのカレー",
+    "dislikes": [
+      "早起き",
+      "明るすぎる照明",
+      "急かされること"
+    ],
+    "favorite_artists_real": [
+      "The Midnight",
+      "Tangerine Dream",
+      "坂本龍一",
+      "Depeche Mode"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
 }

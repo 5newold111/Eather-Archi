@@ -11,7 +11,7 @@
   ],
   "formation": "producer",
   "cadence": "weekly",
-  "debut_week": "",
+  "debut_week": "LAUNCH_WEEK",
   "persona": {
     "members": [
       {
@@ -206,7 +206,35 @@
     ],
     "camera": "正面。完全な対称",
     "cover_series_rule": "リミックス元の組の色を 1 色だけ、床の光として置く",
-    "blend_file": null
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "人が写らない（空間だけ）",
+      "secondary": [
+        "手だけ写す（機材の手元）",
+        "イラスト化（線画の部屋）"
+      ],
+      "never": [
+        "シルエットでも人は写さない",
+        "被り物"
+      ]
+    },
+    "logo": {
+      "concept": "何もない正方形。文字は小さく中央",
+      "mark_type": "記号のみ（文字は小さく）",
+      "color_rule": "無彩色のみ",
+      "typography": "モノスペース、小さく"
+    },
+    "photo_direction": {
+      "taste": "デジタル、粒子なし、完全に均一",
+      "composition": "完全な対称、中央",
+      "location_type": "屋内（何もない部屋）",
+      "brightness": "中",
+      "contrast": "低",
+      "color_temperature": "中",
+      "background": "均一",
+      "positioning": "人なし",
+      "gesture": "なし"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -225,5 +253,38 @@
       "quality"
     ],
     "collab_style": "remix で再構築。『SELF remix of ○○』として配信。第 5 週は前 4 週のどれかをリミックス"
-  }
+  },
+  "profile": {
+    "hometown": "非公表",
+    "height_cm": [
+      "非公表"
+    ],
+    "weight_kg": [
+      "非公表"
+    ],
+    "likes": [
+      "何もない部屋",
+      "長距離の深夜運転",
+      "他人の曲をほどくこと"
+    ],
+    "favorite_food": "非公表（炭酸水だけは認めている）",
+    "dislikes": [
+      "顔写真",
+      "フルの歌詞",
+      "自分について語ること"
+    ],
+    "favorite_artists_real": [
+      "Burial",
+      "DJ Koze",
+      "Nicolas Jaar",
+      "Floating Points"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
 }

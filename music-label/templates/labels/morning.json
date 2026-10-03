@@ -201,7 +201,35 @@
         ],
         "camera": "カウンターの高さ",
         "cover_series_rule": "カップの位置と影だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（カップと湯気）",
+          "secondary": [
+            "窓・湯気のフィルター",
+            "手だけ写す（注ぐ手）"
+          ],
+          "never": [
+            "被り物",
+            "俯瞰"
+          ]
+        },
+        "logo": {
+          "concept": "カップの縁の円弧",
+          "mark_type": "文字＋記号",
+          "color_rule": "生成りに蜂蜜色",
+          "typography": "クラシックなセリフ、斜体"
+        },
+        "photo_direction": {
+          "taste": "フィルム、暖色、低コントラスト",
+          "composition": "中央、カウンター",
+          "location_type": "屋内（焙煎所）",
+          "brightness": "明",
+          "contrast": "低",
+          "color_temperature": "暖",
+          "background": "ボケ（店内）",
+          "positioning": "カウンター越し、近い",
+          "gesture": "カップを顔の前に持つ"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -219,7 +247,39 @@
       "name_candidates": [
         "JUNE CARAWAY",
         "Caraway June"
-      ]
+      ],
+      "profile": {
+        "hometown": "福岡県・焙煎所の多い通り",
+        "height_cm": [
+          165
+        ],
+        "weight_kg": [
+          54
+        ],
+        "likes": [
+          "開店前の店内",
+          "ミルの音",
+          "朝の鼻歌"
+        ],
+        "favorite_food": "浅煎りのコーヒーとバタートースト",
+        "dislikes": [
+          "夜の店の煙",
+          "高音を張ること",
+          "急いだ朝"
+        ],
+        "favorite_artists_real": [
+          "Norah Jones",
+          "Melody Gardot",
+          "Blossom Dearie",
+          "Jamie Cullum"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "morning_duo",
@@ -380,7 +440,35 @@
         ],
         "camera": "テーブル越し",
         "cover_series_rule": "葉の影の形だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（椰子の葉）",
+          "secondary": [
+            "逆光（ベランダ）",
+            "俯瞰"
+          ],
+          "never": [
+            "被り物",
+            "暗闇"
+          ]
+        },
+        "logo": {
+          "concept": "葉と葦の 2 本線が & になる",
+          "mark_type": "文字＋記号",
+          "color_rule": "白に淡い緑",
+          "typography": "丸いサンセリフ"
+        },
+        "photo_direction": {
+          "taste": "デジタル、明るい、彩度中",
+          "composition": "三分割、2 人を左右",
+          "location_type": "屋外（ベランダ）",
+          "brightness": "明",
+          "contrast": "低",
+          "color_temperature": "暖",
+          "background": "情報量少ない（白い壁と葉）",
+          "positioning": "2 人並んで座る",
+          "gesture": "片方がギター、片方が口笛の口元を葉で隠す"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -397,7 +485,41 @@
       "name_candidates": [
         "PALMA & REED",
         "Palma and Reed"
-      ]
+      ],
+      "profile": {
+        "hometown": "沖縄県・海沿いのアパート（隣同士）",
+        "height_cm": [
+          174,
+          159
+        ],
+        "weight_kg": [
+          62,
+          48
+        ],
+        "likes": [
+          "ベランダの朝食",
+          "口笛",
+          "葉の影"
+        ],
+        "favorite_food": "フルーツとヨーグルト（2 人とも）",
+        "dislikes": [
+          "エレキギター",
+          "シンセ",
+          "忙しい朝"
+        ],
+        "favorite_artists_real": [
+          "João Gilberto",
+          "Astrud Gilberto",
+          "Kings of Convenience",
+          "Jack Johnson"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "morning_lofi",
@@ -530,7 +652,35 @@
         ],
         "camera": "真上から（俯瞰）",
         "cover_series_rule": "机の上の物の配置だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "俯瞰（手だけ）",
+          "secondary": [
+            "手だけ写す",
+            "人が写らない"
+          ],
+          "never": [
+            "逆光",
+            "被り物"
+          ]
+        },
+        "logo": {
+          "concept": "トースターのスロット 2 本",
+          "mark_type": "記号のみ（文字は小さく）",
+          "color_rule": "生成りに茶",
+          "typography": "モノスペース"
+        },
+        "photo_direction": {
+          "taste": "デジタル、やや暖",
+          "composition": "真上から、机の上の配置",
+          "location_type": "屋内（机）",
+          "brightness": "明",
+          "contrast": "中",
+          "color_temperature": "暖",
+          "background": "情報量多い（物の配置）",
+          "positioning": "手だけ",
+          "gesture": "トーストを持つ手"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -548,7 +698,39 @@
       "name_candidates": [
         "TOASTER TAPES",
         "Toaster Tape Club"
-      ]
+      ],
+      "profile": {
+        "hometown": "東京都・下町の商店街",
+        "height_cm": [
+          171
+        ],
+        "weight_kg": [
+          60
+        ],
+        "likes": [
+          "朝食の 10 分",
+          "レコードの数秒",
+          "生活音"
+        ],
+        "favorite_food": "トースト（毎朝、焼き加減を変える）",
+        "dislikes": [
+          "四つ打ち",
+          "歌詞のある歌",
+          "冷めたコーヒー"
+        ],
+        "favorite_artists_real": [
+          "Nujabes",
+          "J Dilla",
+          "Tomppabeats",
+          "Idealism"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     }
   ],
   "name_candidates": [

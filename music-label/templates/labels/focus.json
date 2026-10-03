@@ -176,7 +176,34 @@
         ],
         "camera": "真上",
         "cover_series_rule": "方眼の上の青い図形の形だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "人が写らない（方眼紙と鉛筆）",
+          "secondary": [
+            "手だけ写す",
+            "俯瞰"
+          ],
+          "never": [
+            "人物全般"
+          ]
+        },
+        "logo": {
+          "concept": "方眼の 1 マス",
+          "mark_type": "記号のみ",
+          "color_rule": "無彩色に青",
+          "typography": "モノスペース"
+        },
+        "photo_direction": {
+          "taste": "デジタル、均一",
+          "composition": "真上、対称",
+          "location_type": "屋内（机）",
+          "brightness": "中",
+          "contrast": "低",
+          "color_temperature": "中",
+          "background": "均一（方眼）",
+          "positioning": "人なし",
+          "gesture": "なし"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -193,7 +220,39 @@
       "name_candidates": [
         "GRIDPAPER",
         "Grid Paper Co."
-      ]
+      ],
+      "profile": {
+        "hometown": "愛知県・名古屋の設計事務所街",
+        "height_cm": [
+          177
+        ],
+        "weight_kg": [
+          65
+        ],
+        "likes": [
+          "方眼紙",
+          "締切前夜の静けさ",
+          "同じループを 3 分間変化させること"
+        ],
+        "favorite_food": "コンビニのおにぎり（残業中）",
+        "dislikes": [
+          "声の入った BGM",
+          "サイドチェーンの脈動",
+          "会議"
+        ],
+        "favorite_artists_real": [
+          "Bonobo",
+          "Tycho",
+          "Jon Hopkins",
+          "Four Tet"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "focus_postrock",
@@ -337,7 +396,35 @@
         ],
         "camera": "床の高さ",
         "cover_series_rule": "光の帯の幅だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "動きのブレ・長時間露光",
+          "secondary": [
+            "逆光（窓の帯）",
+            "後ろ姿"
+          ],
+          "never": [
+            "俯瞰",
+            "被り物"
+          ]
+        },
+        "logo": {
+          "concept": "長い横線 1 本",
+          "mark_type": "文字のみ",
+          "color_rule": "無彩色に赤",
+          "typography": "細く長い大文字、字間最大"
+        },
+        "photo_direction": {
+          "taste": "フィルム、低彩度、ブレ",
+          "composition": "4 人を横一列、遠く",
+          "location_type": "屋内（リハーサル室）",
+          "brightness": "暗",
+          "contrast": "中",
+          "color_temperature": "寒",
+          "background": "均一（コンクリート）",
+          "positioning": "遠い、床の高さ",
+          "gesture": "演奏中、ブレて溶ける"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -354,7 +441,45 @@
       "name_candidates": [
         "LONGFORM",
         "Long Form"
-      ]
+      ],
+      "profile": {
+        "hometown": "大阪府・郊外の工場地帯（4 人とも）",
+        "height_cm": [
+          173,
+          179,
+          168,
+          176
+        ],
+        "weight_kg": [
+          61,
+          70,
+          58,
+          67
+        ],
+        "likes": [
+          "10 分弾き続けること",
+          "高架下のリバーブ",
+          "夕方の工場"
+        ],
+        "favorite_food": "練習後のラーメン",
+        "dislikes": [
+          "歌",
+          "歪みの強いギター",
+          "短い曲"
+        ],
+        "favorite_artists_real": [
+          "Explosions in the Sky",
+          "Mogwai",
+          "toe",
+          "Mono"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "focus_modular",
@@ -500,7 +625,35 @@
         ],
         "camera": "マクロ",
         "cover_series_rule": "ケーブルの配線だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "暗闇のフィルター（LED の点だけ）",
+          "secondary": [
+            "手だけ写す（配線の手）",
+            "後ろ姿"
+          ],
+          "never": [
+            "逆光",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "虹彩の円＋ジャックの点",
+          "mark_type": "文字＋記号",
+          "color_rule": "黒に緑",
+          "typography": "幾何学的な細い文字"
+        },
+        "photo_direction": {
+          "taste": "デジタル、マクロ、ボケ",
+          "composition": "中央、配線のクローズアップ",
+          "location_type": "屋内（暗い部屋）",
+          "brightness": "暗",
+          "contrast": "高",
+          "color_temperature": "寒",
+          "background": "ボケ（LED）",
+          "positioning": "近い、手元",
+          "gesture": "配線を差す手"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -518,7 +671,39 @@
       "name_candidates": [
         "IRIS PATCH",
         "Patchwire Iris"
-      ]
+      ],
+      "profile": {
+        "hometown": "宮城県・仙台の大学街",
+        "height_cm": [
+          162
+        ],
+        "weight_kg": [
+          51
+        ],
+        "likes": [
+          "配線",
+          "サーバールームの音",
+          "同じ音を長く保つこと"
+        ],
+        "favorite_food": "深夜の研究室のカップ麺",
+        "dislikes": [
+          "感情的な歌",
+          "生ドラム",
+          "配線を抜かれること"
+        ],
+        "favorite_artists_real": [
+          "Kaitlyn Aurelia Smith",
+          "Suzanne Ciani",
+          "Holly Herndon",
+          "Caterina Barbieri"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     }
   ],
   "name_candidates": [

@@ -31,7 +31,8 @@ music-label/
 │   ├── 04_borrowing_rules.md     ← 1 曲 1 枠ルール・ボーカル 6:2:2・フレーズ変形ルール
 │   ├── 05_storage.md             ← Supabase + R2 の構築手順とクローズド化チェックリスト
 │   ├── 06_growth.md              ← 収益目標の現実的な数字・月 1 組追加と週 8 曲上限・伸びた要素を次に返す仕組み・歌手の体と癖
-│   └── 07_sublabels.md           ← 子レーベル構造（場面ごとに別アカウント）で上限なく増やす。自動化の段階
+│   ├── 07_sublabels.md           ← 子レーベル構造（場面ごとに別アカウント）で上限なく増やす。自動化の段階
+│   └── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -40,6 +41,7 @@ music-label/
 │   ├── analysis_sheet.example.json  ← 架空の曲での記入例
 │   ├── artist_sheet.schema.json     ← アーティスト設定書の型定義
 │   ├── brief.schema.json            ← ブリーフの型定義
+│   ├── visual_criteria.json         ← ビジュアル候補の採点基準（オーナーの判断で育つ）
 │   ├── artists/                     ← 本体レーベル（ドライブ）の 5 組（光・時・形・質・自）。下書き済み
 │   │   ├── _template.json           ← 新しい組を足すときのテンプレ
 │   │   └── light.json / time.json / shape.json / quality.json / self.json
@@ -51,7 +53,8 @@ music-label/
 │       └── move.json                ← 歩く・走る
 └── scripts/
     ├── select_references.py      ← 参考曲を枠ごとに自動で割り当てる（1 曲 1 枠を機械的に守る）。設定書の癖・声の仕様をブリーフに固定で入れる
-    └── analyze_growth.py         ← 成績から「伸びている組・曲・要素」を分析し、重みとヒントを次週の割り当てに返す
+    ├── analyze_growth.py         ← 成績から「伸びている組・曲・要素」を分析し、重みとヒント、方針転換の提案を返す
+    └── generate_visuals.py       ← ロゴ・写真・ジャケットの候補を生成し採点。最初の 5 回はオーナーに聞いて基準を学ぶ
 ```
 
 ## 決まっていること（設計の前提）

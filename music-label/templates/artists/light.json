@@ -11,7 +11,7 @@
   ],
   "formation": "solo",
   "cadence": "weekly",
-  "debut_week": "",
+  "debut_week": "LAUNCH_WEEK",
   "persona": {
     "members": [
       {
@@ -217,7 +217,35 @@
     ],
     "camera": "床の高さから窓を見上げる",
     "cover_series_rule": "毎回同じ部屋。朝日の角度（＝季節と時刻）だけ変える",
-    "blend_file": null
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "逆光のシルエット（東の窓）",
+      "secondary": [
+        "窓・霧のフィルター",
+        "後ろ姿"
+      ],
+      "never": [
+        "被り物",
+        "イラスト化"
+      ]
+    },
+    "logo": {
+      "concept": "朝日が床に引く一本の線。文字の下に金色の 1 本線",
+      "mark_type": "文字＋記号",
+      "color_rule": "オフホワイト地に金色 1 色",
+      "typography": "細いサンセリフ、字間広め"
+    },
+    "photo_direction": {
+      "taste": "フィルムの柔らかい粒子、低彩度",
+      "composition": "余白多め、人物は右下 1/4",
+      "location_type": "屋内（東向きの窓）",
+      "brightness": "明（白飛び手前）",
+      "contrast": "低",
+      "color_temperature": "暖",
+      "background": "均一（白い壁）",
+      "positioning": "カメラから遠く、小さく",
+      "gesture": "窓に向かって立つ、手は下ろす"
+    }
   },
   "distribution": {
     "spotify_uri": null,
@@ -234,5 +262,38 @@
       "self"
     ],
     "collab_style": "feat. で客演。形 の昼のグルーヴに高い ooh を乗せる"
-  }
+  },
+  "profile": {
+    "hometown": "長野県・諏訪盆地",
+    "height_cm": [
+      163
+    ],
+    "weight_kg": [
+      50
+    ],
+    "likes": [
+      "日の出前の運転",
+      "窓の角度を測ること",
+      "古い地図"
+    ],
+    "favorite_food": "焼きたてのトーストと蜂蜜",
+    "dislikes": [
+      "遮光カーテン",
+      "渋滞",
+      "結末の暗い映画"
+    ],
+    "favorite_artists_real": [
+      "CHVRCHES",
+      "Carly Rae Jepsen",
+      "宇多田ヒカル",
+      "Robyn"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
 }

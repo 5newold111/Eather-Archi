@@ -194,7 +194,35 @@
         ],
         "camera": "仰向けで天井を見る",
         "cover_series_rule": "天井の光の帯の角度だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（毛布にくるまる）",
+          "secondary": [
+            "後ろ姿",
+            "暗闇のフィルター"
+          ],
+          "never": [
+            "逆光",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "低い波形 1 本",
+          "mark_type": "文字＋記号",
+          "color_rule": "ミッドナイトブルーに生成り",
+          "typography": "細い小文字"
+        },
+        "photo_direction": {
+          "taste": "フィルム、暗部の粒子",
+          "composition": "余白多め、人物は下 1/5",
+          "location_type": "屋内（寝室）",
+          "brightness": "暗",
+          "contrast": "低",
+          "color_temperature": "寒",
+          "background": "均一（暗い壁）",
+          "positioning": "遠い",
+          "gesture": "横たわる"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -211,7 +239,39 @@
       "name_candidates": [
         "VESSEL LOW",
         "Hollow Vessel"
-      ]
+      ],
+      "profile": {
+        "hometown": "北海道・十勝",
+        "height_cm": [
+          182
+        ],
+        "weight_kg": [
+          70
+        ],
+        "likes": [
+          "毛布",
+          "雪の夜の静けさ",
+          "遠くの道路の音"
+        ],
+        "favorite_food": "温めた牛乳と蜂蜜",
+        "dislikes": [
+          "目覚まし時計",
+          "速い音楽",
+          "蛍光灯"
+        ],
+        "favorite_artists_real": [
+          "Stars of the Lid",
+          "Brian Eno",
+          "Grouper",
+          "William Basinski"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "sleep_piano",
@@ -335,7 +395,35 @@
         ],
         "camera": "鍵盤の高さから",
         "cover_series_rule": "灯りの色温度だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "後ろ姿（ピアノに向かう）",
+          "secondary": [
+            "手だけ写す（鍵盤の手）",
+            "暗闇のフィルター"
+          ],
+          "never": [
+            "俯瞰",
+            "被り物"
+          ]
+        },
+        "logo": {
+          "concept": "フェルトの断面（柔らかい長方形）",
+          "mark_type": "文字のみ",
+          "color_rule": "黒地に琥珀",
+          "typography": "細いセリフ"
+        },
+        "photo_direction": {
+          "taste": "フィルム、粒子多め",
+          "composition": "中央、譜面台の灯り",
+          "location_type": "屋内",
+          "brightness": "暗",
+          "contrast": "中",
+          "color_temperature": "暖",
+          "background": "均一",
+          "positioning": "背中、カメラは部屋の隅",
+          "gesture": "鍵盤に両手"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -353,7 +441,39 @@
       "name_candidates": [
         "FELT HOUR",
         "Felt Hours"
-      ]
+      ],
+      "profile": {
+        "hometown": "京都府・町家の多い通り",
+        "height_cm": [
+          168
+        ],
+        "weight_kg": [
+          58
+        ],
+        "likes": [
+          "フェルト",
+          "古い木造の床の軋み",
+          "隣人との壁越しの会話"
+        ],
+        "favorite_food": "ほうじ茶と干菓子",
+        "dislikes": [
+          "大きな音",
+          "強い打鍵",
+          "テンポの変化"
+        ],
+        "favorite_artists_real": [
+          "Nils Frahm",
+          "Ólafur Arnalds",
+          "高木正勝",
+          "Goldmund"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     },
     {
       "slug": "sleep_field",
@@ -500,7 +620,35 @@
         ],
         "camera": "窓越し。室内から",
         "cover_series_rule": "窓の外の景色（雨 / 雪 / 霧）だけ変える",
-        "blend_file": null
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（傘）",
+          "secondary": [
+            "窓・雨のフィルター",
+            "後ろ姿"
+          ],
+          "never": [
+            "被り物",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "雨の縦線 3 本",
+          "mark_type": "文字＋記号",
+          "color_rule": "濃いグレーに滲んだ橙",
+          "typography": "手書き風の細い文字"
+        },
+        "photo_direction": {
+          "taste": "フィルム、滲み",
+          "composition": "三分割、人物は小さく",
+          "location_type": "屋外（雨の軒先・浜）",
+          "brightness": "中〜暗",
+          "contrast": "低",
+          "color_temperature": "寒",
+          "background": "ボケ（雨）",
+          "positioning": "遠い、傘の下",
+          "gesture": "立ち止まる"
+        }
       },
       "distribution": {
         "spotify_uri": null,
@@ -518,7 +666,39 @@
       "name_candidates": [
         "RAINLETTER",
         "Rain Letter"
-      ]
+      ],
+      "profile": {
+        "hometown": "高知県・太平洋側の浜",
+        "height_cm": [
+          158
+        ],
+        "weight_kg": [
+          47
+        ],
+        "likes": [
+          "雨の軒先",
+          "旅先の録音",
+          "家族への手紙"
+        ],
+        "favorite_food": "浜で焼いた魚",
+        "dislikes": [
+          "ドラム",
+          "大きな声",
+          "晴天のビーチ"
+        ],
+        "favorite_artists_real": [
+          "吉村弘",
+          "畠山地平",
+          "Julianna Barwick",
+          "Hiroshi Yoshimura"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      }
     }
   ],
   "name_candidates": [

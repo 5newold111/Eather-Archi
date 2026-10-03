@@ -47,7 +47,7 @@ def load_csv(path: Path) -> list[dict]:
 def demo_data(seed: int, today: date) -> tuple[list[dict], list[dict]]:
     """架空の 5 組 × 8 週ぶんの成績。実在のデータではない。"""
     rng = random.Random(seed)
-    artists = {"a": 1.6, "b": 1.0, "c": 0.7, "d": 1.1, "e": 0.0}   # 伸び方の違いを仕込む（e は新人）
+    artists = {"a": 1.6, "b": 1.0, "c": 0.55, "d": 1.1, "e": 0.0}   # 伸び方の違いを仕込む（e は新人）
     slots = ["lyrics", "worldview", "instruments", "performance", "structure",
              "harmony", "groove", "phrase", "vocal_main", "vocal_sub1", "vocal_sub2"]
     metrics, sources = [], []
@@ -168,6 +168,39 @@ def slot_weights(tracks: dict[str, dict], sources: list[dict]) -> tuple[dict[str
 # 判断ルール → ヒント
 # ---------------------------------------------------------------------------
 
+PIVOT_DOWN_STREAK = 2        # 連続 down の回数（＝ 8 週）で転換
+PIVOT_MIN_TRACKS = 8         # これ以上出していて
+PIVOT_REACHED_RATE = 0.3     # 1,000 再生到達率がこれ未満なら転換
+
+
+def detect_pivots(artists: dict[str, dict], history: dict[str, list[str]]) -> dict[str, dict]:
+    """
+    伸び悩みの判定 → 方針転換の提案（docs/06_growth.md「方針転換」）
+    history[slug] = 過去の trend の並び（新しい順）。無ければ今回だけで判定。
+    レベル 1：音の微調整（枠の組み合わせ・テンポ）／ レベル 2：コンセプト転換（場面・色・空間を変え、写真を撮り直す）
+    """
+    pivots = {}
+    for slug, a in artists.items():
+        past = history.get(slug, [])
+        streak = 1 if a["trend"] == "down" else 0
+        for t in past:
+            if t == "down" and streak: streak += 1
+            else: break
+        low_reach = a["tracks"] >= PIVOT_MIN_TRACKS and a["reached_rate"] < PIVOT_REACHED_RATE
+        if streak >= PIVOT_DOWN_STREAK or low_reach:
+            level = 2 if (streak >= PIVOT_DOWN_STREAK and low_reach) or streak >= PIVOT_DOWN_STREAK + 1 else 1
+            pivots[slug] = {
+                "level": level,
+                "reason": f"down {streak} 回連続" + ("、1,000 再生到達率 {:.0%}".format(a["reached_rate"]) if low_reach else ""),
+                "actions": (["drive_scene / visual.space / visual.palette を隣の場面へ変える", "composition_habits を 1 項目変える",
+                             "アーティスト写真とロゴを撮り直す（generate_visuals.py --kind reshoot）", "concept_history に version +1 を記録"]
+                            if level == 2 else
+                            ["枠の組み合わせを top_slots 以外へ大きく変える", "BPM 範囲を ±5 ずらす", "トレンド曲の枠を 3 に増やす"]),
+                "photos_reshot": level == 2,
+            }
+    return pivots
+
+
 def make_hints(artists: dict[str, dict], top: dict[str, dict]) -> dict[str, dict]:
     hints: dict[str, dict] = {}
     for slug, a in artists.items():
@@ -182,8 +215,6 @@ def make_hints(artists: dict[str, dict], top: dict[str, dict]) -> dict[str, dict
             notes.append("横ばい：トレンド曲の枠を 2 → 3 に増やして変化をつける")
         if a["tracks"] >= 4 and a["reached_rate"] < 0.5:
             notes.append(f"1,000 再生到達率 {a['reached_rate']:.0%}：曲数より 1 曲への告知を厚くする（プレイリスト・ショート動画）")
-        if a["skip_rate"] if "skip_rate" in a else False:
-            pass
         hints[slug] = {
             "artist_trend": a["trend"],
             "growth_ratio": round(a["growth"], 2) if a["growth"] else None,
@@ -254,8 +285,20 @@ def main() -> None:
     print("  参考曲 × 枠 の重みを計算しています…")
     weights, top = slot_weights(tracks, sources)
     hints = make_hints(artists, top)
+    hist_path = args.out / "trend_history.json"
+    history = json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else {}
+    pivots = detect_pivots(artists, history)
+    for slug, h in hints.items():
+        if slug in pivots:
+            h["pivot"] = pivots[slug]
+            h["notes"].append(f"【方針転換 レベル {pivots[slug]['level']}】{pivots[slug]['reason']} → " + "／".join(pivots[slug]["actions"]))
 
     args.out.mkdir(parents=True, exist_ok=True)
+    for slug, a in artists.items():
+        history.setdefault(slug, []).insert(0, a["trend"])
+        history[slug] = history[slug][:12]
+    hist_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+    (args.out / "pivots.json").write_text(json.dumps(pivots, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "weights.json").write_text(json.dumps(weights, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "hints.json").write_text(json.dumps(hints, ensure_ascii=False, indent=2), encoding="utf-8")
     write_report(args.out / "report.md", today, artists, tracks, weights, hints)
@@ -263,6 +306,9 @@ def main() -> None:
     for slug, a in artists.items():
         g = f"{a['growth']:.2f}" if a["growth"] else "—"
         print(f"    {slug:<8} {a['trend']:<5} 直近4週 {a['s4']:>7,} / 前4週 {a['sprev4']:>7,}（{g}）")
+    if pivots:
+        summary = ", ".join(f"{k}（レベル {v['level']}）" for k, v in pivots.items())
+        print(f"  方針転換の提案: {summary} → pivots.json")
     print(f"  重みをつけた参考曲×枠: {len(weights)} 件（1.0 超え {sum(1 for w in weights.values() if w > 1.0)} 件）")
     print(f"\n=== 完了。{args.out.relative_to(ROOT)}/ に report.md / weights.json / hints.json を書き出しました ===")
     print("    次：select_references.py に --weights と --hints を渡すと、来週の割り当てに反映されます")

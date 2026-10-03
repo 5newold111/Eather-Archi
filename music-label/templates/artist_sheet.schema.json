@@ -574,6 +574,78 @@
             "null"
           ],
           "description": "covers/{slug}/scene.blend"
+        },
+        "face_concealment": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": "string"
+            },
+            "secondary": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "never": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "logo": {
+          "type": "object",
+          "properties": {
+            "concept": {
+              "type": "string"
+            },
+            "mark_type": {
+              "type": "string",
+              "enum": [
+                "文字のみ",
+                "文字＋記号",
+                "記号のみ"
+              ]
+            },
+            "color_rule": {
+              "type": "string"
+            },
+            "typography": {
+              "type": "string"
+            }
+          }
+        },
+        "photo_direction": {
+          "type": "object",
+          "description": "アーティスト写真の方向（参考分析の手法を自分の言葉で）",
+          "properties": {
+            "taste": {
+              "type": "string"
+            },
+            "composition": {
+              "type": "string"
+            },
+            "location_type": {
+              "type": "string"
+            },
+            "brightness": {
+              "type": "string"
+            },
+            "contrast": {
+              "type": "string"
+            },
+            "background": {
+              "type": "string"
+            },
+            "positioning": {
+              "type": "string"
+            },
+            "gesture": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -635,6 +707,85 @@
         "collab_style": {
           "type": "string",
           "description": "feat. で客演 / remix で再構築 など"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "hometown": {
+          "type": "string"
+        },
+        "height_cm": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "weight_kg": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "likes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "favorite_food": {
+          "type": "string"
+        },
+        "dislikes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "favorite_artists_real": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "bio と SNS 用。生成の指示文には渡さない"
+        }
+      }
+    },
+    "concept_history": {
+      "type": "object",
+      "properties": {
+        "concept_version": {
+          "type": "integer"
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "integer"
+              },
+              "date": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "changes": {
+                "type": "object"
+              },
+              "photos_reshot": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     }

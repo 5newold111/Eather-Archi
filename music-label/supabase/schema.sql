@@ -83,6 +83,9 @@ create table artists (
   cadence          cadence_t not null default 'weekly',  -- weekly / biweekly（週の総曲数が上限を超えたら古い組から biweekly）
   debut_week       date,                            -- デビュー週の月曜（月 1 組ずつ増やす運用の記録）
   composition_habits jsonb not null default '{}',   -- 作曲の癖（毎週のブリーフに固定の制約として入る）
+  profile          jsonb not null default '{}',     -- 出身・身長・体重・好み・好きな実在アーティスト（bio 用。生成には渡さない）
+  concept_version  int not null default 1,         -- 方針転換のたびに +1
+  concept_history  jsonb not null default '[]',    -- 転換の履歴
   sheet            jsonb not null default '{}',     -- templates/artist_sheet.schema.json に沿った設定書の全文
   spotify_uri      text,
   apple_artist_id  text,
@@ -284,6 +287,42 @@ create table metrics (
   listeners      bigint not null default 0,
   created_at     timestamptz not null default now(),
   unique (release_id, date, platform)
+);
+
+-- -----------------------------------------------------------------------------
+-- 9. ビジュアル（ロゴ・アーティスト写真・ジャケット）の候補と選択
+-- -----------------------------------------------------------------------------
+create type visual_kind_t as enum ('logo', 'photo', 'cover');
+create type decided_by_t  as enum ('owner', 'auto');
+
+create table visual_assets (
+  id              uuid primary key default gen_random_uuid(),
+  artist_id       uuid not null references artists(id),
+  release_id      uuid references releases(id),          -- cover のとき
+  kind            visual_kind_t not null,
+  concept_version int not null default 1,                -- 撮り直しの世代
+  candidate_no    int not null,
+  prompt          text not null,                         -- 画像 API に渡した指示文（実名を含まないこと）
+  method          text,                                  -- 顔を見せない方法（photo）
+  storage_path    text,                                  -- covers/{artist}/{debut|release}/..
+  scores          jsonb not null default '{}',           -- 5 観点の点
+  total           numeric(4,3),
+  compliance_ok   boolean,                               -- 規約チェックを通ったか
+  selected        boolean not null default false,
+  decided_by      decided_by_t,
+  created_at      timestamptz not null default now(),
+  unique (artist_id, release_id, kind, concept_version, candidate_no)
+);
+-- 同じ組・同じ種類・同じ世代で選ばれるのは 1 枚
+create unique index visual_assets_one_selected
+  on visual_assets (artist_id, coalesce(release_id, '00000000-0000-0000-0000-000000000000'::uuid), kind, concept_version) where selected;
+
+-- オーナーの判断（最初の 5 回）と理由。採点基準の学習元
+create table visual_decisions (
+  id          uuid primary key default gen_random_uuid(),
+  asset_id    uuid not null references visual_assets(id),
+  reason      text,
+  decided_at  timestamptz not null default now()
 );
 
 -- =============================================================================
@@ -504,7 +543,7 @@ declare t text;
 begin
   foreach t in array array[
     'label_settings','labels','artists','reference_tracks','reference_web_sources','track_analyses','weekly_trends',
-    'briefs','brief_sources','generations','releases','collab_pairs','metrics'
+    'briefs','brief_sources','generations','releases','collab_pairs','metrics','visual_assets','visual_decisions'
   ] loop
     execute format('alter table %I enable row level security', t);
     -- ログイン済みの本人（オーナー）だけ全操作を許可。anon は何もできない。
