@@ -15,15 +15,42 @@
   "formation": "",
   "_formation": "solo（ソロ）/ duo（デュオ）/ band（バンド）/ producer（プロデューサー）",
 
+  "cadence": "weekly",
+  "debut_week": "",
+  "_cadence": "weekly（毎週）/ biweekly（隔週）。レーベル全体の週の総曲数が 8 を超えたら、古い組から biweekly に切り替える。debut_week はデビュー週の月曜（YYYY-MM-DD）",
+
   "persona": {
     "members": [
       { "role": "", "description": "" }
     ],
     "age_feel": "",
     "story": "",
-    "background": "",
     "drive_scene": "",
+    "origin": {
+      "birthplace": "",
+      "upbringing": "",
+      "landscape_words": [],
+      "_説明": "生まれと育ち。landscape_words は Suno に渡すための『風景・質感の言葉』（例：港の湿った空気、乾いた高原の風）。地名そのものより、こちらが曲に効く"
+    },
+    "influences": [
+      { "name": "", "era": "", "genre": "", "what_was_taken": "", "reference_id": null }
+    ],
+    "_influences": "影響を受けた音楽・アーティスト。name は公開プロフィール（bio）には書いてよいが、Suno の指示文には渡さない。指示文には era / genre / what_was_taken（何を受け継いだか）だけを渡す。reference_id はその人の曲を参考曲 DB に入れたときの ID",
     "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）"
+  },
+
+  "composition_habits": {
+    "modulation": "",
+    "intro": "",
+    "outro": "",
+    "phrase_endings": "",
+    "structure": "",
+    "instruments_rule": "",
+    "rhythm": "",
+    "lyrics_tic": "",
+    "always": [],
+    "never": [],
+    "_説明": "作曲の癖。毎週のブリーフに『固定の制約』としてそのまま入る（これがキャラクターの正体）。例：modulation『ラスサビで必ず半音上げる』、intro『4 小節以内に歌が入る』、phrase_endings『語尾は下げて落とす』、structure『ブリッジを置かない』、instruments_rule『必ず生楽器を 1 つ入れる』、lyrics_tic『毎曲どこかに時刻を 1 回入れる』。always / never は箇条書きで追加"
   },
 
   "vocal": {
@@ -31,6 +58,40 @@
     "range": "",
     "fixed_timbre": true,
     "suno_persona_id": null,
+    "voice_spec": {
+      "comfortable_low": "",
+      "comfortable_high": "",
+      "chest_voice_top": "",
+      "falsetto_switch_point": "",
+      "falsetto_quality": "",
+      "strength": "",
+      "weakness": "",
+      "_説明": "歌手としての体の仕様。comfortable_low / high は楽に出る音域の下端と上端（音名で。例：G2 / E4）。chest_voice_top は地声の上限、falsetto_switch_point は裏声に切り替わる高さ（例：F#4）。falsetto_quality は裏声の質（例：細く透明 / 息多め / 芯がある）。strength は得意（例：低音の響き / 高音のロングトーン / 速い言葉さばき）、weakness は苦手（例：高音を張ると硬くなる）。Suno には音名ではなく『この高さで裏声に変わる』という描写に変えて渡す"
+    },
+    "signature_techniques": {
+      "primary": "",
+      "secondary": [],
+      "avoid": [],
+      "wordless_style": "",
+      "tics": [
+        { "technique": "", "where": "", "frequency": "every_song" }
+      ],
+      "_tics": "毎曲入れる『癖』。technique は歌い方（例：la-la-la / ハミング / 囁き / シャウト / しゃくり）、where はどこに入れるか（例：イントロ / サビ前の 1 拍 / 2 番の後 / アウトロ / 歌詞のない間奏）、frequency は every_song（毎曲）/ most（ほぼ毎曲）/ sometimes（時々）。例：『アウトロで必ずハミング』『サビ前で一度囁いてからラウドに張る』『間奏は la-la-la で埋める』",
+      "_説明": "得意な歌い方（キャラクターの核）。primary は一番の武器 1 つ、secondary は 2〜3 個、avoid はこの組がやらない歌い方（他の組との差をつける）。wordless_style は歌詞のない部分をどう歌うか（例：la-la-la / ooh / ハミング / 無言で楽器に任せる）。選択肢は下の _歌い方の一覧 から選ぶか、自由に書く",
+      "_歌い方の一覧": {
+        "声量・強さ": ["囁くようなウィスパー（息多め・マイクに近い）", "圧倒的な声量で押し切るベルティング", "シャウト／ラウド（歪ませて張り上げる）", "ささやきから張り上げまでの急な落差"],
+        "語尾・輪郭": ["語尾のフォール（下げて落とす）", "語尾を切る（スタッカート）", "語尾を伸ばして浅いビブラート", "しゃくり上げ（下から入る）"],
+        "声区": ["地声と裏声の往復", "裏声で頂点を抜く", "地声の低音で語る"],
+        "歌詞のない部分": ["la-la-la のスキャット", "ooh / ah のコーラス", "ハミング", "口笛", "無言で楽器に任せる"],
+        "リズム": ["言葉を刻む（ラップ寄り）", "拍の後ろにもたれる", "前に突っ込む"]
+      }
+    },
+    "melodic_tendency": {
+      "motion": "",
+      "chorus_peak": "",
+      "verse_register": "",
+      "_説明": "メロディの癖。motion は『順次進行が多い / 跳躍が多い』、chorus_peak は『サビの最高音は裏声の切り替え点のすぐ下に置く / 切り替え点を越えて裏声で頂点を取る』など、verse_register は『A メロは地声の低めで語る』など。voice_spec と矛盾しないように書く"
+    },
     "timbre_blend": {
       "main": { "reference_id": null, "weight": 0.6, "traits": [] },
       "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },

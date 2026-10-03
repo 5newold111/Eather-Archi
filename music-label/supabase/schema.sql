@@ -21,6 +21,18 @@ create type vocal_range_t as enum ('low', 'mid', 'high');
 create type vocal_sex_t   as enum ('female', 'male', 'mixed', 'none');
 create type ref_source_t  as enum ('own', 'chart', 'manual', 'trend');            -- 自作 / チャート / 手動 / 今週のトレンド
 create type release_status_t as enum ('planned', 'generated', 'mastered', 'uploaded', 'live', 'takedown');
+create type cadence_t     as enum ('weekly', 'biweekly');
+
+-- レーベル全体の設定（1 行だけ）
+create table label_settings (
+  id                   boolean primary key default true check (id),   -- 常に 1 行
+  max_weekly_releases  int not null default 8,       -- 週の総曲数の上限（人の作業 4 時間以内）
+  release_hour_et      int not null default 17,      -- 配信時刻（米国東部時間）
+  lead_weeks           int not null default 2,       -- 仕込み期間
+  weight_cap           numeric(3,1) not null default 3.0,  -- 成績由来の重みの上限（ルール 5）
+  min_streams_for_weight int not null default 1000   -- これ未満の再生数の曲は重み計算に使わない（Spotify の支払い下限と同じ）
+);
+insert into label_settings default values;
 
 -- 借用の「枠」。1 ブリーフにつき各枠 1 つ、1 参考曲は 1 枠だけ。
 create type slot_t as enum (
@@ -45,7 +57,10 @@ create table artists (
   bpm_max          int not null check (bpm_max between 40 and 220 and bpm_max >= bpm_min),
   dna_tags         text[] not null default '{}',    -- 参考曲を絞るためのタグ（例：{night, synth, retro}）
   lyric_language   text not null default 'en',
-  trend_language_ok boolean not null default false, -- トレンド言語のフレーズを混ぜてよいか（質 だけ true）
+  trend_language_ok boolean not null default false, -- トレンド言語のフレーズを混ぜてよいか（1 組だけ true）
+  cadence          cadence_t not null default 'weekly',  -- weekly / biweekly（週の総曲数が上限を超えたら古い組から biweekly）
+  debut_week       date,                            -- デビュー週の月曜（月 1 組ずつ増やす運用の記録）
+  composition_habits jsonb not null default '{}',   -- 作曲の癖（毎週のブリーフに固定の制約として入る）
   sheet            jsonb not null default '{}',     -- templates/artist_sheet.schema.json に沿った設定書の全文
   spotify_uri      text,
   apple_artist_id  text,
@@ -306,6 +321,116 @@ join releases r          on r.brief_id = bs.brief_id
 left join metrics m      on m.release_id = r.id
 group by bs.slot, bs.reference_track_id, rt.title, rt.artist_name;
 
+-- =============================================================================
+-- 成長分析（伸びているアーティスト・曲・要素を次のリリースに返す）
+-- =============================================================================
+
+-- 曲ごとの週次成績（配信後 n 週目の再生・保存。全プラットフォーム合算）
+create or replace view v_track_weekly as
+select
+  r.id          as release_id,
+  r.artist_id,
+  r.title,
+  r.release_at,
+  date_trunc('week', m.date)::date                  as week_start,
+  floor((m.date - r.release_at::date) / 7.0)::int   as week_no,   -- 配信週 = 0
+  sum(m.streams) as streams,
+  sum(m.saves)   as saves,
+  sum(m.skips)   as skips,
+  sum(m.playlist_adds) as playlist_adds
+from releases r
+join metrics m on m.release_id = r.id
+group by r.id, r.artist_id, r.title, r.release_at, date_trunc('week', m.date), floor((m.date - r.release_at::date) / 7.0);
+
+-- 曲の伸び：直近 4 週とその前 4 週の比較、保存率、1,000 再生到達の見込み
+create or replace view v_track_growth as
+with recent as (
+  select release_id,
+         sum(streams) filter (where week_start >= (current_date - 28))                                   as streams_4w,
+         sum(streams) filter (where week_start <  (current_date - 28) and week_start >= (current_date - 56)) as streams_prev_4w,
+         sum(streams) as streams_total,
+         sum(saves)   as saves_total,
+         sum(skips)   as skips_total
+  from v_track_weekly group by release_id
+)
+select
+  r.id as release_id, a.slug as artist, r.title, r.release_at::date as released,
+  coalesce(x.streams_total, 0) as streams_total,
+  coalesce(x.streams_4w, 0)    as streams_4w,
+  coalesce(x.streams_prev_4w, 0) as streams_prev_4w,
+  case when coalesce(x.streams_prev_4w,0) > 0
+       then round(x.streams_4w::numeric / x.streams_prev_4w, 2) end as growth_ratio,   -- 1.0 = 横ばい
+  case when coalesce(x.streams_total,0) > 0 then round(x.saves_total::numeric / x.streams_total, 4) end as save_rate,
+  case when coalesce(x.streams_total,0) > 0 then round(x.skips_total::numeric / x.streams_total, 4) end as skip_rate,
+  coalesce(x.streams_total, 0) >= 1000 as reached_1000   -- Spotify の支払い下限
+from releases r
+join artists a on a.id = r.artist_id
+left join recent x on x.release_id = r.id
+where r.status = 'live';
+
+-- アーティストの伸び：直近 4 週 vs その前 4 週、曲あたり平均、1,000 到達率
+create or replace view v_artist_growth as
+select
+  a.slug, a.name, a.cadence, a.debut_week,
+  count(g.release_id)                          as live_tracks,
+  sum(g.streams_4w)                            as streams_4w,
+  sum(g.streams_prev_4w)                       as streams_prev_4w,
+  case when sum(g.streams_prev_4w) > 0
+       then round(sum(g.streams_4w)::numeric / sum(g.streams_prev_4w), 2) end as growth_ratio,
+  case when count(g.release_id) > 0
+       then round(avg(g.streams_total)) end    as avg_streams_per_track,
+  case when count(g.release_id) > 0
+       then round(avg(case when g.reached_1000 then 1 else 0 end), 2) end as reached_1000_rate,
+  case
+    when sum(g.streams_prev_4w) = 0 or sum(g.streams_prev_4w) is null then 'new'
+    when sum(g.streams_4w)::numeric / sum(g.streams_prev_4w) >= 1.2 then 'up'
+    when sum(g.streams_4w)::numeric / sum(g.streams_prev_4w) <= 0.8 then 'down'
+    else 'flat'
+  end as trend
+from artists a
+left join v_track_growth g on g.artist = a.slug
+group by a.id, a.slug, a.name, a.cadence, a.debut_week;
+
+-- 参考曲 × 枠 の重み：保存率が高いほど重く。上限は label_settings.weight_cap（既定 3 倍）。
+-- scripts/select_references.py が weights.json として読む
+create or replace view v_reference_weights as
+with base as (
+  select bs.slot, bs.reference_track_id,
+         sum(m.streams) as streams, sum(m.saves) as saves
+  from brief_sources bs
+  join releases r on r.brief_id = bs.brief_id
+  join metrics m  on m.release_id = r.id
+  group by bs.slot, bs.reference_track_id
+),
+label_avg as (
+  select case when sum(streams) > 0 then sum(saves)::numeric / sum(streams) else null end as save_rate
+  from base
+)
+select
+  b.slot, b.reference_track_id,
+  b.streams, b.saves,
+  round(b.saves::numeric / nullif(b.streams,0), 4) as save_rate,
+  -- レーベル平均の保存率に対する比を重みにし、1.0〜weight_cap に収める
+  least(
+    (select weight_cap from label_settings),
+    greatest(1.0,
+      round((b.saves::numeric / nullif(b.streams,0)) / nullif((select save_rate from label_avg),0), 2)
+    )
+  ) as weight
+from base b
+where b.streams >= (select min_streams_for_weight from label_settings);
+
+-- 週の総曲数チェック：上限を超えていないか（cadence の切り替え判断に使う）
+create or replace view v_weekly_release_load as
+select
+  release_week,
+  count(*) as releases,
+  (select max_weekly_releases from label_settings) as cap,
+  count(*) > (select max_weekly_releases from label_settings) as over_cap
+from releases
+group by release_week
+order by release_week;
+
 -- ブリーフの枠がそろっているか（11 枠すべて埋まっているか）を確認する
 create or replace view v_brief_completeness as
 select
@@ -333,7 +458,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'artists','reference_tracks','reference_web_sources','track_analyses','weekly_trends',
+    'label_settings','artists','reference_tracks','reference_web_sources','track_analyses','weekly_trends',
     'briefs','brief_sources','generations','releases','collab_pairs','metrics'
   ] loop
     execute format('alter table %I enable row level security', t);

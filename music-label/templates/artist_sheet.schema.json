@@ -12,6 +12,8 @@
     "name_status": { "type": "string", "enum": ["draft", "checked", "registered"], "description": "draft：仮 / checked：重複確認済み / registered：配信登録済み" },
     "name_candidates": { "type": "array", "items": { "type": "string" } },
     "formation": { "type": "string", "enum": ["solo", "duo", "band", "producer"] },
+    "cadence": { "type": "string", "enum": ["weekly", "biweekly"], "default": "weekly", "description": "リリース頻度。週の総曲数が上限（8）を超えたら古い組から biweekly に" },
+    "debut_week": { "type": ["string", "null"], "format": "date", "description": "デビュー週の月曜" },
 
     "persona": {
       "type": "object",
@@ -20,8 +22,47 @@
         "members": { "type": "array", "items": { "type": "object", "properties": { "role": { "type": "string" }, "description": { "type": "string" } } } },
         "age_feel": { "type": "string" },
         "story": { "type": "string" },
-        "background": { "type": "string" },
-        "drive_scene": { "type": "string", "description": "このアーティストが担当するドライブの場面" }
+        "drive_scene": { "type": "string", "description": "このアーティストが担当するドライブの場面" },
+        "origin": {
+          "type": "object",
+          "description": "生まれと育ち",
+          "properties": {
+            "birthplace": { "type": "string" },
+            "upbringing": { "type": "string" },
+            "landscape_words": { "type": "array", "items": { "type": "string" }, "description": "Suno に渡す風景・質感の言葉。地名は渡さない" }
+          }
+        },
+        "influences": {
+          "type": "array",
+          "description": "影響源。name は bio にのみ。指示文には era / genre / what_was_taken だけ",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "era": { "type": "string" },
+              "genre": { "type": "string" },
+              "what_was_taken": { "type": "string" },
+              "reference_id": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+
+    "composition_habits": {
+      "type": "object",
+      "description": "作曲の癖。毎週のブリーフに固定の制約として入る",
+      "properties": {
+        "modulation": { "type": "string" },
+        "intro": { "type": "string" },
+        "outro": { "type": "string" },
+        "phrase_endings": { "type": "string" },
+        "structure": { "type": "string" },
+        "instruments_rule": { "type": "string" },
+        "rhythm": { "type": "string" },
+        "lyrics_tic": { "type": "string" },
+        "always": { "type": "array", "items": { "type": "string" } },
+        "never": { "type": "array", "items": { "type": "string" } }
       }
     },
 
@@ -34,6 +75,50 @@
         "range": { "type": "string", "enum": ["low", "mid", "high"] },
         "fixed_timbre": { "type": "boolean", "description": "true：声質を Persona で固定 / false：曲ごとに声質も変える（自 など）" },
         "suno_persona_id": { "type": ["string", "null"], "description": "Suno の Persona ID。声の試作が終わったら記入" },
+        "voice_spec": {
+          "type": "object",
+          "description": "歌手としての体の仕様。組ごとに必ず違う値にする",
+          "properties": {
+            "comfortable_low": { "type": "string", "description": "楽に出る下端（音名。例：G2）" },
+            "comfortable_high": { "type": "string", "description": "楽に出る上端（音名。例：E4）" },
+            "chest_voice_top": { "type": "string", "description": "地声の上限" },
+            "falsetto_switch_point": { "type": "string", "description": "裏声に切り替わる高さ（例：F#4）" },
+            "falsetto_quality": { "type": "string", "description": "裏声の質" },
+            "strength": { "type": "string", "description": "得意（低音の響き / 高音のロングトーン …）" },
+            "weakness": { "type": "string", "description": "苦手。曲作りで避ける" }
+          }
+        },
+        "signature_techniques": {
+          "type": "object",
+          "description": "得意な歌い方（キャラクターの核）",
+          "properties": {
+            "primary": { "type": "string", "description": "一番の武器 1 つ" },
+            "secondary": { "type": "array", "items": { "type": "string" }, "maxItems": 3 },
+            "avoid": { "type": "array", "items": { "type": "string" }, "description": "この組がやらない歌い方" },
+            "wordless_style": { "type": "string", "description": "歌詞のない部分の歌い方（la-la-la / ooh / ハミング / 口笛 / 無言）" },
+            "tics": {
+              "type": "array",
+              "description": "毎曲入れる癖。ブリーフに固定で入り、Suno の歌詞タグ（[Humming] など）や歌唱指示に変換される",
+              "items": {
+                "type": "object",
+                "required": ["technique", "where", "frequency"],
+                "properties": {
+                  "technique": { "type": "string" },
+                  "where": { "type": "string", "description": "イントロ / サビ前 / 間奏 / アウトロ など" },
+                  "frequency": { "type": "string", "enum": ["every_song", "most", "sometimes"] }
+                }
+              }
+            }
+          }
+        },
+        "melodic_tendency": {
+          "type": "object",
+          "properties": {
+            "motion": { "type": "string" },
+            "chorus_peak": { "type": "string", "description": "サビの最高音を切り替え点に対してどこに置くか" },
+            "verse_register": { "type": "string" }
+          }
+        },
         "timbre_blend": {
           "type": "object",
           "description": "声質の 6:2:2 配合。参考曲の解析シートから形容詞を合成する。実在アーティスト名は書かない",

@@ -106,9 +106,21 @@ def demo_artist() -> dict:
         "axis": "time",
         "name": "DEMO ARTIST（架空）",
         "formation": "solo",
-        "vocal": {"sex": "male", "range": "low", "fixed_timbre": True},
-        "sound": {"bpm_min": 95, "bpm_max": 105, "dna_tags": ["night", "retro", "synth", "drive"]},
+        "vocal": {
+            "sex": "male", "range": "low", "fixed_timbre": True,
+            "voice_spec": {"comfortable_low": "G2", "comfortable_high": "D4", "falsetto_switch_point": "E4",
+                           "falsetto_quality": "息多め", "strength": "低音の響き", "weakness": "高音を張ると硬くなる"},
+            "signature_techniques": {"primary": "語尾のフォール（下げて落とす）", "secondary": ["囁くようなウィスパー", "ハミング"],
+                                     "avoid": ["シャウト／ラウド", "ベルティング"], "wordless_style": "ハミング",
+                                     "tics": [{"technique": "ハミング", "where": "アウトロ", "frequency": "every_song"},
+                                              {"technique": "囁き", "where": "サビ前の 1 拍", "frequency": "most"}]},
+            "melodic_tendency": {"motion": "順次進行が多い", "chorus_peak": "切り替え点のすぐ下で地声", "verse_register": "地声の低音で語る"},
+        },
+        "sound": {"bpm_min": 95, "bpm_max": 105, "dna_tags": ["night", "retro", "synth", "drive"], "forbidden": ["急な無音"]},
         "lyrics": {"primary_language": "en", "trend_language_ok": False},
+        "persona": {"origin": {"landscape_words": ["港の湿った空気", "街灯の反復"]},
+                    "influences": [{"name": "（bio のみ）", "era": "80s", "genre": "シンセポップ", "what_was_taken": "ゲートリバーブの空間感"}]},
+        "composition_habits": {"modulation": "ラスサビで半音上げ", "intro": "4 小節以内に歌", "phrase_endings": "下げて落とす"},
     }
 
 
@@ -196,19 +208,22 @@ def dna_score(ref: Reference, artist: dict) -> float:
     return len(ref.tags & dna) / len(dna)
 
 
-def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict) -> Reference:
+def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
+                  slot: str, slot_weights: dict[str, float]) -> Reference:
     """DNA の重なり・成績の重み・トレンドかどうかを掛け合わせてランダムに 1 曲選ぶ"""
     weights = []
     for c in candidates:
         w = 0.2 + dna_score(c, artist)      # タグが全く重ならなくても 0 にはしない（多様性のため）
-        w *= min(c.weight, 3.0)             # ルール 5：成績の重みは最大 3 倍まで
+        # ルール 5：成績の重み（analyze_growth.py の weights.json「枠|参考曲ID」）。最大 3 倍まで
+        w *= min(slot_weights.get(f"{slot}|{c.id}", c.weight), 3.0)
         if c.is_trend:
             w *= 1.5                        # 今週のトレンド曲は少し優先
         weights.append(w)
     return rng.choices(candidates, weights=weights, k=1)[0]
 
 
-def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_quota: int = 2) -> dict[str, Reference]:
+def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_quota: int = 2,
+                 slot_weights: dict[str, float] | None = None) -> dict[str, Reference]:
     """
     枠ごとに参考曲を 1 曲ずつ割り当てる。
     - 同じ参考曲は 2 枠に使わない（1 曲 1 枠）
@@ -217,6 +232,7 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
     """
     used: set[str] = set()
     result: dict[str, Reference] = {}
+    slot_weights = slot_weights or {}
 
     for slot in SLOT_ORDER:
         pool = [r for r in refs if r.id not in used]
@@ -242,7 +258,7 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
         if trend_pool and (trend_quota - trend_used) >= remaining_slots:
             pool = trend_pool
 
-        chosen = weighted_pick(rng, pool, artist)
+        chosen = weighted_pick(rng, pool, artist, slot, slot_weights)
         result[slot] = chosen
         used.add(chosen.id)
         mark = "（トレンド）" if chosen.is_trend else ""
@@ -273,7 +289,34 @@ def monday_of(d: date) -> date:
 # ブリーフの骨組みを作る
 # ---------------------------------------------------------------------------
 
-def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday: date, trend_language: str | None) -> dict:
+def artist_constraints(artist: dict) -> dict:
+    """
+    設定書から『固定の制約』を写し取る。参考曲より優先される。
+    影響源は名前を落として era / genre / what_was_taken だけにする（Suno に実名を渡さない）。
+    """
+    persona = artist.get("persona", {})
+    vocal = artist.get("vocal", {})
+    sound = artist.get("sound", {})
+    influence_traits = []
+    for inf in persona.get("influences", []):
+        parts = [inf.get("era"), inf.get("genre"), inf.get("what_was_taken")]
+        text = " / ".join(p for p in parts if p)
+        if text:
+            influence_traits.append(text)
+    return {
+        "composition_habits": {k: v for k, v in artist.get("composition_habits", {}).items() if not k.startswith("_") and v},
+        "voice_spec": {k: v for k, v in vocal.get("voice_spec", {}).items() if not k.startswith("_") and v},
+        "signature_techniques": {k: v for k, v in vocal.get("signature_techniques", {}).items() if not k.startswith("_") and v},
+        "melodic_tendency": {k: v for k, v in vocal.get("melodic_tendency", {}).items() if not k.startswith("_") and v},
+        "landscape_words": persona.get("origin", {}).get("landscape_words", []),
+        "influence_traits": influence_traits,
+        "bpm_range": [sound.get("bpm_min"), sound.get("bpm_max")],
+        "forbidden": sound.get("forbidden", []),
+    }
+
+
+def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday: date,
+                         trend_language: str | None, hints: dict | None = None) -> dict:
     release_at = release_at_for_production_week(week_monday)
     return {
         "week_start": week_monday.isoformat(),
@@ -302,6 +345,8 @@ def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday:
             "contour_interval_changed": False,
             "description": "（Claude が変形案を 3 つ出し、人が 1 つ選ぶ。kept は最大 2 要素）",
         },
+        "artist_constraints": artist_constraints(artist),
+        "growth_hints": hints or {"artist_trend": "new", "top_slots": [], "notes": ["成績データなし"]},
         "title_candidates": [],
         "suno_style_prompt": "",
         "suno_lyrics": "",
@@ -322,6 +367,8 @@ def main() -> None:
     ap.add_argument("--demo", action="store_true", help="架空の参考曲で動作確認する")
     ap.add_argument("--week", help="制作週の日付（YYYY-MM-DD）。省略時は今日の週")
     ap.add_argument("--trend-language", help="今週のトレンド言語（例：es）。質 だけが使う")
+    ap.add_argument("--weights", type=Path, help="analyze_growth.py が出した weights.json（成績由来の重み）")
+    ap.add_argument("--hints", type=Path, help="analyze_growth.py が出した hints.json（組ごとのヒント）")
     ap.add_argument("--seed", type=int, help="乱数の種（同じ結果を再現したいとき）")
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "briefs", help="出力フォルダ")
     args = ap.parse_args()
@@ -341,6 +388,15 @@ def main() -> None:
     print(f"  配信日時        : {release_at.astimezone(ZoneInfo('America/New_York')):%Y-%m-%d %H:%M %Z}"
           f"（日本時間 {release_at.astimezone(ZoneInfo('Asia/Tokyo')):%m/%d %H:%M}）")
     print(f"  乱数の種        : {seed}")
+
+    slot_weights: dict[str, float] = {}
+    hints_all: dict[str, dict] = {}
+    if args.weights and args.weights.exists():
+        slot_weights = json.loads(args.weights.read_text(encoding="utf-8"))
+        print(f"  成績由来の重みを {len(slot_weights)} 件読み込みました（{args.weights}）")
+    if args.hints and args.hints.exists():
+        hints_all = json.loads(args.hints.read_text(encoding="utf-8"))
+        print(f"  組ごとのヒントを {len(hints_all)} 件読み込みました（{args.hints}）")
 
     refs = demo_references(seed) if args.demo else load_references_from_dir(args.references)
     if len(refs) < len(SLOT_ORDER):
@@ -366,12 +422,14 @@ def main() -> None:
         artist = demo_artist() if slug == "demo" else load_artist(slug)
         print(f"\n--- {slug}（{artist['name']}）---")
         try:
-            slots = assign_slots(artist, refs, rng)
+            slots = assign_slots(artist, refs, rng, slot_weights=slot_weights)
         except RuntimeError as e:
             print(f"  [失敗] {e}")
             failed.append(slug)
             continue
-        brief = build_brief_skeleton(artist, slots, week_monday, args.trend_language)
+        brief = build_brief_skeleton(artist, slots, week_monday, args.trend_language, hints_all.get(slug))
+        c = brief["artist_constraints"]
+        print(f"    固定の制約: 作曲の癖 {len(c['composition_habits'])} 項目 / 声の仕様 {len(c['voice_spec'])} 項目 / 得意な歌い方 {len(c['signature_techniques'])} 項目")
         out_path = args.out / f"{week_monday}_{slug}.json"
         out_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  → ブリーフの骨組みを書き出しました: {out_path.relative_to(ROOT)}")
