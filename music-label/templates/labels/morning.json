@@ -2,7 +2,7 @@
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "morning",
   "name": "FIRST POUR",
-  "name_status": "draft",
+  "name_status": "checked",
   "parent": "etherarchi",
   "scene": "起きてからコーヒーを飲み終えるまで",
   "sound_center": [
@@ -50,7 +50,7 @@
     {
       "slug": "morning_jazz",
       "name": "JUNE CARAWAY",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
@@ -279,12 +279,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "morning_duo",
       "name": "PALMA & REED",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "duo",
       "cadence": "weekly",
       "persona": {
@@ -519,12 +530,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "morning_lofi",
       "name": "TOASTER TAPES",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "producer",
       "cadence": "weekly",
       "persona": {
@@ -730,10 +752,32 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     }
   ],
   "name_candidates": [
     "FIRST POUR"
-  ]
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "完全一致なし",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
 }

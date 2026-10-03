@@ -233,9 +233,15 @@ def main() -> None:
     ap.add_argument("--choose", help="オーナーの選択。例 logo:3 / photo:5 / cover:2")
     ap.add_argument("--reason", default="", help="選んだ理由（一言。基準に反映される）")
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "visuals")
+    ap.add_argument("--skip-name-check", action="store_true", help="名前の重複確認を飛ばす（テスト用。本番では使わない）")
     args = ap.parse_args()
 
     artist = load_artist(args.artist, args.label)
+    # デビュー処理の最初に名前の重複確認。checked でなければロゴ・写真を作らない（名前が変わると全部作り直しになる）
+    if args.kind == "debut" and not args.choose and not args.skip_name_check and artist.get("name_status") != "checked":
+        sys.exit(f"[停止] {artist['name']} の名前はまだ重複確認が済んでいません（name_status={artist.get('name_status')}）。\n"
+                 f"       先に python3 scripts/check_names.py --artist {artist['slug']}" + (f" --label {args.label}" if args.label else "") +
+                 " --apply を実行し、report.md の手動確認（商標・SNS）も済ませてください。")
     criteria = load_criteria()
     outdir = args.out / artist["slug"] / args.kind
     outdir.mkdir(parents=True, exist_ok=True)

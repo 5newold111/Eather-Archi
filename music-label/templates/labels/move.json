@@ -1,8 +1,8 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "move",
-  "name": "STRIDE",
-  "name_status": "draft",
+  "name": "PACENOTE",
+  "name_status": "checked",
   "parent": "etherarchi",
   "scene": "歩く・走る・体を動かす",
   "sound_center": [
@@ -50,7 +50,7 @@
     {
       "slug": "move_belter",
       "name": "KILO VERA",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
@@ -237,7 +237,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "KILO VERA is part of the EtherArchi group (STRIDE). A voice built for the last kilometer."
+        "bio_en": "KILO VERA is part of the EtherArchi group (PACENOTE). A voice built for the last kilometer."
       },
       "collab": {
         "preferred_partners": [
@@ -280,12 +280,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "move_electro",
-      "name": "CROSSWALK",
-      "name_status": "draft",
+      "name": "KOSATEN",
+      "name_status": "checked",
       "formation": "duo",
       "cadence": "weekly",
       "persona": {
@@ -323,7 +334,7 @@
           "how": "同じ駅の同じ階段を毎朝同じ時刻に上る 2 人。信号待ちで片方のイヤホンから漏れた曲を、もう片方が口ずさんだのが最初の会話",
           "inspired_by_pattern": "通勤の偶然の出会いから結成する型（通勤電車や駅で知り合って結成した 2 人組の経緯）",
           "first_release": "『青になるまで』",
-          "name_meaning": "横断歩道"
+          "name_meaning": "交差点（日本語のローマ字）。2 人が毎朝すれ違う場所"
         }
       },
       "vocal": {
@@ -475,7 +486,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "CROSSWALK is part of the EtherArchi group (STRIDE). Two voices at walking speed."
+        "bio_en": "KOSATEN is part of the EtherArchi group (PACENOTE). Two voices at walking speed."
       },
       "collab": {
         "preferred_partners": [
@@ -485,7 +496,7 @@
         "collab_style": "feat. で客演"
       },
       "name_candidates": [
-        "CROSSWALK",
+        "KOSATEN",
         "Crosswalk Duo"
       ],
       "profile": {
@@ -521,12 +532,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "旧名 CROSSWALK が衝突したため改名",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "move_loud",
       "name": "LAST HILL",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "band",
       "cadence": "weekly",
       "persona": {
@@ -722,7 +744,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "LAST HILL is part of the EtherArchi group (STRIDE). Loud enough for the last hill."
+        "bio_en": "LAST HILL is part of the EtherArchi group (PACENOTE). Loud enough for the last hill."
       },
       "collab": {
         "preferred_partners": [
@@ -771,10 +793,33 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "near",
+        "note": "『The Last Hill』という曲名のみ。同名バンドなし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     }
   ],
   "name_candidates": [
-    "STRIDE"
-  ]
+    "PACENOTE"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 STRIDE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "ラリーで助手席が読む『ペースノート』。走る・歩くリズムの指示"
 }

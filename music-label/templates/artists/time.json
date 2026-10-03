@@ -3,7 +3,7 @@
   "slug": "time",
   "axis": "time",
   "name": "MERIDIAN TAPE",
-  "name_status": "draft",
+  "name_status": "checked",
   "name_candidates": [
     "MERIDIAN TAPE",
     "Kassette Noir",
@@ -296,5 +296,16 @@
     "history": [],
     "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
   },
-  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する",
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "near",
+    "note": "Meridian Records（クラシックのレーベル）が近い。混同は低い",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
 }

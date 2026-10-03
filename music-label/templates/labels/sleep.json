@@ -1,8 +1,8 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "sleep",
-  "name": "LOW TIDE",
-  "name_status": "draft",
+  "name": "SLACK WATER",
+  "name_status": "checked",
   "parent": "etherarchi",
   "scene": "眠る前・眠りの中",
   "sound_center": [
@@ -51,7 +51,7 @@
     {
       "slug": "sleep_drone",
       "name": "VESSEL LOW",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
@@ -271,12 +271,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "sleep_piano",
       "name": "FELT HOUR",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
@@ -429,7 +440,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "FELT HOUR is part of the EtherArchi group (LOW TIDE). Felt piano, recorded after midnight."
+        "bio_en": "FELT HOUR is part of the EtherArchi group (SLACK WATER). Felt piano, recorded after midnight."
       },
       "collab": {
         "preferred_partners": [
@@ -473,12 +484,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "sleep_field",
       "name": "RAINLETTER",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "producer",
       "cadence": "weekly",
       "persona": {
@@ -654,7 +676,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "RAINLETTER is part of the EtherArchi group (LOW TIDE). Field recordings with a voice far away."
+        "bio_en": "RAINLETTER is part of the EtherArchi group (SLACK WATER). Field recordings with a voice far away."
       },
       "collab": {
         "preferred_partners": [
@@ -698,10 +720,33 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     }
   ],
   "name_candidates": [
-    "LOW TIDE"
-  ]
+    "SLACK WATER"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 LOW TIDE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "潮の流れが止まる『憩流』の時間。眠りに入る直前の静けさ"
 }

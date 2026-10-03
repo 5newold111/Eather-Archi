@@ -2,10 +2,10 @@
   "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
   "slug": "self",
   "axis": "self",
-  "name": "NULLROOM",
-  "name_status": "draft",
+  "name": "NULLFLOOR",
+  "name_status": "checked",
   "name_candidates": [
-    "NULLROOM",
+    "NULLFLOOR",
     "Null Room",
     "Room Zero"
   ],
@@ -53,7 +53,7 @@
       "how": "レーベルの 4 組が出た直後、素顔も名前も出さないプロデューサーが 4 組の曲をほどいたリミックスを匿名で送ってきた。正体は明かされていない。レーベルは『5 つ目の軸』として迎え入れた",
       "inspired_by_pattern": "匿名・覆面プロデューサーがリミックスから知られる型（素顔を出さずリミックスで名を広げたプロデューサーの経緯）",
       "first_release": "AURELINE の 1 曲目のリミックス。『NULLROOM remix』の表記が初めて付いた曲",
-      "name_meaning": "null（何もない）＋ room。床と壁と光だけの部屋"
+      "name_meaning": "null（何もない）＋ floor。床と光だけの部屋"
     }
   },
   "vocal": {
@@ -243,7 +243,7 @@
     "youtube_channel": null,
     "instagram": null,
     "tiktok": null,
-    "bio_en": "NULLROOM is a virtual producer from EtherArchi, a label where AI-generated music meets spatial design. Rebuilding the label's songs into loops for long drives."
+    "bio_en": "NULLFLOOR is a virtual producer from EtherArchi, a label where AI-generated music meets spatial design. Rebuilding the label's songs into loops for long drives."
   },
   "collab": {
     "preferred_partners": [
@@ -286,5 +286,16 @@
     "history": [],
     "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
   },
-  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する",
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 NULLROOM が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
 }

@@ -2,10 +2,10 @@
   "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
   "slug": "light",
   "axis": "light",
-  "name": "AURELINE",
-  "name_status": "draft",
+  "name": "LUMENLINE",
+  "name_status": "checked",
   "name_candidates": [
-    "AURELINE",
+    "LUMENLINE",
     "Eastlight Avenue",
     "Lumen Six"
   ],
@@ -53,7 +53,7 @@
       "how": "東向きの 6 畳の部屋で、朝 5 時台にスマートフォン 1 台で録った弾き語りを毎朝 1 本ずつ投稿。40 日目の動画が高速道路の運転手たちに拾われ、『朝の高速で聴く歌』として広がった",
       "inspired_by_pattern": "ベッドルーム録音の毎日投稿から見つかる型（自室録音を SNS に積み上げてデビューしたシンガーソングライターの経緯）",
       "first_release": "夏至の日の朝 6:00 に配信した 1 曲目。以後、配信はいつも朝の時間帯",
-      "name_meaning": "aure（金色）＋ line（線）。朝日が床に引く一本の線"
+      "name_meaning": "lumen（光の単位）＋ line。朝日が床に引く一本の光の線"
     }
   },
   "vocal": {
@@ -254,7 +254,7 @@
     "youtube_channel": null,
     "instagram": null,
     "tiktok": null,
-    "bio_en": "AURELINE is a virtual artist from EtherArchi, a label where AI-generated music meets spatial design. Morning highways, first light, a voice that opens like a window."
+    "bio_en": "LUMENLINE is a virtual artist from EtherArchi, a label where AI-generated music meets spatial design. Morning highways, first light, a voice that opens like a window."
   },
   "collab": {
     "preferred_partners": [
@@ -295,5 +295,16 @@
     "history": [],
     "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
   },
-  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する"
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する",
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 AURELINE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
 }

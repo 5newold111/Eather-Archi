@@ -1,8 +1,8 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "focus",
-  "name": "DEEP WORK DEPT.",
-  "name_status": "draft",
+  "name": "MONOTASK",
+  "name_status": "checked",
   "parent": "etherarchi",
   "scene": "仕事・勉強の集中",
   "sound_center": [
@@ -50,7 +50,7 @@
     {
       "slug": "focus_beats",
       "name": "GRIDPAPER",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "producer",
       "cadence": "weekly",
       "persona": {
@@ -209,7 +209,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "GRIDPAPER is part of the EtherArchi group (DEEP WORK DEPT.). Beats that stay out of your way."
+        "bio_en": "GRIDPAPER is part of the EtherArchi group (MONOTASK). Beats that stay out of your way."
       },
       "collab": {
         "preferred_partners": [
@@ -252,12 +252,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "focus_postrock",
       "name": "LONGFORM",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "band",
       "cadence": "biweekly",
       "_cadence_note": "曲が長い（5 分前後）ので隔週から始める",
@@ -430,7 +441,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "LONGFORM is part of the EtherArchi group (DEEP WORK DEPT.). Four players, no singer, slow builds for long afternoons."
+        "bio_en": "LONGFORM is part of the EtherArchi group (MONOTASK). Four players, no singer, slow builds for long afternoons."
       },
       "collab": {
         "preferred_partners": [
@@ -479,12 +490,23 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "near",
+        "note": "一般語。同名バンドは見つからず",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     },
     {
       "slug": "focus_modular",
       "name": "IRIS PATCH",
-      "name_status": "draft",
+      "name_status": "checked",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
@@ -659,7 +681,7 @@
         "spotify_uri": null,
         "apple_artist_id": null,
         "distrokid_artist_id": null,
-        "bio_en": "IRIS PATCH is part of the EtherArchi group (DEEP WORK DEPT.). A voice patched into a modular system."
+        "bio_en": "IRIS PATCH is part of the EtherArchi group (MONOTASK). A voice patched into a modular system."
       },
       "collab": {
         "preferred_partners": [
@@ -703,10 +725,33 @@
         "concept_version": 1,
         "history": [],
         "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
       }
     }
   ],
   "name_candidates": [
-    "DEEP WORK DEPT."
-  ]
+    "MONOTASK"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 DEEP WORK DEPT. が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "一度に一つのことだけ。集中の定義"
 }
