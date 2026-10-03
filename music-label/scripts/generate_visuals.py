@@ -44,6 +44,25 @@ def load_dotenv(path: Path) -> None:
 load_dotenv(ROOT / ".env")
 
 
+def ssl_context():
+    """
+    HTTPS の証明書検証に使う設定。
+    Mac の python.org 版 Python は証明書を持っていないことがあり、CERTIFICATE_VERIFY_FAILED になる。
+    certifi（pip install certifi）が入っていればそれを使い、無ければ標準の設定を使う。
+    """
+    import ssl
+    try:
+        import certifi  # type: ignore
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+SSL_HINT = ("証明書の問題です（鍵は関係ありません）。次のどちらかで直ります：\n"
+            "       A) pip3 install certifi   を実行してから再実行\n"
+            "       B) Finder の「アプリケーション → Python 3.x → Install Certificates.command」をダブルクリック")
+
+
 # 候補の枚数
 N_LOGO, N_PHOTO, N_COVER = 6, 8, 6
 
@@ -165,7 +184,7 @@ def generate_image(prompt: str, out_path: Path, size: str = "1024x1024") -> bool
     body = json.dumps({"model": "gpt-image-1", "prompt": prompt, "size": size, "n": 1}).encode()
     req = urllib.request.Request("https://api.openai.com/v1/images/generations", data=body,
                                  headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=180) as r:
+    with urllib.request.urlopen(req, timeout=180, context=ssl_context()) as r:
         data = json.loads(r.read())
     b64 = data["data"][0]["b64_json"]
     out_path.write_bytes(base64.b64decode(b64))
@@ -316,7 +335,8 @@ def main() -> None:
         print(f"  画像を {generated} 枚生成しました" + (f"（失敗 {len(errors)} 枚）" if errors else ""))
     if errors:
         first = errors[0]
-        hint = ("鍵が無効です。.env の OPENAI_API_KEY を確認（前後の空白・改行、sk- で始まるか）" if "401" in first else
+        hint = (SSL_HINT if "CERTIFICATE_VERIFY_FAILED" in first or "SSL" in first else
+                "鍵が無効です。.env の OPENAI_API_KEY を確認（前後の空白・改行、sk- で始まるか。`python3 scripts/set_key.py --check`）" if "401" in first else
                 "OpenAI 側の残高不足か回数制限です。platform.openai.com の Billing を確認" if "429" in first else
                 "画像モデルの利用が許可されていません。OpenAI の組織設定で gpt-image-1 の利用（本人確認）を確認" if "403" in first or "verif" in first.lower() else
                 "指示文が内容ポリシーで拒否されました。該当候補だけ除外して続行できます" if "safety" in first.lower() or "content_policy" in first.lower() else

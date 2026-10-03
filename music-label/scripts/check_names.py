@@ -44,6 +44,25 @@ def load_dotenv(path: Path) -> None:
 load_dotenv(ROOT / ".env")
 
 
+def ssl_context():
+    """
+    HTTPS の証明書検証に使う設定。
+    Mac の python.org 版 Python は証明書を持っていないことがあり、CERTIFICATE_VERIFY_FAILED になる。
+    certifi（pip install certifi）が入っていればそれを使い、無ければ標準の設定を使う。
+    """
+    import ssl
+    try:
+        import certifi  # type: ignore
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
+SSL_HINT = ("証明書の問題です（鍵は関係ありません）。次のどちらかで直ります：\n"
+            "       A) pip3 install certifi   を実行してから再実行\n"
+            "       B) Finder の「アプリケーション → Python 3.x → Install Certificates.command」をダブルクリック")
+
+
 
 def norm(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", s.lower())
@@ -51,7 +70,7 @@ def norm(s: str) -> str:
 
 def get_json(url: str, headers: dict | None = None, timeout: int = 20):
     req = urllib.request.Request(url, headers={"User-Agent": UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl_context()) as r:
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
@@ -86,7 +105,7 @@ def q_spotify(name: str) -> list[str] | None:
         auth = base64.b64encode(f"{cid}:{sec}".encode()).decode()
         req = urllib.request.Request("https://accounts.spotify.com/api/token", data=body,
                                      headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"})
-        with urllib.request.urlopen(req, timeout=20) as r:
+        with urllib.request.urlopen(req, timeout=20, context=ssl_context()) as r:
             _spotify_token = json.loads(r.read())["access_token"]
     d = get_json("https://api.spotify.com/v1/search?" + urllib.parse.urlencode({"q": f'artist:"{name}"', "type": "artist", "limit": 25}),
                  headers={"Authorization": f"Bearer {_spotify_token}"})
