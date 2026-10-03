@@ -1,100 +1,592 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "move",
-  "name": "MOVE_LABEL_TBD",
+  "name": "STRIDE",
   "name_status": "draft",
   "parent": "etherarchi",
   "scene": "歩く・走る・体を動かす",
-  "sound_center": ["テンポの速いポップ", "エレクトロ"],
-  "expansion_path": ["ドラムンベース", "アフロビーツ", "走るためのロック", "ハイテンポのハウス"],
-  "scene_spec": { "bpm_min": 120, "bpm_max": 175, "length_sec_min": 150, "length_sec_max": 210, "hook_within_sec": 20, "no_sudden_silence": true,
-    "_説明": "歩幅・足音に合う BPM。ウォーク 120〜130、ジョグ 150〜165、ラン 170〜175。サビは 20 秒以内" },
+  "sound_center": [
+    "テンポの速いポップ",
+    "エレクトロ"
+  ],
+  "expansion_path": [
+    "ドラムンベース",
+    "アフロビーツ",
+    "走るためのロック",
+    "ハイテンポのハウス"
+  ],
+  "scene_spec": {
+    "bpm_min": 120,
+    "bpm_max": 175,
+    "length_sec_min": 150,
+    "length_sec_max": 210,
+    "hook_within_sec": 20,
+    "no_sudden_silence": true,
+    "_説明": "歩幅・足音に合う BPM。ウォーク 120〜130、ジョグ 150〜165、ラン 170〜175。サビは 20 秒以内"
+  },
   "automation_tier": "B",
   "max_weekly_releases": 8,
   "release_hour_et": 6,
   "release_weekday": "saturday",
   "_release": "土曜 6:00 ET（日本 土曜 19:00/20:00）。週末の朝の運動に届く",
-  "accounts": { "distrokid_email": "move-label", "spotify_for_artists_team": "move-team", "apple_music_for_artists_team": "", "youtube_channel": "", "instagram": "", "tiktok": "" },
-  "visual": { "space_theme": "屋外。河川敷、階段、橋の上。空が広い", "palette": ["白", "空色", "蛍光の差し色"], "cover_series_rule": "地面の素材（アスファルト / 芝 / 階段）と空の比率だけ変える" },
-
+  "accounts": {
+    "distrokid_email": "move-label",
+    "spotify_for_artists_team": "move-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "屋外。河川敷、階段、橋の上。空が広い",
+    "palette": [
+      "白",
+      "空色",
+      "蛍光の差し色"
+    ],
+    "cover_series_rule": "地面の素材（アスファルト / 芝 / 階段）と空の比率だけ変える"
+  },
   "artists": [
     {
       "slug": "move_belter",
-      "name": "MOVE_BELTER_TBD",
+      "name": "KILO VERA",
       "name_status": "draft",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "vocal", "description": "女性。圧倒的な声量が持ち味。高音を張って抜ける" }],
+        "members": [
+          {
+            "role": "vocal",
+            "description": "女性。圧倒的な声量が持ち味。高音を張って抜ける"
+          }
+        ],
         "age_feel": "20 代半ば",
         "story": "朝の河川敷を走りながら歌っていた人。息が切れても声が出る",
         "scene": "ランニング",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["河川敷の朝の風", "橋の下の反響"] },
-        "influences": [{ "name": "（bio のみ）", "era": "2010s", "genre": "パワーポップ / EDM ポップ", "what_was_taken": "サビで一気に開く声量の落差" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "河川敷の朝の風",
+            "橋の下の反響"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2010s",
+            "genre": "パワーポップ / EDM ポップ",
+            "what_was_taken": "サビで一気に開く声量の落差"
+          }
+        ],
+        "formation_story": {
+          "started": "2024 年",
+          "how": "朝の河川敷で走りながら歌う人として近所で知られていた。マラソン大会の沿道で歌った応援が中継に乗り、翌週に声がかかった",
+          "inspired_by_pattern": "路上・イベントでの歌が中継や動画で広がる型（路上やスポーツイベントで歌って見つかったシンガーの経緯）",
+          "first_release": "『ラスト 1 キロ』",
+          "name_meaning": "kilo（1 km）＋ vera（真実）"
+        }
       },
-      "vocal": { "sex": "female", "range": "high", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "A3", "comfortable_high": "F5", "chest_voice_top": "E5", "falsetto_switch_point": "F#5", "falsetto_quality": "鋭く、芯がある", "strength": "圧倒的な声量、高音のロングトーン", "weakness": "小さな声で歌うと平坦になる" },
-        "signature_techniques": { "primary": "圧倒的な声量で押し切るベルティング", "secondary": ["ささやきから張り上げまでの急な落差", "しゃくり上げ"], "avoid": ["囁くようなウィスパー（1 曲通して）", "ハミング", "語りに近い歌"], "wordless_style": "ooh / ah のコーラス（大きく）",
-          "tics": [{ "technique": "サビ前の 1 拍だけ囁いてから張る", "where": "各サビ前", "frequency": "every_song" }, { "technique": "ラスサビの最高音を 4 拍以上伸ばす", "where": "ラスサビ", "frequency": "every_song" }] },
-        "melodic_tendency": { "motion": "サビ頭で 6 度以上の跳躍", "chorus_peak": "切り替え点のすぐ下（E5）で地声を張る", "verse_register": "中音域で抑える（落差のため）" } },
-      "composition_habits": { "modulation": "ラスサビで全音上げ", "intro": "キックの四つ打ちから 2 小節で歌", "outro": "サビの最後の音で即終了", "phrase_endings": "伸ばして切る", "structure": "Verse-Pre-Chorus-Chorus × 2 → Bridge → ラスサビ", "instruments_rule": "四つ打ちのキック必須", "always": ["サビ前の囁き → 爆発"], "never": ["フェードアウト", "ブレイクの長い無音"] },
-      "sound": { "genres": ["EDM pop", "power pop"], "palette": ["四つ打ちキック", "シンセリード", "サイドチェーンのパッド", "手拍子", "ボーカルの大きな重ね"], "bpm_min": 150, "bpm_max": 170, "energy_curve_type": "5-6-7-10-6-7-10-10", "dna_tags": ["move", "run", "edm", "pop", "power", "bright"], "forbidden": ["フェードアウト", "急な無音", "遅いテンポ"] },
-      "lyrics": { "themes": ["走り出す", "息", "橋を渡る", "昨日より遠く"], "point_of_view": "私 → あなたへの呼びかけ", "primary_language": "en", "trend_language_ok": false, "tone": "前向きで強い" },
-      "visual": { "space": "朝の河川敷。空が 7 割", "light": "朝日の逆光", "materials": ["アスファルト", "芝", "空"], "palette": ["白", "空色", "蛍光オレンジ"], "camera": "低い位置から空を見上げる", "cover_series_rule": "空の比率と地面の素材だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. A voice built for the last kilometer." },
-      "collab": { "preferred_partners": ["move_electro"], "collab_style": "feat. で客演" }
+      "vocal": {
+        "sex": "female",
+        "range": "high",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "A3",
+          "comfortable_high": "F5",
+          "chest_voice_top": "E5",
+          "falsetto_switch_point": "F#5",
+          "falsetto_quality": "鋭く、芯がある",
+          "strength": "圧倒的な声量、高音のロングトーン",
+          "weakness": "小さな声で歌うと平坦になる"
+        },
+        "signature_techniques": {
+          "primary": "圧倒的な声量で押し切るベルティング",
+          "secondary": [
+            "ささやきから張り上げまでの急な落差",
+            "しゃくり上げ"
+          ],
+          "avoid": [
+            "囁くようなウィスパー（1 曲通して）",
+            "ハミング",
+            "語りに近い歌"
+          ],
+          "wordless_style": "ooh / ah のコーラス（大きく）",
+          "tics": [
+            {
+              "technique": "サビ前の 1 拍だけ囁いてから張る",
+              "where": "各サビ前",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "ラスサビの最高音を 4 拍以上伸ばす",
+              "where": "ラスサビ",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "サビ頭で 6 度以上の跳躍",
+          "chorus_peak": "切り替え点のすぐ下（E5）で地声を張る",
+          "verse_register": "中音域で抑える（落差のため）"
+        }
+      },
+      "composition_habits": {
+        "modulation": "ラスサビで全音上げ",
+        "intro": "キックの四つ打ちから 2 小節で歌",
+        "outro": "サビの最後の音で即終了",
+        "phrase_endings": "伸ばして切る",
+        "structure": "Verse-Pre-Chorus-Chorus × 2 → Bridge → ラスサビ",
+        "instruments_rule": "四つ打ちのキック必須",
+        "always": [
+          "サビ前の囁き → 爆発"
+        ],
+        "never": [
+          "フェードアウト",
+          "ブレイクの長い無音"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "EDM pop",
+          "power pop"
+        ],
+        "palette": [
+          "四つ打ちキック",
+          "シンセリード",
+          "サイドチェーンのパッド",
+          "手拍子",
+          "ボーカルの大きな重ね"
+        ],
+        "bpm_min": 150,
+        "bpm_max": 170,
+        "energy_curve_type": "5-6-7-10-6-7-10-10",
+        "dna_tags": [
+          "move",
+          "run",
+          "edm",
+          "pop",
+          "power",
+          "bright"
+        ],
+        "forbidden": [
+          "フェードアウト",
+          "急な無音",
+          "遅いテンポ"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "走り出す",
+          "息",
+          "橋を渡る",
+          "昨日より遠く"
+        ],
+        "point_of_view": "私 → あなたへの呼びかけ",
+        "primary_language": "en",
+        "trend_language_ok": false,
+        "tone": "前向きで強い"
+      },
+      "visual": {
+        "space": "朝の河川敷。空が 7 割",
+        "light": "朝日の逆光",
+        "materials": [
+          "アスファルト",
+          "芝",
+          "空"
+        ],
+        "palette": [
+          "白",
+          "空色",
+          "蛍光オレンジ"
+        ],
+        "camera": "低い位置から空を見上げる",
+        "cover_series_rule": "空の比率と地面の素材だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "KILO VERA is part of the EtherArchi group (STRIDE). A voice built for the last kilometer."
+      },
+      "collab": {
+        "preferred_partners": [
+          "move_electro"
+        ],
+        "collab_style": "feat. で客演"
+      },
+      "name_candidates": [
+        "KILO VERA",
+        "Vera Kilo"
+      ]
     },
     {
       "slug": "move_electro",
-      "name": "MOVE_ELECTRO_TBD",
+      "name": "CROSSWALK",
       "name_status": "draft",
       "formation": "duo",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "vocal / synth", "description": "男性。中音域、クールで乾いた声" }, { "role": "vocal / drums", "description": "女性。低めでハスキー。掛け合い担当" }],
+        "members": [
+          {
+            "role": "vocal / synth",
+            "description": "男性。中音域、クールで乾いた声"
+          },
+          {
+            "role": "vocal / drums",
+            "description": "女性。低めでハスキー。掛け合い担当"
+          }
+        ],
         "age_feel": "30 代の 2 人",
         "story": "街を歩く速度で作る 2 人。歌は会話のように短い",
         "scene": "ウォーキング、通勤の早歩き",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["駅の階段の足音", "ガラス張りの街の反射"] },
-        "influences": [{ "name": "（bio のみ）", "era": "2000s", "genre": "エレクトロ / インディーダンス", "what_was_taken": "男女の短い掛け合いと乾いたドラム" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "駅の階段の足音",
+            "ガラス張りの街の反射"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2000s",
+            "genre": "エレクトロ / インディーダンス",
+            "what_was_taken": "男女の短い掛け合いと乾いたドラム"
+          }
+        ],
+        "formation_story": {
+          "started": "2023 年",
+          "how": "同じ駅の同じ階段を毎朝同じ時刻に上る 2 人。信号待ちで片方のイヤホンから漏れた曲を、もう片方が口ずさんだのが最初の会話",
+          "inspired_by_pattern": "通勤の偶然の出会いから結成する型（通勤電車や駅で知り合って結成した 2 人組の経緯）",
+          "first_release": "『青になるまで』",
+          "name_meaning": "横断歩道"
+        }
       },
-      "vocal": { "sex": "mixed", "range": "mid", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "B2（男）/ G3（女）", "comfortable_high": "E4（男）/ C5（女）", "chest_voice_top": "F4 / D5", "falsetto_switch_point": "G4 / E5", "falsetto_quality": "使わない（地声のまま）", "strength": "言葉を刻むリズム感", "weakness": "ロングトーン" },
-        "signature_techniques": { "primary": "言葉を刻む（ラップ寄り）", "secondary": ["男女の掛け合い", "語尾を切る（スタッカート）"], "avoid": ["ベルティング", "ビブラート", "ハミング"], "wordless_style": "無言で楽器に任せる",
-          "tics": [{ "technique": "男女の 1 語ずつの掛け合い", "where": "サビ", "frequency": "every_song" }, { "technique": "数を数える（1, 2, 3, 4）", "where": "ブレイク", "frequency": "most" }] },
-        "melodic_tendency": { "motion": "同音連打。音程より言葉", "chorus_peak": "頂点を作らない。リズムで盛る", "verse_register": "中音域、乾いた声" } },
-      "composition_habits": { "modulation": "転調なし", "intro": "ドラムマシンのみ 4 小節", "outro": "ドラムだけ残して止める", "phrase_endings": "切る", "structure": "A-B-A-B-Break-B", "instruments_rule": "ドラムマシンの乾いた音必須", "always": ["男女の掛け合い"], "never": ["リバーブの深いボーカル", "生ドラム"] },
-      "sound": { "genres": ["electro", "indie dance"], "palette": ["ドラムマシン", "モノシンセのベース", "短いシンセのスタブ", "手拍子"], "bpm_min": 120, "bpm_max": 132, "energy_curve_type": "5-6-7-6-7-5-8-5", "dna_tags": ["move", "walk", "electro", "dry", "city"], "forbidden": ["深いリバーブ", "急な無音", "バラード"] },
-      "lyrics": { "themes": ["歩く速度", "街の反射", "信号", "短い会話"], "point_of_view": "私 / あなた（交互）", "primary_language": "en", "trend_language_ok": true, "trend_language_max_ratio": 0.15, "tone": "クール、少し皮肉" },
-      "visual": { "space": "駅の階段とガラスの反射", "light": "昼の硬い光", "materials": ["ガラス", "コンクリート", "金属"], "palette": ["白", "グレー", "蛍光イエロー"], "camera": "歩く目線", "cover_series_rule": "階段の段数と反射の角度だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Two voices at walking speed." },
-      "collab": { "preferred_partners": ["move_belter", "move_loud"], "collab_style": "feat. で客演" }
+      "vocal": {
+        "sex": "mixed",
+        "range": "mid",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "B2（男）/ G3（女）",
+          "comfortable_high": "E4（男）/ C5（女）",
+          "chest_voice_top": "F4 / D5",
+          "falsetto_switch_point": "G4 / E5",
+          "falsetto_quality": "使わない（地声のまま）",
+          "strength": "言葉を刻むリズム感",
+          "weakness": "ロングトーン"
+        },
+        "signature_techniques": {
+          "primary": "言葉を刻む（ラップ寄り）",
+          "secondary": [
+            "男女の掛け合い",
+            "語尾を切る（スタッカート）"
+          ],
+          "avoid": [
+            "ベルティング",
+            "ビブラート",
+            "ハミング"
+          ],
+          "wordless_style": "無言で楽器に任せる",
+          "tics": [
+            {
+              "technique": "男女の 1 語ずつの掛け合い",
+              "where": "サビ",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "数を数える（1, 2, 3, 4）",
+              "where": "ブレイク",
+              "frequency": "most"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "同音連打。音程より言葉",
+          "chorus_peak": "頂点を作らない。リズムで盛る",
+          "verse_register": "中音域、乾いた声"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし",
+        "intro": "ドラムマシンのみ 4 小節",
+        "outro": "ドラムだけ残して止める",
+        "phrase_endings": "切る",
+        "structure": "A-B-A-B-Break-B",
+        "instruments_rule": "ドラムマシンの乾いた音必須",
+        "always": [
+          "男女の掛け合い"
+        ],
+        "never": [
+          "リバーブの深いボーカル",
+          "生ドラム"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "electro",
+          "indie dance"
+        ],
+        "palette": [
+          "ドラムマシン",
+          "モノシンセのベース",
+          "短いシンセのスタブ",
+          "手拍子"
+        ],
+        "bpm_min": 120,
+        "bpm_max": 132,
+        "energy_curve_type": "5-6-7-6-7-5-8-5",
+        "dna_tags": [
+          "move",
+          "walk",
+          "electro",
+          "dry",
+          "city"
+        ],
+        "forbidden": [
+          "深いリバーブ",
+          "急な無音",
+          "バラード"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "歩く速度",
+          "街の反射",
+          "信号",
+          "短い会話"
+        ],
+        "point_of_view": "私 / あなた（交互）",
+        "primary_language": "en",
+        "trend_language_ok": true,
+        "trend_language_max_ratio": 0.15,
+        "tone": "クール、少し皮肉"
+      },
+      "visual": {
+        "space": "駅の階段とガラスの反射",
+        "light": "昼の硬い光",
+        "materials": [
+          "ガラス",
+          "コンクリート",
+          "金属"
+        ],
+        "palette": [
+          "白",
+          "グレー",
+          "蛍光イエロー"
+        ],
+        "camera": "歩く目線",
+        "cover_series_rule": "階段の段数と反射の角度だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "CROSSWALK is part of the EtherArchi group (STRIDE). Two voices at walking speed."
+      },
+      "collab": {
+        "preferred_partners": [
+          "move_belter",
+          "move_loud"
+        ],
+        "collab_style": "feat. で客演"
+      },
+      "name_candidates": [
+        "CROSSWALK",
+        "Crosswalk Duo"
+      ]
     },
     {
       "slug": "move_loud",
-      "name": "MOVE_LOUD_TBD",
+      "name": "LAST HILL",
       "name_status": "draft",
       "formation": "band",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "vocal / guitar", "description": "男性。シャウトとラウドが持ち味。歪んだ声" }, { "role": "guitar", "description": "" }, { "role": "bass", "description": "" }, { "role": "drums", "description": "速い" }],
+        "members": [
+          {
+            "role": "vocal / guitar",
+            "description": "男性。シャウトとラウドが持ち味。歪んだ声"
+          },
+          {
+            "role": "guitar",
+            "description": ""
+          },
+          {
+            "role": "bass",
+            "description": ""
+          },
+          {
+            "role": "drums",
+            "description": "速い"
+          }
+        ],
         "age_feel": "20 代の 4 人",
         "story": "ジムの隅で鳴っていてほしい音を、そのまま作るバンド",
         "scene": "ジム、坂道のダッシュ",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["地下の練習スタジオの汗の匂い", "深夜の国道の照明"] },
-        "influences": [{ "name": "（bio のみ）", "era": "1990s〜2000s", "genre": "オルタナ / ポップパンク", "what_was_taken": "サビで全員が叫ぶ構造" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "地下の練習スタジオの汗の匂い",
+            "深夜の国道の照明"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1990s〜2000s",
+            "genre": "オルタナ / ポップパンク",
+            "what_was_taken": "サビで全員が叫ぶ構造"
+          }
+        ],
+        "formation_story": {
+          "started": "2022 年",
+          "how": "地下の練習スタジオで隣の部屋同士だった 2 組のバンドが、それぞれ解散して残った 4 人で結成。ジムのトレーナーだったベーシストの提案で『走るためのロック』に",
+          "inspired_by_pattern": "解散した 2 バンドの残党が合流する型（複数のバンドの元メンバーが集まって結成したロックバンドの経緯）",
+          "first_release": "『坂』",
+          "name_meaning": "最後の坂"
+        }
       },
-      "vocal": { "sex": "male", "range": "mid", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "A2", "comfortable_high": "G4", "chest_voice_top": "A4", "falsetto_switch_point": "B4", "falsetto_quality": "ほとんど使わず、代わりに歪ませる", "strength": "シャウト、ラウドでも音程が保てる", "weakness": "静かな曲" },
-        "signature_techniques": { "primary": "シャウト／ラウド（歪ませて張り上げる）", "secondary": ["全員のコーラス（ギャングボーカル）", "ささやきから張り上げまでの急な落差"], "avoid": ["囁くようなウィスパー（1 曲通して）", "ビブラート", "la-la-la"], "wordless_style": "全員で「Hey!」「Woah!」",
-          "tics": [{ "technique": "Woah-oh の全員コーラス", "where": "サビ後", "frequency": "every_song" }, { "technique": "一度だけのシャウト（1 語）", "where": "ブリッジの終わり", "frequency": "every_song" }] },
-        "melodic_tendency": { "motion": "ペンタトニック、順次進行で駆け上がる", "chorus_peak": "切り替え点（B4）の上を歪ませて越える", "verse_register": "中低音域" } },
-      "composition_habits": { "modulation": "ブリッジで半音下げ、ラスサビで戻す", "intro": "ギターリフ 2 小節 → 全員", "outro": "全員が同じ 1 音で止める", "phrase_endings": "切る", "structure": "Verse-Chorus × 2 → Bridge（静）→ ラスサビ（最大）", "instruments_rule": "歪んだギター 2 本必須", "always": ["ギャングボーカル"], "never": ["シンセ", "フェードアウト"] },
-      "sound": { "genres": ["alt rock", "pop punk"], "palette": ["歪んだギター × 2", "ベース", "速い生ドラム", "ギャングボーカル"], "bpm_min": 160, "bpm_max": 175, "energy_curve_type": "7-6-9-6-9-4-10-10", "dna_tags": ["move", "run", "rock", "loud", "fast"], "forbidden": ["シンセ", "フェードアウト", "急な無音"] },
-      "lyrics": { "themes": ["限界", "坂", "やめない", "汗"], "point_of_view": "俺たち", "primary_language": "en", "trend_language_ok": false, "tone": "まっすぐ、熱い" },
-      "visual": { "space": "坂道の上から見下ろす街。空が広い", "light": "真昼の硬い光", "materials": ["アスファルト", "ガードレール"], "palette": ["白", "空色", "蛍光レッド"], "camera": "坂の上", "cover_series_rule": "坂の角度だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Loud enough for the last hill." },
-      "collab": { "preferred_partners": ["move_electro"], "collab_style": "feat. で客演（相手の曲で 1 シャウト）" }
+      "vocal": {
+        "sex": "male",
+        "range": "mid",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "A2",
+          "comfortable_high": "G4",
+          "chest_voice_top": "A4",
+          "falsetto_switch_point": "B4",
+          "falsetto_quality": "ほとんど使わず、代わりに歪ませる",
+          "strength": "シャウト、ラウドでも音程が保てる",
+          "weakness": "静かな曲"
+        },
+        "signature_techniques": {
+          "primary": "シャウト／ラウド（歪ませて張り上げる）",
+          "secondary": [
+            "全員のコーラス（ギャングボーカル）",
+            "ささやきから張り上げまでの急な落差"
+          ],
+          "avoid": [
+            "囁くようなウィスパー（1 曲通して）",
+            "ビブラート",
+            "la-la-la"
+          ],
+          "wordless_style": "全員で「Hey!」「Woah!」",
+          "tics": [
+            {
+              "technique": "Woah-oh の全員コーラス",
+              "where": "サビ後",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "一度だけのシャウト（1 語）",
+              "where": "ブリッジの終わり",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "ペンタトニック、順次進行で駆け上がる",
+          "chorus_peak": "切り替え点（B4）の上を歪ませて越える",
+          "verse_register": "中低音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "ブリッジで半音下げ、ラスサビで戻す",
+        "intro": "ギターリフ 2 小節 → 全員",
+        "outro": "全員が同じ 1 音で止める",
+        "phrase_endings": "切る",
+        "structure": "Verse-Chorus × 2 → Bridge（静）→ ラスサビ（最大）",
+        "instruments_rule": "歪んだギター 2 本必須",
+        "always": [
+          "ギャングボーカル"
+        ],
+        "never": [
+          "シンセ",
+          "フェードアウト"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "alt rock",
+          "pop punk"
+        ],
+        "palette": [
+          "歪んだギター × 2",
+          "ベース",
+          "速い生ドラム",
+          "ギャングボーカル"
+        ],
+        "bpm_min": 160,
+        "bpm_max": 175,
+        "energy_curve_type": "7-6-9-6-9-4-10-10",
+        "dna_tags": [
+          "move",
+          "run",
+          "rock",
+          "loud",
+          "fast"
+        ],
+        "forbidden": [
+          "シンセ",
+          "フェードアウト",
+          "急な無音"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "限界",
+          "坂",
+          "やめない",
+          "汗"
+        ],
+        "point_of_view": "俺たち",
+        "primary_language": "en",
+        "trend_language_ok": false,
+        "tone": "まっすぐ、熱い"
+      },
+      "visual": {
+        "space": "坂道の上から見下ろす街。空が広い",
+        "light": "真昼の硬い光",
+        "materials": [
+          "アスファルト",
+          "ガードレール"
+        ],
+        "palette": [
+          "白",
+          "空色",
+          "蛍光レッド"
+        ],
+        "camera": "坂の上",
+        "cover_series_rule": "坂の角度だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "LAST HILL is part of the EtherArchi group (STRIDE). Loud enough for the last hill."
+      },
+      "collab": {
+        "preferred_partners": [
+          "move_electro"
+        ],
+        "collab_style": "feat. で客演（相手の曲で 1 シャウト）"
+      },
+      "name_candidates": [
+        "LAST HILL",
+        "The Last Hill"
+      ]
     }
+  ],
+  "name_candidates": [
+    "STRIDE"
   ]
 }

@@ -2,29 +2,60 @@
   "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
   "slug": "self",
   "axis": "self",
-  "name": "SELF_TBD",
+  "name": "NULLROOM",
   "name_status": "draft",
-  "name_candidates": [],
+  "name_candidates": [
+    "NULLROOM",
+    "Null Room",
+    "Room Zero"
+  ],
   "formation": "producer",
   "cadence": "weekly",
   "debut_week": "",
-
   "persona": {
-    "members": [{ "role": "producer", "description": "顔を出さないプロデューサー。他 4 組の素材をほどいて組み直す。声は素材として切り貼りし、自分では歌わない" }],
+    "members": [
+      {
+        "role": "producer",
+        "description": "顔を出さないプロデューサー。他 4 組の素材をほどいて組み直す。声は素材として切り貼りし、自分では歌わない"
+      }
+    ],
     "age_feel": "年齢不詳",
     "story": "レーベルの『つなぎ』。4 組の曲を分解し、長距離の無心な区間のためのループに組み直す。空間そのものを音にしたい人",
     "drive_scene": "全場面のつなぎ。長距離の無心な区間、深夜の高速",
     "origin": {
       "birthplace": "不明（本人が明かさない）",
       "upbringing": "何もない部屋で育ったと語る。床と壁と光だけ",
-      "landscape_words": ["何もない部屋の残響", "一方向からの柔らかい光", "深夜の高速の均一な走行音", "コンクリートの冷たさ"]
+      "landscape_words": [
+        "何もない部屋の残響",
+        "一方向からの柔らかい光",
+        "深夜の高速の均一な走行音",
+        "コンクリートの冷たさ"
+      ]
     },
     "influences": [
-      { "name": "（bio のみ）", "era": "1990s", "genre": "ディープハウス", "what_was_taken": "四つ打ちの上で、声の断片をループさせる手法", "reference_id": null },
-      { "name": "（bio のみ）", "era": "2010s", "genre": "ローファイハウス", "what_was_taken": "レコードノイズとフィルターの開閉で場面を変える", "reference_id": null }
-    ]
+      {
+        "name": "（bio のみ）",
+        "era": "1990s",
+        "genre": "ディープハウス",
+        "what_was_taken": "四つ打ちの上で、声の断片をループさせる手法",
+        "reference_id": null
+      },
+      {
+        "name": "（bio のみ）",
+        "era": "2010s",
+        "genre": "ローファイハウス",
+        "what_was_taken": "レコードノイズとフィルターの開閉で場面を変える",
+        "reference_id": null
+      }
+    ],
+    "formation_story": {
+      "started": "2024 年初夏",
+      "how": "レーベルの 4 組が出た直後、素顔も名前も出さないプロデューサーが 4 組の曲をほどいたリミックスを匿名で送ってきた。正体は明かされていない。レーベルは『5 つ目の軸』として迎え入れた",
+      "inspired_by_pattern": "匿名・覆面プロデューサーがリミックスから知られる型（素顔を出さずリミックスで名を広げたプロデューサーの経緯）",
+      "first_release": "AURELINE の 1 曲目のリミックス。『NULLROOM remix』の表記が初めて付いた曲",
+      "name_meaning": "null（何もない）＋ room。床と壁と光だけの部屋"
+    }
   },
-
   "vocal": {
     "sex": "none",
     "range": "mid",
@@ -41,13 +72,31 @@
     },
     "signature_techniques": {
       "primary": "声の切り貼り（他の組の 1 単語を 2 拍ループ）",
-      "secondary": ["ピッチを 1 オクターブ下げた声", "フィルターで声を開閉"],
-      "avoid": ["フルの歌詞", "自分の声"],
+      "secondary": [
+        "ピッチを 1 オクターブ下げた声",
+        "フィルターで声を開閉"
+      ],
+      "avoid": [
+        "フルの歌詞",
+        "自分の声"
+      ],
       "wordless_style": "無言で楽器に任せる（声は素材としてだけ）",
       "tics": [
-        { "technique": "リミックス元の組の声を 1 単語だけループ", "where": "ビートが入ってから 16 小節目", "frequency": "every_song" },
-        { "technique": "フィルターを完全に閉じて 2 小節", "where": "中間点", "frequency": "every_song" },
-        { "technique": "元の組の環境音（ワイパー / 雨 / 手拍子）を 1 つ残す", "where": "全体", "frequency": "every_song" }
+        {
+          "technique": "リミックス元の組の声を 1 単語だけループ",
+          "where": "ビートが入ってから 16 小節目",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "フィルターを完全に閉じて 2 小節",
+          "where": "中間点",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "元の組の環境音（ワイパー / 雨 / 手拍子）を 1 つ残す",
+          "where": "全体",
+          "frequency": "every_song"
+        }
       ]
     },
     "melodic_tendency": {
@@ -56,14 +105,25 @@
       "verse_register": "—"
     },
     "timbre_blend": {
-      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
-      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
-      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "main": {
+        "reference_id": null,
+        "weight": 0.6,
+        "traits": []
+      },
+      "sub1": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
+      "sub2": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
       "synthesized": "（声質は固定しない。曲ごとに素材として切り貼りする声を 6:2:2 で選ぶ）"
     },
     "guest_description": "（客演時は声ではなく、リミックス / 再構築という形で参加する）"
   },
-
   "composition_habits": {
     "modulation": "転調しない",
     "intro": "レコードノイズ → コードのループ 8 小節 → キックイン",
@@ -73,23 +133,59 @@
     "instruments_rule": "四つ打ちキックと、元の組の素材（声 1 単語・環境音 1 つ）を必ず",
     "rhythm": "四つ打ち。ハイハットは裏。スイングは 54〜56%",
     "lyrics_tic": "歌詞なし。元の組の曲名の 1 単語だけがループする",
-    "always": ["元の組へのクレジット（remix of ○○）", "長距離向けの 3〜4 分"],
-    "never": ["フルの歌詞", "急な無音", "極端に長いブレイクダウン", "元の組の声の全文使用"]
+    "always": [
+      "元の組へのクレジット（remix of ○○）",
+      "長距離向けの 3〜4 分"
+    ],
+    "never": [
+      "フルの歌詞",
+      "急な無音",
+      "極端に長いブレイクダウン",
+      "元の組の声の全文使用"
+    ]
   },
-
   "sound": {
-    "genres": ["house", "lo-fi house", "downtempo"],
-    "palette": ["四つ打ちキック", "声の切り貼り", "フィルターのかかったコード", "サイドチェーンのパッド", "レコードノイズ", "元の組の環境音"],
+    "genres": [
+      "house",
+      "lo-fi house",
+      "downtempo"
+    ],
+    "palette": [
+      "四つ打ちキック",
+      "声の切り貼り",
+      "フィルターのかかったコード",
+      "サイドチェーンのパッド",
+      "レコードノイズ",
+      "元の組の環境音"
+    ],
     "bpm_min": 100,
     "bpm_max": 124,
     "energy_curve_type": "3-5-7-7-5-8-8-4",
-    "dna_tags": ["house", "lofi", "instrumental", "texture", "loop", "drive", "night"],
-    "forbidden": ["フルの歌詞", "急な無音", "極端なブレイクダウンの長さ"],
-    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 180, "length_sec_max": 240, "no_sudden_silence": true }
+    "dna_tags": [
+      "house",
+      "lofi",
+      "instrumental",
+      "texture",
+      "loop",
+      "drive",
+      "night"
+    ],
+    "forbidden": [
+      "フルの歌詞",
+      "急な無音",
+      "極端なブレイクダウンの長さ"
+    ],
+    "drive_spec": {
+      "hook_within_sec": 30,
+      "length_sec_min": 180,
+      "length_sec_max": 240,
+      "no_sudden_silence": true
+    }
   },
-
   "lyrics": {
-    "themes": ["（歌詞なし。声は単語や母音の断片のみ）"],
+    "themes": [
+      "（歌詞なし。声は単語や母音の断片のみ）"
+    ],
     "point_of_view": "なし",
     "primary_language": "none",
     "trend_language_ok": false,
@@ -97,22 +193,37 @@
     "tone": "無心",
     "forbidden_topics": []
   },
-
   "visual": {
     "space": "4 組の空間を抽象化した、何もない部屋。床と壁と光だけ",
     "light": "一方向からの柔らかい光",
-    "materials": ["コンクリート", "空気"],
-    "palette": ["無彩色", "差し色なし"],
+    "materials": [
+      "コンクリート",
+      "空気"
+    ],
+    "palette": [
+      "無彩色",
+      "差し色なし"
+    ],
     "camera": "正面。完全な対称",
     "cover_series_rule": "リミックス元の組の色を 1 色だけ、床の光として置く",
     "blend_file": null
   },
-
   "distribution": {
-    "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null,
-    "youtube_channel": null, "instagram": null, "tiktok": null,
-    "bio_en": "A virtual producer from EtherArchi, a label where AI-generated music meets spatial design. Rebuilding the label's songs into loops for long drives."
+    "spotify_uri": null,
+    "apple_artist_id": null,
+    "distrokid_artist_id": null,
+    "youtube_channel": null,
+    "instagram": null,
+    "tiktok": null,
+    "bio_en": "NULLROOM is a virtual producer from EtherArchi, a label where AI-generated music meets spatial design. Rebuilding the label's songs into loops for long drives."
   },
-
-  "collab": { "preferred_partners": ["light", "time", "shape", "quality"], "collab_style": "remix で再構築。『SELF remix of ○○』として配信。第 5 週は前 4 週のどれかをリミックス" }
+  "collab": {
+    "preferred_partners": [
+      "light",
+      "time",
+      "shape",
+      "quality"
+    ],
+    "collab_style": "remix で再構築。『SELF remix of ○○』として配信。第 5 週は前 4 週のどれかをリミックス"
+  }
 }

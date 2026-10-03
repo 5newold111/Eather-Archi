@@ -2,29 +2,60 @@
   "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
   "slug": "time",
   "axis": "time",
-  "name": "TIME_TBD",
+  "name": "MERIDIAN TAPE",
   "name_status": "draft",
-  "name_candidates": [],
+  "name_candidates": [
+    "MERIDIAN TAPE",
+    "Kassette Noir",
+    "Ring Road Nine"
+  ],
   "formation": "solo",
   "cadence": "weekly",
   "debut_week": "",
-
   "persona": {
-    "members": [{ "role": "vocal / synth", "description": "男性。低くて少しかすれた声。語るように歌う" }],
+    "members": [
+      {
+        "role": "vocal / synth",
+        "description": "男性。低くて少しかすれた声。語るように歌う"
+      }
+    ],
     "age_feel": "30 代前半",
     "story": "仕事のあと、用もなく環状線を一周してから帰る。古い車のカセットデッキで 80 年代を聴いて育ったが、当時を知らない",
     "drive_scene": "夜のドライブ、街灯、環状線",
     "origin": {
       "birthplace": "港湾都市の埠頭の近く",
       "upbringing": "父の中古車の助手席。夜の高架道路の街灯が等間隔に流れるのを数えて育った",
-      "landscape_words": ["港の湿った夜気", "等間隔に流れる街灯", "雨粒のついたフロントガラス", "ダッシュボードの淡い発光"]
+      "landscape_words": [
+        "港の湿った夜気",
+        "等間隔に流れる街灯",
+        "雨粒のついたフロントガラス",
+        "ダッシュボードの淡い発光"
+      ]
     },
     "influences": [
-      { "name": "（bio のみ）", "era": "1980s", "genre": "シンセポップ / ニューロマンティック", "what_was_taken": "ゲートリバーブのスネアと、低い声で語る歌", "reference_id": null },
-      { "name": "（bio のみ）", "era": "2010s", "genre": "シンセウェーブ", "what_was_taken": "80 年代の記憶を現代の太い低音で鳴らす配分", "reference_id": null }
-    ]
+      {
+        "name": "（bio のみ）",
+        "era": "1980s",
+        "genre": "シンセポップ / ニューロマンティック",
+        "what_was_taken": "ゲートリバーブのスネアと、低い声で語る歌",
+        "reference_id": null
+      },
+      {
+        "name": "（bio のみ）",
+        "era": "2010s",
+        "genre": "シンセウェーブ",
+        "what_was_taken": "80 年代の記憶を現代の太い低音で鳴らす配分",
+        "reference_id": null
+      }
+    ],
+    "formation_story": {
+      "started": "2023 年冬",
+      "how": "深夜ラジオの『自作曲コーナー』にカセットテープで送り続けた無名のリスナー。局が番組の最後に流した 90 秒がきっかけで、本人の許可を得てラジオ局が初めてデジタル配信した",
+      "inspired_by_pattern": "深夜ラジオへの投稿・自主制作カセットから世に出る型（ラジオ DJ に拾われてデビューしたシンセ系ソロの経緯）",
+      "first_release": "ラジオで流れた 90 秒を 3 分半に広げた曲。ジャケットは番組ディレクターが撮った夜の環状線",
+      "name_meaning": "meridian（子午線＝深夜 0 時の線）＋ tape（カセット）"
+    }
   },
-
   "vocal": {
     "sex": "male",
     "range": "low",
@@ -41,13 +72,34 @@
     },
     "signature_techniques": {
       "primary": "語尾のフォール（下げて落とす）",
-      "secondary": ["囁くようなウィスパー（A メロ）", "低音のハミング", "拍の後ろにもたれる"],
-      "avoid": ["シャウト／ラウド", "ベルティング", "速いビブラート", "la-la-la"],
+      "secondary": [
+        "囁くようなウィスパー（A メロ）",
+        "低音のハミング",
+        "拍の後ろにもたれる"
+      ],
+      "avoid": [
+        "シャウト／ラウド",
+        "ベルティング",
+        "速いビブラート",
+        "la-la-la"
+      ],
       "wordless_style": "ハミング（低く）",
       "tics": [
-        { "technique": "低音のハミング", "where": "アウトロ", "frequency": "every_song" },
-        { "technique": "ブリッジの最後の 1 フレーズだけ裏声", "where": "ブリッジ末", "frequency": "every_song" },
-        { "technique": "歌い出しの前に 1 拍の休符", "where": "各セクションの頭", "frequency": "every_song" }
+        {
+          "technique": "低音のハミング",
+          "where": "アウトロ",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "ブリッジの最後の 1 フレーズだけ裏声",
+          "where": "ブリッジ末",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "歌い出しの前に 1 拍の休符",
+          "where": "各セクションの頭",
+          "frequency": "every_song"
+        }
       ]
     },
     "melodic_tendency": {
@@ -56,14 +108,25 @@
       "verse_register": "地声の最低音域（F2〜A2）で語る"
     },
     "timbre_blend": {
-      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
-      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
-      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "main": {
+        "reference_id": null,
+        "weight": 0.6,
+        "traits": []
+      },
+      "sub1": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
+      "sub2": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
       "synthesized": "（参考曲 DB が 10 曲以上たまったら、male・low の 3 曲から 6:2:2 で合成）"
     },
     "guest_description": "低くて少しかすれた男性ボイス。語るように歌い、語尾を静かに落とす。息が多い"
   },
-
   "composition_habits": {
     "modulation": "転調しない。代わりにブリッジで同主長調の和音を 1 つ借りる",
     "intro": "環境音（ワイパー / ウインカー / 雨）→ アルペジオシンセ 8 小節 → 歌",
@@ -73,46 +136,104 @@
     "instruments_rule": "ゲートリバーブのスネアと、交互型 16 分のアルペジオシンセを必ず",
     "rhythm": "ハーフタイム気味のキック。スネアは数ミリ秒遅らせてもたらせる",
     "lyrics_tic": "毎曲、車の部品か計器の名前を 1 つ入れる（ワイパー、ダッシュボード、燃料計 …）",
-    "always": ["環境音から始まる", "4 コードのループ"],
-    "never": ["明るすぎるメジャー一辺倒", "急な無音", "速いカット感", "ラップ"]
+    "always": [
+      "環境音から始まる",
+      "4 コードのループ"
+    ],
+    "never": [
+      "明るすぎるメジャー一辺倒",
+      "急な無音",
+      "速いカット感",
+      "ラップ"
+    ]
   },
-
   "sound": {
-    "genres": ["retrowave", "synthwave", "night pop"],
-    "palette": ["アナログ風シンセパッド", "ゲートリバーブのスネア", "サブベース", "交互型アルペジオシンセ", "クリーンギター少量", "環境音"],
+    "genres": [
+      "retrowave",
+      "synthwave",
+      "night pop"
+    ],
+    "palette": [
+      "アナログ風シンセパッド",
+      "ゲートリバーブのスネア",
+      "サブベース",
+      "交互型アルペジオシンセ",
+      "クリーンギター少量",
+      "環境音"
+    ],
     "bpm_min": 95,
     "bpm_max": 105,
     "energy_curve_type": "3-4-7-5-7-4-9-3",
-    "dna_tags": ["night", "retro", "synth", "drive", "nostalgia", "city"],
-    "forbidden": ["明るすぎるメジャーコード一辺倒", "急な無音", "速すぎるカット感"],
-    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 160, "length_sec_max": 220, "no_sudden_silence": true }
+    "dna_tags": [
+      "night",
+      "retro",
+      "synth",
+      "drive",
+      "nostalgia",
+      "city"
+    ],
+    "forbidden": [
+      "明るすぎるメジャーコード一辺倒",
+      "急な無音",
+      "速すぎるカット感"
+    ],
+    "drive_spec": {
+      "hook_within_sec": 30,
+      "length_sec_min": 160,
+      "length_sec_max": 220,
+      "no_sudden_silence": true
+    }
   },
-
   "lyrics": {
-    "themes": ["夜の移動", "記憶", "街灯の反復", "戻れない時間", "受け入れ"],
+    "themes": [
+      "夜の移動",
+      "記憶",
+      "街灯の反復",
+      "戻れない時間",
+      "受け入れ"
+    ],
     "point_of_view": "私（回想と現在の往復。2 番で二人称が消える）",
     "primary_language": "en",
     "trend_language_ok": false,
     "trend_language_max_ratio": 0.0,
     "tone": "ノスタルジック。湿りすぎない",
-    "forbidden_topics": ["宗教", "政治", "特定の人物"]
+    "forbidden_topics": [
+      "宗教",
+      "政治",
+      "特定の人物"
+    ]
   },
-
   "visual": {
     "space": "夜の車内。ダッシュボード越しに流れる街灯",
     "light": "点光源の反復。計器の淡い発光",
-    "materials": ["古い革シート", "黒いダッシュボード", "雨粒のついたガラス"],
-    "palette": ["群青", "アンバー", "黒"],
+    "materials": [
+      "古い革シート",
+      "黒いダッシュボード",
+      "雨粒のついたガラス"
+    ],
+    "palette": [
+      "群青",
+      "アンバー",
+      "黒"
+    ],
     "camera": "助手席から前方。固定",
     "cover_series_rule": "毎回同じ車内。外の景色（街灯 / トンネル / 橋 / 雨）だけ変える",
     "blend_file": null
   },
-
   "distribution": {
-    "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null,
-    "youtube_channel": null, "instagram": null, "tiktok": null,
-    "bio_en": "A virtual artist from EtherArchi, a label where AI-generated music meets spatial design. Night loops, streetlights, a low voice from the driver's seat."
+    "spotify_uri": null,
+    "apple_artist_id": null,
+    "distrokid_artist_id": null,
+    "youtube_channel": null,
+    "instagram": null,
+    "tiktok": null,
+    "bio_en": "MERIDIAN TAPE is a virtual artist from EtherArchi, a label where AI-generated music meets spatial design. Night loops, streetlights, a low voice from the driver's seat."
   },
-
-  "collab": { "preferred_partners": ["quality", "self"], "collab_style": "feat. で客演。質 の雨の海岸線に低いハミングを添える" }
+  "collab": {
+    "preferred_partners": [
+      "quality",
+      "self"
+    ],
+    "collab_style": "feat. で客演。質 の雨の海岸線に低いハミングを添える"
+  }
 }

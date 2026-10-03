@@ -1,27 +1,24 @@
 {
   "_使い方": "このファイルをコピーして「<slug>.json」という名前で同じフォルダに置き、5 組ぶん作ります（例：light.json）。_ で始まる項目は説明なので消してかまいません。配信名（name）は登録後に変えられないので、docs/03_artists.md の重複確認を終えてから name_status を checked にしてください。",
-
   "slug": "",
   "_slug": "フォルダ名などに使う英小文字（例：light）。半角英数字とハイフンだけ",
-
   "axis": "",
   "_axis": "担当する軸。shape（形）/ quality（質）/ light（光）/ time（時）/ self（自）のどれか 1 つ。1 軸に 1 組",
-
   "name": "",
   "name_status": "draft",
   "name_candidates": [],
   "_name": "配信名。name_status は draft（仮）→ checked（重複確認済み）→ registered（配信登録済み）",
-
   "formation": "",
   "_formation": "solo（ソロ）/ duo（デュオ）/ band（バンド）/ producer（プロデューサー）",
-
   "cadence": "weekly",
   "debut_week": "",
   "_cadence": "weekly（毎週）/ biweekly（隔週）。レーベル全体の週の総曲数が 8 を超えたら、古い組から biweekly に切り替える。debut_week はデビュー週の月曜（YYYY-MM-DD）",
-
   "persona": {
     "members": [
-      { "role": "", "description": "" }
+      {
+        "role": "",
+        "description": ""
+      }
     ],
     "age_feel": "",
     "story": "",
@@ -33,12 +30,25 @@
       "_説明": "生まれと育ち。landscape_words は Suno に渡すための『風景・質感の言葉』（例：港の湿った空気、乾いた高原の風）。地名そのものより、こちらが曲に効く"
     },
     "influences": [
-      { "name": "", "era": "", "genre": "", "what_was_taken": "", "reference_id": null }
+      {
+        "name": "",
+        "era": "",
+        "genre": "",
+        "what_was_taken": "",
+        "reference_id": null
+      }
     ],
     "_influences": "影響を受けた音楽・アーティスト。name は公開プロフィール（bio）には書いてよいが、Suno の指示文には渡さない。指示文には era / genre / what_was_taken（何を受け継いだか）だけを渡す。reference_id はその人の曲を参考曲 DB に入れたときの ID",
-    "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）"
+    "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）",
+    "formation_story": {
+      "started": "",
+      "how": "",
+      "inspired_by_pattern": "",
+      "first_release": "",
+      "name_meaning": "",
+      "_説明": "結成・活動開始のエピソード。実在アーティストの結成の『型』（学校の仲間＋募集貼り紙、対バンの夜の偶然、匿名リミックス、深夜ラジオ投稿 など）を参考にし、中身は架空にする。inspired_by_pattern は内部メモで bio には書かない"
+    }
   },
-
   "composition_habits": {
     "modulation": "",
     "intro": "",
@@ -52,7 +62,6 @@
     "never": [],
     "_説明": "作曲の癖。毎週のブリーフに『固定の制約』としてそのまま入る（これがキャラクターの正体）。例：modulation『ラスサビで必ず半音上げる』、intro『4 小節以内に歌が入る』、phrase_endings『語尾は下げて落とす』、structure『ブリッジを置かない』、instruments_rule『必ず生楽器を 1 つ入れる』、lyrics_tic『毎曲どこかに時刻を 1 回入れる』。always / never は箇条書きで追加"
   },
-
   "vocal": {
     "sex": "",
     "range": "",
@@ -74,16 +83,44 @@
       "avoid": [],
       "wordless_style": "",
       "tics": [
-        { "technique": "", "where": "", "frequency": "every_song" }
+        {
+          "technique": "",
+          "where": "",
+          "frequency": "every_song"
+        }
       ],
       "_tics": "毎曲入れる『癖』。technique は歌い方（例：la-la-la / ハミング / 囁き / シャウト / しゃくり）、where はどこに入れるか（例：イントロ / サビ前の 1 拍 / 2 番の後 / アウトロ / 歌詞のない間奏）、frequency は every_song（毎曲）/ most（ほぼ毎曲）/ sometimes（時々）。例：『アウトロで必ずハミング』『サビ前で一度囁いてからラウドに張る』『間奏は la-la-la で埋める』",
       "_説明": "得意な歌い方（キャラクターの核）。primary は一番の武器 1 つ、secondary は 2〜3 個、avoid はこの組がやらない歌い方（他の組との差をつける）。wordless_style は歌詞のない部分をどう歌うか（例：la-la-la / ooh / ハミング / 無言で楽器に任せる）。選択肢は下の _歌い方の一覧 から選ぶか、自由に書く",
       "_歌い方の一覧": {
-        "声量・強さ": ["囁くようなウィスパー（息多め・マイクに近い）", "圧倒的な声量で押し切るベルティング", "シャウト／ラウド（歪ませて張り上げる）", "ささやきから張り上げまでの急な落差"],
-        "語尾・輪郭": ["語尾のフォール（下げて落とす）", "語尾を切る（スタッカート）", "語尾を伸ばして浅いビブラート", "しゃくり上げ（下から入る）"],
-        "声区": ["地声と裏声の往復", "裏声で頂点を抜く", "地声の低音で語る"],
-        "歌詞のない部分": ["la-la-la のスキャット", "ooh / ah のコーラス", "ハミング", "口笛", "無言で楽器に任せる"],
-        "リズム": ["言葉を刻む（ラップ寄り）", "拍の後ろにもたれる", "前に突っ込む"]
+        "声量・強さ": [
+          "囁くようなウィスパー（息多め・マイクに近い）",
+          "圧倒的な声量で押し切るベルティング",
+          "シャウト／ラウド（歪ませて張り上げる）",
+          "ささやきから張り上げまでの急な落差"
+        ],
+        "語尾・輪郭": [
+          "語尾のフォール（下げて落とす）",
+          "語尾を切る（スタッカート）",
+          "語尾を伸ばして浅いビブラート",
+          "しゃくり上げ（下から入る）"
+        ],
+        "声区": [
+          "地声と裏声の往復",
+          "裏声で頂点を抜く",
+          "地声の低音で語る"
+        ],
+        "歌詞のない部分": [
+          "la-la-la のスキャット",
+          "ooh / ah のコーラス",
+          "ハミング",
+          "口笛",
+          "無言で楽器に任せる"
+        ],
+        "リズム": [
+          "言葉を刻む（ラップ寄り）",
+          "拍の後ろにもたれる",
+          "前に突っ込む"
+        ]
       }
     },
     "melodic_tendency": {
@@ -93,15 +130,26 @@
       "_説明": "メロディの癖。motion は『順次進行が多い / 跳躍が多い』、chorus_peak は『サビの最高音は裏声の切り替え点のすぐ下に置く / 切り替え点を越えて裏声で頂点を取る』など、verse_register は『A メロは地声の低めで語る』など。voice_spec と矛盾しないように書く"
     },
     "timbre_blend": {
-      "main": { "reference_id": null, "weight": 0.6, "traits": [] },
-      "sub1": { "reference_id": null, "weight": 0.2, "traits": [] },
-      "sub2": { "reference_id": null, "weight": 0.2, "traits": [] },
+      "main": {
+        "reference_id": null,
+        "weight": 0.6,
+        "traits": []
+      },
+      "sub1": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
+      "sub2": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
       "synthesized": ""
     },
     "guest_description": "",
     "_説明": "sex は female / male / mixed（男女）/ none（歌なし）。range は low / mid / high。fixed_timbre は true で声質を Persona に固定（二層運用）、false で曲ごとに声質も変える。timbre_blend は参考曲 DB がたまったあと、音域・性別の合う 3 曲から 6:2:2 で合成して埋める。guest_description は他の組の曲に客演するとき相手のブリーフへ貼る声の描写（形容詞だけ。実在アーティスト名は書かない）"
   },
-
   "sound": {
     "genres": [],
     "palette": [],
@@ -109,11 +157,17 @@
     "bpm_max": 0,
     "energy_curve_type": "",
     "dna_tags": [],
-    "forbidden": ["急な無音"],
-    "drive_spec": { "hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": true },
+    "forbidden": [
+      "急な無音"
+    ],
+    "drive_spec": {
+      "hook_within_sec": 30,
+      "length_sec_min": 150,
+      "length_sec_max": 210,
+      "no_sudden_silence": true
+    },
     "_説明": "palette は楽器パレット。energy_curve_type は各セクションの盛り上がりを 10 段階で（例：3-5-8-5-8-4-10-3）。dna_tags は参考曲を絞るためのタグで、参考曲側の tags と照合する（例：night, synth, retro, drive）。drive_spec はドライブ向けの共通仕様（30 秒以内にサビ要素、2:30〜3:30、急な無音なし）"
   },
-
   "lyrics": {
     "themes": [],
     "point_of_view": "",
@@ -121,10 +175,13 @@
     "trend_language_ok": false,
     "trend_language_max_ratio": 0.2,
     "tone": "",
-    "forbidden_topics": ["宗教", "政治", "特定の人物"],
+    "forbidden_topics": [
+      "宗教",
+      "政治",
+      "特定の人物"
+    ],
     "_説明": "trend_language_ok を true にした組だけが、世界チャートで伸びている言語のフレーズをサビの決め台詞などに混ぜる（全体の 20% まで）。基本は 1 組だけ true にする"
   },
-
   "visual": {
     "space": "",
     "light": "",
@@ -135,7 +192,6 @@
     "blend_file": null,
     "_説明": "Blender で作る『この組の空間』。ジャケットも SNS 動画もここから生成する。cover_series_rule はジャケットをシリーズとして統一するルール（例：毎回同じ部屋で、朝日の角度だけ変える）"
   },
-
   "distribution": {
     "spotify_uri": null,
     "apple_artist_id": null,
@@ -146,7 +202,6 @@
     "bio_en": "",
     "_説明": "配信登録後に各 ID を埋める。bio_en は各ストアのプロフィール文（英語）。AI と空間デザインで作っていることを明記する"
   },
-
   "collab": {
     "preferred_partners": [],
     "collab_style": "",

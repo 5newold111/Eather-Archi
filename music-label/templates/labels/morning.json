@@ -1,97 +1,557 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "morning",
-  "name": "MORNING_LABEL_TBD",
+  "name": "FIRST POUR",
   "name_status": "draft",
   "parent": "etherarchi",
   "scene": "起きてからコーヒーを飲み終えるまで",
-  "sound_center": ["ジャズホップ", "ボサノバ", "アコースティック"],
-  "expansion_path": ["ソウル", "ネオクラシカル（朝）", "朝のシティポップ", "ゴスペル寄りのコーラス"],
-  "scene_spec": { "bpm_min": 75, "bpm_max": 100, "length_sec_min": 150, "length_sec_max": 220, "hook_within_sec": 30, "no_sudden_silence": true },
+  "sound_center": [
+    "ジャズホップ",
+    "ボサノバ",
+    "アコースティック"
+  ],
+  "expansion_path": [
+    "ソウル",
+    "ネオクラシカル（朝）",
+    "朝のシティポップ",
+    "ゴスペル寄りのコーラス"
+  ],
+  "scene_spec": {
+    "bpm_min": 75,
+    "bpm_max": 100,
+    "length_sec_min": 150,
+    "length_sec_max": 220,
+    "hook_within_sec": 30,
+    "no_sudden_silence": true
+  },
   "automation_tier": "B",
   "max_weekly_releases": 8,
   "release_hour_et": 6,
   "release_weekday": "monday",
   "_release": "月曜 6:00 ET（日本 月曜 19:00/20:00）。米国の月曜の朝に新曲が届く",
-  "accounts": { "distrokid_email": "morning-label", "spotify_for_artists_team": "morning-team", "apple_music_for_artists_team": "", "youtube_channel": "", "instagram": "", "tiktok": "" },
-  "visual": { "space_theme": "キッチンのカウンター。朝日と湯気", "palette": ["生成り", "蜂蜜色", "淡い緑"], "cover_series_rule": "毎回同じカウンター。カップと光の角度だけ変える" },
-
+  "accounts": {
+    "distrokid_email": "morning-label",
+    "spotify_for_artists_team": "morning-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "キッチンのカウンター。朝日と湯気",
+    "palette": [
+      "生成り",
+      "蜂蜜色",
+      "淡い緑"
+    ],
+    "cover_series_rule": "毎回同じカウンター。カップと光の角度だけ変える"
+  },
   "artists": [
     {
       "slug": "morning_jazz",
-      "name": "MORNING_JAZZ_TBD",
+      "name": "JUNE CARAWAY",
       "name_status": "draft",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "vocal", "description": "女性。低めで温かい声。朝は小さな声で歌う人" }],
+        "members": [
+          {
+            "role": "vocal",
+            "description": "女性。低めで温かい声。朝は小さな声で歌う人"
+          }
+        ],
         "age_feel": "30 代後半",
         "story": "朝のキッチンで鼻歌から曲を作る。夜の店ではなく、朝のためのジャズ",
         "scene": "コーヒーを淹れる 10 分",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["焙煎の匂いのする商店街", "朝市の濡れた石畳"] },
-        "influences": [{ "name": "（bio のみ）", "era": "1950s〜60s", "genre": "ボーカルジャズ", "what_was_taken": "語りかけるような小さな声量での表現" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "焙煎の匂いのする商店街",
+            "朝市の濡れた石畳"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1950s〜60s",
+            "genre": "ボーカルジャズ",
+            "what_was_taken": "語りかけるような小さな声量での表現"
+          }
+        ],
+        "formation_story": {
+          "started": "2023 年",
+          "how": "焙煎所の朝番として働きながら、開店前の店内で鼻歌を歌っていた。常連の録音技師が『朝のための声だ』と店内で録ったのが最初",
+          "inspired_by_pattern": "職場の常連に見つかって録音される型（カフェやバーで歌っていて録音技師に見つかったジャズシンガーの経緯）",
+          "first_release": "開店前の店内で録った 3 曲。ミルの音が入っている",
+          "name_meaning": "june（6 月）＋ caraway（香辛料）。朝の香り"
+        }
       },
-      "vocal": { "sex": "female", "range": "low", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "F3", "comfortable_high": "B4", "chest_voice_top": "C5", "falsetto_switch_point": "D5", "falsetto_quality": "息多めで柔らかい", "strength": "低音の温かさ、言葉の後ろにもたれるリズム", "weakness": "高音のロングトーン" },
-        "signature_techniques": { "primary": "拍の後ろにもたれる語り", "secondary": ["語尾のフォール", "la-la-la のスキャット", "囁くようなウィスパー"], "avoid": ["シャウト／ラウド", "ベルティング", "速いビブラート"], "wordless_style": "la-la-la のスキャット",
-          "tics": [{ "technique": "la-la-la のスキャット", "where": "2 番のあとの間奏", "frequency": "every_song" }, { "technique": "囁きで曲名を言う", "where": "アウトロの最後", "frequency": "most" }] },
-        "melodic_tendency": { "motion": "順次進行。3 度の跳躍まで", "chorus_peak": "切り替え点のかなり下。張らない", "verse_register": "地声の低音域" } },
-      "composition_habits": { "modulation": "ブリッジで一度だけ 4 度上へ、サビで戻る", "intro": "ブラシのドラムとベースだけで 4 小節", "outro": "スキャットで自然に終わる", "phrase_endings": "下げて落とす", "structure": "A-A-B-A（ジャズの型）", "instruments_rule": "生ドラム（ブラシ）必須", "always": ["ウッドベース"], "never": ["打ち込みのハイハット", "ピッチ補正の強いボーカル"] },
-      "sound": { "genres": ["jazz-hop", "vocal jazz"], "palette": ["ウッドベース", "ブラシドラム", "ローズピアノ", "ナイロンギター"], "bpm_min": 78, "bpm_max": 92, "energy_curve_type": "3-4-5-4-5-3", "dna_tags": ["morning", "jazz", "warm", "acoustic", "coffee"], "forbidden": ["大きな声", "急な無音", "重い低音"] },
-      "lyrics": { "themes": ["朝の小さな儀式", "湯気", "まだ始まっていない一日"], "point_of_view": "私（現在形）", "primary_language": "en", "trend_language_ok": true, "trend_language_max_ratio": 0.2, "tone": "穏やか、少しユーモア" },
-      "visual": { "space": "朝のキッチンカウンター", "light": "東からの低い朝日", "materials": ["無垢の木", "陶器", "湯気"], "palette": ["生成り", "蜂蜜色"], "camera": "カウンターの高さ", "cover_series_rule": "カップの位置と影だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Jazz for the first coffee, not the last drink." },
-      "collab": { "preferred_partners": ["morning_duo", "morning_lofi"], "collab_style": "feat. で客演" }
+      "vocal": {
+        "sex": "female",
+        "range": "low",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "F3",
+          "comfortable_high": "B4",
+          "chest_voice_top": "C5",
+          "falsetto_switch_point": "D5",
+          "falsetto_quality": "息多めで柔らかい",
+          "strength": "低音の温かさ、言葉の後ろにもたれるリズム",
+          "weakness": "高音のロングトーン"
+        },
+        "signature_techniques": {
+          "primary": "拍の後ろにもたれる語り",
+          "secondary": [
+            "語尾のフォール",
+            "la-la-la のスキャット",
+            "囁くようなウィスパー"
+          ],
+          "avoid": [
+            "シャウト／ラウド",
+            "ベルティング",
+            "速いビブラート"
+          ],
+          "wordless_style": "la-la-la のスキャット",
+          "tics": [
+            {
+              "technique": "la-la-la のスキャット",
+              "where": "2 番のあとの間奏",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "囁きで曲名を言う",
+              "where": "アウトロの最後",
+              "frequency": "most"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "順次進行。3 度の跳躍まで",
+          "chorus_peak": "切り替え点のかなり下。張らない",
+          "verse_register": "地声の低音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "ブリッジで一度だけ 4 度上へ、サビで戻る",
+        "intro": "ブラシのドラムとベースだけで 4 小節",
+        "outro": "スキャットで自然に終わる",
+        "phrase_endings": "下げて落とす",
+        "structure": "A-A-B-A（ジャズの型）",
+        "instruments_rule": "生ドラム（ブラシ）必須",
+        "always": [
+          "ウッドベース"
+        ],
+        "never": [
+          "打ち込みのハイハット",
+          "ピッチ補正の強いボーカル"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "jazz-hop",
+          "vocal jazz"
+        ],
+        "palette": [
+          "ウッドベース",
+          "ブラシドラム",
+          "ローズピアノ",
+          "ナイロンギター"
+        ],
+        "bpm_min": 78,
+        "bpm_max": 92,
+        "energy_curve_type": "3-4-5-4-5-3",
+        "dna_tags": [
+          "morning",
+          "jazz",
+          "warm",
+          "acoustic",
+          "coffee"
+        ],
+        "forbidden": [
+          "大きな声",
+          "急な無音",
+          "重い低音"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "朝の小さな儀式",
+          "湯気",
+          "まだ始まっていない一日"
+        ],
+        "point_of_view": "私（現在形）",
+        "primary_language": "en",
+        "trend_language_ok": true,
+        "trend_language_max_ratio": 0.2,
+        "tone": "穏やか、少しユーモア"
+      },
+      "visual": {
+        "space": "朝のキッチンカウンター",
+        "light": "東からの低い朝日",
+        "materials": [
+          "無垢の木",
+          "陶器",
+          "湯気"
+        ],
+        "palette": [
+          "生成り",
+          "蜂蜜色"
+        ],
+        "camera": "カウンターの高さ",
+        "cover_series_rule": "カップの位置と影だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "JUNE CARAWAY is part of the EtherArchi group (FIRST POUR). Jazz for the first coffee, not the last drink."
+      },
+      "collab": {
+        "preferred_partners": [
+          "morning_duo",
+          "morning_lofi"
+        ],
+        "collab_style": "feat. で客演"
+      },
+      "name_candidates": [
+        "JUNE CARAWAY",
+        "Caraway June"
+      ]
     },
     {
       "slug": "morning_duo",
-      "name": "MORNING_DUO_TBD",
+      "name": "PALMA & REED",
       "name_status": "draft",
       "formation": "duo",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "vocal / nylon guitar", "description": "男性。中音域、明るい声" }, { "role": "vocal / percussion", "description": "女性。高めで軽い声。ハーモニー担当" }],
+        "members": [
+          {
+            "role": "vocal / nylon guitar",
+            "description": "男性。中音域、明るい声"
+          },
+          {
+            "role": "vocal / percussion",
+            "description": "女性。高めで軽い声。ハーモニー担当"
+          }
+        ],
         "age_feel": "20 代後半",
         "story": "ベランダで朝食をとりながら作る 2 人。ボサノバの軽さと、朝の空気",
         "scene": "朝食の時間",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["海沿いのベランダの朝風", "白い壁に映る葉の影"] },
-        "influences": [{ "name": "（bio のみ）", "era": "1960s", "genre": "ボサノバ", "what_was_taken": "ささやくような 2 声のユニゾンと、ギターの裏拍" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "海沿いのベランダの朝風",
+            "白い壁に映る葉の影"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1960s",
+            "genre": "ボサノバ",
+            "what_was_taken": "ささやくような 2 声のユニゾンと、ギターの裏拍"
+          }
+        ],
+        "formation_story": {
+          "started": "2024 年春",
+          "how": "海沿いのアパートの隣同士。ベランダ越しに片方がギター、片方が口笛で返していた朝の習慣を、下の階の住人が動画に撮って広まった",
+          "inspired_by_pattern": "隣人同士の偶然の合奏から結成する型（アパートの隣室で出会って結成した 2 人組の経緯）",
+          "first_release": "ベランダで録った 1 曲。鳥の声が入っている",
+          "name_meaning": "palma（椰子・手のひら）＋ reed（葦・楽器のリード）"
+        }
       },
-      "vocal": { "sex": "mixed", "range": "mid", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "C3（男）/ A3（女）", "comfortable_high": "E4（男）/ E5（女）", "chest_voice_top": "F4 / F5", "falsetto_switch_point": "G4 / G5", "falsetto_quality": "軽く、笑っているような", "strength": "2 声のユニゾンの揃い方", "weakness": "ソロで張る高音" },
-        "signature_techniques": { "primary": "囁くような 2 声ユニゾン", "secondary": ["3 度のハーモニー", "口笛"], "avoid": ["シャウト／ラウド", "ビブラート", "しゃくり"], "wordless_style": "口笛",
-          "tics": [{ "technique": "口笛", "where": "イントロ", "frequency": "every_song" }, { "technique": "2 人の掛け合いの一言", "where": "サビ前", "frequency": "most" }] },
-        "melodic_tendency": { "motion": "順次進行、半音の下降が多い", "chorus_peak": "切り替え点の下で 2 声が開く", "verse_register": "中音域、小さな声" } },
-      "composition_habits": { "modulation": "転調なし。代わりに借用和音を多く", "intro": "口笛とギターだけ", "outro": "ギターのコード 1 つで止める", "phrase_endings": "伸ばさずに切る", "structure": "Verse-Chorus を 2 回、ブリッジなし", "instruments_rule": "ナイロンギター必須。ドラムは手で叩くパーカッション", "always": ["口笛"], "never": ["エレキギター", "シンセ"] },
-      "sound": { "genres": ["bossa nova", "acoustic pop"], "palette": ["ナイロンギター", "シェイカー", "カホン", "口笛", "ウッドベース"], "bpm_min": 85, "bpm_max": 100, "energy_curve_type": "3-4-5-4-5-3", "dna_tags": ["morning", "bossa", "acoustic", "light", "breakfast"], "forbidden": ["シンセ", "急な無音", "大きな声"] },
-      "lyrics": { "themes": ["朝食", "ベランダ", "何もしない日曜"], "point_of_view": "私たち", "primary_language": "en", "trend_language_ok": true, "trend_language_max_ratio": 0.2, "tone": "軽やか" },
-      "visual": { "space": "朝のベランダ。白い壁と葉の影", "light": "明るい拡散光", "materials": ["白い壁", "植物", "木のテーブル"], "palette": ["白", "淡い緑", "蜂蜜色"], "camera": "テーブル越し", "cover_series_rule": "葉の影の形だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Two voices, one guitar, breakfast on the balcony." },
-      "collab": { "preferred_partners": ["morning_jazz"], "collab_style": "feat. で客演" }
+      "vocal": {
+        "sex": "mixed",
+        "range": "mid",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "C3（男）/ A3（女）",
+          "comfortable_high": "E4（男）/ E5（女）",
+          "chest_voice_top": "F4 / F5",
+          "falsetto_switch_point": "G4 / G5",
+          "falsetto_quality": "軽く、笑っているような",
+          "strength": "2 声のユニゾンの揃い方",
+          "weakness": "ソロで張る高音"
+        },
+        "signature_techniques": {
+          "primary": "囁くような 2 声ユニゾン",
+          "secondary": [
+            "3 度のハーモニー",
+            "口笛"
+          ],
+          "avoid": [
+            "シャウト／ラウド",
+            "ビブラート",
+            "しゃくり"
+          ],
+          "wordless_style": "口笛",
+          "tics": [
+            {
+              "technique": "口笛",
+              "where": "イントロ",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "2 人の掛け合いの一言",
+              "where": "サビ前",
+              "frequency": "most"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "順次進行、半音の下降が多い",
+          "chorus_peak": "切り替え点の下で 2 声が開く",
+          "verse_register": "中音域、小さな声"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし。代わりに借用和音を多く",
+        "intro": "口笛とギターだけ",
+        "outro": "ギターのコード 1 つで止める",
+        "phrase_endings": "伸ばさずに切る",
+        "structure": "Verse-Chorus を 2 回、ブリッジなし",
+        "instruments_rule": "ナイロンギター必須。ドラムは手で叩くパーカッション",
+        "always": [
+          "口笛"
+        ],
+        "never": [
+          "エレキギター",
+          "シンセ"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "bossa nova",
+          "acoustic pop"
+        ],
+        "palette": [
+          "ナイロンギター",
+          "シェイカー",
+          "カホン",
+          "口笛",
+          "ウッドベース"
+        ],
+        "bpm_min": 85,
+        "bpm_max": 100,
+        "energy_curve_type": "3-4-5-4-5-3",
+        "dna_tags": [
+          "morning",
+          "bossa",
+          "acoustic",
+          "light",
+          "breakfast"
+        ],
+        "forbidden": [
+          "シンセ",
+          "急な無音",
+          "大きな声"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "朝食",
+          "ベランダ",
+          "何もしない日曜"
+        ],
+        "point_of_view": "私たち",
+        "primary_language": "en",
+        "trend_language_ok": true,
+        "trend_language_max_ratio": 0.2,
+        "tone": "軽やか"
+      },
+      "visual": {
+        "space": "朝のベランダ。白い壁と葉の影",
+        "light": "明るい拡散光",
+        "materials": [
+          "白い壁",
+          "植物",
+          "木のテーブル"
+        ],
+        "palette": [
+          "白",
+          "淡い緑",
+          "蜂蜜色"
+        ],
+        "camera": "テーブル越し",
+        "cover_series_rule": "葉の影の形だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "PALMA & REED is part of the EtherArchi group (FIRST POUR). Two voices, one guitar, breakfast on the balcony."
+      },
+      "collab": {
+        "preferred_partners": [
+          "morning_jazz"
+        ],
+        "collab_style": "feat. で客演"
+      },
+      "name_candidates": [
+        "PALMA & REED",
+        "Palma and Reed"
+      ]
     },
     {
       "slug": "morning_lofi",
-      "name": "MORNING_LOFI_TBD",
+      "name": "TOASTER TAPES",
       "name_status": "draft",
       "formation": "producer",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "producer", "description": "歌は切り貼りだけ。朝のためのビート" }],
+        "members": [
+          {
+            "role": "producer",
+            "description": "歌は切り貼りだけ。朝のためのビート"
+          }
+        ],
         "age_feel": "20 代",
         "story": "朝、誰かのレコードの数秒から 1 日分のビートを作る",
         "scene": "コーヒーを持って机に向かうまで",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["朝の喫茶店のレコードノイズ", "トースターの弾ける音"] },
-        "influences": [{ "name": "（bio のみ）", "era": "2010s", "genre": "ローファイヒップホップ", "what_was_taken": "揺れるドラムとレコードの質感" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "朝の喫茶店のレコードノイズ",
+            "トースターの弾ける音"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2010s",
+            "genre": "ローファイヒップホップ",
+            "what_was_taken": "揺れるドラムとレコードの質感"
+          }
+        ],
+        "formation_story": {
+          "started": "2023 年",
+          "how": "朝食を作る間の 10 分で 1 ビートを作る『朝ビート』を 100 日連続で投稿。トースターの音をキックに使った 37 日目が広まった",
+          "inspired_by_pattern": "毎日 1 ビートの連続投稿で知られる型（日課のビート投稿で知られたローファイ作家の経緯）",
+          "first_release": "100 日分から選んだ 12 曲",
+          "name_meaning": "toaster ＋ tapes"
+        }
       },
-      "vocal": { "sex": "none", "range": "mid", "fixed_timbre": false, "suno_persona_id": null,
-        "voice_spec": {}, "signature_techniques": { "primary": "声の切り貼り（1 単語のループ）", "secondary": ["ピッチを下げた声"], "avoid": ["フルの歌"], "wordless_style": "無言で楽器に任せる",
-          "tics": [{ "technique": "トースターや食器の音をパーカッションに", "where": "ビートの中", "frequency": "every_song" }] }, "melodic_tendency": { "motion": "ループ", "chorus_peak": "なし", "verse_register": "—" } },
-      "composition_habits": { "modulation": "転調なし（4 コードのループ）", "intro": "レコードノイズ → ドラムイン", "outro": "ドラムが抜けてコードだけ", "structure": "ループ。中間でフィルターを一度閉じる", "instruments_rule": "生活音を 1 つ必ず", "always": ["揺れたドラム（スイング 58〜62%）"], "never": ["歌詞のある歌", "四つ打ち"] },
-      "sound": { "genres": ["lo-fi hip hop"], "palette": ["揺れたドラム", "ローズピアノ", "レコードノイズ", "生活音", "声のチョップ"], "bpm_min": 75, "bpm_max": 88, "energy_curve_type": "3-4-4-3-4-3", "dna_tags": ["morning", "lofi", "beats", "coffee", "texture"], "forbidden": ["四つ打ち", "急な無音"] },
-      "lyrics": { "themes": [], "point_of_view": "なし", "primary_language": "none", "trend_language_ok": false, "tone": "ゆるい" },
-      "visual": { "space": "朝の机。マグカップとレコードプレーヤー", "light": "窓からの斜光", "materials": ["木", "紙", "陶器"], "palette": ["生成り", "茶", "淡い緑"], "camera": "真上から（俯瞰）", "cover_series_rule": "机の上の物の配置だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Beats made before the coffee gets cold." },
-      "collab": { "preferred_partners": ["morning_jazz", "morning_duo"], "collab_style": "remix で再構築" }
+      "vocal": {
+        "sex": "none",
+        "range": "mid",
+        "fixed_timbre": false,
+        "suno_persona_id": null,
+        "voice_spec": {},
+        "signature_techniques": {
+          "primary": "声の切り貼り（1 単語のループ）",
+          "secondary": [
+            "ピッチを下げた声"
+          ],
+          "avoid": [
+            "フルの歌"
+          ],
+          "wordless_style": "無言で楽器に任せる",
+          "tics": [
+            {
+              "technique": "トースターや食器の音をパーカッションに",
+              "where": "ビートの中",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "ループ",
+          "chorus_peak": "なし",
+          "verse_register": "—"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし（4 コードのループ）",
+        "intro": "レコードノイズ → ドラムイン",
+        "outro": "ドラムが抜けてコードだけ",
+        "structure": "ループ。中間でフィルターを一度閉じる",
+        "instruments_rule": "生活音を 1 つ必ず",
+        "always": [
+          "揺れたドラム（スイング 58〜62%）"
+        ],
+        "never": [
+          "歌詞のある歌",
+          "四つ打ち"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "lo-fi hip hop"
+        ],
+        "palette": [
+          "揺れたドラム",
+          "ローズピアノ",
+          "レコードノイズ",
+          "生活音",
+          "声のチョップ"
+        ],
+        "bpm_min": 75,
+        "bpm_max": 88,
+        "energy_curve_type": "3-4-4-3-4-3",
+        "dna_tags": [
+          "morning",
+          "lofi",
+          "beats",
+          "coffee",
+          "texture"
+        ],
+        "forbidden": [
+          "四つ打ち",
+          "急な無音"
+        ]
+      },
+      "lyrics": {
+        "themes": [],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "ゆるい"
+      },
+      "visual": {
+        "space": "朝の机。マグカップとレコードプレーヤー",
+        "light": "窓からの斜光",
+        "materials": [
+          "木",
+          "紙",
+          "陶器"
+        ],
+        "palette": [
+          "生成り",
+          "茶",
+          "淡い緑"
+        ],
+        "camera": "真上から（俯瞰）",
+        "cover_series_rule": "机の上の物の配置だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "TOASTER TAPES is part of the EtherArchi group (FIRST POUR). Beats made before the coffee gets cold."
+      },
+      "collab": {
+        "preferred_partners": [
+          "morning_jazz",
+          "morning_duo"
+        ],
+        "collab_style": "remix で再構築"
+      },
+      "name_candidates": [
+        "TOASTER TAPES",
+        "Toaster Tape Club"
+      ]
     }
+  ],
+  "name_candidates": [
+    "FIRST POUR"
   ]
 }

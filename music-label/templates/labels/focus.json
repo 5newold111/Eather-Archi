@@ -1,98 +1,527 @@
 {
   "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
   "slug": "focus",
-  "name": "FOCUS_LABEL_TBD",
+  "name": "DEEP WORK DEPT.",
   "name_status": "draft",
   "parent": "etherarchi",
   "scene": "仕事・勉強の集中",
-  "sound_center": ["ミニマルなエレクトロニカ", "ローファイビーツ（歌なし）"],
-  "expansion_path": ["インストのポストロック", "モジュラーシンセ", "歌の少ないディープハウス", "ピアノ＋ビート"],
-  "scene_spec": { "bpm_min": 70, "bpm_max": 120, "length_sec_min": 180, "length_sec_max": 300, "hook_within_sec": 0, "no_sudden_silence": true,
-    "_説明": "注意を引かないことが価値。サビの山を作らず、変化は緩やかに。歌詞は原則なし（言葉は集中を妨げる）" },
+  "sound_center": [
+    "ミニマルなエレクトロニカ",
+    "ローファイビーツ（歌なし）"
+  ],
+  "expansion_path": [
+    "インストのポストロック",
+    "モジュラーシンセ",
+    "歌の少ないディープハウス",
+    "ピアノ＋ビート"
+  ],
+  "scene_spec": {
+    "bpm_min": 70,
+    "bpm_max": 120,
+    "length_sec_min": 180,
+    "length_sec_max": 300,
+    "hook_within_sec": 0,
+    "no_sudden_silence": true,
+    "_説明": "注意を引かないことが価値。サビの山を作らず、変化は緩やかに。歌詞は原則なし（言葉は集中を妨げる）"
+  },
   "automation_tier": "C",
   "_automation_tier": "歌詞がなく判定項目が少ないので、最初から自動選曲（人は 20% 抜き取り）",
   "max_weekly_releases": 8,
   "release_hour_et": 8,
   "release_weekday": "tuesday",
   "_release": "火曜 8:00 ET（日本 火曜 21:00/22:00）。米国の仕事始めに届く",
-  "accounts": { "distrokid_email": "focus-label", "spotify_for_artists_team": "focus-team", "apple_music_for_artists_team": "", "youtube_channel": "", "instagram": "", "tiktok": "" },
-  "visual": { "space_theme": "何もない作業机と、壁の一枚の光", "palette": ["無彩色", "差し色 1 色（組ごと）"], "cover_series_rule": "製図シートの方眼の上に、組ごとの 1 色の図形" },
-
+  "accounts": {
+    "distrokid_email": "focus-label",
+    "spotify_for_artists_team": "focus-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "何もない作業机と、壁の一枚の光",
+    "palette": [
+      "無彩色",
+      "差し色 1 色（組ごと）"
+    ],
+    "cover_series_rule": "製図シートの方眼の上に、組ごとの 1 色の図形"
+  },
   "artists": [
     {
       "slug": "focus_beats",
-      "name": "FOCUS_BEATS_TBD",
+      "name": "GRIDPAPER",
       "name_status": "draft",
       "formation": "producer",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "producer", "description": "ビートメイカー。声は使わない" }],
+        "members": [
+          {
+            "role": "producer",
+            "description": "ビートメイカー。声は使わない"
+          }
+        ],
         "age_feel": "20 代後半",
         "story": "締切の夜に自分が集中するために作っていたビート。歌が入ると気が散るので入れない",
         "scene": "午前中の深い作業",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["図書館の空調の低い音", "雨の日のオフィスの窓"] },
-        "influences": [{ "name": "（bio のみ）", "era": "2010s", "genre": "インストヒップホップ", "what_was_taken": "同じループを 3 分間飽きさせない微細な変化" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "図書館の空調の低い音",
+            "雨の日のオフィスの窓"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2010s",
+            "genre": "インストヒップホップ",
+            "what_was_taken": "同じループを 3 分間飽きさせない微細な変化"
+          }
+        ],
+        "formation_story": {
+          "started": "2022 年",
+          "how": "建築事務所の深夜残業中、自分の集中のために作ったループを事務所内で共有していた。同僚が『作業用に外でも聴きたい』と言い出し公開",
+          "inspired_by_pattern": "職場の作業用に作った音が外に出る型（自分の作業用 BGM が広まった作家の経緯）",
+          "first_release": "『締切前夜』と題した 8 曲",
+          "name_meaning": "方眼紙。EtherArchi の製図シートのモチーフと同じ"
+        }
       },
-      "vocal": { "sex": "none", "range": "mid", "fixed_timbre": false, "suno_persona_id": null, "voice_spec": {},
-        "signature_techniques": { "primary": "（歌なし）", "secondary": [], "avoid": ["声全般"], "wordless_style": "無言で楽器に任せる", "tics": [{ "technique": "8 小節ごとにハイハットのパターンを 1 回だけ変える", "where": "全体", "frequency": "every_song" }] },
-        "melodic_tendency": { "motion": "ループ", "chorus_peak": "なし", "verse_register": "—" } },
-      "composition_habits": { "modulation": "転調なし", "intro": "ドラムなしで 8 小節", "outro": "要素が 1 つずつ抜ける", "structure": "ループ。32 小節ごとに 1 要素追加 / 削除", "instruments_rule": "低音は常に一定の音量", "always": ["サイドチェーンなし（脈動は集中を妨げる）"], "never": ["声", "急な展開", "サビ"] },
-      "sound": { "genres": ["instrumental hip hop", "lo-fi"], "palette": ["ソフトなキック", "ローズ", "ギターのループ", "ビニールノイズ"], "bpm_min": 72, "bpm_max": 88, "energy_curve_type": "3-4-4-4-4-3", "dna_tags": ["focus", "beats", "lofi", "instrumental", "loop"], "forbidden": ["声", "急な無音", "大きな展開"] },
-      "lyrics": { "themes": [], "point_of_view": "なし", "primary_language": "none", "trend_language_ok": false, "tone": "—" },
-      "visual": { "space": "方眼の作業机。鉛筆 1 本", "light": "均一な作業灯", "materials": ["紙", "鉛筆"], "palette": ["無彩色", "差し色：青"], "camera": "真上", "cover_series_rule": "方眼の上の青い図形の形だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Beats that stay out of your way." },
-      "collab": { "preferred_partners": ["focus_modular"], "collab_style": "remix" }
+      "vocal": {
+        "sex": "none",
+        "range": "mid",
+        "fixed_timbre": false,
+        "suno_persona_id": null,
+        "voice_spec": {},
+        "signature_techniques": {
+          "primary": "（歌なし）",
+          "secondary": [],
+          "avoid": [
+            "声全般"
+          ],
+          "wordless_style": "無言で楽器に任せる",
+          "tics": [
+            {
+              "technique": "8 小節ごとにハイハットのパターンを 1 回だけ変える",
+              "where": "全体",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "ループ",
+          "chorus_peak": "なし",
+          "verse_register": "—"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし",
+        "intro": "ドラムなしで 8 小節",
+        "outro": "要素が 1 つずつ抜ける",
+        "structure": "ループ。32 小節ごとに 1 要素追加 / 削除",
+        "instruments_rule": "低音は常に一定の音量",
+        "always": [
+          "サイドチェーンなし（脈動は集中を妨げる）"
+        ],
+        "never": [
+          "声",
+          "急な展開",
+          "サビ"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "instrumental hip hop",
+          "lo-fi"
+        ],
+        "palette": [
+          "ソフトなキック",
+          "ローズ",
+          "ギターのループ",
+          "ビニールノイズ"
+        ],
+        "bpm_min": 72,
+        "bpm_max": 88,
+        "energy_curve_type": "3-4-4-4-4-3",
+        "dna_tags": [
+          "focus",
+          "beats",
+          "lofi",
+          "instrumental",
+          "loop"
+        ],
+        "forbidden": [
+          "声",
+          "急な無音",
+          "大きな展開"
+        ]
+      },
+      "lyrics": {
+        "themes": [],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "—"
+      },
+      "visual": {
+        "space": "方眼の作業机。鉛筆 1 本",
+        "light": "均一な作業灯",
+        "materials": [
+          "紙",
+          "鉛筆"
+        ],
+        "palette": [
+          "無彩色",
+          "差し色：青"
+        ],
+        "camera": "真上",
+        "cover_series_rule": "方眼の上の青い図形の形だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "GRIDPAPER is part of the EtherArchi group (DEEP WORK DEPT.). Beats that stay out of your way."
+      },
+      "collab": {
+        "preferred_partners": [
+          "focus_modular"
+        ],
+        "collab_style": "remix"
+      },
+      "name_candidates": [
+        "GRIDPAPER",
+        "Grid Paper Co."
+      ]
     },
     {
       "slug": "focus_postrock",
-      "name": "FOCUS_POSTROCK_TBD",
+      "name": "LONGFORM",
       "name_status": "draft",
       "formation": "band",
       "cadence": "biweekly",
       "_cadence_note": "曲が長い（5 分前後）ので隔週から始める",
       "persona": {
-        "members": [{ "role": "guitar", "description": "ディレイの長いクリーンギター" }, { "role": "guitar", "description": "低く鳴らすリズムギター" }, { "role": "bass", "description": "" }, { "role": "drums", "description": "ブラシと小さな音量" }],
+        "members": [
+          {
+            "role": "guitar",
+            "description": "ディレイの長いクリーンギター"
+          },
+          {
+            "role": "guitar",
+            "description": "低く鳴らすリズムギター"
+          },
+          {
+            "role": "bass",
+            "description": ""
+          },
+          {
+            "role": "drums",
+            "description": "ブラシと小さな音量"
+          }
+        ],
         "age_feel": "30 代の 4 人",
         "story": "リハーサルスタジオの隅で、誰も歌わないまま 10 分弾き続けていたら曲になった",
         "scene": "午後の長い作業",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["郊外の工場地帯の夕方", "高架下のリバーブ"] },
-        "influences": [{ "name": "（bio のみ）", "era": "2000s", "genre": "ポストロック", "what_was_taken": "静から動への 3 分かけた積み上げ" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "郊外の工場地帯の夕方",
+            "高架下のリバーブ"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2000s",
+            "genre": "ポストロック",
+            "what_was_taken": "静から動への 3 分かけた積み上げ"
+          }
+        ],
+        "formation_story": {
+          "started": "2021 年",
+          "how": "ボーカルが脱退して解散寸前だった 4 人が、『歌なしで 1 回だけ』とスタジオに入り、10 分弾き続けた録音がそのまま 1 曲目になった",
+          "inspired_by_pattern": "ボーカル脱退をきっかけにインストに転じる型（歌い手を失ってインストバンドになったポストロックの経緯）",
+          "first_release": "その 10 分をそのまま",
+          "name_meaning": "長い形式。短い曲を作らない宣言"
+        }
       },
-      "vocal": { "sex": "none", "range": "mid", "fixed_timbre": false, "suno_persona_id": null, "voice_spec": {},
-        "signature_techniques": { "primary": "（歌なし）", "secondary": [], "avoid": ["声全般"], "wordless_style": "無言で楽器に任せる", "tics": [{ "technique": "ギターのハーモニクスの 1 音", "where": "最初の 10 秒", "frequency": "every_song" }] },
-        "melodic_tendency": { "motion": "ギターのアルペジオが主旋律。順次進行", "chorus_peak": "なし（頂点はあるが 3 分以降）", "verse_register": "—" } },
-      "composition_habits": { "modulation": "転調なし", "intro": "ギター 1 本で 60 秒", "outro": "全員が同じ音を伸ばして消える", "structure": "積み上げ型。3 分で全員がそろい、4 分で引く", "instruments_rule": "ディレイのギター必須。ドラムはブラシ", "always": ["ハーモニクス"], "never": ["声", "歪みの強いギター", "速いドラム"] },
-      "sound": { "genres": ["post-rock", "instrumental"], "palette": ["クリーンギター（ディレイ）", "ベース", "ブラシドラム", "グロッケン"], "bpm_min": 80, "bpm_max": 100, "energy_curve_type": "2-3-4-5-6-5-3", "dna_tags": ["focus", "postrock", "instrumental", "build", "guitar"], "forbidden": ["声", "歪み", "急な無音"] },
-      "lyrics": { "themes": [], "point_of_view": "なし", "primary_language": "none", "trend_language_ok": false, "tone": "—" },
-      "visual": { "space": "何もないリハーサル室。窓の光の帯", "light": "横からの光", "materials": ["コンクリート", "ケーブル"], "palette": ["無彩色", "差し色：赤"], "camera": "床の高さ", "cover_series_rule": "光の帯の幅だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. Four players, no singer, slow builds for long afternoons." },
-      "collab": { "preferred_partners": ["focus_beats"], "collab_style": "ギターのループを提供" }
+      "vocal": {
+        "sex": "none",
+        "range": "mid",
+        "fixed_timbre": false,
+        "suno_persona_id": null,
+        "voice_spec": {},
+        "signature_techniques": {
+          "primary": "（歌なし）",
+          "secondary": [],
+          "avoid": [
+            "声全般"
+          ],
+          "wordless_style": "無言で楽器に任せる",
+          "tics": [
+            {
+              "technique": "ギターのハーモニクスの 1 音",
+              "where": "最初の 10 秒",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "ギターのアルペジオが主旋律。順次進行",
+          "chorus_peak": "なし（頂点はあるが 3 分以降）",
+          "verse_register": "—"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし",
+        "intro": "ギター 1 本で 60 秒",
+        "outro": "全員が同じ音を伸ばして消える",
+        "structure": "積み上げ型。3 分で全員がそろい、4 分で引く",
+        "instruments_rule": "ディレイのギター必須。ドラムはブラシ",
+        "always": [
+          "ハーモニクス"
+        ],
+        "never": [
+          "声",
+          "歪みの強いギター",
+          "速いドラム"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "post-rock",
+          "instrumental"
+        ],
+        "palette": [
+          "クリーンギター（ディレイ）",
+          "ベース",
+          "ブラシドラム",
+          "グロッケン"
+        ],
+        "bpm_min": 80,
+        "bpm_max": 100,
+        "energy_curve_type": "2-3-4-5-6-5-3",
+        "dna_tags": [
+          "focus",
+          "postrock",
+          "instrumental",
+          "build",
+          "guitar"
+        ],
+        "forbidden": [
+          "声",
+          "歪み",
+          "急な無音"
+        ]
+      },
+      "lyrics": {
+        "themes": [],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "—"
+      },
+      "visual": {
+        "space": "何もないリハーサル室。窓の光の帯",
+        "light": "横からの光",
+        "materials": [
+          "コンクリート",
+          "ケーブル"
+        ],
+        "palette": [
+          "無彩色",
+          "差し色：赤"
+        ],
+        "camera": "床の高さ",
+        "cover_series_rule": "光の帯の幅だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "LONGFORM is part of the EtherArchi group (DEEP WORK DEPT.). Four players, no singer, slow builds for long afternoons."
+      },
+      "collab": {
+        "preferred_partners": [
+          "focus_beats"
+        ],
+        "collab_style": "ギターのループを提供"
+      },
+      "name_candidates": [
+        "LONGFORM",
+        "Long Form"
+      ]
     },
     {
       "slug": "focus_modular",
-      "name": "FOCUS_MODULAR_TBD",
+      "name": "IRIS PATCH",
       "name_status": "draft",
       "formation": "solo",
       "cadence": "weekly",
       "persona": {
-        "members": [{ "role": "modular synth / voice", "description": "機械と一緒に歌う人。声は母音だけで、楽器のように扱う" }],
+        "members": [
+          {
+            "role": "modular synth / voice",
+            "description": "機械と一緒に歌う人。声は母音だけで、楽器のように扱う"
+          }
+        ],
         "age_feel": "年齢不詳",
         "story": "配線を変えるたびに違う曲になる。声は配線の 1 本",
         "scene": "夜の作業",
-        "origin": { "birthplace": "", "upbringing": "", "landscape_words": ["サーバールームのファンの音", "蛍光灯の唸り"] },
-        "influences": [{ "name": "（bio のみ）", "era": "1970s / 2010s", "genre": "電子音楽 / モジュラーシンセ", "what_was_taken": "シーケンスが少しずつずれていく構造" }]
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "サーバールームのファンの音",
+            "蛍光灯の唸り"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1970s / 2010s",
+            "genre": "電子音楽 / モジュラーシンセ",
+            "what_was_taken": "シーケンスが少しずつずれていく構造"
+          }
+        ],
+        "formation_story": {
+          "started": "2024 年",
+          "how": "電子工学の学生が自作のモジュラーシンセに自分の声を通して実験していた映像が、楽器メーカーの目に留まった",
+          "inspired_by_pattern": "自作楽器の実験映像から見つかる型（自作シンセの動画でメーカーに見つかった電子音楽家の経緯）",
+          "first_release": "『配線 01』",
+          "name_meaning": "iris（虹彩・花）＋ patch（配線）"
+        }
       },
-      "vocal": { "sex": "female", "range": "high", "fixed_timbre": true, "suno_persona_id": null,
-        "voice_spec": { "comfortable_low": "C4", "comfortable_high": "G5", "chest_voice_top": "D5", "falsetto_switch_point": "E5", "falsetto_quality": "芯があり、楽器のように均一", "strength": "音程の正確さ、同じ音を長く保つ", "weakness": "感情的な歌い方" },
-        "signature_techniques": { "primary": "母音だけのロングトーン（楽器として）", "secondary": ["ooh の重ね", "裏声で頂点を抜く"], "avoid": ["歌詞のある歌", "ビブラート", "シャウト"], "wordless_style": "ooh / ah のコーラス",
-          "tics": [{ "technique": "声をシーケンスに通して刻む", "where": "中間点以降", "frequency": "every_song" }] },
-        "melodic_tendency": { "motion": "同音の持続と 5 度の跳躍", "chorus_peak": "切り替え点を越えて裏声で頂点", "verse_register": "高音域" } },
-      "composition_habits": { "modulation": "1 曲に 1 回、シーケンスが半音ずれる", "intro": "1 つのシーケンスだけ", "outro": "シーケンスのテンポが落ちて止まる", "structure": "シーケンスの積層。声は 2 分以降", "instruments_rule": "全てモジュラー音源の質感", "always": ["ずれていくシーケンス"], "never": ["歌詞", "生ドラム", "コード弾き"] },
-      "sound": { "genres": ["modular", "minimal electronic"], "palette": ["シーケンス", "フィルター", "クリック", "声（母音）"], "bpm_min": 100, "bpm_max": 120, "energy_curve_type": "3-4-4-5-5-4", "dna_tags": ["focus", "modular", "electronic", "sequence", "night"], "forbidden": ["歌詞", "急な無音", "生ドラム"] },
-      "lyrics": { "themes": ["（母音のみ）"], "point_of_view": "なし", "primary_language": "none", "trend_language_ok": false, "tone": "機械的で静か" },
-      "visual": { "space": "暗い部屋のパッチケーブル。LED の点", "light": "LED の点光源", "materials": ["金属", "ケーブル"], "palette": ["黒", "差し色：緑"], "camera": "マクロ", "cover_series_rule": "ケーブルの配線だけ変える", "blend_file": null },
-      "distribution": { "spotify_uri": null, "apple_artist_id": null, "distrokid_artist_id": null, "bio_en": "Part of the EtherArchi group. A voice patched into a modular system." },
-      "collab": { "preferred_partners": ["focus_beats", "sleep_drone"], "collab_style": "声の素材を提供" }
+      "vocal": {
+        "sex": "female",
+        "range": "high",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "C4",
+          "comfortable_high": "G5",
+          "chest_voice_top": "D5",
+          "falsetto_switch_point": "E5",
+          "falsetto_quality": "芯があり、楽器のように均一",
+          "strength": "音程の正確さ、同じ音を長く保つ",
+          "weakness": "感情的な歌い方"
+        },
+        "signature_techniques": {
+          "primary": "母音だけのロングトーン（楽器として）",
+          "secondary": [
+            "ooh の重ね",
+            "裏声で頂点を抜く"
+          ],
+          "avoid": [
+            "歌詞のある歌",
+            "ビブラート",
+            "シャウト"
+          ],
+          "wordless_style": "ooh / ah のコーラス",
+          "tics": [
+            {
+              "technique": "声をシーケンスに通して刻む",
+              "where": "中間点以降",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "同音の持続と 5 度の跳躍",
+          "chorus_peak": "切り替え点を越えて裏声で頂点",
+          "verse_register": "高音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "1 曲に 1 回、シーケンスが半音ずれる",
+        "intro": "1 つのシーケンスだけ",
+        "outro": "シーケンスのテンポが落ちて止まる",
+        "structure": "シーケンスの積層。声は 2 分以降",
+        "instruments_rule": "全てモジュラー音源の質感",
+        "always": [
+          "ずれていくシーケンス"
+        ],
+        "never": [
+          "歌詞",
+          "生ドラム",
+          "コード弾き"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "modular",
+          "minimal electronic"
+        ],
+        "palette": [
+          "シーケンス",
+          "フィルター",
+          "クリック",
+          "声（母音）"
+        ],
+        "bpm_min": 100,
+        "bpm_max": 120,
+        "energy_curve_type": "3-4-4-5-5-4",
+        "dna_tags": [
+          "focus",
+          "modular",
+          "electronic",
+          "sequence",
+          "night"
+        ],
+        "forbidden": [
+          "歌詞",
+          "急な無音",
+          "生ドラム"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "（母音のみ）"
+        ],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "機械的で静か"
+      },
+      "visual": {
+        "space": "暗い部屋のパッチケーブル。LED の点",
+        "light": "LED の点光源",
+        "materials": [
+          "金属",
+          "ケーブル"
+        ],
+        "palette": [
+          "黒",
+          "差し色：緑"
+        ],
+        "camera": "マクロ",
+        "cover_series_rule": "ケーブルの配線だけ変える",
+        "blend_file": null
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "IRIS PATCH is part of the EtherArchi group (DEEP WORK DEPT.). A voice patched into a modular system."
+      },
+      "collab": {
+        "preferred_partners": [
+          "focus_beats",
+          "sleep_drone"
+        ],
+        "collab_style": "声の素材を提供"
+      },
+      "name_candidates": [
+        "IRIS PATCH",
+        "Patchwire Iris"
+      ]
     }
+  ],
+  "name_candidates": [
+    "DEEP WORK DEPT."
   ]
 }
