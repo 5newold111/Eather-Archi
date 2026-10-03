@@ -34,7 +34,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
-ARTISTS_DIR = ROOT / "templates" / "artists"
+ARTISTS_DIR = ROOT / "templates" / "artists"     # 本体レーベル（ドライブ）の設定書
+LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
 
 # 借用の枠。順番は「埋めにくい枠から先に」。
 # ボーカル枠は候補が少ない（音域・性別で絞る）ので最初に埋める。
@@ -97,6 +98,25 @@ def load_artist(slug: str) -> dict:
 def list_artist_slugs() -> list[str]:
     """templates/artists/ にある設定書（_template.json 以外）の slug を返す"""
     return sorted(p.stem for p in ARTISTS_DIR.glob("*.json") if not p.name.startswith("_"))
+
+
+def load_label(slug: str) -> dict:
+    """子レーベルの設定（templates/labels/<slug>.json）。代表アーティストの設定書を内包している"""
+    path = LABELS_DIR / f"{slug}.json"
+    if not path.exists():
+        sys.exit(f"[エラー] 子レーベルの設定が見つかりません: {path}\n        templates/labels/_template.json をコピーして作ってください。")
+    label = json.loads(path.read_text(encoding="utf-8"))
+    if not label.get("artists"):
+        sys.exit(f"[エラー] {path.name} に artists（代表アーティスト）がありません")
+    # 子レーベルの共通仕様（場面の BPM など）を、各組の設定に不足分だけ補う
+    spec = label.get("scene_spec", {})
+    for a in label["artists"]:
+        a.setdefault("sound", {})
+        a["sound"].setdefault("bpm_min", spec.get("bpm_min"))
+        a["sound"].setdefault("bpm_max", spec.get("bpm_max"))
+        a["label_slug"] = label["slug"]
+    print(f"  子レーベル「{label['slug']}」（場面：{label.get('scene','')}）の {len(label['artists'])} 組を読み込みました")
+    return label
 
 
 def demo_artist() -> dict:
@@ -320,6 +340,7 @@ def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday:
     release_at = release_at_for_production_week(week_monday)
     return {
         "week_start": week_monday.isoformat(),
+        "label_slug": artist.get("label_slug", "drive"),
         "artist_slug": artist["slug"],
         "featured_artist_slug": None,
         "release_at": release_at.isoformat().replace("+00:00", "Z"),
@@ -363,6 +384,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="参考曲を枠ごとに自動で割り当てる（1 曲 1 枠）")
     ap.add_argument("--artist", help="アーティストの slug（templates/artists/<slug>.json）。--demo だけなら省略可")
     ap.add_argument("--all", action="store_true", help="templates/artists/ にある設定書すべてをまとめて実行する")
+    ap.add_argument("--label", help="子レーベルの slug（templates/labels/<slug>.json）。その代表アーティスト全組ぶんを実行する")
     ap.add_argument("--references", type=Path, help="解析シート JSON が入ったフォルダ")
     ap.add_argument("--demo", action="store_true", help="架空の参考曲で動作確認する")
     ap.add_argument("--week", help="制作週の日付（YYYY-MM-DD）。省略時は今日の週")
@@ -373,8 +395,8 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "briefs", help="出力フォルダ")
     args = ap.parse_args()
 
-    if not args.artist and not args.all and not args.demo:
-        ap.error("--artist <slug> / --all / --demo のどれかを指定してください")
+    if not args.artist and not args.all and not args.demo and not args.label:
+        ap.error("--artist <slug> / --all / --label <slug> / --demo のどれかを指定してください")
     if not args.demo and not args.references:
         ap.error("--references <フォルダ> か --demo を指定してください")
 
@@ -404,7 +426,12 @@ def main() -> None:
 
     # 対象のアーティスト：--all ならフォルダ内の設定書すべて、--artist なら 1 組、
     # どちらも無く --demo だけなら架空のアーティスト 1 組
-    if args.all:
+    label_artists: dict[str, dict] = {}
+    if args.label:
+        label = load_label(args.label)
+        label_artists = {a["slug"]: a for a in label["artists"]}
+        slugs = list(label_artists)
+    elif args.all:
         slugs = list_artist_slugs()
         if not slugs:
             print("  [注意] templates/artists/ に設定書がありません。_template.json をコピーして作ってください。")
@@ -419,7 +446,10 @@ def main() -> None:
 
     failed: list[str] = []
     for slug in slugs:
-        artist = demo_artist() if slug == "demo" else load_artist(slug)
+        if slug in label_artists:
+            artist = label_artists[slug]
+        else:
+            artist = demo_artist() if slug == "demo" else load_artist(slug)
         print(f"\n--- {slug}（{artist['name']}）---")
         try:
             slots = assign_slots(artist, refs, rng, slot_weights=slot_weights)

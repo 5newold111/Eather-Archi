@@ -23,16 +23,37 @@ create type ref_source_t  as enum ('own', 'chart', 'manual', 'trend');          
 create type release_status_t as enum ('planned', 'generated', 'mastered', 'uploaded', 'live', 'takedown');
 create type cadence_t     as enum ('weekly', 'biweekly');
 
--- レーベル全体の設定（1 行だけ）
+-- グループ共通の設定（1 行だけ）
 create table label_settings (
   id                   boolean primary key default true check (id),   -- 常に 1 行
-  max_weekly_releases  int not null default 8,       -- 週の総曲数の上限（人の作業 4 時間以内）
-  release_hour_et      int not null default 17,      -- 配信時刻（米国東部時間）
+  max_weekly_releases  int not null default 8,       -- 1 レーベルあたりの週の総曲数の上限（既定値。レーベルごとに上書き可）
+  release_hour_et      int not null default 17,      -- 配信時刻（米国東部時間）の既定値
   lead_weeks           int not null default 2,       -- 仕込み期間
   weight_cap           numeric(3,1) not null default 3.0,  -- 成績由来の重みの上限（ルール 5）
   min_streams_for_weight int not null default 1000   -- これ未満の再生数の曲は重み計算に使わない（Spotify の支払い下限と同じ）
 );
 insert into label_settings default values;
+
+-- レーベル（本体＋子レーベル）。子レーベルは別の配信アカウントを持つ。docs/07_sublabels.md
+create type automation_tier_t as enum ('A', 'B', 'C');   -- A：全テイクを人が聴く / B：機械が 2 つに絞る / C：機械が選ぶ
+
+create table labels (
+  id                   uuid primary key default gen_random_uuid(),
+  slug                 text unique not null,            -- drive / sleep / morning / focus / move …
+  name                 text unique not null,
+  parent_slug          text not null default 'etherarchi',
+  scene                text not null,                   -- 聴く場面（ジャンルではなく体験で分ける）
+  sound_center         text[] not null default '{}',
+  expansion_path       text[] not null default '{}',    -- 月 1 組ずつ広げる方向
+  automation_tier      automation_tier_t not null default 'B',
+  max_weekly_releases  int,                             -- null なら label_settings の既定値
+  release_weekday      int not null default 3 check (release_weekday between 0 and 6),  -- 0=日 … 3=水 … 6=土
+  release_hour_et      int not null default 17 check (release_hour_et between 0 and 23),
+  distrokid_account    text,                            -- アカウントの識別名だけ（メールや鍵は書かない）
+  spotify_team         text,
+  sheet                jsonb not null default '{}',     -- templates/labels/<slug>.json の全文
+  created_at           timestamptz not null default now()
+);
 
 -- 借用の「枠」。1 ブリーフにつき各枠 1 つ、1 参考曲は 1 枠だけ。
 create type slot_t as enum (
@@ -45,8 +66,9 @@ create type slot_t as enum (
 -- -----------------------------------------------------------------------------
 create table artists (
   id               uuid primary key default gen_random_uuid(),
+  label_id         uuid references labels(id),      -- 所属レーベル（null は本体扱い）
   slug             text unique not null,            -- フォルダ名などに使う英小文字（例：light）
-  axis             axis_t unique not null,          -- 1 軸につき 1 アーティスト
+  axis             axis_t,                          -- 本体レーベルは 1 軸につき 1 組。子レーベルは null でよい
   name             text unique not null,            -- 配信名（登録後は変えない）
   formation        formation_t not null,
   persona_id       text,                            -- Suno の Persona ID（声を固定する）
@@ -67,6 +89,10 @@ create table artists (
   distrokid_artist_id text,
   created_at       timestamptz not null default now()
 );
+
+-- 本体レーベル（label_id が null）では 1 軸に 1 組。子レーベルは axis を空にしてよく、何組でも置ける
+create unique index artists_one_per_axis_in_main_label
+  on artists (axis) where label_id is null and axis is not null;
 
 -- -----------------------------------------------------------------------------
 -- 2. 参考曲（音源は保存しない。曲を特定する情報だけ）
@@ -420,16 +446,35 @@ select
 from base b
 where b.streams >= (select min_streams_for_weight from label_settings);
 
--- 週の総曲数チェック：上限を超えていないか（cadence の切り替え判断に使う）
+-- 週の総曲数チェック：レーベルごとに上限を超えていないか（cadence の切り替え・次の子レーベル作成の判断に使う）
 create or replace view v_weekly_release_load as
 select
-  release_week,
+  r.release_week,
+  coalesce(l.slug, 'drive') as label,
   count(*) as releases,
-  (select max_weekly_releases from label_settings) as cap,
-  count(*) > (select max_weekly_releases from label_settings) as over_cap
-from releases
-group by release_week
-order by release_week;
+  coalesce(l.max_weekly_releases, (select max_weekly_releases from label_settings)) as cap,
+  count(*) > coalesce(l.max_weekly_releases, (select max_weekly_releases from label_settings)) as over_cap
+from releases r
+join artists a on a.id = r.artist_id
+left join labels l on l.id = a.label_id
+group by r.release_week, l.slug, l.max_weekly_releases
+order by r.release_week, label;
+
+-- レーベルごとの成長（子レーベルを増やす順番の判断に使う）
+create or replace view v_label_growth as
+select
+  coalesce(l.slug, 'drive') as label,
+  count(distinct a.id)        as artists,
+  sum(g.live_tracks)          as live_tracks,
+  sum(g.streams_4w)           as streams_4w,
+  sum(g.streams_prev_4w)      as streams_prev_4w,
+  case when sum(g.streams_prev_4w) > 0
+       then round(sum(g.streams_4w)::numeric / sum(g.streams_prev_4w), 2) end as growth_ratio,
+  round(avg(g.reached_1000_rate), 2) as reached_1000_rate
+from artists a
+left join labels l on l.id = a.label_id
+left join v_artist_growth g on g.slug = a.slug
+group by l.slug;
 
 -- ブリーフの枠がそろっているか（11 枠すべて埋まっているか）を確認する
 create or replace view v_brief_completeness as
@@ -458,7 +503,7 @@ do $$
 declare t text;
 begin
   foreach t in array array[
-    'label_settings','artists','reference_tracks','reference_web_sources','track_analyses','weekly_trends',
+    'label_settings','labels','artists','reference_tracks','reference_web_sources','track_analyses','weekly_trends',
     'briefs','brief_sources','generations','releases','collab_pairs','metrics'
   ] loop
     execute format('alter table %I enable row level security', t);
