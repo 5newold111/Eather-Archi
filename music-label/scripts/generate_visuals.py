@@ -22,7 +22,7 @@
 標準ライブラリだけで動く（画像 API 呼び出しは urllib）。
 """
 from __future__ import annotations
-import argparse, base64, json, os, sys, urllib.request
+import argparse, base64, json, os, sys, urllib.error, urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -289,15 +289,39 @@ def main() -> None:
         cands = prompts_reshoot(artist, args.pivot_reason)
     print(f"  指示文を {len(cands)} 本作りました（実名・商標は含めていません）")
 
-    generated = 0
-    for c in cands:
+    generated, errors = 0, []
+    has_key = bool(os.environ.get("OPENAI_API_KEY"))
+    if not has_key:
+        print("  OPENAI_API_KEY が見つかりません（music-label/.env か環境変数）。画像は生成せず、指示文だけ書き出します（ドライラン）")
+    else:
+        print(f"  画像を生成しています（{len(cands)} 枚。1 枚 10〜30 秒）…")
+    for i, c in enumerate(cands, 1):
         f = outdir / f"{c['kind']}_{c['no']:02d}.png"
         try:
             if generate_image(c["prompt"], f):
                 c["file"] = f.name; generated += 1
+                print(f"    [{i}/{len(cands)}] {c['kind']} {c['no']:02d} 完了")
+        except urllib.error.HTTPError as e:   # API からのエラー応答（鍵・残高・内容の拒否など）
+            body = e.read().decode("utf-8", "replace")[:300]
+            msg = f"HTTP {e.code}: {body}"
+            c["error"] = msg; errors.append(msg)
+            print(f"    [{i}/{len(cands)}] {c['kind']} {c['no']:02d} 失敗 → {msg}")
         except Exception as e:   # noqa: BLE001
-            c["error"] = str(e)
-    print(f"  画像を {generated} 枚生成しました" if generated else "  OPENAI_API_KEY が無いので画像は生成せず、指示文だけ書き出します（ドライラン）")
+            c["error"] = str(e); errors.append(str(e))
+            print(f"    [{i}/{len(cands)}] {c['kind']} {c['no']:02d} 失敗 → {e}")
+        if errors and len(errors) >= 3 and generated == 0:
+            print("  3 枚続けて失敗したので中断します（同じ原因の可能性が高い）")
+            break
+    if has_key:
+        print(f"  画像を {generated} 枚生成しました" + (f"（失敗 {len(errors)} 枚）" if errors else ""))
+    if errors:
+        first = errors[0]
+        hint = ("鍵が無効です。.env の OPENAI_API_KEY を確認（前後の空白・改行、sk- で始まるか）" if "401" in first else
+                "OpenAI 側の残高不足か回数制限です。platform.openai.com の Billing を確認" if "429" in first else
+                "画像モデルの利用が許可されていません。OpenAI の組織設定で gpt-image-1 の利用（本人確認）を確認" if "403" in first or "verif" in first.lower() else
+                "指示文が内容ポリシーで拒否されました。該当候補だけ除外して続行できます" if "safety" in first.lower() or "content_policy" in first.lower() else
+                "ネットワークか API の一時的な問題の可能性。少し待って再実行")
+        print(f"  → 対処のヒント: {hint}")
 
     for c in cands:
         score_candidate(c, criteria)
