@@ -180,7 +180,10 @@
         "point_of_view": "なし",
         "primary_language": "en",
         "trend_language_ok": false,
-        "tone": "無"
+        "tone": "無",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "寝室の天井。月光の帯",
@@ -391,7 +394,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "静"
+        "tone": "静",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "ピアノのある暗い部屋。譜面台の小さな灯り",
@@ -627,7 +633,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "遠い"
+        "tone": "遠い",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "雨の夜の窓。室内は暗く、外の雨だけ見える",

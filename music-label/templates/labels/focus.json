@@ -161,7 +161,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "—"
+        "tone": "—",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "方眼の作業机。鉛筆 1 本",
@@ -392,7 +395,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "—"
+        "tone": "—",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "何もないリハーサル室。窓の光の帯",
@@ -632,7 +638,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "機械的で静か"
+        "tone": "機械的で静か",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "暗い部屋のパッチケーブル。LED の点",

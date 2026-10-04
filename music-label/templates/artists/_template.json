@@ -180,7 +180,10 @@
       "政治",
       "特定の人物"
     ],
-    "_説明": "trend_language_ok を true にした組だけが、世界チャートで伸びている言語のフレーズをサビの決め台詞などに混ぜる（全体の 20% まで）。基本は 1 組だけ true にする"
+    "_説明": "trend_language_ok を true にした組だけが、世界チャートで伸びている言語のフレーズをサビの決め台詞などに混ぜる（全体の 20% まで）。基本は 1 組だけ true にする",
+    "mode": "core_fixed",
+    "suno_share": 0.45,
+    "_mode": "full / core_fixed / instrumental。core_fixed はサビ・決め台詞・タグ・構成を固定し、節は Suno の歌詞生成に任せて merge_lyrics.py で合体する"
   },
   "visual": {
     "space": "",

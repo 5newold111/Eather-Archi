@@ -185,7 +185,10 @@
         "primary_language": "en",
         "trend_language_ok": true,
         "trend_language_max_ratio": 0.2,
-        "tone": "穏やか、少しユーモア"
+        "tone": "穏やか、少しユーモア",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "朝のキッチンカウンター",
@@ -434,7 +437,10 @@
         "primary_language": "en",
         "trend_language_ok": true,
         "trend_language_max_ratio": 0.2,
-        "tone": "軽やか"
+        "tone": "軽やか",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "朝のベランダ。白い壁と葉の影",
@@ -657,7 +663,10 @@
         "point_of_view": "なし",
         "primary_language": "none",
         "trend_language_ok": false,
-        "tone": "ゆるい"
+        "tone": "ゆるい",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "朝の机。マグカップとレコードプレーヤー",

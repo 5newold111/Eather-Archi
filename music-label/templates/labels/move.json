@@ -186,7 +186,10 @@
         "point_of_view": "私 → あなたへの呼びかけ",
         "primary_language": "en",
         "trend_language_ok": false,
-        "tone": "前向きで強い"
+        "tone": "前向きで強い",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "朝の河川敷。空が 7 割",
@@ -435,7 +438,10 @@
         "primary_language": "en",
         "trend_language_ok": true,
         "trend_language_max_ratio": 0.15,
-        "tone": "クール、少し皮肉"
+        "tone": "クール、少し皮肉",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "駅の階段とガラスの反射",
@@ -694,7 +700,10 @@
         "point_of_view": "俺たち",
         "primary_language": "en",
         "trend_language_ok": false,
-        "tone": "まっすぐ、熱い"
+        "tone": "まっすぐ、熱い",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
       },
       "visual": {
         "space": "坂道の上から見下ろす街。空が広い",

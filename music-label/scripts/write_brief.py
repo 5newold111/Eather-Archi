@@ -46,7 +46,7 @@ OUTPUT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": ["title_candidates", "suno_style_prompt", "suno_lyrics", "vocal_instruction",
-                 "phrase_transform_options", "cover_prompt_seed", "notes_ja", "self_check"],
+                 "phrase_transform_options", "cover_prompt_seed", "notes_ja", "self_check", "core", "suno_lyric_prompt"],
     "properties": {
         "title_candidates": {"type": "array", "minItems": 3, "maxItems": 5, "items": {"type": "string"}},
         "suno_style_prompt": {"type": "string", "description": "Suno の Style 欄。英語。ジャンル・テンポ・楽器・声の質感・場面。実在アーティスト名を含めない。900 文字以内"},
@@ -63,6 +63,21 @@ OUTPUT_SCHEMA = {
                           "description": {"type": "string"}}}},
         "cover_prompt_seed": {"type": "string", "description": "ジャケット生成の種（英語 3〜5 行）。色調・光・構図・質感・モチーフ。人の顔・文字・ロゴなし"},
         "notes_ja": {"type": "string", "description": "オーナー向けの日本語メモ：この曲で何を狙ったか、どの枠から何を借りたか、迷った点"},
+        "core": {
+            "type": "object", "additionalProperties": False,
+            "description": "この曲の印象を決める『核』。core_fixed モードでは固定され、Suno は変更できない。full / instrumental では空でよい",
+            "required": ["chorus_lines", "hook_line", "title_placement", "fixed_tags", "syllables_per_line_target"],
+            "properties": {
+                "chorus_lines": {"type": "array", "items": {"type": "string"}, "description": "サビ全文（4〜6 行）"},
+                "hook_line": {"type": "string", "description": "決め台詞（タイトル語を含むか連想させる 1 行）"},
+                "bridge_lines": {"type": "array", "items": {"type": "string"}, "description": "ブリッジを固定する場合のみ"},
+                "title_placement": {"type": "string", "description": "タイトル語をどこで言うか（サビ末 など）"},
+                "fixed_tags": {"type": "array", "items": {"type": "string"}, "description": "位置込みの歌い方タグ（例：'[Outro] [Humming]'）"},
+                "trend_language_line": {"type": "string", "description": "トレンド言語の 1 行（使う場合）。無ければ空文字"},
+                "syllables_per_line_target": {"type": "integer", "description": "節（Verse）の 1 行あたり音節数の目標。Suno に書かせる節をサビと揃えるため"}
+            }
+        },
+        "suno_lyric_prompt": {"type": "string", "description": "Suno の歌詞生成（Write Lyrics）に貼る英文指示。節（Verse 1 / Verse 2 / Pre-Chorus）だけを書かせる。テーマ・視点・風景語・1 行の音節数・行数・禁止事項を含み、サビは含めない（核はこちらで固定）。実名なし。full / instrumental では空文字"},
         "self_check": {"type": "object", "additionalProperties": False,
                        "required": ["no_real_artist_names", "hook_within_limit", "tics_included", "forbidden_avoided"],
                        "properties": {k: {"type": "boolean"} for k in ["no_real_artist_names", "hook_within_limit", "tics_included", "forbidden_avoided"]}},
@@ -93,6 +108,20 @@ Hard rules (never break):
 8. Suno style prompt: English, under 900 characters, comma-separated descriptors (genre, era feel, tempo/BPM,
    instruments, vocal timbre and delivery, mood, scene), no artist names, no lyrics.
 9. notes_ja is written in Japanese for the owner; everything else in English unless the brief says otherwise.
+
+Lyrics modes (artist profile -> lyrics.mode):
+- "full": you write every line of suno_lyrics.
+- "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the
+  title lands, the performance tags for the artist's tics, the trend-language line if any, and the section
+  structure. Verses and pre-chorus are left to Suno's lyric writer: in suno_lyrics put the placeholders
+  {{SUNO_VERSE_1}}, {{SUNO_PRE_CHORUS}}, {{SUNO_VERSE_2}} (and {{SUNO_BRIDGE}} only if the bridge is not fixed) on
+  their own lines under the section tags, and write suno_lyric_prompt - the instruction the owner pastes into
+  Suno's lyric writer - asking only for those sections, with the theme, point of view, landscape words, the exact
+  syllables-per-line target (match the chorus), the number of lines per section, the forbidden topics, and
+  "do not write a chorus; do not name any real person, brand or artist". Roughly 40-50% of the final word count
+  should come from Suno. The core must be strong enough to define the song on its own.
+- "instrumental": suno_lyrics is "[Instrumental]" plus any vowel/one-word fragments the artist uses; core and
+  suno_lyric_prompt are empty.
 Return only the JSON object described by the schema."""
 
 
@@ -175,6 +204,11 @@ def validate(result: dict, artist: dict, brief: dict) -> list[str]:
     if any(re.search(r"\b(feat|ft)\.?\s", t, re.I) for t in result["title_candidates"]):
         problems.append("曲名に feat. が入っている（フィーチャリング欄で登録する運用）")
     tics = [t for t in artist.get("vocal", {}).get("signature_techniques", {}).get("tics", []) if t.get("frequency") == "every_song"]
+    mode = artist.get("lyrics", {}).get("mode", "core_fixed")
+    if mode == "core_fixed" and "{{SUNO_" not in result["suno_lyrics"]:
+        problems.append("core_fixed なのに Suno 用の差し込み位置（{{SUNO_VERSE_1}} など）が無い")
+    if mode == "core_fixed" and not result.get("core", {}).get("chorus_lines"):
+        problems.append("core_fixed なのに核（サビ）が空")
     if tics and "[" not in result["suno_lyrics"]:
         problems.append("歌詞にセクション／歌い方タグが無い（毎曲の癖が入っていない可能性）")
     if not all(result["self_check"].values()):
@@ -276,6 +310,12 @@ def main() -> None:
         brief["phrase_transform"]["description"] = "options から 1 つ選び、kept / changed / contour_interval_changed を上に写す"
         brief["cover_prompt_seed"] = result["cover_prompt_seed"]
         brief["notes_ja"] = result["notes_ja"]
+        brief["lyrics_mode"] = artist.get("lyrics", {}).get("mode", "core_fixed")
+        brief["core"] = result.get("core", {})
+        brief["suno_lyric_prompt"] = result.get("suno_lyric_prompt", "")
+        if brief["lyrics_mode"] == "core_fixed" and "{{SUNO_" in brief["suno_lyrics"]:
+            print("  歌詞モード core_fixed：核（サビ・決め台詞・タグ）は固定済み。節は Suno の Write Lyrics に suno_lyric_prompt を貼って作り、")
+            print("    python3 scripts/merge_lyrics.py <このブリーフ> --verses <Suno の出力を保存したテキスト>  で合体してください")
         brief["validation"] = {"problems": problems, "checked_at": date.today().isoformat()}
         brief["generated_by"] = f"select_references.py + write_brief.py ({MODEL})"
         bp.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

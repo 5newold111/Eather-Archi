@@ -213,7 +213,10 @@
       "宗教",
       "政治",
       "特定の人物"
-    ]
+    ],
+    "mode": "core_fixed",
+    "suno_share": 0.45,
+    "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
   },
   "visual": {
     "space": "昼のハイウェイを走るワゴンの車内と、サービスエリアの屋外",

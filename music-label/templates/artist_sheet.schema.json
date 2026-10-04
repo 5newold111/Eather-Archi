@@ -535,6 +535,21 @@
           "items": {
             "type": "string"
           }
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "full",
+            "core_fixed",
+            "instrumental"
+          ],
+          "default": "core_fixed"
+        },
+        "suno_share": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Suno の歌詞生成に任せる割合の目安（core_fixed で 0.4〜0.5）"
         }
       }
     },
