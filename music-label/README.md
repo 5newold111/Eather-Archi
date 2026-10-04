@@ -53,6 +53,7 @@ music-label/
 │       └── move.json                ← 歩く・走る
 └── scripts/
     ├── select_references.py      ← 参考曲を枠ごとに自動で割り当てる（1 曲 1 枠を機械的に守る）。設定書の癖・声の仕様をブリーフに固定で入れる
+    ├── analyze_track.py          ← 参考曲の解析シートを音源から自動で下書き（BPM・キー・構成・エネルギー・音節・韻、Claude で欄を埋める）
     ├── write_brief.py            ← 骨組みに Suno 用の指示文・歌詞の核・タイトル候補を Claude が書き足す（鍵が無ければ指示文だけ書き出す）
     ├── merge_lyrics.py           ← 固定した核と Suno が書いた節を合体（core_fixed）、または Suno の全文を検査・タグ補完（topic_only）して最終歌詞に
     ├── analyze_growth.py         ← 成績から「伸びている組・曲・要素」を分析し、重みとヒント、方針転換の提案を返す

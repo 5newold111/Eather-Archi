@@ -148,7 +148,8 @@ def slot_excerpts(brief: dict, refs_dir: Path | None) -> dict[str, dict]:
     """枠ごとに、参考曲の解析シートから『その枠の欄だけ』を抜き出す。歌詞の語（key_words.word）は落とす"""
     out = {}
     for slot, src in brief["slots"].items():
-        entry = {"reference_title": src["title"], "reference_artist": src.get("artist_name", ""), "weight": src.get("weight", 1.0)}
+        # 参考曲のアーティスト実名は渡さない（曲名と枠の中身だけ。実名は模倣の方向に引っ張る）
+        entry = {"reference_title": src["title"], "weight": src.get("weight", 1.0)}
         sheet = None
         if refs_dir:
             for cand in (refs_dir / f"{src['reference_id']}.json",):

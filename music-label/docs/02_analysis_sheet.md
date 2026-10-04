@@ -156,3 +156,28 @@
 日本の著作権法 30 条の 4 は、作品を「享受」する目的ではない**情報解析**のための利用を認めています。
 分析自体はこの範囲ですが、**出力（作った曲）が元の曲に似すぎれば別問題**です。
 似すぎを防ぐのが `docs/04_borrowing_rules.md` のルールです。
+
+## 自動で下書きする：`scripts/analyze_track.py`
+
+```bash
+python3 scripts/analyze_track.py \
+  --audio ~/Music/ref/overpass.wav \                # 正規に入手した音源
+  --title "Overpass at Six" --artist "Harbor Lights Dept." --year 2024 --language en \
+  --tags night drive synth retro --source chart --acquired-from "正規購入" \
+  --lyrics ~/Music/ref/overpass_lyrics.txt \        # 歌詞テキスト（任意）
+  --notes  ~/Music/ref/overpass_notes.txt \         # 耳メモ（任意・日本語の自由文）
+  --web mv:https://... official_site:https://... sns:https://... \
+  --research                                        # Claude に公開情報を調べさせる（任意）
+```
+
+| 工程 | 何をするか | 人の作業 |
+|---|---|---|
+| 機械計測（librosa） | BPM、キー、長さ、セクション分割（4 小節未満は併合）、エネルギー 1〜10、イントロ長、サビ推定（30 秒以内か）、スイング率、音量、急な無音 | なし |
+| 歌詞の構造（規則） | 1 行あたり音節数、韻の型（AABB など）、繰り返し段落、タイトル語の位置と回数 | 歌詞テキストを用意 |
+| Claude | テーマ・起伏・トーン、耳メモを奏法／エフェクト／環境音／印象の欄に整形、`--research` で背景・ライブの場・MV／ジャケット／SNS の手法 | 耳メモを書く（5〜10 分） |
+
+出力は `out/references/<id>.json`。`select_references.py --references out/references` と `write_brief.py --references out/references` がそのまま読み、**枠ごとにその欄だけ**を Claude に渡します（参考曲のアーティスト名は渡しません）。
+
+精度の目安：BPM ±3、キーは確信度が 0.6 未満なら耳で確認、セクションの名前（verse / chorus）は推定なので耳メモで直す。
+`--no-claude` で機械計測と規則だけの下書きも作れます（鍵が無いとき）。
+音源は解析後に保存しません（解析シートだけが残る）。
