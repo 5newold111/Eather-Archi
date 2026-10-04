@@ -241,6 +241,11 @@ def main() -> None:
 
     for bp in args.briefs:
         bp = bp.resolve()
+        if not bp.exists():
+            print(f"\n[停止] 骨組みファイルがありません: {rel(bp)}")
+            print("       先に  python3 scripts/select_references.py --all --demo --week <月曜の日付>  を実行して骨組みを作ってください")
+            print("       （実際の参考曲 DB があるときは --demo の代わりに --references <解析シートのフォルダ>）")
+            continue
         brief = load_json(bp)
         artist = load_artist(brief["artist_slug"], brief.get("label_slug", "drive"))
         print(f"\n--- {bp.name}（{artist['name']}）---")
