@@ -1,0 +1,767 @@
+{
+  "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
+  "slug": "sleep",
+  "name": "SLACK WATER",
+  "name_status": "checked",
+  "parent": "etherarchi",
+  "scene": "眠る前・眠りの中",
+  "sound_center": [
+    "アンビエント",
+    "ソロピアノ",
+    "環境音"
+  ],
+  "expansion_path": [
+    "ニューエイジ",
+    "スローなギターアンビエント",
+    "雨音とハミングだけの曲",
+    "眠りのためのローファイ"
+  ],
+  "scene_spec": {
+    "bpm_min": 50,
+    "bpm_max": 75,
+    "length_sec_min": 240,
+    "length_sec_max": 480,
+    "hook_within_sec": 0,
+    "no_sudden_silence": true,
+    "_説明": "サビの概念を持たない。エネルギー曲線は 3 → 3 → 2 → 2 のように下がるだけ。終わりはフェード必須"
+  },
+  "automation_tier": "B",
+  "max_weekly_releases": 8,
+  "release_hour_et": 21,
+  "release_weekday": "sunday",
+  "_release": "日曜 21:00 ET（日本 月曜 10:00/11:00）。眠る前の時間帯に合わせる",
+  "accounts": {
+    "distrokid_email": "sleep-label",
+    "spotify_for_artists_team": "sleep-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "暗い寝室。窓から入る月光と、床に落ちる一筋の光だけ",
+    "palette": [
+      "ミッドナイトブルー",
+      "チャコール",
+      "ほのかな生成り"
+    ],
+    "cover_series_rule": "毎回同じ寝室。月の位置と光の幅だけ変える"
+  },
+  "artists": [
+    {
+      "slug": "sleep_drone",
+      "name": "VESSEL LOW",
+      "name_status": "checked",
+      "formation": "solo",
+      "cadence": "weekly",
+      "persona": {
+        "members": [
+          {
+            "role": "voice / synth",
+            "description": "低く長く息を吐くように歌う人。言葉はほとんど使わない"
+          }
+        ],
+        "age_feel": "年齢不詳",
+        "story": "眠れない夜に自分のために作っていた音を、そのまま出している",
+        "scene": "眠りに入る瞬間",
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "冬の夜の静電気",
+            "遠くの道路の低い唸り",
+            "毛布の中の暗さ"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1970s〜80s",
+            "genre": "アンビエント",
+            "what_was_taken": "繰り返しの中で少しずつ変わる音の層"
+          }
+        ],
+        "formation_story": {
+          "started": "2024 年冬",
+          "how": "不眠症の本人が、自分が寝るためだけに毎晩 1 本、低い声のハミングを録って公開していた。『この人が眠れた日の録音』として聴かれ始めた",
+          "inspired_by_pattern": "自分の不眠のために作った音がリスナーに見つかる型（自分用のアンビエントが広がった作家の経緯）",
+          "first_release": "本人が初めて 6 時間眠れた夜の録音",
+          "name_meaning": "vessel（器・船）＋ low（低い）"
+        }
+      },
+      "vocal": {
+        "sex": "male",
+        "range": "low",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "E2",
+          "comfortable_high": "A3",
+          "chest_voice_top": "B3",
+          "falsetto_switch_point": "C4",
+          "falsetto_quality": "息だけに近い、ほぼ無声",
+          "strength": "低音の持続（ロングトーン）",
+          "weakness": "速い言葉さばき"
+        },
+        "signature_techniques": {
+          "primary": "低音のハミング（ロングトーン）",
+          "secondary": [
+            "囁くようなウィスパー",
+            "ooh の重ね"
+          ],
+          "avoid": [
+            "シャウト／ラウド",
+            "ビブラート",
+            "言葉を刻む"
+          ],
+          "wordless_style": "ハミング",
+          "tics": [
+            {
+              "technique": "ハミング",
+              "where": "曲の 70% 以上",
+              "frequency": "every_song"
+            },
+            {
+              "technique": "囁きの単語を 1 つだけ",
+              "where": "中間点",
+              "frequency": "most"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "ほぼ同音。半音の揺れだけ",
+          "chorus_peak": "頂点を作らない",
+          "verse_register": "地声の最低音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし",
+        "intro": "最初の 30 秒は音が 1 層だけ",
+        "outro": "60 秒以上のフェード",
+        "structure": "セクションを持たない。層が増えて減る",
+        "instruments_rule": "常にサブベース帯のパッドを 1 つ鳴らす",
+        "always": [
+          "終わりは無音に溶ける"
+        ],
+        "never": [
+          "ドラム",
+          "明確なコード進行"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "drone ambient"
+        ],
+        "palette": [
+          "シンセパッド（低域）",
+          "ボーカルのハミング",
+          "テープのヒス"
+        ],
+        "bpm_min": 50,
+        "bpm_max": 60,
+        "energy_curve_type": "2-3-3-2-1",
+        "dna_tags": [
+          "sleep",
+          "drone",
+          "ambient",
+          "night",
+          "texture"
+        ],
+        "forbidden": [
+          "ドラム",
+          "急な無音",
+          "高音の張り"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "（ほぼ言葉なし。1 単語だけ）"
+        ],
+        "point_of_view": "なし",
+        "primary_language": "en",
+        "trend_language_ok": false,
+        "tone": "無",
+        "mode": "core_fixed",
+        "suno_share": 0.45,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.2,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
+      },
+      "visual": {
+        "space": "寝室の天井。月光の帯",
+        "light": "月光のみ",
+        "materials": [
+          "リネン",
+          "暗い木"
+        ],
+        "palette": [
+          "ミッドナイトブルー"
+        ],
+        "camera": "仰向けで天井を見る",
+        "cover_series_rule": "天井の光の帯の角度だけ変える",
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（毛布にくるまる）",
+          "secondary": [
+            "後ろ姿",
+            "暗闇のフィルター"
+          ],
+          "never": [
+            "逆光",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "低い波形 1 本",
+          "mark_type": "文字＋記号",
+          "color_rule": "ミッドナイトブルーに生成り",
+          "typography": "細い小文字"
+        },
+        "photo_direction": {
+          "taste": "フィルム、暗部の粒子",
+          "composition": "余白多め、人物は下 1/5",
+          "location_type": "屋内（寝室）",
+          "brightness": "暗",
+          "contrast": "低",
+          "color_temperature": "寒",
+          "background": "均一（暗い壁）",
+          "positioning": "遠い",
+          "gesture": "横たわる"
+        }
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "Part of the EtherArchi group, a label where AI-generated music meets spatial design. Drones for the last minutes before sleep."
+      },
+      "collab": {
+        "preferred_partners": [
+          "sleep_field"
+        ],
+        "collab_style": "重ねる（レイヤーの相互提供）"
+      },
+      "name_candidates": [
+        "VESSEL LOW",
+        "Hollow Vessel"
+      ],
+      "profile": {
+        "hometown": "北海道・十勝",
+        "height_cm": [
+          182
+        ],
+        "weight_kg": [
+          70
+        ],
+        "likes": [
+          "毛布",
+          "雪の夜の静けさ",
+          "遠くの道路の音"
+        ],
+        "favorite_food": "温めた牛乳と蜂蜜",
+        "dislikes": [
+          "目覚まし時計",
+          "速い音楽",
+          "蛍光灯"
+        ],
+        "favorite_artists_real": [
+          "Stars of the Lid",
+          "Brian Eno",
+          "Grouper",
+          "William Basinski"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
+      }
+    },
+    {
+      "slug": "sleep_piano",
+      "name": "FELT HOUR",
+      "name_status": "checked",
+      "formation": "solo",
+      "cadence": "weekly",
+      "persona": {
+        "members": [
+          {
+            "role": "piano",
+            "description": "歌わない。ピアノだけ"
+          }
+        ],
+        "age_feel": "40 代",
+        "story": "深夜に弱音ペダルを踏んだまま弾く。隣の部屋の人を起こさないために生まれた音",
+        "scene": "眠る前の読書",
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "雪の日の吸音された静けさ",
+            "古い木造の家の床の軋み"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "2000s〜",
+            "genre": "ネオクラシカル",
+            "what_was_taken": "弱音ペダルの打鍵音と余白"
+          }
+        ],
+        "formation_story": {
+          "started": "2023 年",
+          "how": "集合住宅の深夜、隣人を起こさないためにピアノにフェルトを挟んで弾いていた。壁越しに聴いていた隣人が『毎晩の音を録音させてほしい』と頼んだのが最初の録音",
+          "inspired_by_pattern": "隣人への配慮から生まれた音色がそのまま作風になる型（フェルトピアノを特徴にした作曲家の経緯）",
+          "first_release": "隣人が録った 7 夜ぶん",
+          "name_meaning": "felt（フェルト）＋ hour（深夜の 1 時間）"
+        }
+      },
+      "vocal": {
+        "sex": "none",
+        "range": "mid",
+        "fixed_timbre": false,
+        "suno_persona_id": null,
+        "voice_spec": {},
+        "signature_techniques": {
+          "primary": "（歌なし）",
+          "secondary": [],
+          "avoid": [
+            "歌"
+          ],
+          "wordless_style": "無言で楽器に任せる",
+          "tics": []
+        },
+        "melodic_tendency": {
+          "motion": "順次進行。右手は 1 オクターブ内",
+          "chorus_peak": "なし",
+          "verse_register": "中音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "1 曲に 1 回、平行調へ静かに移る",
+        "intro": "単音で 4 小節",
+        "outro": "最後の和音を 10 秒以上残す",
+        "phrase_endings": "必ず解決させずに終える",
+        "structure": "A-A'-B-A''。繰り返しの中で 1 音ずつ変える",
+        "instruments_rule": "ピアノのみ。ペダルと打鍵のノイズを残す",
+        "always": [
+          "弱音ペダル（フェルト）の質感"
+        ],
+        "never": [
+          "ピアノ以外の楽器",
+          "テンポの変化"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "neo-classical",
+          "solo piano"
+        ],
+        "palette": [
+          "フェルトピアノ",
+          "部屋鳴り",
+          "ペダルのノイズ"
+        ],
+        "bpm_min": 55,
+        "bpm_max": 70,
+        "energy_curve_type": "2-3-4-3-2",
+        "dna_tags": [
+          "sleep",
+          "piano",
+          "neoclassical",
+          "quiet",
+          "night"
+        ],
+        "forbidden": [
+          "歌",
+          "ドラム",
+          "強い打鍵"
+        ]
+      },
+      "lyrics": {
+        "themes": [],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "静",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.0,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
+      },
+      "visual": {
+        "space": "ピアノのある暗い部屋。譜面台の小さな灯り",
+        "light": "点光源 1 つ",
+        "materials": [
+          "黒い木",
+          "フェルト"
+        ],
+        "palette": [
+          "黒",
+          "琥珀"
+        ],
+        "camera": "鍵盤の高さから",
+        "cover_series_rule": "灯りの色温度だけ変える",
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "後ろ姿（ピアノに向かう）",
+          "secondary": [
+            "手だけ写す（鍵盤の手）",
+            "暗闇のフィルター"
+          ],
+          "never": [
+            "俯瞰",
+            "被り物"
+          ]
+        },
+        "logo": {
+          "concept": "フェルトの断面（柔らかい長方形）",
+          "mark_type": "文字のみ",
+          "color_rule": "黒地に琥珀",
+          "typography": "細いセリフ"
+        },
+        "photo_direction": {
+          "taste": "フィルム、粒子多め",
+          "composition": "中央、譜面台の灯り",
+          "location_type": "屋内",
+          "brightness": "暗",
+          "contrast": "中",
+          "color_temperature": "暖",
+          "background": "均一",
+          "positioning": "背中、カメラは部屋の隅",
+          "gesture": "鍵盤に両手"
+        }
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "FELT HOUR is part of the EtherArchi group (SLACK WATER). Felt piano, recorded after midnight."
+      },
+      "collab": {
+        "preferred_partners": [
+          "sleep_drone",
+          "sleep_field"
+        ],
+        "collab_style": "ピアノを相手の曲に提供"
+      },
+      "name_candidates": [
+        "FELT HOUR",
+        "Felt Hours"
+      ],
+      "profile": {
+        "hometown": "京都府・町家の多い通り",
+        "height_cm": [
+          168
+        ],
+        "weight_kg": [
+          58
+        ],
+        "likes": [
+          "フェルト",
+          "古い木造の床の軋み",
+          "隣人との壁越しの会話"
+        ],
+        "favorite_food": "ほうじ茶と干菓子",
+        "dislikes": [
+          "大きな音",
+          "強い打鍵",
+          "テンポの変化"
+        ],
+        "favorite_artists_real": [
+          "Nils Frahm",
+          "Ólafur Arnalds",
+          "高木正勝",
+          "Goldmund"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
+      }
+    },
+    {
+      "slug": "sleep_field",
+      "name": "RAINLETTER",
+      "name_status": "checked",
+      "formation": "producer",
+      "cadence": "weekly",
+      "persona": {
+        "members": [
+          {
+            "role": "producer / field recording",
+            "description": "雨・風・水の音を録って、わずかな音程を足す人"
+          }
+        ],
+        "age_feel": "30 代",
+        "story": "旅先で録った環境音をそのまま曲にする。歌は、遠くで誰かが歌っているように小さく",
+        "scene": "眠りの中（かけたまま寝る）",
+        "origin": {
+          "birthplace": "",
+          "upbringing": "",
+          "landscape_words": [
+            "雨の軒先",
+            "夜の浜の引き波",
+            "山小屋の薪の音"
+          ]
+        },
+        "influences": [
+          {
+            "name": "（bio のみ）",
+            "era": "1990s〜",
+            "genre": "フィールド録音 / アンビエント",
+            "what_was_taken": "環境音を主役にし、楽器を添え物にする配分"
+          }
+        ],
+        "formation_story": {
+          "started": "2022 年",
+          "how": "旅先から家族に送っていた『音の手紙』（雨や波の録音に小さく歌を乗せたもの）が、家族の手で公開された",
+          "inspired_by_pattern": "私的な録音が本人以外の手で公開されて始まる型（家族・友人が音源を公開してデビューした作家の経緯）",
+          "first_release": "最初の手紙の 1 本目、雨の軒先",
+          "name_meaning": "rain ＋ letter（手紙）"
+        }
+      },
+      "vocal": {
+        "sex": "female",
+        "range": "mid",
+        "fixed_timbre": true,
+        "suno_persona_id": null,
+        "voice_spec": {
+          "comfortable_low": "A3",
+          "comfortable_high": "D5",
+          "chest_voice_top": "C5",
+          "falsetto_switch_point": "D5",
+          "falsetto_quality": "細く、遠い",
+          "strength": "小さな声でも音程が安定",
+          "weakness": "大きな声"
+        },
+        "signature_techniques": {
+          "primary": "遠くで歌っているような小さな ooh",
+          "secondary": [
+            "ハミング",
+            "囁くようなウィスパー"
+          ],
+          "avoid": [
+            "シャウト／ラウド",
+            "ベルティング",
+            "言葉を刻む"
+          ],
+          "wordless_style": "ooh / ah のコーラス",
+          "tics": [
+            {
+              "technique": "ooh のコーラス",
+              "where": "環境音が薄くなる中間点",
+              "frequency": "every_song"
+            }
+          ]
+        },
+        "melodic_tendency": {
+          "motion": "長い音の 3〜4 音だけ",
+          "chorus_peak": "切り替え点の下で地声のまま",
+          "verse_register": "中音域"
+        }
+      },
+      "composition_habits": {
+        "modulation": "転調なし",
+        "intro": "環境音だけで 45 秒以上",
+        "outro": "楽器が先に消え、環境音だけ 30 秒残す",
+        "structure": "環境音 → 楽器が薄く入る → 声 → 楽器が消える → 環境音",
+        "instruments_rule": "環境音が常に一番前。楽器は 2 つまで",
+        "always": [
+          "本物の環境音の層"
+        ],
+        "never": [
+          "ドラム",
+          "ベースライン"
+        ]
+      },
+      "sound": {
+        "genres": [
+          "field recording",
+          "ambient"
+        ],
+        "palette": [
+          "雨音",
+          "波",
+          "ギターのハーモニクス",
+          "グロッケン",
+          "小さな声"
+        ],
+        "bpm_min": 50,
+        "bpm_max": 65,
+        "energy_curve_type": "2-2-3-3-2-1",
+        "dna_tags": [
+          "sleep",
+          "rain",
+          "field",
+          "ambient",
+          "texture"
+        ],
+        "forbidden": [
+          "ドラム",
+          "急な無音",
+          "大きな声"
+        ]
+      },
+      "lyrics": {
+        "themes": [
+          "（母音だけ）"
+        ],
+        "point_of_view": "なし",
+        "primary_language": "none",
+        "trend_language_ok": false,
+        "tone": "遠い",
+        "mode": "instrumental",
+        "suno_share": 0.0,
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.0,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
+      },
+      "visual": {
+        "space": "雨の夜の窓。室内は暗く、外の雨だけ見える",
+        "light": "外の街灯が雨粒に滲む",
+        "materials": [
+          "ガラス",
+          "雨"
+        ],
+        "palette": [
+          "濃いグレー",
+          "滲んだ橙"
+        ],
+        "camera": "窓越し。室内から",
+        "cover_series_rule": "窓の外の景色（雨 / 雪 / 霧）だけ変える",
+        "blend_file": null,
+        "face_concealment": {
+          "primary": "物で隠す（傘）",
+          "secondary": [
+            "窓・雨のフィルター",
+            "後ろ姿"
+          ],
+          "never": [
+            "被り物",
+            "イラスト化"
+          ]
+        },
+        "logo": {
+          "concept": "雨の縦線 3 本",
+          "mark_type": "文字＋記号",
+          "color_rule": "濃いグレーに滲んだ橙",
+          "typography": "手書き風の細い文字"
+        },
+        "photo_direction": {
+          "taste": "フィルム、滲み",
+          "composition": "三分割、人物は小さく",
+          "location_type": "屋外（雨の軒先・浜）",
+          "brightness": "中〜暗",
+          "contrast": "低",
+          "color_temperature": "寒",
+          "background": "ボケ（雨）",
+          "positioning": "遠い、傘の下",
+          "gesture": "立ち止まる"
+        }
+      },
+      "distribution": {
+        "spotify_uri": null,
+        "apple_artist_id": null,
+        "distrokid_artist_id": null,
+        "bio_en": "RAINLETTER is part of the EtherArchi group (SLACK WATER). Field recordings with a voice far away."
+      },
+      "collab": {
+        "preferred_partners": [
+          "sleep_drone",
+          "sleep_piano"
+        ],
+        "collab_style": "環境音を相手に提供"
+      },
+      "name_candidates": [
+        "RAINLETTER",
+        "Rain Letter"
+      ],
+      "profile": {
+        "hometown": "高知県・太平洋側の浜",
+        "height_cm": [
+          158
+        ],
+        "weight_kg": [
+          47
+        ],
+        "likes": [
+          "雨の軒先",
+          "旅先の録音",
+          "家族への手紙"
+        ],
+        "favorite_food": "浜で焼いた魚",
+        "dislikes": [
+          "ドラム",
+          "大きな声",
+          "晴天のビーチ"
+        ],
+        "favorite_artists_real": [
+          "吉村弘",
+          "畠山地平",
+          "Julianna Barwick",
+          "Hiroshi Yoshimura"
+        ],
+        "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+      },
+      "concept_history": {
+        "concept_version": 1,
+        "history": [],
+        "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+      },
+      "name_check": {
+        "method": "web_search（配信サービス・レーベル名・一般検索）",
+        "date": "2026-10-03",
+        "verdict": "clear",
+        "note": "完全一致なし",
+        "manual_pending": [
+          "商標（J-PlatPat / USPTO / WIPO）",
+          "SNS ハンドル（Instagram / TikTok / YouTube）",
+          "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+        ]
+      }
+    }
+  ],
+  "name_candidates": [
+    "SLACK WATER"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 LOW TIDE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "潮の流れが止まる『憩流』の時間。眠りに入る直前の静けさ"
+}

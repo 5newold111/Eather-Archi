@@ -1,0 +1,992 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "analysis_sheet.schema.json",
+  "title": "解析シート v2（参考曲 1 曲ぶん）",
+  "description": "参考曲を『シートを読めば思い出して歌える』レベルまで分解した記録。音源・歌詞の文章・画像そのものは含めない。",
+  "type": "object",
+  "required": [
+    "reference",
+    "lyrics",
+    "worldview",
+    "instruments",
+    "performance",
+    "harmony",
+    "groove",
+    "structure",
+    "phrases",
+    "vocal",
+    "visual_web",
+    "signature"
+  ],
+  "properties": {
+    "reference": {
+      "type": "object",
+      "description": "曲を特定する情報（reference_tracks テーブルに対応）",
+      "required": [
+        "title",
+        "artist_name"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "artist_name": {
+          "type": "string"
+        },
+        "isrc": {
+          "type": "string"
+        },
+        "release_year": {
+          "type": "integer"
+        },
+        "language": {
+          "type": "string",
+          "description": "歌詞の主言語（ISO 639-1）"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "own",
+            "chart",
+            "manual",
+            "trend"
+          ]
+        },
+        "acquired_from": {
+          "type": "string",
+          "description": "どこで正規に入手したか"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "lyrics": {
+      "type": "object",
+      "description": "A. 歌詞",
+      "properties": {
+        "theme": {
+          "type": "string",
+          "description": "主題一文"
+        },
+        "sub_themes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "key_words": {
+          "type": "array",
+          "description": "印象的なワード。生成に渡すのは category だけ",
+          "items": {
+            "type": "object",
+            "required": [
+              "word",
+              "category"
+            ],
+            "properties": {
+              "word": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string",
+                "description": "固有名詞 / 色 / 体の部位 / 乗り物 / 天候 / 時刻 / 場所 など"
+              }
+            }
+          }
+        },
+        "narrative_arc": {
+          "type": "array",
+          "description": "セクションごとの場所・時間・感情・視点",
+          "items": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string"
+              },
+              "place": {
+                "type": "string"
+              },
+              "time": {
+                "type": "string"
+              },
+              "emotion": {
+                "type": "string"
+              },
+              "point_of_view": {
+                "type": "string",
+                "description": "私 / あなた / 私たち / 三人称"
+              }
+            }
+          }
+        },
+        "rhyme": {
+          "type": "object",
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "description": "AABB / ABAB / 自由 など"
+            },
+            "type": {
+              "type": "string",
+              "description": "母音韻 / 子音韻 / 完全韻"
+            },
+            "position": {
+              "type": "string",
+              "description": "行末 / 行中 / 両方"
+            },
+            "denser_in_chorus": {
+              "type": "boolean"
+            }
+          }
+        },
+        "syllables_per_line": {
+          "type": "object",
+          "description": "セクション名 → 各行の音節数の配列（例：\"verse\": [7,7,8,7]）",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "title_word": {
+          "type": "object",
+          "properties": {
+            "count": {
+              "type": "integer"
+            },
+            "positions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "foreshadowing_technique": {
+              "type": "string",
+              "description": "タイトルを言わずに連想させる手法"
+            }
+          }
+        },
+        "emotional_tone": {
+          "type": "object",
+          "description": "セクション名 → トーン",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "irony_or_humor": {
+          "type": "string"
+        },
+        "language": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": "string"
+            },
+            "mixed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "lang": {
+                    "type": "string"
+                  },
+                  "usage": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "spoken_or_rap": {
+          "type": "string"
+        },
+        "repetition_pattern": {
+          "type": "string"
+        },
+        "other": {
+          "type": "string"
+        }
+      }
+    },
+    "worldview": {
+      "type": "object",
+      "description": "B. 世界観",
+      "properties": {
+        "setting": {
+          "type": "object",
+          "properties": {
+            "place": {
+              "type": "string"
+            },
+            "season": {
+              "type": "string"
+            },
+            "time_of_day": {
+              "type": "string"
+            },
+            "weather": {
+              "type": "string"
+            },
+            "transport": {
+              "type": "string"
+            }
+          }
+        },
+        "inner_world": {
+          "type": "object",
+          "properties": {
+            "age_feel": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "burden": {
+              "type": "string"
+            },
+            "changes_in_song": {
+              "type": "string"
+            }
+          }
+        },
+        "era_mix": {
+          "type": "object",
+          "description": "時代感と MIX 感",
+          "properties": {
+            "eras": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "例：[\"80s シンセ\", \"現代の低音\"]"
+            },
+            "stereo_width": {
+              "type": "string"
+            },
+            "vocal_depth": {
+              "type": "string",
+              "description": "前 / 中 / 奥"
+            },
+            "low_end": {
+              "type": "string"
+            },
+            "compression": {
+              "type": "string"
+            },
+            "room_feel": {
+              "type": "string"
+            }
+          }
+        },
+        "artist_background": {
+          "type": "object",
+          "properties": {
+            "origin": {
+              "type": "string"
+            },
+            "influences": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "career_stage": {
+              "type": "string"
+            },
+            "recurring_themes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "live_context": {
+          "type": "object",
+          "properties": {
+            "main_venue_type": {
+              "type": "string"
+            },
+            "audience": {
+              "type": "string"
+            },
+            "how_it_shapes_the_song": {
+              "type": "string"
+            }
+          }
+        },
+        "other": {
+          "type": "string"
+        }
+      }
+    },
+    "instruments": {
+      "type": "object",
+      "description": "C. 使用楽器",
+      "properties": {
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "role"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "lead",
+                  "accompaniment",
+                  "rhythm",
+                  "color"
+                ]
+              },
+              "sections": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "timbre": {
+                "type": "string",
+                "description": "質感の形容（木の温かさ / ガラスの硬さ …）"
+              }
+            }
+          }
+        },
+        "formation_feel": {
+          "type": "string",
+          "description": "3 ピース / 打ち込み＋生ギター など"
+        },
+        "ambient_sounds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "at_seconds": {
+                "type": "number"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "contemporary_elements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "classic_vs_modern_coexistence": {
+          "type": "string"
+        },
+        "effects": {
+          "type": "object",
+          "description": "楽器名 → エフェクトの説明",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "balance": {
+          "type": "object",
+          "properties": {
+            "tuning": {
+              "type": "string",
+              "description": "440Hz / 432Hz / 半音下げ"
+            },
+            "frequency_center": {
+              "type": "string"
+            },
+            "loudness_curve": {
+              "type": "string"
+            },
+            "stereo_width": {
+              "type": "string"
+            },
+            "front_instrument": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "description": "D. 演奏のクセ",
+      "properties": {
+        "note_placement": {
+          "type": "string",
+          "description": "拍の頭 / 裏 / 前に突っ込む / 後ろにもたれる、休符の使い方"
+        },
+        "melodic_habits": {
+          "type": "object",
+          "properties": {
+            "motion": {
+              "type": "string",
+              "description": "跳躍が多い / 順次進行"
+            },
+            "repeated_notes": {
+              "type": "string"
+            },
+            "phrase_endings": {
+              "type": "string",
+              "description": "語尾の下げ方 / しゃくり / 伸ばし"
+            },
+            "scale": {
+              "type": "string",
+              "description": "ペンタトニック / ブルーノート / モード"
+            }
+          }
+        },
+        "techniques": {
+          "type": "object",
+          "description": "楽器名 → 奏法（指 / ピック / スライド / ドリル / スラップ / ブラシ …）",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "fills_and_ornaments": {
+          "type": "string"
+        }
+      }
+    },
+    "harmony": {
+      "type": "object",
+      "description": "E. 和声と転調",
+      "properties": {
+        "modulation_count": {
+          "type": "integer"
+        },
+        "modulations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "position": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "returns_how": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "progression_character": {
+          "type": "string",
+          "description": "ループ型 / 循環型 / 展開型"
+        },
+        "borrowed_chords_tensions": {
+          "type": "string"
+        },
+        "bass_motion": {
+          "type": "string",
+          "description": "ペダル / 歩く / ルート刻み"
+        }
+      }
+    },
+    "groove": {
+      "type": "object",
+      "description": "F. グルーヴとテンポ",
+      "properties": {
+        "bpm": {
+          "type": "number"
+        },
+        "felt_as": {
+          "type": "string",
+          "description": "そのまま / 倍 / 半分"
+        },
+        "tempo_drift": {
+          "type": "string"
+        },
+        "feel": {
+          "type": "string",
+          "description": "真っすぐ / シャッフル / ハーフタイム"
+        },
+        "swing_ratio": {
+          "type": "number"
+        },
+        "hihat_pattern": {
+          "type": "string"
+        },
+        "kick_bass_relation": {
+          "type": "string"
+        },
+        "micro_timing": {
+          "type": "string",
+          "description": "スネアが少し遅い、ボーカルが前乗り など"
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "description": "G. 構成",
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "start_sec"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "start_sec": {
+                "type": "number"
+              },
+              "bars": {
+                "type": "integer"
+              },
+              "energy": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 10
+              }
+            }
+          }
+        },
+        "intro": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "いきなりサビ要素 / 積み上げ"
+            },
+            "bars": {
+              "type": "integer"
+            },
+            "first_instrument": {
+              "type": "string"
+            },
+            "handoff": {
+              "type": "string"
+            }
+          }
+        },
+        "outro": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "description": "フェード / 即終了 / 楽器だけ / サビ反復"
+            },
+            "bars": {
+              "type": "integer"
+            },
+            "afterglow": {
+              "type": "string"
+            }
+          }
+        },
+        "chorus": {
+          "type": "object",
+          "properties": {
+            "enters_at_sec": {
+              "type": "number"
+            },
+            "lift_mechanism": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "contour": {
+              "type": "string",
+              "description": "上昇 / 平坦 / 波"
+            },
+            "repetitions": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "phrases": {
+      "type": "array",
+      "description": "G. フレーズの骨格（決めフレーズを複数）。音程の並び（絶対音名）は書かない",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "rhythm_skeleton",
+          "contour"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "リフ / サビ頭 / 合いの手 など"
+          },
+          "rhythm_skeleton": {
+            "type": "string",
+            "description": "例：♩ ♪♪ | ♩ ー"
+          },
+          "contour": {
+            "type": "string",
+            "description": "例：上 → 上 → 下 → 伸ばす"
+          },
+          "start_degree": {
+            "type": "string",
+            "description": "例：主音の 5 度上（調の中の相対位置）"
+          },
+          "bars": {
+            "type": "number"
+          },
+          "instrument": {
+            "type": "string"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "function": {
+            "type": "string",
+            "description": "掛け合い / 声の切り貼り / リフ / 合いの手"
+          }
+        }
+      }
+    },
+    "vocal": {
+      "type": "object",
+      "description": "H. ボーカル。「○○に似た声」とは書かない",
+      "properties": {
+        "sex": {
+          "type": "string",
+          "enum": [
+            "female",
+            "male",
+            "mixed",
+            "none"
+          ]
+        },
+        "range": {
+          "type": "string",
+          "enum": [
+            "low",
+            "mid",
+            "high"
+          ]
+        },
+        "chest_voice_top": {
+          "type": "string"
+        },
+        "falsetto_use": {
+          "type": "string"
+        },
+        "timbre": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "息混じり / ざらつき / 澄んだ / 鼻にかかる / 太い / 細い …"
+        },
+        "delivery": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": "string",
+              "description": "なめらか / 刻む / 語り"
+            },
+            "vibrato": {
+              "type": "string"
+            },
+            "scoops": {
+              "type": "string"
+            },
+            "phrase_endings": {
+              "type": "string"
+            }
+          }
+        },
+        "expression": {
+          "type": "object",
+          "description": "曲ごとに 6:2:2 で配合する『表現』の層",
+          "properties": {
+            "breath": {
+              "type": "string"
+            },
+            "ad_libs": {
+              "type": "string"
+            },
+            "layering": {
+              "type": "string",
+              "description": "ユニゾン / 3 度 / オクターブ"
+            },
+            "call_and_response": {
+              "type": "string"
+            }
+          }
+        },
+        "processing": {
+          "type": "object",
+          "properties": {
+            "pitch_correction": {
+              "type": "string"
+            },
+            "doubling": {
+              "type": "string"
+            },
+            "delay_reverb": {
+              "type": "string"
+            },
+            "lofi": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "visual_web": {
+      "type": "object",
+      "description": "I. ビジュアルと Web 上の表現。将来のジャケット自動生成・SNS 動画の参考。映像・画像・投稿文そのものは保存しない",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "url"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mv",
+                  "official_site",
+                  "sns",
+                  "live",
+                  "interview",
+                  "cover_art",
+                  "other"
+                ]
+              },
+              "url": {
+                "type": "string"
+              },
+              "fetched_at": {
+                "type": "string",
+                "format": "date"
+              },
+              "summary": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "mv": {
+          "type": "object",
+          "properties": {
+            "setting": {
+              "type": "string",
+              "description": "屋内 / 屋外 / 車内 / 抽象"
+            },
+            "color_tone": {
+              "type": "string",
+              "description": "暖 / 寒 / 無彩色"
+            },
+            "light_quality": {
+              "type": "string",
+              "description": "自然光 / ネオン / 逆光"
+            },
+            "camera": {
+              "type": "string",
+              "description": "固定 / 手持ち / ドローン"
+            },
+            "cut_pace": {
+              "type": "string"
+            },
+            "narrative": {
+              "type": "string"
+            },
+            "motifs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "cover_art": {
+          "type": "object",
+          "properties": {
+            "composition": {
+              "type": "string",
+              "description": "中央 / 余白多め / 全面写真"
+            },
+            "subject": {
+              "type": "string",
+              "description": "本人 / 風景 / 抽象 / タイポグラフィのみ"
+            },
+            "color_count": {
+              "type": "string"
+            },
+            "typography": {
+              "type": "string"
+            },
+            "texture": {
+              "type": "string",
+              "description": "写真 / イラスト / 3D / コラージュ"
+            },
+            "series_rule": {
+              "type": "string",
+              "description": "シリーズとしての統一ルール"
+            }
+          }
+        },
+        "official_site": {
+          "type": "object",
+          "properties": {
+            "density": {
+              "type": "string"
+            },
+            "tone": {
+              "type": "string"
+            },
+            "colors_fonts": {
+              "type": "string"
+            },
+            "fan_funnels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "sns": {
+          "type": "object",
+          "properties": {
+            "main_platform": {
+              "type": "string"
+            },
+            "frequency": {
+              "type": "string"
+            },
+            "content_mix": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              },
+              "description": "制作過程 / 日常 / 告知 / 交流 の比率"
+            },
+            "writing_style": {
+              "type": "string"
+            },
+            "video_format": {
+              "type": "string"
+            },
+            "reply_style": {
+              "type": "string"
+            }
+          }
+        },
+        "live": {
+          "type": "object",
+          "properties": {
+            "lighting": {
+              "type": "string"
+            },
+            "stage_scale": {
+              "type": "string"
+            },
+            "audience_reaction": {
+              "type": "string"
+            },
+            "live_arrangement_diff": {
+              "type": "string"
+            }
+          }
+        },
+        "brand_consistency": {
+          "type": "string"
+        },
+        "image_prompt_seed": {
+          "type": "string",
+          "description": "3〜5 行に圧縮した『ビジュアルの指示文の種』（色調・光・構図・質感・モチーフ）"
+        },
+        "artist_photo": {
+          "type": "object",
+          "description": "アーティスト写真の分析。手法だけを記録し、本人の姿・衣装・ロゴは記録しない",
+          "properties": {
+            "taste": {
+              "type": "string",
+              "description": "フィルム / デジタル / 粒子感 / 彩度"
+            },
+            "composition": {
+              "type": "string",
+              "description": "中央 / 三分割 / 余白多め / 対称"
+            },
+            "location_type": {
+              "type": "string",
+              "description": "屋内 / 屋外 / 車内 / スタジオ / 街 / 自然"
+            },
+            "concept": {
+              "type": "string"
+            },
+            "brightness": {
+              "type": "string",
+              "description": "明 / 中 / 暗"
+            },
+            "contrast": {
+              "type": "string",
+              "description": "高 / 中 / 低"
+            },
+            "color_temperature": {
+              "type": "string",
+              "description": "暖 / 中 / 寒"
+            },
+            "background": {
+              "type": "string",
+              "description": "ボケ / 均一 / 情報量多い"
+            },
+            "positioning": {
+              "type": "string",
+              "description": "カメラとの距離、人数の並び"
+            },
+            "gesture": {
+              "type": "string",
+              "description": "手の位置、視線、歩く / 座る"
+            },
+            "face_concealment": {
+              "type": "string",
+              "description": "顔を見せない方法のカテゴリ（逆光 / 後ろ姿 / 物で隠す / 被り物 / 手 / 俯瞰 / ブレ / フィルター / 人なし / イラスト）。具体的な意匠は書かない"
+            }
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "string",
+      "description": "一言で思い出す要素"
+    },
+    "analyzed_by": {
+      "type": "string",
+      "description": "auto / human / claude の組み合わせ"
+    },
+    "version": {
+      "type": "integer",
+      "default": 1
+    }
+  }
+}

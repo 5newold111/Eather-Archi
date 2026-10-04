@@ -1,0 +1,5 @@
+anthropic>=1.0
+certifi
+librosa>=0.10
+soundfile
+numpy

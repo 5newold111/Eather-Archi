@@ -1,0 +1,51 @@
+{
+  "_使い方": "子レーベル 1 つにつき 1 ファイル。artists には代表アーティストの設定書（templates/artists/_template.json と同じ形式）を並べる。名前はすべて重複確認が終わるまで仮。",
+
+  "slug": "",
+  "name": "",
+  "name_status": "draft",
+  "parent": "etherarchi",
+  "scene": "",
+  "_scene": "このレーベルが担当する『聴く場面』（例：眠る前 / 朝のコーヒー / 仕事の集中 / 走る）。ジャンルではなく場面で分ける",
+
+  "sound_center": [],
+  "expansion_path": [],
+  "_expansion": "sound_center は中心の音。expansion_path は月 1 組ずつ広げていく方向を順番に",
+
+  "scene_spec": {
+    "bpm_min": 0,
+    "bpm_max": 0,
+    "length_sec_min": 150,
+    "length_sec_max": 240,
+    "hook_within_sec": 30,
+    "no_sudden_silence": true,
+    "_説明": "場面に合わせた共通仕様。眠りなら長く・サビの概念を弱く、走るなら速く・短く"
+  },
+
+  "automation_tier": "B",
+  "_automation_tier": "A：全テイクを人が聴く / B：機械が 2 テイクに絞って人が選ぶ / C：機械が選び人は 20% 抜き取り",
+
+  "max_weekly_releases": 8,
+  "release_hour_et": 17,
+  "release_weekday": "wednesday",
+  "_release": "本体と配信曜日をずらすと、週の登録作業を分散できる（例：Sleep は日曜夜、Morning は月曜朝）",
+
+  "accounts": {
+    "distrokid_email": "",
+    "spotify_for_artists_team": "",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": "",
+    "_注意": "値は書かず、どのアカウントを使うかの『識別名』だけ。パスワード・鍵は絶対に書かない"
+  },
+
+  "visual": {
+    "space_theme": "",
+    "palette": [],
+    "cover_series_rule": "",
+    "_説明": "レーベル全体の視覚言語。各組の visual はこの中で個性を出す"
+  },
+
+  "artists": []
+}

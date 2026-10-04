@@ -1,0 +1,269 @@
+{
+  "_注意": "これは実在しない架空の曲での記入例です。実在の曲を分析するときも、歌詞の文章・音程の並び・画像そのものは書きません。",
+
+  "reference": {
+    "title": "Overpass at Six",
+    "artist_name": "（架空）Harbor Lights Dept.",
+    "release_year": 2024,
+    "language": "en",
+    "source": "manual",
+    "acquired_from": "正規ダウンロード購入",
+    "tags": ["night", "drive", "synth", "retro", "mid-tempo"]
+  },
+
+  "lyrics": {
+    "theme": "終電を逃した夜、車で遠回りして帰るうちに、別れを受け入れていく",
+    "sub_themes": ["街灯の反復が時間の経過を表す", "後悔ではなく整理"],
+    "key_words": [
+      { "word": "overpass", "category": "場所・構造物" },
+      { "word": "amber", "category": "色" },
+      { "word": "wipers", "category": "車の部品" },
+      { "word": "six", "category": "時刻" }
+    ],
+    "narrative_arc": [
+      { "section": "verse1", "place": "駐車場", "time": "深夜 1 時", "emotion": "まだ怒っている", "point_of_view": "私 → あなた" },
+      { "section": "chorus", "place": "高架道路", "time": "走行中", "emotion": "開放感と寂しさが半分ずつ", "point_of_view": "私" },
+      { "section": "verse2", "place": "湾岸", "time": "明け方 4 時", "emotion": "静かになる", "point_of_view": "私" },
+      { "section": "bridge", "place": "家の前", "time": "6 時", "emotion": "受け入れ", "point_of_view": "私たち（過去形）" }
+    ],
+    "rhyme": { "scheme": "ABAB", "type": "母音韻", "position": "行末", "denser_in_chorus": true },
+    "syllables_per_line": { "verse": [8, 7, 8, 7], "pre_chorus": [6, 6], "chorus": [5, 5, 9, 5], "bridge": [4, 4, 4, 8] },
+    "title_word": {
+      "count": 3,
+      "positions": ["サビ尻", "サビ尻", "ブリッジ末"],
+      "foreshadowing_technique": "1 番では時計やダッシュボードの数字で『6 時』を匂わせ、サビで初めて言う"
+    },
+    "emotional_tone": { "verse1": "いら立ち", "chorus": "開放", "verse2": "沈静", "bridge": "受容", "outro": "余韻" },
+    "irony_or_humor": "なし。終始まっすぐ",
+    "language": { "primary": "en", "mixed": [] },
+    "spoken_or_rap": "なし",
+    "repetition_pattern": "サビ 1 行目を 3 回繰り返し、3 回目だけ最後の単語を変える",
+    "other": "2 人称が 2 番以降消えるのが物語の仕掛け"
+  },
+
+  "worldview": {
+    "setting": { "place": "港湾都市の高架道路", "season": "初秋", "time_of_day": "深夜〜明け方", "weather": "小雨のち止む", "transport": "古いセダン" },
+    "inner_world": { "age_feel": "20 代後半", "position": "別れた直後", "burden": "言い過ぎた言葉", "changes_in_song": "怒り → 受容へ" },
+    "era_mix": {
+      "eras": ["80s のシンセパッドとゲートリバーブ", "現代の太いサブベースと乾いたボーカル"],
+      "stereo_width": "広い（パッドは左右いっぱい、ボーカルは中央で狭い）",
+      "vocal_depth": "前",
+      "low_end": "多め。サブベースが常に鳴っている",
+      "compression": "中程度。ドラムはパンチ重視",
+      "room_feel": "ボーカルは乾いている。シンセだけ大きな部屋鳴り"
+    },
+    "artist_background": {
+      "origin": "港町出身の 2 人組（架空）",
+      "influences": ["80s シンセポップ", "2010 年代の夜のドライブ系プレイリスト文化"],
+      "career_stage": "中堅",
+      "recurring_themes": ["移動", "夜", "街灯"]
+    },
+    "live_context": {
+      "main_venue_type": "500〜1000 人のライブハウス",
+      "audience": "20〜30 代、1 人で来る客が多い",
+      "how_it_shapes_the_song": "サビをシンガロングしやすい 5 音節に揃えている"
+    },
+    "other": "ジャケットと MV が同じ『アンバー × 群青』の 2 色で統一されている"
+  },
+
+  "instruments": {
+    "list": [
+      { "name": "シンセパッド", "role": "accompaniment", "sections": ["all"], "timbre": "柔らかく、ややざらついたアナログ感" },
+      { "name": "サブベース（シンセ）", "role": "rhythm", "sections": ["all"], "timbre": "丸くて太い" },
+      { "name": "エレキギター（クリーン）", "role": "color", "sections": ["verse2", "bridge"], "timbre": "ガラスのように硬く透明" },
+      { "name": "ドラム（打ち込み＋生スネア）", "role": "rhythm", "sections": ["all except intro"], "timbre": "ゲートリバーブのかかったスネア" },
+      { "name": "アルペジオシンセ", "role": "lead", "sections": ["intro", "chorus", "outro"], "timbre": "鈴のように明るい" }
+    ],
+    "formation_feel": "2 人組の打ち込み主体＋生スネアだけ人が叩いている感じ",
+    "ambient_sounds": [
+      { "kind": "ワイパーの音", "at_seconds": 0, "role": "イントロの場面提示。拍に合わせてループ" },
+      { "kind": "車のドアが閉まる音", "at_seconds": 172, "role": "ブリッジ前の場面転換" }
+    ],
+    "contemporary_elements": ["サブベース", "ボーカルのピッチを下げた合いの手", "サイドチェーンでパッドが脈動"],
+    "classic_vs_modern_coexistence": "80s の上物と現代の低音を、ボーカルを乾かすことでつないでいる",
+    "effects": {
+      "シンセパッド": "コーラス＋ロングリバーブ、サイドチェーン",
+      "エレキギター": "コーラス、軽いトレモロ、ディレイ（付点 8 分）",
+      "ボーカル": "ピッチ補正は弱め。サビだけダブリング。ディレイは 4 分音符で薄く",
+      "スネア": "ゲートリバーブ"
+    },
+    "balance": {
+      "tuning": "440Hz",
+      "frequency_center": "低域と高域が多く、中域が少し空いている（ボーカルの居場所）",
+      "loudness_curve": "イントロ 小 → サビで一段上がる → ブリッジで一度落として → ラスサビ最大",
+      "stereo_width": "広い",
+      "front_instrument": "ボーカル、次にアルペジオ"
+    }
+  },
+
+  "performance": {
+    "note_placement": "ボーカルは拍の少し後ろにもたれる。歌い出しの前に必ず 1 拍の休符",
+    "melodic_habits": {
+      "motion": "A メロは順次進行、サビ頭で 5 度の跳躍",
+      "repeated_notes": "A メロで同音連打が多い（語りに近い）",
+      "phrase_endings": "語尾を下げて静かに落とす。サビの最後だけ伸ばす",
+      "scale": "自然的短音階。サビでブルーノートを 1 回だけ"
+    },
+    "techniques": {
+      "エレキギター": "指弾き。ピックは使っていない（アタックが丸い）",
+      "ベース": "シンセなので奏法なし。ただしスライドで音程を滑らせる箇所がブリッジにある",
+      "ドラム": "キック・ハットは打ち込み、スネアだけ生。ゆらぎは少ない",
+      "アルペジオシンセ": "上行→下行の交互型、16 分音符、ゲートで歯切れよく"
+    },
+    "fills_and_ornaments": "ドラムのフィルはサビ前の 1 か所だけ。ギターのオブリガートは 2 番の歌の合間に短く 2 回"
+  },
+
+  "harmony": {
+    "modulation_count": 1,
+    "modulations": [
+      { "position": "ラスサビ", "type": "半音上げ", "returns_how": "戻らずそのまま終わる" }
+    ],
+    "progression_character": "ループ型（4 コードを曲中ほぼ変えない）",
+    "borrowed_chords_tensions": "ブリッジで一度だけ同主長調からの借用",
+    "bass_motion": "ルートのペダル。コードが変わってもベースはなかなか動かない"
+  },
+
+  "groove": {
+    "bpm": 102,
+    "felt_as": "そのまま",
+    "tempo_drift": "ほぼなし（打ち込み）",
+    "feel": "真っすぐ。ハーフタイム気味のキック",
+    "swing_ratio": 0.5,
+    "hihat_pattern": "8 分。サビで 16 分に増える",
+    "kick_bass_relation": "同期（キックとサブベースが同じ場所）",
+    "micro_timing": "生スネアだけ数ミリ秒遅く、もたる感じを作っている"
+  },
+
+  "structure": {
+    "sections": [
+      { "name": "intro", "start_sec": 0, "bars": 8, "energy": 3 },
+      { "name": "verse1", "start_sec": 19, "bars": 16, "energy": 4 },
+      { "name": "pre_chorus", "start_sec": 56, "bars": 4, "energy": 6 },
+      { "name": "chorus", "start_sec": 66, "bars": 16, "energy": 8 },
+      { "name": "verse2", "start_sec": 103, "bars": 16, "energy": 5 },
+      { "name": "chorus2", "start_sec": 141, "bars": 16, "energy": 8 },
+      { "name": "bridge", "start_sec": 178, "bars": 8, "energy": 4 },
+      { "name": "final_chorus", "start_sec": 197, "bars": 16, "energy": 10 },
+      { "name": "outro", "start_sec": 235, "bars": 8, "energy": 3 }
+    ],
+    "intro": { "type": "いきなりサビ要素（アルペジオのリフから）", "bars": 8, "first_instrument": "ワイパー音 → アルペジオシンセ", "handoff": "キックが入って A メロへ" },
+    "outro": { "type": "楽器だけ（アルペジオの反復）＋フェード", "bars": 8, "afterglow": "ワイパー音だけ最後に残る" },
+    "chorus": {
+      "enters_at_sec": 66,
+      "lift_mechanism": ["ハイハットが 16 分に", "ボーカルをダブリング", "サビ頭で 5 度跳躍"],
+      "contour": "波（上がって、下がって、最後に伸ばす）",
+      "repetitions": 3
+    }
+  },
+
+  "phrases": [
+    {
+      "name": "アルペジオのリフ",
+      "rhythm_skeleton": "♪♪♪♪ ♪♪♪♪ | ♪♪♪♪ ♪♪♪♪",
+      "contour": "上 → 上 → 上 → 下 → 下 → 下（山型を 2 回）",
+      "start_degree": "主音",
+      "bars": 2,
+      "instrument": "アルペジオシンセ",
+      "occurrences": ["intro", "chorus", "chorus2", "final_chorus", "outro"],
+      "function": "リフ。曲の顔"
+    },
+    {
+      "name": "サビ頭",
+      "rhythm_skeleton": "♩ ♪♪ | ♩ ー",
+      "contour": "上（5 度跳躍）→ 下 → 下 → 伸ばす",
+      "start_degree": "主音の 5 度上",
+      "bars": 2,
+      "instrument": "ボーカル（ダブリング）",
+      "occurrences": ["chorus", "chorus2", "final_chorus"],
+      "function": "サビ頭の決め。5 音節"
+    },
+    {
+      "name": "低い合いの手",
+      "rhythm_skeleton": "・・♪♪ | ♩ ・・",
+      "contour": "平坦 → 下",
+      "start_degree": "主音の 1 オクターブ下",
+      "bars": 2,
+      "instrument": "ピッチを下げたボーカル",
+      "occurrences": ["chorus の各 4 小節目"],
+      "function": "掛け合い（合いの手）"
+    }
+  ],
+
+  "vocal": {
+    "sex": "male",
+    "range": "low",
+    "chest_voice_top": "中音域の上端まで。高音は出さない",
+    "falsetto_use": "ブリッジの最後 1 フレーズだけ",
+    "timbre": ["低く", "太く", "少しかすれ", "息混じり"],
+    "delivery": {
+      "style": "語りに近いなめらかさ。A メロはほぼ同音で言葉を置く",
+      "vibrato": "ほとんどかけない。サビの伸ばしで浅く遅いビブラート",
+      "scoops": "語頭にごく短いしゃくりを時々",
+      "phrase_endings": "下げて静かに落とす"
+    },
+    "expression": {
+      "breath": "多め。息の音をマイクに乗せている",
+      "ad_libs": "ほぼなし。アウトロで 1 回だけハミング",
+      "layering": "サビでユニゾンのダブリング。ハーモニーはなし",
+      "call_and_response": "ピッチを下げた自分の声との掛け合い（サビ）"
+    },
+    "processing": {
+      "pitch_correction": "弱め（自然）",
+      "doubling": "サビだけ",
+      "delay_reverb": "4 分音符のディレイを薄く。リバーブは短い",
+      "lofi": "なし"
+    }
+  },
+
+  "visual_web": {
+    "sources": [
+      { "kind": "mv", "url": "https://example.invalid/mv", "fetched_at": "2026-10-01", "summary": "夜の高架道路を走る車内からの固定カメラ。アンバーの街灯が一定間隔で流れる" },
+      { "kind": "official_site", "url": "https://example.invalid/", "fetched_at": "2026-10-01", "summary": "黒背景・1 ページ。ツアー日程とストアへのリンクだけ" },
+      { "kind": "sns", "url": "https://example.invalid/instagram", "fetched_at": "2026-10-01", "summary": "週 2 投稿。制作過程の短い動画が中心、文は 1 行" },
+      { "kind": "cover_art", "url": "https://example.invalid/cover", "fetched_at": "2026-10-01", "summary": "群青の背景にアンバーの横線 1 本。文字なし" }
+    ],
+    "mv": {
+      "setting": "車内（固定カメラ）と高架道路",
+      "color_tone": "寒色（群青）に暖色（アンバー）が点で入る",
+      "light_quality": "街灯の点光源。逆光多め",
+      "camera": "固定。ダッシュボード越し",
+      "cut_pace": "遅い。1 カット 8〜16 秒",
+      "narrative": "ほぼなし。走り続けるだけで、最後に車を降りる",
+      "motifs": ["街灯", "ワイパー", "ダッシュボードの時計", "高架の柱の反復"]
+    },
+    "cover_art": {
+      "composition": "余白多め。横線 1 本を下 1/3 に",
+      "subject": "抽象（風景の記号化）",
+      "color_count": "2 色",
+      "typography": "なし（文字を置かない）",
+      "texture": "フラットなグラフィック。わずかな粒子",
+      "series_rule": "シングルは全部『群青 × アンバーの線』。線の位置と本数だけ変える"
+    },
+    "official_site": {
+      "density": "極めて低い",
+      "tone": "ミニマル",
+      "colors_fonts": "黒・白・アンバー。細いサンセリフ",
+      "fan_funnels": ["ツアー日程", "ストア", "メルマガ"]
+    },
+    "sns": {
+      "main_platform": "Instagram（次に TikTok）",
+      "frequency": "週 2",
+      "content_mix": { "制作過程": 0.5, "日常": 0.1, "告知": 0.3, "交流": 0.1 },
+      "writing_style": "1 行。絵文字なし",
+      "video_format": "縦 15〜30 秒。車内や機材の手元",
+      "reply_style": "いいねだけ。返信はほぼしない"
+    },
+    "live": {
+      "lighting": "アンバーと群青の 2 色だけ。ストロボなし",
+      "stage_scale": "小〜中",
+      "audience_reaction": "静かに聴く。サビだけ合唱",
+      "live_arrangement_diff": "生ドラムに変わり、テンポが 2〜3 速い"
+    },
+    "brand_consistency": "音・MV・ジャケット・SNS・照明が『群青 × アンバー』『反復』『余白』で完全に統一されている",
+    "image_prompt_seed": "群青の夜。アンバーの点光源が等間隔に流れる。固定カメラの車内視点。余白を大きく取り、被写体は風景の記号。文字なし。わずかな粒子感"
+  },
+
+  "signature": "拍に合わせてループするワイパー音と、サビ頭の 5 度跳躍",
+  "analyzed_by": "auto + claude + human",
+  "version": 1
+}
