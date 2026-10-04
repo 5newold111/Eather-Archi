@@ -308,7 +308,8 @@ def main() -> None:
         artist = json.loads(json.dumps(artist)); artist.setdefault("lyrics", {})["mode"] = mode
         brief["lyrics_mode"] = mode
         print(f"  歌詞モード: {mode}" + ("（『お題だけ』の回。歌詞は全部 Suno が書き、こちらは検査とタグ補完）" if mode == "topic_only" else ""))
-        excerpts = slot_excerpts(brief, args.references)
+        refs_dir = args.references or (Path(brief["references_dir"]) if brief.get("references_dir") else None)
+        excerpts = slot_excerpts(brief, refs_dir)
         n_sheets = sum(1 for e in excerpts.values() if "note" not in e)
         print(f"  参考曲の解析シート: {n_sheets}/{len(excerpts)} 枠ぶんを渡します（無い枠はタイトルだけ）")
         user = build_user_message(brief, artist, excerpts)

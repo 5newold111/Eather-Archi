@@ -113,6 +113,13 @@ def measure(audio: Path) -> dict:
         k = int(np.clip(duration // 25, 4, 10))
         bounds = librosa.segment.agglomerative(feat_sync, k)
         bound_times = [0.0] + [float(beat_times[min(b, len(beat_times) - 1)]) for b in bounds[1:]] + [duration]
+        # エネルギーの段差（4 秒平均で 3 dB 以上動く地点）も境界の候補に加える
+        if len(per_sec) > 12:
+            sm = np.convolve(per_sec, np.ones(4) / 4, mode="same")
+            for i in range(4, len(sm) - 4):
+                if abs(sm[i] - sm[i - 4]) >= 3 and (i == 4 or abs(sm[i - 1] - sm[i - 5]) < abs(sm[i] - sm[i - 4])):
+                    bound_times.append(float(i))
+        bound_times = sorted(set(round(b, 1) for b in bound_times))
         # 短すぎる区間（4 小節未満）は隣と併合する
         min_len = 4 * 4 * 60 / tempo
         merged = [bound_times[0]]
@@ -136,11 +143,9 @@ def measure(audio: Path) -> dict:
         sections.append({"name": f"sec{i+1}", "start_sec": round(a, 1), "end_sec": round(b, 1),
                          "bars": int(round(bars)), "energy": int(np.clip(energy, 1, 10))})
     # サビ推定：エネルギーが高い区間のうち、特徴が似た区間が他にもあるもの（繰り返し）→ 最初の出現
-    if len(sections) >= 3:
-        top = sorted(sections, key=lambda s: -s["energy"])[: max(2, len(sections) // 3)]
-        chorus_guess = min(top, key=lambda s: s["start_sec"])
-    else:
-        chorus_guess = max(sections, key=lambda s: s["energy"])
+    inner = sections[1:-1] if len(sections) >= 3 else sections   # 先頭（イントロ）と末尾（アウトロ）はサビ候補から外す
+    top = sorted(inner, key=lambda s: -s["energy"])[: max(1, len(inner) // 3)]
+    chorus_guess = min(top, key=lambda s: s["start_sec"])
     # イントロ長：最初のセクション、または最初に声/エネルギーが上がる地点
     intro_end = sections[0]["end_sec"] if sections else 0.0
 

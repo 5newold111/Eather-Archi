@@ -458,6 +458,7 @@ def main() -> None:
             failed.append(slug)
             continue
         brief = build_brief_skeleton(artist, slots, week_monday, args.trend_language, hints_all.get(slug))
+        brief["references_dir"] = str(args.references.resolve()) if args.references else None   # write_brief.py が解析シートを探す場所
         c = brief["artist_constraints"]
         print(f"    固定の制約: 作曲の癖 {len(c['composition_habits'])} 項目 / 声の仕様 {len(c['voice_spec'])} 項目 / 得意な歌い方 {len(c['signature_techniques'])} 項目")
         out_path = args.out / f"{week_monday}_{slug}.json"
