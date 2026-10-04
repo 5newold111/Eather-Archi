@@ -120,6 +120,14 @@ Lyrics modes (artist profile -> lyrics.mode):
   syllables-per-line target (match the chorus), the number of lines per section, the forbidden topics, and
   "do not write a chorus; do not name any real person, brand or artist". Roughly 40-50% of the final word count
   should come from Suno. The core must be strong enough to define the song on its own.
+- "topic_only" (occasional): Suno writes ALL the lyrics. You write only suno_lyric_prompt: a complete brief for
+  Suno's lyric writer - theme and point of view, the scene/landscape words, the full section structure with line
+  counts and the syllables-per-line target, where the title should land, which performance tags to include at
+  which positions (the artist's tics), the trend-language line rule if any, and the forbidden topics; plus
+  "do not name any real person, brand or artist". suno_lyrics is the empty string. core keeps only fixed_tags,
+  title_placement and syllables_per_line_target (chorus_lines empty, hook_line empty) so the merge step can
+  verify Suno's output and add missing tags. Use this mode to let fresh phrasing in; the result is checked,
+  never copied into later cores.
 - "instrumental": suno_lyrics is "[Instrumental]" plus any vowel/one-word fragments the artist uses; core and
   suno_lyric_prompt are empty.
 Return only the JSON object described by the schema."""
@@ -205,11 +213,13 @@ def validate(result: dict, artist: dict, brief: dict) -> list[str]:
         problems.append("曲名に feat. が入っている（フィーチャリング欄で登録する運用）")
     tics = [t for t in artist.get("vocal", {}).get("signature_techniques", {}).get("tics", []) if t.get("frequency") == "every_song"]
     mode = artist.get("lyrics", {}).get("mode", "core_fixed")
+    if mode == "topic_only" and len(result.get("suno_lyric_prompt", "")) < 200:
+        problems.append("topic_only なのに Suno への指示文が短すぎる")
     if mode == "core_fixed" and "{{SUNO_" not in result["suno_lyrics"]:
         problems.append("core_fixed なのに Suno 用の差し込み位置（{{SUNO_VERSE_1}} など）が無い")
     if mode == "core_fixed" and not result.get("core", {}).get("chorus_lines"):
         problems.append("core_fixed なのに核（サビ）が空")
-    if tics and "[" not in result["suno_lyrics"]:
+    if mode != "topic_only" and tics and "[" not in result["suno_lyrics"]:
         problems.append("歌詞にセクション／歌い方タグが無い（毎曲の癖が入っていない可能性）")
     if not all(result["self_check"].values()):
         problems.append(f"Claude の自己チェックで未達: {[k for k, v in result['self_check'].items() if not v]}")
@@ -258,6 +268,8 @@ def main() -> None:
     ap.add_argument("briefs", nargs="+", type=Path, help="骨組み JSON（複数可）")
     ap.add_argument("--references", type=Path, help="解析シート JSON のフォルダ（<reference_id>.json）")
     ap.add_argument("--dry-run", action="store_true", help="API を呼ばず、Claude に渡す内容だけ書き出す")
+    ap.add_argument("--lyrics-mode", choices=["full", "core_fixed", "topic_only", "instrumental"],
+                    help="歌詞モードを手動で指定（省略時は設定書の mode。topic_only_ratio により『たまに』自動で topic_only になる）")
     args = ap.parse_args()
 
     has_key = bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"))
@@ -283,6 +295,18 @@ def main() -> None:
         brief = load_json(bp)
         artist = load_artist(brief["artist_slug"], brief.get("label_slug", "drive"))
         print(f"\n--- {bp.name}（{artist['name']}）---")
+        # 歌詞モードの決定：手動指定 > 『たまに』の自動選択（週と組で決まる乱数）> 設定書の既定
+        import random as _random
+        base_mode = artist.get("lyrics", {}).get("mode", "core_fixed")
+        mode = args.lyrics_mode or base_mode
+        if not args.lyrics_mode and base_mode in ("core_fixed", "full"):
+            ratio = float(artist.get("lyrics", {}).get("topic_only_ratio", 0) or 0)
+            rng = _random.Random(f"{brief.get('week_start')}|{artist['slug']}|topic_only")
+            if ratio > 0 and rng.random() < ratio:
+                mode = "topic_only"
+        artist = json.loads(json.dumps(artist)); artist.setdefault("lyrics", {})["mode"] = mode
+        brief["lyrics_mode"] = mode
+        print(f"  歌詞モード: {mode}" + ("（『お題だけ』の回。歌詞は全部 Suno が書き、こちらは検査とタグ補完）" if mode == "topic_only" else ""))
         excerpts = slot_excerpts(brief, args.references)
         n_sheets = sum(1 for e in excerpts.values() if "note" not in e)
         print(f"  参考曲の解析シート: {n_sheets}/{len(excerpts)} 枠ぶんを渡します（無い枠はタイトルだけ）")
@@ -313,7 +337,10 @@ def main() -> None:
         brief["lyrics_mode"] = artist.get("lyrics", {}).get("mode", "core_fixed")
         brief["core"] = result.get("core", {})
         brief["suno_lyric_prompt"] = result.get("suno_lyric_prompt", "")
-        if brief["lyrics_mode"] == "core_fixed" and "{{SUNO_" in brief["suno_lyrics"]:
+        if brief["lyrics_mode"] == "topic_only":
+            print("  歌詞モード topic_only：suno_lyric_prompt を Suno の Write Lyrics に貼り、出てきた歌詞全文を保存して")
+            print("    python3 scripts/merge_lyrics.py <このブリーフ> --verses <保存したテキスト>  で検査・タグ補完してください")
+        elif brief["lyrics_mode"] == "core_fixed" and "{{SUNO_" in brief["suno_lyrics"]:
             print("  歌詞モード core_fixed：核（サビ・決め台詞・タグ）は固定済み。節は Suno の Write Lyrics に suno_lyric_prompt を貼って作り、")
             print("    python3 scripts/merge_lyrics.py <このブリーフ> --verses <Suno の出力を保存したテキスト>  で合体してください")
         brief["validation"] = {"problems": problems, "checked_at": date.today().isoformat()}

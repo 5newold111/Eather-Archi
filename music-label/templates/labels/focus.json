@@ -164,7 +164,9 @@
         "tone": "—",
         "mode": "instrumental",
         "suno_share": 0.0,
-        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.0,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
       },
       "visual": {
         "space": "方眼の作業机。鉛筆 1 本",
@@ -398,7 +400,9 @@
         "tone": "—",
         "mode": "instrumental",
         "suno_share": 0.0,
-        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.0,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
       },
       "visual": {
         "space": "何もないリハーサル室。窓の光の帯",
@@ -641,7 +645,9 @@
         "tone": "機械的で静か",
         "mode": "instrumental",
         "suno_share": 0.0,
-        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安"
+        "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+        "topic_only_ratio": 0.0,
+        "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
       },
       "visual": {
         "space": "暗い部屋のパッチケーブル。LED の点",

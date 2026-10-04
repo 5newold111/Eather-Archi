@@ -541,6 +541,7 @@
           "enum": [
             "full",
             "core_fixed",
+            "topic_only",
             "instrumental"
           ],
           "default": "core_fixed"
@@ -550,6 +551,12 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Suno の歌詞生成に任せる割合の目安（core_fixed で 0.4〜0.5）"
+        },
+        "topic_only_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "たまに『お題だけ』にする割合（週ごとの乱数で決まる）"
         }
       }
     },
