@@ -33,14 +33,40 @@
 | 月 | 深夜 | 英語以外の言語の割合を算出。しきい値を超えた言語を「今週のトレンド言語」に設定 | 自動 | 例：Global 200 上位 50 曲のうち 10% 以上 |
 | 火 | 朝 | 5 アーティストぶんのブリーフを生成 | 自動 | `scripts/select_references.py` で参考曲を枠に割り当て → `scripts/write_brief.py` で Claude（claude-opus-5-5）が Suno 用の指示文・歌詞・タイトル候補・歌唱指示・フレーズ変形案 3 つ・ジャケットの種を書く。実名が混ざると警告 |
 | 火 | 朝 | 節の歌詞を Suno の Write Lyrics に書かせ、`scripts/merge_lyrics.py` で核と合体（core_fixed の組） | **人（1 曲 3 分）** | 核（サビ・決め台詞・タグ）は固定。節の 4〜5 割を Suno が書く。実名・音節数を自動検査 |
-| 火 | 日中 | Suno で各曲 4〜6 テイク生成 → 聴いて 1 曲選ぶ | **人** | 1 曲 25〜35 分、5 曲で 2.5〜3 時間。月曜夜に 2 曲、火曜に 3 曲と分けてもよい |
+| 火 | 日中 | Suno で各曲 4〜6 テイク生成 → `scripts/select_takes.py` が計測して聴く順番を出す → 聴いて 1 曲選ぶ | **人** | 1 曲 25〜35 分、5 曲で 2.5〜3 時間。長さ・無音・サビの位置・終わり方・歌詞の一致で落ちたテイクは聴かなくてよい |
 | 火 | 日中 | 歌詞の最終目視（NG ワード、他言語フレーズの意味） | **人** | 1 曲 5 分 |
-| 火 | 夕方 | 音量調整（マスタリング：-14 LUFS / -1 dBTP）、ジャケット書き出し（3000×3000）、曲情報の整理 | 自動 | ffmpeg、Blender のコマンド実行 |
-| 火 | 夕方 | 完成音源・没テイク・ブリーフを Supabase に保存 | 自動 | `docs/05_storage.md` のフォルダ構造 |
-| 水 | 日中 | DistroKid に 5 曲登録 | **人** | 1 曲 5 分。登録用シート（コピペ用）は自動で作る |
+| 火 | 夕方 | 音量調整（マスタリング：-14 LUFS / -1 dBTP）、ジャケット書き出し（3000×3000）、曲情報の整理 | 自動 | `scripts/master_track.py`（ffmpeg）、`scripts/generate_visuals.py --kind cover` → `scripts/finalize_cover.py` |
+| 火 | 夕方 | 完成音源・テイクの記録・ブリーフを Supabase に保存 | 自動 | `scripts/supabase_sync.py week --week <週> --apply`（鍵が無ければ SQL を書き出す） |
+| 水 | 日中 | DistroKid に 5 曲登録 | **人** | 1 曲 5 分。`scripts/distrokid_sheet.py --week <週>` が作る `out/distrokid/<週>/sheet.md` を見ながらコピペ |
 | 水 | 17:00 ET | 2 週間前に登録した 5 曲が配信開始 | ― | ― |
-| 水 | 17:00 ET〜 | SNS に自動投稿（YouTube / Instagram / TikTok） | 自動 | Blender のルームツアー動画 × 曲のショート動画 |
+| 水 | 17:00 ET〜 | SNS に自動投稿（YouTube / Instagram / TikTok） | 自動 | `scripts/post_social.py plan` が縦動画（サビ 30 秒）と説明文を作り、`post` が配信時刻に投稿。AI 申告の欄を必ず立てる。将来は Blender のルームツアー動画に差し替え |
 | 木〜日 | ― | 再生数・保存数・スキップ率を回収し、解析シートの項目別に集計 | 自動 | 「どの枠の要素が伸びたか」を次週の参考曲選びの重みに反映 |
+
+## コマンドの順番（1 週間ぶん）
+
+`<週>` は制作週の月曜（例 2026-10-05）。各スクリプトは何をしているかを日本語で表示する。
+
+```
+# 火曜の朝
+python3 scripts/select_references.py --all --week <週> --references out/references   # 骨組み
+python3 scripts/write_brief.py out/briefs/<週>_light.json                             # 指示文・核・タイトル候補（組ごと）
+python3 scripts/merge_lyrics.py out/briefs/<週>_light.json --verses <Suno の節.txt>   # 最終歌詞
+
+# 火曜の日中：Suno のテイクを out/takes/<週>_light/take_01.mp3 … に保存して
+python3 scripts/select_takes.py out/briefs/<週>_light.json                            # 計測と聴く順番（Tier A）
+python3 scripts/select_takes.py out/briefs/<週>_light.json --choose 3 --note "理由"   # 選んだテイクを記録
+
+# 火曜の夕方
+python3 scripts/master_track.py out/briefs/<週>_light.json                            # -14 LUFS / -1 dBTP の WAV
+python3 scripts/generate_visuals.py --artist light --kind cover --brief out/briefs/<週>_light.json
+python3 scripts/finalize_cover.py out/briefs/<週>_light.json                          # 3000×3000 JPEG
+
+# 水曜
+python3 scripts/distrokid_sheet.py --week <週> --title light="決めたタイトル"          # 登録シート
+python3 scripts/supabase_sync.py week --week <週> --apply                              # DB と保管庫へ
+python3 scripts/post_social.py plan --week <週>                                        # 縦動画と説明文
+python3 scripts/post_social.py post --week <週>                                        # 15 分ごとに自動実行
+```
 
 ## DistroKid 登録時のチェックリスト（1 曲ごと）
 

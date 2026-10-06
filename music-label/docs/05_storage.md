@@ -36,6 +36,9 @@ Supabase Pro（月約 $25、保管 100 GB 込み）で 3 年ほど収まりま�
    - `service_role` キー（**自動処理専用。絶対に公開しない**）
 6. 「Authentication → Providers」で、使わないログイン方法を全部オフにする（メール ＋ 2 段階認証だけ残す）
 
+7. 手元のファイルの登録は `scripts/supabase_sync.py`（`seed` → `references` → 毎週 `week --week <週>`）。
+   鍵が入る前は `out/supabase/*.sql` を書き出すので、SQL Editor に貼っても同じ登録ができる。SNS 用の縦動画は `social` バケットに置く
+
 ### 2. Cloudflare R2（予備）
 
 1. Cloudflare ダッシュボード → R2 → バケット作成（例：`label-backup`）。**公開アクセスはオフのまま**

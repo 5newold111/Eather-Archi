@@ -12,14 +12,15 @@ values
   ('masters',     'masters',     false, 524288000, array['audio/wav','audio/x-wav','audio/mpeg','image/png','application/json']),
   ('generations', 'generations', false, 104857600, array['audio/mpeg','audio/wav','audio/x-wav','application/json']),
   ('covers',      'covers',      false, 524288000, array['image/png','image/jpeg','application/octet-stream']),  -- .blend は octet-stream
-  ('references',  'references',  false, 52428800,  array['application/json','image/png','image/jpeg'])
+  ('references',  'references',  false, 52428800,  array['application/json','image/png','image/jpeg']),
+  ('social',      'social',      false, 209715200, array['video/mp4','image/jpeg','image/png'])   -- SNS 用の縦動画。Instagram には期限付き URL で渡す
 on conflict (id) do nothing;
 
 -- ログイン済みの本人だけが読み書きできる。anon には何も許可しない。
 do $$
 declare b text;
 begin
-  foreach b in array array['masters','generations','covers','references'] loop
+  foreach b in array array['masters','generations','covers','references','social'] loop
     execute format(
       'create policy %I on storage.objects for select to authenticated using (bucket_id = %L)',
       b || '_read_owner', b);

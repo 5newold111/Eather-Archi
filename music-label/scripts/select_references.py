@@ -115,7 +115,10 @@ def load_label(slug: str) -> dict:
         a["sound"].setdefault("bpm_min", spec.get("bpm_min"))
         a["sound"].setdefault("bpm_max", spec.get("bpm_max"))
         a["label_slug"] = label["slug"]
-    print(f"  子レーベル「{label['slug']}」（場面：{label.get('scene','')}）の {len(label['artists'])} 組を読み込みました")
+        a.setdefault("release_weekday", label.get("release_weekday", "wednesday"))
+        a.setdefault("release_hour_et", label.get("release_hour_et", 17))
+    print(f"  子レーベル「{label['slug']}」（場面：{label.get('scene','')}）の {len(label['artists'])} 組を読み込みました"
+          f"（配信 {label.get('release_weekday', 'wednesday')} {label.get('release_hour_et', 17)}:00 ET）")
     return label
 
 
@@ -294,10 +297,14 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
 # 配信日時（2 週間ベルトコンベア）
 # ---------------------------------------------------------------------------
 
-def release_at_for_production_week(week_monday: date) -> datetime:
-    """制作週の月曜 → 2 週間後の水曜 17:00 米国東部時間（UTC に変換して返す）"""
-    release_wed = week_monday + timedelta(days=14 + 2)
-    local = datetime.combine(release_wed, time(17, 0), tzinfo=ZoneInfo("America/New_York"))
+WEEKDAY_OFFSET = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+
+
+def release_at_for_production_week(week_monday: date, weekday: str = "wednesday", hour_et: int = 17) -> datetime:
+    """制作週の月曜 → 2 週間後の週の配信曜日・時刻（米国東部時間）を UTC に変換して返す。
+    本体は水曜 17:00。子レーベルは設定書の release_weekday / release_hour_et（例：集中は火曜 8:00）"""
+    release_day = week_monday + timedelta(days=14 + WEEKDAY_OFFSET.get(str(weekday).lower(), 2))
+    local = datetime.combine(release_day, time(int(hour_et), 0), tzinfo=ZoneInfo("America/New_York"))
     return local.astimezone(ZoneInfo("UTC"))
 
 
@@ -337,7 +344,8 @@ def artist_constraints(artist: dict) -> dict:
 
 def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday: date,
                          trend_language: str | None, hints: dict | None = None) -> dict:
-    release_at = release_at_for_production_week(week_monday)
+    release_at = release_at_for_production_week(week_monday, artist.get("release_weekday", "wednesday"),
+                                                 artist.get("release_hour_et", 17))
     return {
         "week_start": week_monday.isoformat(),
         "label_slug": artist.get("label_slug", "drive"),

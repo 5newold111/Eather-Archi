@@ -51,7 +51,10 @@ def dedupe(name: str = "OPENAI_API_KEY") -> None:
 def status() -> None:
     lines = read_env()
     print(f"=== .env の状態（{ENV}）===")
-    for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"):
+    names = [l.split("=", 1)[0].strip() for l in (EXAMPLE.read_text(encoding="utf-8").splitlines() if EXAMPLE.exists() else [])
+             if "=" in l and not l.lstrip().startswith("#")]
+    names += [l.split("=", 1)[0] for l in lines if "__" in l.split("=", 1)[0] and "=" in l]   # 組・レーベル別の鍵
+    for name in dict.fromkeys(names or ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]):
         val = next((l.split("=", 1)[1].strip() for l in lines if l.startswith(name + "=")), None)
         if val is None:
             print(f"  {name:28} 行がありません")
@@ -59,11 +62,13 @@ def status() -> None:
             print(f"  {name:28} 空です")
         else:
             ok = val.startswith(PREFIX.get(name, ""))
+            if name.split("__")[0].endswith(("_URL", "_HOST", "_BUCKET")):   # 秘密でない設定値だけ表示
+                print(f"  {name:28} 設定済み（{val}）"); continue
             rep = repeated_unit(val)
             print(f"  {name:28} 設定済み（{len(val)} 文字、先頭 {val[:3]}…）"
                   + ("" if ok else f" ← 先頭が {PREFIX[name]} ではありません。鍵を貼り間違えていないか確認")
                   + (f" ← 同じ鍵が {len(val)//len(rep)} 回繰り返されています。`python3 scripts/set_key.py --dedupe` で直せます" if rep else "")
-                  + (" ← 長すぎます（通常 150〜200 文字）。貼り付け内容を確認" if not rep and len(val) > 260 else ""))
+                  + (" ← 長すぎます（通常 150〜200 文字）。貼り付け内容を確認" if not rep and len(val) > 260 and name in PREFIX else ""))
 
 
 def main() -> None:

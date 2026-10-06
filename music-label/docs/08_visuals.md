@@ -107,9 +107,17 @@
 ```
 covers/{artist_slug}/debut/
   logo_01..06.png, photo_01..08.png, review.md, selection.json
-covers/{artist_slug}/{release_id}/
-  cover_01..06.png, review.md, selection.json, cover_3000.png（選ばれたもの）
+手元（out/visuals/）
+  {artist_slug}/debut/    logo_01..06.png, photo_01..08.png, review.md, selection_logo.json, selection_photo.json
+  {artist_slug}/cover/{制作週}/
+                          cover_01..06.png, review.md, selection_cover.json,
+                          cover_final.jpg（finalize_cover.py が 3000×3000 に拡大したもの）, cover_final.check.json
+保管庫（Supabase の covers バケット）
+  covers/{artist_slug}/{配信週}/cover_final.jpg   ← supabase_sync.py week --apply が上げる
 ```
+
+画像生成は最大 1024×1024 なので、`finalize_cover.py` が lanczos（細部が崩れにくい拡大方法）で 3000×3000 にし、
+正方形・RGB・10 MB 未満・真っ黒 / 真っ白でないことを機械で確かめる。顔・商標・文字の確認は人が登録シートで行う。
 
 データベースには `visual_assets`（候補と選択）と `visual_decisions`（オーナーの判断と理由）を記録する。
 

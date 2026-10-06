@@ -32,7 +32,8 @@ music-label/
 │   ├── 05_storage.md             ← Supabase + R2 の構築手順とクローズド化チェックリスト
 │   ├── 06_growth.md              ← 収益目標の現実的な数字・月 1 組追加と週 8 曲上限・伸びた要素を次に返す仕組み・歌手の体と癖
 │   ├── 07_sublabels.md           ← 子レーベル構造（場面ごとに別アカウント）で上限なく増やす。自動化の段階
-│   └── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
+│   ├── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
+│   └── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -58,7 +59,16 @@ music-label/
     ├── merge_lyrics.py           ← 固定した核と Suno が書いた節を合体（core_fixed）、または Suno の全文を検査・タグ補完（topic_only）して最終歌詞に
     ├── analyze_growth.py         ← 成績から「伸びている組・曲・要素」を分析し、重みとヒント、方針転換の提案を返す
     ├── generate_visuals.py       ← ロゴ・写真・ジャケットの候補を生成し採点。最初の 5 回はオーナーに聞いて基準を学ぶ
-    └── check_names.py            ← 名前の重複確認（デビュー処理の最初に自動実行。checked でないとロゴ・写真を作らない）
+    ├── check_names.py            ← 名前の重複確認（デビュー処理の最初に自動実行。checked でないとロゴ・写真を作らない）
+    ├── select_takes.py           ← Suno のテイクを計測（長さ・無音・サビの位置・終わり方・歌詞の一致・癖）し、Tier A/B/C に合わせて選ぶ
+    ├── master_track.py           ← 選んだテイクを -14 LUFS / -1 dBTP の WAV（44.1kHz / 24bit）に整える
+    ├── finalize_cover.py         ← 選んだジャケットを 3000×3000 の JPEG に仕上げて機械チェック
+    ├── distrokid_sheet.py        ← その週の DistroKid 登録シート（コピペ用）と確認リストを作る
+    ├── supabase_sync.py          ← 設定書・解析シート・毎週の曲を Supabase に登録（鍵が無ければ SQL を書き出す）
+    ├── post_social.py            ← 縦動画（サビ 30 秒）と説明文を作り、配信時刻に YouTube / Instagram / TikTok へ投稿
+    ├── oauth_youtube.py          ← YouTube 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
+    ├── set_key.py                ← 鍵を .env に安全に書き込む / 確認する
+    └── _common.py, _supabase.py  ← 上のスクリプトが共通で使う部品
 ```
 
 ## 決まっていること（設計の前提）
@@ -79,8 +89,8 @@ music-label/
 
 ## 人がやること（毎週 2 か所だけ）
 
-1. **火曜**：Suno で生成した数テイクを聴いて、1 曲選ぶ（5 曲ぶん）
-2. **水曜**：DistroKid に 5 曲を登録し、配信日時を 2 週間後の水曜 17:00 ET に指定する
+1. **火曜**：Suno で生成した数テイクを聴いて、1 曲選ぶ（5 曲ぶん）。機械が先に計測して、聴く順番と落ちたテイクを教える
+2. **水曜**：DistroKid に 5 曲を登録し、配信日時を 2 週間後の水曜 17:00 ET に指定する（登録シートを見ながらコピペ）
 
 それ以外（トレンド取得、ブリーフ生成、音量調整、ジャケット書き出し、SNS 投稿、成績回収）は自動化の対象です。
 
@@ -92,3 +102,5 @@ music-label/
 4. `docs/02_analysis_sheet.md` を見ながら、参考曲を 1 曲だけ試しに分析してみる
 5. `docs/05_storage.md` に沿って Supabase を用意し、`supabase/schema.sql` → `supabase/storage.sql` を流す
 6. `pip install -r requirements.txt` のあと `scripts/select_references.py --demo` → `scripts/write_brief.py out/briefs/<週>_demo.json` で、骨組み → ブリーフの流れを確かめる
+7. ffmpeg（音と動画の変換ソフト）を入れる（Mac：`brew install ffmpeg`）。そのあと `scripts/select_takes.py --demo` → `scripts/master_track.py --demo` → `scripts/finalize_cover.py --demo` で、テイク選び → 音量 → ジャケットを合成音で確かめる
+8. コマンドの順番は `docs/01_pipeline.md` の「コマンドの順番」、鍵の設定は `docs/09_auth_batch.md`

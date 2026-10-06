@@ -278,6 +278,9 @@ def main() -> None:
                  " --apply を実行し、report.md の手動確認（商標・SNS）も済ませてください。")
     criteria = load_criteria()
     outdir = args.out / artist["slug"] / args.kind
+    if args.kind == "cover" and args.brief:
+        # ジャケットは週ごとに分ける（前の週の候補を上書きしない）
+        outdir = outdir / json.loads(args.brief.read_text(encoding="utf-8")).get("week_start", "undated")
     outdir.mkdir(parents=True, exist_ok=True)
     print(f"=== ビジュアル生成：{artist['name']}（{args.kind}）===")
     print(f"  顔を見せない方法：主「{artist['visual'].get('face_concealment',{}).get('primary','')}」")
@@ -291,7 +294,7 @@ def main() -> None:
         if not chosen:
             sys.exit(f"[エラー] 候補 {args.choose} がありません")
         record_choice(criteria, artist["slug"], kind, no, args.reason, cands)
-        (outdir / "selection.json").write_text(json.dumps({"kind": kind, "chosen": no, "reason": args.reason, "by": "owner",
+        (outdir / f"selection_{kind}.json").write_text(json.dumps({"kind": kind, "chosen": no, "reason": args.reason, "by": "owner",
                                                             "date": date.today().isoformat()}, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  選択を記録しました：{kind} #{no}（{args.reason}）")
         print(f"  基準の学習：{criteria['decisions_asked']}/{criteria['decisions_required_before_lock']} 回。"

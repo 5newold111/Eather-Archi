@@ -3,3 +3,6 @@ certifi
 librosa>=0.10
 soundfile
 numpy
+
+# 任意：テイクの歌詞照合（select_takes.py）。入れると自動で文字起こしする（初回にモデルを数百 MB ダウンロード）
+# faster-whisper
