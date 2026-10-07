@@ -54,11 +54,33 @@ FONT_CANDIDATES = [
 # ---------------------------------------------------------------------------
 # 鍵
 # ---------------------------------------------------------------------------
-def cred(name: str, artist_slug: str, label_slug: str) -> str | None:
+def cred_key(name: str, artist_slug: str, label_slug: str) -> str | None:
+    """実際に使う鍵の名前（組専用 → レーベル専用 → 共通の順）"""
     for k in (f"{name}__{artist_slug.upper()}", f"{name}__{label_slug.upper()}", name):
         if os.environ.get(k):
-            return os.environ[k]
+            return k
     return None
+
+
+def cred(name: str, artist_slug: str, label_slug: str) -> str | None:
+    k = cred_key(name, artist_slug, label_slug)
+    return os.environ[k] if k else None
+
+
+def tiktok_access(artist_slug: str, label_slug: str) -> str | None:
+    """TikTok の一時トークンを取る。更新用の鍵が新しくなって返ってきたら .env に保存し直す"""
+    ck, cs = cred("TIKTOK_CLIENT_KEY", artist_slug, label_slug), cred("TIKTOK_CLIENT_SECRET", artist_slug, label_slug)
+    rk = cred_key("TIKTOK_REFRESH_TOKEN", artist_slug, label_slug)
+    if not (ck and cs and rk):
+        return None
+    res = http("POST", "https://open.tiktokapis.com/v2/oauth/token/",
+               form={"client_key": ck, "client_secret": cs, "grant_type": "refresh_token", "refresh_token": os.environ[rk]})
+    new = res.get("refresh_token")
+    if new and new != os.environ[rk]:
+        from oauth_youtube import save_env
+        save_env(rk, new)
+        os.environ[rk] = new
+    return res["access_token"]
 
 
 def http(method: str, url: str, *, data: bytes | None = None, headers: dict | None = None, form: dict | None = None,
@@ -218,13 +240,13 @@ def post_instagram(p: dict, a_slug: str, l_slug: str) -> dict:
 
 
 def post_tiktok(p: dict, a_slug: str, l_slug: str) -> dict:
-    ck, cs, rt = (cred(k, a_slug, l_slug) for k in ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET", "TIKTOK_REFRESH_TOKEN"))
-    if not (ck and cs and rt):
+    if not cred("TIKTOK_REFRESH_TOKEN", a_slug, l_slug):
         return {"skipped": "TikTok の鍵（TIKTOK_CLIENT_KEY / SECRET / REFRESH_TOKEN）がありません"}
     api = "https://open.tiktokapis.com/v2"
     step("TikTok：アクセス用の一時トークンを取得しています")
-    tok = http("POST", f"{api}/oauth/token/", form={"client_key": ck, "client_secret": cs,
-                                                     "grant_type": "refresh_token", "refresh_token": rt})["access_token"]
+    tok = tiktok_access(a_slug, l_slug)
+    if not tok:
+        return {"skipped": "TikTok の鍵（TIKTOK_CLIENT_KEY / SECRET）がありません"}
     auth = {"Authorization": f"Bearer {tok}"}
     info = http("POST", f"{api}/post/publish/creator_info/query/", headers=auth, body={})["data"]
     options = info.get("privacy_level_options", [])
@@ -269,8 +291,11 @@ def cmd_plan(week: str) -> None:
         folder = OUT / "social" / week / slug
         video = folder / "clip_vertical.mp4"
         start = chorus_start(week, slug)
-        step(f"{artist['name']}：縦動画（サビ {start:.0f} 秒地点から {CLIP_SEC} 秒）を書き出しています")
-        make_clip(master, cover, start, m["title"], artist["name"], video)
+        if video.exists() and video.stat().st_mtime > max(master.stat().st_mtime, cover.stat().st_mtime, mp.stat().st_mtime):
+            print(f"   － {artist['name']}：縦動画は最新なので作り直しません")
+        else:
+            step(f"{artist['name']}：縦動画（サビ {start:.0f} 秒地点から {CLIP_SEC} 秒）を書き出しています")
+            make_clip(master, cover, start, m["title"], artist["name"], video)
         feat = load_artist(m["featured_artist_slug"])["name"] if m.get("featured_artist_slug") else None
         cap = captions(artist, m["title"], feat)
         for v in cap.values():
@@ -291,12 +316,18 @@ def cmd_plan(week: str) -> None:
 
 
 def cmd_post(week: str, dry: bool) -> None:
-    plans = sorted((OUT / "social" / week).glob("*/plan.json"))
+    # week="all"：まだ投稿していない計画をすべて見る（定期実行はこれ）
+    plans = sorted((OUT / "social").glob("*/*/plan.json")) if week == "all" else sorted((OUT / "social" / week).glob("*/plan.json"))
     if not plans:
+        if week == "all":
+            print("   投稿の計画はまだありません")
+            return
         sys.exit(f"[エラー] out/social/{week}/ に計画がありません。先に  post_social.py plan --week {week}")
     now = datetime.now(timezone.utc)
     for pp in plans:
         plan = read_json(pp)
+        if all(p["status"] == "done" for p in plan["posts"]):
+            continue
         for p in plan["posts"]:
             if p["status"] == "done":
                 continue

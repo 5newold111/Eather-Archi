@@ -7,8 +7,9 @@
      - 実在アーティスト名（favorite_artists_real、influences.name）は絶対に渡さない
      - 顔を出さない方法（face_concealment）を必ず指示文に含める
   2. 画像 API で候補を生成（OPENAI_API_KEY があれば ChatGPT 側の gpt-image-1。無ければ指示文だけ書き出す＝ドライラン）
-  3. 規約チェック（サイズ・形式。顔・文字の検出は外部ツール or Claude の目視に委ねる）
-  4. 採点（templates/visual_criteria.json の重み）
+  3. Claude が画像を見て採点（5 観点 1〜5 点）し、顔・他社ロゴ・余計な文字などの禁止ルールに当たる候補を外す
+     （ANTHROPIC_API_KEY が無いときは仮の点）
+  4. 重み付きの合計点（templates/visual_criteria.json の重み）。5 回の判断がそろったら、Claude が重みと好みを学び直す
   5. 最初の 5 回はオーナーに聞く（review.md を書き出し、--choose で判断を記録 → 基準に反映）
      6 回目以降は自動選択。1 位と 2 位の差が小さいときだけ聞く
 
@@ -203,6 +204,122 @@ def compliance_checklist(kind: str) -> list[str]:
     return common + ["Instagram / TikTok で危険行為に見えない"]
 
 
+SCORE_SYSTEM = """You are the art director of EtherArchi, a music label where AI-generated music meets spatial design.
+Score each candidate image for the given artist on five criteria from 1 (poor) to 5 (excellent):
+consistency (fits the artist's visual sheet), symbolism (memorable, says something about the act),
+scene_fit (fits the listening scene / the song), safety (platform rules and the face-hiding rule), craft (finish).
+Then check every hard rule and the compliance list; list each violation you can SEE (a recognizable face, a third-party
+logo or character, a URL / handle / price, text that is not exactly the song title or artist name, an identifiable real
+building or sign, sexual or violent content). compliance_ok is false if there is any violation.
+Apply the owner's learned preferences when scoring. comment_ja is one short Japanese sentence for the owner."""
+
+SCORE_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["candidates"],
+    "properties": {"candidates": {"type": "array", "items": {
+        "type": "object", "additionalProperties": False,
+        "required": ["no", "scores", "violations", "compliance_ok", "comment_ja"],
+        "properties": {
+            "no": {"type": "integer"},
+            "scores": {"type": "object", "additionalProperties": False,
+                       "required": ["consistency", "symbolism", "scene_fit", "safety", "craft"],
+                       "properties": {k: {"type": "integer", "minimum": 1, "maximum": 5}
+                                      for k in ["consistency", "symbolism", "scene_fit", "safety", "craft"]}},
+            "violations": {"type": "array", "items": {"type": "string"}},
+            "compliance_ok": {"type": "boolean"},
+            "comment_ja": {"type": "string"}}}}},
+}
+
+
+def thumbnail(src: Path) -> Path:
+    """採点用に 768px の JPEG に縮める（送る量を減らす）。ffmpeg が無ければ元の画像"""
+    import shutil, subprocess
+    if not shutil.which("ffmpeg"):
+        return src
+    dst = src.with_name(src.stem + ".thumb.jpg")
+    if not dst.exists() or dst.stat().st_mtime < src.stat().st_mtime:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-vf", "scale=768:-2", "-q:v", "4", str(dst)], check=False)
+    return dst if dst.exists() else src
+
+
+def claude_score(cands: list[dict], outdir: Path, artist: dict, criteria: dict, brief: dict | None) -> int:
+    """生成した画像を Claude が見て 5 観点で採点し、禁止ルールに当たる候補を外す。戻り値：採点した枚数"""
+    import _claude  # 同じフォルダ。ANTHROPIC_API_KEY が無ければ何もしない
+    if not _claude.available():
+        return 0
+    done = 0
+    for kind in sorted({c["kind"] for c in cands}):
+        group = [c for c in cands if c["kind"] == kind and c.get("file") and (outdir / c["file"]).exists()]
+        if not group:
+            continue
+        safe_artist = {k: artist.get(k) for k in ("name", "formation", "visual")}
+        safe_artist["scene"] = (artist.get("persona") or {}).get("drive_scene") or (artist.get("persona") or {}).get("scene")
+        content: list = [{"type": "text", "text": json.dumps({
+            "kind": kind, "artist": safe_artist,
+            "song": {k: (brief or {}).get(k) for k in ("title", "cover_prompt_seed")} if kind == "cover" else None,
+            "hard_rules": criteria.get("hard_rules", []), "compliance": compliance_checklist(kind),
+            "owner_preferences": criteria.get("preferences", [])}, ensure_ascii=False)}]
+        for c in group:
+            content += [{"type": "text", "text": f"Candidate {c['no']}:"}, _claude.image_block(thumbnail(outdir / c["file"]))]
+        print(f"  Claude が {kind} の候補 {len(group)} 枚を見て採点しています…")
+        res, msg = _claude.call_json(SCORE_SYSTEM, content, SCORE_SCHEMA, effort="medium")
+        if not res:
+            print(f"    採点できませんでした（{msg}）。仮の点のままにします")
+            continue
+        by_no = {r["no"]: r for r in res["candidates"]}
+        for c in group:
+            r = by_no.get(c["no"])
+            if not r:
+                continue
+            c["scores"] = {k: float(v) for k, v in r["scores"].items()}
+            c["violations"], c["compliance_ok"], c["claude_note"] = r["violations"], r["compliance_ok"], r["comment_ja"]
+            c.pop("scores_note", None)
+            done += 1
+    return done
+
+
+LEARN_SYSTEM = """You maintain the scoring criteria for an art director's taste. From the owner's past choices
+(what they picked, the scores the machine gave every candidate at the time, and the reason they wrote), adjust the five
+weights so that the machine would have ranked the owner's pick first more often, and distill short Japanese preference
+notes (each one concrete and checkable, e.g. 余白が多い構図を優先). Weights must be between 0.05 and 0.5 and sum to 1.0."""
+
+LEARN_SCHEMA = {
+    "type": "object", "additionalProperties": False, "required": ["weights", "preferences", "note_ja"],
+    "properties": {
+        "weights": {"type": "object", "additionalProperties": False,
+                    "required": ["consistency", "symbolism", "scene_fit", "safety", "craft"],
+                    "properties": {k: {"type": "number"} for k in ["consistency", "symbolism", "scene_fit", "safety", "craft"]}},
+        "preferences": {"type": "array", "items": {"type": "string"}},
+        "note_ja": {"type": "string"}},
+}
+
+
+def learn_criteria(criteria: dict) -> None:
+    """オーナーの判断（最初の 5 回）から、採点の重みと好みのメモを Claude が更新する"""
+    import _claude
+    user = json.dumps({"current_weights": criteria["weights"], "decisions": criteria["decisions"],
+                       "current_preferences": criteria.get("preferences", [])}, ensure_ascii=False, indent=1)
+    if not _claude.available():
+        f = ROOT / "out" / "visuals" / "learn_criteria.prompt.md"
+        _claude.dry_run_file(f, LEARN_SYSTEM, user, LEARN_SCHEMA)
+        print(f"  ANTHROPIC_API_KEY が無いので、基準の更新は依頼文だけ書き出しました: {f.relative_to(ROOT)}")
+        return
+    print("  オーナーの 5 回の判断から、採点の重みと好みを更新しています…")
+    res, msg = _claude.call_json(LEARN_SYSTEM, user, LEARN_SCHEMA)
+    if not res:
+        print(f"  基準を更新できませんでした（{msg}）")
+        return
+    w = {k: min(0.5, max(0.05, float(v))) for k, v in res["weights"].items()}
+    total = sum(w.values())
+    old = dict(criteria["weights"])
+    criteria["weights"] = {k: round(v / total, 3) for k, v in w.items()}
+    criteria["preferences"] = list(dict.fromkeys(res["preferences"]))[:12]
+    criteria["version"] = int(criteria.get("version", 1)) + 1
+    criteria.setdefault("learning_log", []).append({"date": date.today().isoformat(), "from": old,
+                                                    "to": criteria["weights"], "note": res["note_ja"]})
+    save_criteria(criteria)
+    print(f"  基準を更新しました（版 {criteria['version']}）：{res['note_ja']}")
+
+
 def score_candidate(c: dict, criteria: dict) -> float:
     """
     採点。本番では Claude が画像を見て 5 観点に 1〜5 点をつける（c['scores'] に入れる）。
@@ -213,6 +330,8 @@ def score_candidate(c: dict, criteria: dict) -> float:
         c["scores"] = {k: round(base, 1) for k in criteria["weights"]}
         c["scores_note"] = "仮の点（画像未生成）。Claude が画像を見て付け直す"
     total = sum(criteria["weights"][k] * c["scores"].get(k, 0) for k in criteria["weights"])
+    if c.get("compliance_ok") is False:
+        total = 0.0      # 禁止ルールに当たる候補は除外（0 点）
     c["total"] = round(total, 3)
     return c["total"]
 
@@ -221,7 +340,9 @@ def score_candidate(c: dict, criteria: dict) -> float:
 # 選択（最初の 5 回は聞く → 基準を学ぶ → 自動）
 # ---------------------------------------------------------------------------
 def decide(cands: list[dict], criteria: dict, ask_forced: bool = False) -> tuple[dict | None, str]:
-    ranked = sorted(cands, key=lambda c: -c["total"])
+    ranked = sorted([c for c in cands if c.get("compliance_ok") is not False], key=lambda c: -c["total"])
+    if not ranked:
+        return None, "全候補が禁止ルールに当たったので作り直しが必要"
     if len(ranked) < 2:
         return (ranked[0] if ranked else None), "候補が 1 つ"
     margin = ranked[0]["total"] - ranked[1]["total"]
@@ -238,18 +359,25 @@ def record_choice(criteria: dict, artist: str, kind: str, chosen_no: int, reason
     if reason:
         criteria["preferences"].append(reason)
     criteria["decisions_asked"] += 1
-    if criteria["decisions_asked"] >= criteria["decisions_required_before_lock"]:
+    just_locked = False
+    if criteria["decisions_asked"] >= criteria["decisions_required_before_lock"] and not criteria["locked"]:
         criteria["locked"] = True
-        criteria["_locked_note"] = f"{date.today()} に 5 回の判断がそろったので自動選択に切り替え。preferences を Claude が重みに反映すること"
+        criteria["_locked_note"] = f"{date.today()} に 5 回の判断がそろったので自動選択に切り替え"
+        just_locked = True
     save_criteria(criteria)
+    if just_locked:
+        learn_criteria(criteria)   # 5 回の判断から重みと好みを学ぶ
 
 
 def write_review(path: Path, artist: dict, cands: list[dict], note: str) -> None:
     lines = [f"# ビジュアル候補レビュー：{artist['name']}（{artist['slug']}）", "", f"判断：{note}", ""]
     for kind in sorted({c["kind"] for c in cands}):
-        lines += [f"## {kind}", "", "| # | 点 | 方法 / 変種 | ファイル | 規約チェック |", "|---|---|---|---|---|"]
+        lines += [f"## {kind}", "", "| # | 点 | 方法 / 変種 | ファイル | Claude の所見 | 規約チェック |", "|---|---|---|---|---|---|"]
         for c in sorted([c for c in cands if c["kind"] == kind], key=lambda c: -c["total"]):
-            lines.append(f"| {c['no']} | {c['total']} | {c.get('method', '')} | {c.get('file', '（未生成：指示文のみ）')} | {'／'.join(compliance_checklist(kind))} |")
+            check = ("✕ " + "、".join(c.get("violations", []))) if c.get("compliance_ok") is False else (
+                "○" if c.get("compliance_ok") else "／".join(compliance_checklist(kind)))
+            lines.append(f"| {c['no']} | {c['total']} | {c.get('method', '')} | {c.get('file', '（未生成：指示文のみ）')} | "
+                         f"{c.get('claude_note', c.get('scores_note', ''))} | {check} |")
         lines.append("")
     lines += ["## 選ぶとき", "", "`--choose <kind>:<番号> --reason \"一言\"` で記録してください。理由が基準に反映されます。", ""]
     lines += ["## 指示文（確認用）", ""] + [f"- **{c['kind']} {c['no']}**: {c['prompt']}" for c in cands]
@@ -346,6 +474,10 @@ def main() -> None:
                 "ネットワークか API の一時的な問題の可能性。少し待って再実行")
         print(f"  → 対処のヒント: {hint}")
 
+    n_scored = claude_score(cands, outdir, artist, criteria,
+                            json.loads(args.brief.read_text(encoding="utf-8")) if args.brief else None) if generated else 0
+    if n_scored:
+        print(f"  Claude が {n_scored} 枚を採点しました")
     for c in cands:
         score_candidate(c, criteria)
     cand_path.write_text(json.dumps(cands, ensure_ascii=False, indent=2), encoding="utf-8")

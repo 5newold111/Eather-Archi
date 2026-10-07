@@ -46,6 +46,18 @@
 
 `<週>` は制作週の月曜（例 2026-10-05）。各スクリプトは何をしているかを日本語で表示する。
 
+**まとめて流す場合**（定期実行を入れていれば、これも自動。`docs/10_automation.md`）
+
+```
+python3 scripts/run_week.py brief  --week <週>    # 話題曲 → 割り当て（全組）→ コラボ → Claude のブリーフ
+python3 scripts/run_week.py lyrics --week <週>    # Suno の節（.verses.txt）を合体
+python3 scripts/run_week.py takes  --week <週>    # テイクの計測（Tier A/B/C）
+python3 scripts/run_week.py finish --week <週>    # 音量・ジャケット・登録シート・DB・SNS の準備
+python3 scripts/run_week.py status --week <週>    # 組ごとの進み具合
+```
+
+**1 つずつ流す場合**
+
 ```
 # 火曜の朝
 python3 scripts/select_references.py --all --week <週> --references out/references   # 骨組み

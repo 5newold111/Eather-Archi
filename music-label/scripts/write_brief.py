@@ -108,6 +108,16 @@ Hard rules (never break):
 8. Suno style prompt: English, under 900 characters, comma-separated descriptors (genre, era feel, tempo/BPM,
    instruments, vocal timbre and delivery, mood, scene), no artist names, no lyrics.
 9. notes_ja is written in Japanese for the owner; everything else in English unless the brief says otherwise.
+10. Collaboration (brief has featured_guest): this song is released under THIS artist's name with the guest in the
+   Featured Artist field - never write "feat." in any title. Suno can load only one Persona, so describe the guest's
+   voice with featured_guest.guest_description (verbatim adjectives) inside suno_style_prompt and give the guest a
+   clearly marked part in the lyrics (e.g. "[Verse 2 - guest vocal]" or call-and-response in the bridge) following
+   featured_guest.collab_style. The guest's own name never appears in the lyrics or the style prompt.
+11. Remix (brief has remix_of): this is the remixer's reconstruction of the label's own earlier song. Reuse the
+   original's hook/chorus words from remix_of.core (it is our own song, so this is allowed) but rebuild everything else
+   in this artist's sound (tempo, groove, instruments, structure). The first title candidate must be exactly
+   remix_of.title_rule; the others may vary only after the original title. State in notes_ja that the owner can use
+   Suno's cover/remix of the original take if they prefer.
 
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
@@ -212,6 +222,12 @@ def validate(result: dict, artist: dict, brief: dict) -> list[str]:
             problems.append("輪郭を残しているのに音程の幅を変えていない")
     if any(re.search(r"\b(feat|ft)\.?\s", t, re.I) for t in result["title_candidates"]):
         problems.append("曲名に feat. が入っている（フィーチャリング欄で登録する運用）")
+    guest = (brief.get("featured_guest") or {}).get("name")
+    if guest and guest.lower() in (result["suno_style_prompt"] + result["suno_lyrics"]).lower():
+        problems.append(f"客演の名前（{guest}）が Suno への指示文か歌詞に入っている（声は形容詞で描写する）")
+    rule = (brief.get("remix_of") or {}).get("title_rule")
+    if rule and (not result["title_candidates"] or result["title_candidates"][0] != rule):
+        problems.append(f"リミックスの 1 番目のタイトル候補が「{rule}」になっていない")
     tics = [t for t in artist.get("vocal", {}).get("signature_techniques", {}).get("tics", []) if t.get("frequency") == "every_song"]
     mode = artist.get("lyrics", {}).get("mode", "core_fixed")
     if mode == "topic_only" and len(result.get("suno_lyric_prompt", "")) < 200:

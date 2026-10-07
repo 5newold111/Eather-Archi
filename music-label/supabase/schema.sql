@@ -21,7 +21,7 @@ create type vocal_range_t as enum ('low', 'mid', 'high');
 create type vocal_sex_t   as enum ('female', 'male', 'mixed', 'none');
 create type ref_source_t  as enum ('own', 'chart', 'manual', 'trend');            -- 自作 / チャート / 手動 / 今週のトレンド
 create type release_status_t as enum ('planned', 'generated', 'mastered', 'uploaded', 'live', 'takedown');
-create type cadence_t     as enum ('weekly', 'biweekly');
+create type cadence_t     as enum ('weekly', 'biweekly', 'paused');   -- paused：方針転換で戻らなかった組などを休止
 
 -- グループ共通の設定（1 行だけ）
 create table label_settings (
@@ -279,7 +279,8 @@ create table metrics (
   id             uuid primary key default gen_random_uuid(),
   release_id     uuid not null references releases(id) on delete cascade,
   date           date not null,
-  platform       text not null,                     -- spotify / apple / youtube / tiktok …
+  platform       text not null,                     -- spotify / apple / youtube_music / youtube_shorts / tiktok …
+  kind           text not null default 'dsp' check (kind in ('dsp', 'sns')),  -- dsp＝配信サービスの再生（分析に使う）/ sns＝SNS の動画再生（告知の効果。分析には混ぜない）
   streams        bigint not null default 0,
   saves          bigint not null default 0,
   skips          bigint not null default 0,
@@ -311,7 +312,8 @@ create table visual_assets (
   selected        boolean not null default false,
   decided_by      decided_by_t,
   created_at      timestamptz not null default now(),
-  unique (artist_id, release_id, kind, concept_version, candidate_no)
+  -- デビュー写真（release_id が null）でも同じ候補を二重に登録しないよう、null も同じ値として扱う
+  unique nulls not distinct (artist_id, release_id, kind, concept_version, candidate_no)
 );
 -- 同じ組・同じ種類・同じ世代で選ばれるのは 1 枚
 create unique index visual_assets_one_selected
@@ -322,7 +324,8 @@ create table visual_decisions (
   id          uuid primary key default gen_random_uuid(),
   asset_id    uuid not null references visual_assets(id),
   reason      text,
-  decided_at  timestamptz not null default now()
+  decided_at  timestamptz not null default now(),
+  unique (asset_id)                                -- 1 つの候補につき判断は 1 回
 );
 
 -- =============================================================================
@@ -383,7 +386,7 @@ select
 from brief_sources bs
 join reference_tracks rt on rt.id = bs.reference_track_id
 join releases r          on r.brief_id = bs.brief_id
-left join metrics m      on m.release_id = r.id
+left join metrics m      on m.release_id = r.id and m.kind = 'dsp'
 group by bs.slot, bs.reference_track_id, rt.title, rt.artist_name;
 
 -- =============================================================================
@@ -404,7 +407,7 @@ select
   sum(m.skips)   as skips,
   sum(m.playlist_adds) as playlist_adds
 from releases r
-join metrics m on m.release_id = r.id
+join metrics m on m.release_id = r.id and m.kind = 'dsp'
 group by r.id, r.artist_id, r.title, r.release_at, date_trunc('week', m.date), floor((m.date - r.release_at::date) / 7.0);
 
 -- 曲の伸び：直近 4 週とその前 4 週の比較、保存率、1,000 再生到達の見込み
@@ -464,7 +467,7 @@ with base as (
          sum(m.streams) as streams, sum(m.saves) as saves
   from brief_sources bs
   join releases r on r.brief_id = bs.brief_id
-  join metrics m  on m.release_id = r.id
+  join metrics m  on m.release_id = r.id and m.kind = 'dsp'
   group by bs.slot, bs.reference_track_id
 ),
 label_avg as (

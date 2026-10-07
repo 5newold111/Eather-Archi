@@ -38,7 +38,7 @@ def sql_value(v) -> str:
     if v is None:
         return "null"
     if isinstance(v, Ref):
-        cond = " and ".join(f"{k} = {sql_value(x)}" for k, x in v.where)
+        cond = " and ".join(f"{k} is null" if x is None else f"{k} = {sql_value(x)}" for k, x in v.where)
         return f"(select id from {v.table} where {cond})"
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -101,7 +101,8 @@ class Client:
             return v
         if v in self._ids:
             return self._ids[v]
-        q = "&".join(f"{k}=eq.{urllib.parse.quote(str(self.resolve(x)))}" for k, x in v.where)
+        q = "&".join(f"{k}=is.null" if x is None else f"{k}=eq.{urllib.parse.quote(str(self.resolve(x)))}"
+                     for k, x in v.where)
         rows = self._req("GET", f"/rest/v1/{v.table}?select=id&{q}")
         if not rows:
             raise RuntimeError(f"{v.table} に {dict(v.where)} が見つかりません（先に seed / 前の手順を実行）")

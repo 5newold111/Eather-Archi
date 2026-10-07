@@ -196,10 +196,19 @@ def iter_targets(args) -> list[tuple[str, str, Path | None, str | None]]:
 def apply_status(path: Path, label_slug: str | None, slug_or_label: str, verdict: str) -> None:
     """clear なら name_status を checked に。collision なら draft のまま、フラグを付ける"""
     d = json.loads(path.read_text(encoding="utf-8"))
-    status = "checked" if verdict == "clear" else "draft"   # near / collision / unverified は draft のまま
+    status = "checked" if verdict == "clear" else "draft"   # near / collision は draft に戻す
     def set_on(obj):
-        obj["name_status"] = status
-        obj["name_check"] = {"verdict": verdict, "date": date.today().isoformat(), "manual_pending": ["商標", "SNS ハンドル"] if verdict == "clear" else []}
+        # unverified（照合先に届かなかった）は判定できていないので、前回の確認結果をそのまま残す
+        if verdict != "unverified":
+            obj["name_status"] = status
+        nc = dict(obj.get("name_check") or {})   # 以前の確認メモは消さずに、自動確認の結果を足す
+        nc.setdefault("auto_checks", []).append({"verdict": verdict, "date": date.today().isoformat()})
+        nc["auto_checks"] = nc["auto_checks"][-5:]
+        if verdict != "unverified":
+            nc.update(verdict=verdict, date=date.today().isoformat())
+            if verdict == "clear":
+                nc.setdefault("manual_pending", ["商標", "SNS ハンドル"])
+        obj["name_check"] = nc
     if label_slug and slug_or_label.startswith("[レーベル]"):
         set_on(d)
     elif label_slug:

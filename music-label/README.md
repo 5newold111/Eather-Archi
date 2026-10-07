@@ -33,7 +33,8 @@ music-label/
 │   ├── 06_growth.md              ← 収益目標の現実的な数字・月 1 組追加と週 8 曲上限・伸びた要素を次に返す仕組み・歌手の体と癖
 │   ├── 07_sublabels.md           ← 子レーベル構造（場面ごとに別アカウント）で上限なく増やす。自動化の段階
 │   ├── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
-│   └── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
+│   ├── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
+│   └── 10_automation.md          ← 自動運転の全体像（定期実行の時間割・人がやること・自動で決めていること）
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -67,8 +68,19 @@ music-label/
     ├── supabase_sync.py          ← 設定書・解析シート・毎週の曲を Supabase に登録（鍵が無ければ SQL を書き出す）
     ├── post_social.py            ← 縦動画（サビ 30 秒）と説明文を作り、配信時刻に YouTube / Instagram / TikTok へ投稿
     ├── oauth_youtube.py          ← YouTube 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
+    ├── oauth_tiktok.py           ← TikTok 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
     ├── set_key.py                ← 鍵を .env に安全に書き込む / 確認する
-    └── _common.py, _supabase.py  ← 上のスクリプトが共通で使う部品
+    ├── debut.py                  ← デビューの段取り（デビュー週の設定 → 名前確認 → ロゴ・写真 → DB → 準備状況）
+    ├── run_week.py               ← 1 週間ぶんを段階ごとに全組まとめて流す（brief / lyrics / takes / finish / status / auto）
+    ├── schedule.py               ← 定期実行の登録（Mac の launchd）。時間割は docs/10_automation.md
+    ├── fetch_trends.py           ← 今週の話題曲・トレンド言語を Claude が Web で調べ、話題曲の解析シートを作る
+    ├── plan_collabs.py           ← その週のコラボ（feat. / remix）を決めてブリーフに書く
+    ├── collect_metrics.py        ← 成績を集める（DistroKid・Spotify for Artists の書き出し、SNS の API）→ 成長分析へ
+    ├── apply_pivot.py            ← 方針転換の提案を設定書に反映（レベル 2 は写真の撮り直しまで）
+    ├── expand_label.py           ← 月 1 組の追加（Claude が設定書を下書きしデビュー予約）と隔週への切り替え
+    ├── plan_quarterly.py         ← 四半期の EP・コンピレーションの計画と登録シート
+    ├── backup_r2.py              ← Cloudflare R2 への予備保管（変わったファイルだけ）
+    └── _common.py, _supabase.py, _claude.py  ← 上のスクリプトが共通で使う部品
 ```
 
 ## 決まっていること（設計の前提）
@@ -92,7 +104,9 @@ music-label/
 1. **火曜**：Suno で生成した数テイクを聴いて、1 曲選ぶ（5 曲ぶん）。機械が先に計測して、聴く順番と落ちたテイクを教える
 2. **水曜**：DistroKid に 5 曲を登録し、配信日時を 2 週間後の水曜 17:00 ET に指定する（登録シートを見ながらコピペ）
 
-それ以外（トレンド取得、ブリーフ生成、音量調整、ジャケット書き出し、SNS 投稿、成績回収）は自動化の対象です。
+それ以外（トレンド取得、ブリーフ生成、コラボの組み合わせ、テイクの計測、音量調整、ジャケットの採点と書き出し、
+登録シート、データベース、SNS 投稿、成績回収、成長分析、方針転換、月 1 組の追加、予備保管）は自動で動きます。
+時間割と、人がやることの一覧は `docs/10_automation.md`。
 
 ## 読む順番
 
@@ -104,3 +118,4 @@ music-label/
 6. `pip install -r requirements.txt` のあと `scripts/select_references.py --demo` → `scripts/write_brief.py out/briefs/<週>_demo.json` で、骨組み → ブリーフの流れを確かめる
 7. ffmpeg（音と動画の変換ソフト）を入れる（Mac：`brew install ffmpeg`）。そのあと `scripts/select_takes.py --demo` → `scripts/master_track.py --demo` → `scripts/finalize_cover.py --demo` で、テイク選び → 音量 → ジャケットを合成音で確かめる
 8. コマンドの順番は `docs/01_pipeline.md` の「コマンドの順番」、鍵の設定は `docs/09_auth_batch.md`
+9. 立ち上げ：`scripts/debut.py --launch-week <デビュー週の月曜>` → `scripts/schedule.py install`（自動運転の開始。`docs/10_automation.md`）

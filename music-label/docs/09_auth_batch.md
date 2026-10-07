@@ -58,7 +58,7 @@ python3 scripts/generate_visuals.py --artist light --kind debut     # 5 組同�
 ```
 python3 scripts/set_key.py YOUTUBE_CLIENT_ID
 python3 scripts/set_key.py YOUTUBE_CLIENT_SECRET
-python3 scripts/oauth_youtube.py              # ブラウザで「許可」→ .env に自動保存
+python3 scripts/oauth_youtube.py              # ブラウザで「許可」→ .env に自動保存（投稿と、再生数の読み取りの 2 つの権限）
 python3 scripts/oauth_youtube.py --for focus  # 子レーベル用チャンネルが別なら、レーベルごとに
 ```
 
@@ -71,7 +71,7 @@ python3 scripts/oauth_youtube.py --for focus  # 子レーベル用チャンネ�
 
 1. Instagram アカウントを **プロアカウント**（クリエイター）に切り替える
 2. https://developers.facebook.com でアプリ作成 → ユースケース「Instagram でメッセージとコンテンツを管理」（Instagram ログイン方式）
-3. 権限 `instagram_business_basic` と `instagram_business_content_publish` を追加
+3. 権限 `instagram_business_basic`・`instagram_business_content_publish`・`instagram_business_manage_insights`（再生数・保存数の読み取り）を追加
 4. 「アプリの役割」で自分の Instagram アカウントをテスターに追加し、Instagram 側で承認
 5. アプリの画面で「トークンを生成」→ 長期トークン（60 日）と Instagram のユーザー ID が出る
 
@@ -87,24 +87,34 @@ python3 scripts/post_social.py refresh-ig      # 月 1 回。60 日で切れる�
 ## 5. TikTok
 
 1. https://developers.tiktok.com で開発者登録 → アプリ作成
-2. 製品に **Login Kit** と **Content Posting API** を追加。Direct Post を有効化、スコープ `video.publish` と `user.info.basic`
+2. 製品に **Login Kit** と **Content Posting API** を追加。Direct Post を有効化、スコープ `video.publish`・`video.list`（再生数の読み取り）・`user.info.basic`
 3. リダイレクト URI を登録（Login Kit の設定）
-4. 自分のアカウントで許可して、Client Key・Client Secret・refresh token を .env へ
+4. Client Key・Client Secret・登録したリダイレクト URI を .env に入れ、補助スクリプトで許可を取る
 
 ```
 python3 scripts/set_key.py TIKTOK_CLIENT_KEY
 python3 scripts/set_key.py TIKTOK_CLIENT_SECRET
-python3 scripts/set_key.py TIKTOK_REFRESH_TOKEN
+python3 scripts/set_key.py TIKTOK_REDIRECT_URI     # 例 http://localhost:8765/callback/（アプリに登録したものと同じ）
+python3 scripts/oauth_tiktok.py                     # ブラウザで「許可」→ TIKTOK_REFRESH_TOKEN を自動保存
 ```
+
+- リダイレクト URI が localhost なら自動で受け取る。https の自分のサイトなら、許可のあとのアドレス欄の URL を貼る
+- デスクトップ用アプリとして登録した場合は `--pkce` を付ける
+- 更新用の鍵は投稿のたびに自動で延長・保存し直す
 
 **注意**
 - 審査（Content Posting API の監査）前のアプリは **自分だけに公開**（SELF_ONLY）でしか投稿できない。`post_social.py` は自動でそれを選び、結果に注記を残す
 - 投稿時に「AI 生成コンテンツ」（`is_aigc`）を必ず立てている
-- refresh token を取る補助スクリプトは、リダイレクト URI が決まった時点で作る（YouTube の `oauth_youtube.py` と同じ形）
 
 ## 6. Cloudflare R2（予備）
 
-`docs/05_storage.md` の「2. Cloudflare R2」と「毎晩のバックアップ（rclone の例）」の通り。鍵は `R2_*` に入れる。
+Cloudflare ダッシュボード → R2 → バケット作成（例 `label-backup`、公開アクセスはオフ）→ R2 API トークン
+（権限 Object Read & Write、対象はこのバケットだけ）。鍵は `R2_*` に入れる。
+
+```
+python3 scripts/backup_r2.py --dry-run     # 何を上げるか確認
+python3 scripts/backup_r2.py               # 毎晩 03:30 に自動（定期実行）
+```
 
 ## 7. DistroKid
 
@@ -126,4 +136,8 @@ python3 scripts/post_social.py post --week <制作週> --dry-run          # 何�
 python3 scripts/post_social.py post --week <制作週>                    # 本番（YouTube は公開予約、他は時刻後）
 ```
 
-投稿は配信時刻に合わせる必要があるので、Mac の cron（定時実行）か GitHub Actions で 15 分ごとに `post_social.py post` を回す。
+最後に定期実行を登録すると、自動運転が始まる（時間割は `docs/10_automation.md`）。
+
+```
+python3 scripts/schedule.py install
+```

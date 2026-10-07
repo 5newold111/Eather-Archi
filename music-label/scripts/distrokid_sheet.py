@@ -58,7 +58,7 @@ def build_row(brief_path: Path, titles: dict[str, str]) -> dict:
     label = load_label(label_slug)
     feat = load_artist(b["featured_artist_slug"]) if b.get("featured_artist_slug") else None
 
-    title = titles.get(slug) or b.get("title")
+    title = titles.get(slug) or b.get("title") or ((b.get("remix_of") or {}).get("title_rule"))
     title_status = "決定" if title else "仮（候補 1 番）"
     if not title:
         cands = b.get("title_candidates") or []
@@ -102,6 +102,7 @@ def build_row(brief_path: Path, titles: dict[str, str]) -> dict:
         "distrokid_account": (label.get("accounts") or {}).get("distrokid_email") or "本体アカウント",
         "artist": artist["name"], "artist_slug": slug,
         "featured_artist": feat["name"] if feat else "",
+        "featured_spotify": ((feat.get("distribution") or {}).get("spotify_uri") or "未登録（相手の最初の曲が配信された後に Spotify のアーティストリンクを設定書へ）") if feat else "",
         "title": title, "title_status": title_status,
         "release_date_et": rel_et.strftime("%Y-%m-%d"), "release_time_et": rel_et.strftime("%H:%M"),
         "release_jst": rel_jst.strftime("%Y-%m-%d %H:%M"), "release_at_utc": b["release_at"],
@@ -113,6 +114,7 @@ def build_row(brief_path: Path, titles: dict[str, str]) -> dict:
         "lyrics_file": rel(lyrics_file) if lyrics_file.exists() else "",
         "isrc": "（空欄：DistroKid が自動で付ける）",
         "spotify_artist": (artist.get("distribution") or {}).get("spotify_uri") or "初回は「新しいアーティスト」",
+        "remix_of": (f"{b['remix_of']['artist_name']} — {b['remix_of']['title']}" if b.get("remix_of") else ""),
         "problems": problems, "brief": rel(brief_path), "week_start": b["week_start"],
     }
 
@@ -133,8 +135,11 @@ def sheet_md(week: str, rows: list[dict]) -> str:
         out += [
             f"- ログインするアカウント：`{r['distrokid_account']}`（{r['label']}）",
             f"- Artist / Band name：`{r['artist']}`（Spotify：{r['spotify_artist']}）",
-            f"- Featured artist：`{r['featured_artist']}`" if r["featured_artist"] else "- Featured artist：なし",
+            (f"- Featured artist：`{r['featured_artist']}`（相手の Spotify：{r['featured_spotify']}。同名の別人に紐づかないよう必ず指定）"
+             if r["featured_artist"] else "- Featured artist：なし"),
             f"- Song title：`{r['title']}`（feat. はタイトルに入れない）",
+            *([f"- リミックス：元曲は {r['remix_of']}。画面に Remixer 欄があれば `{r['artist']}` を入れ、元曲のアーティストを"
+               "メインアーティストに追加できる画面なら追加する（できなければこの名義だけで登録）"] if r.get("remix_of") else []),
             f"- Release date：`{r['release_date_et']}`（米国東部 {r['release_time_et']} ＝ 日本 {r['release_jst']}）",
             "  - 時刻を指定できる画面ならこの時刻、できなければ日付だけ（各国の 0 時に公開）",
             f"- Language：`{r['language']}`" + ("・Instrumental にチェック" if r["instrumental"] else ""),

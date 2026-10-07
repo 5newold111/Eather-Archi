@@ -34,6 +34,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import production_status  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # 本体レーベル（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
 
@@ -74,6 +76,8 @@ class Reference:
     vocal_range: str | None    # low / mid / high
     is_trend: bool = False     # 今週のトレンド曲か
     weight: float = 1.0        # 成績から来る重み（1.0〜3.0）。ルール 5
+    usable_slots: set[str] | None = None   # 音源なしの解析シート（話題曲の Web 調査だけ）は、使える枠が限られる
+    trend_week: str | None = None          # 話題曲として取り込んだ週
     raw: dict = field(default_factory=dict, repr=False)
 
 
@@ -151,6 +155,8 @@ def load_references_from_dir(folder: Path) -> list[Reference]:
     """解析シート（analysis_sheet.schema.json 形式）の JSON をフォルダから読む"""
     refs: list[Reference] = []
     for p in sorted(folder.glob("*.json")):
+        if p.name.endswith(".measure.json"):   # analyze_track.py の計測値（解析シートではない）
+            continue
         sheet = json.loads(p.read_text(encoding="utf-8"))
         r = sheet.get("reference", {})
         v = sheet.get("vocal", {})
@@ -165,6 +171,8 @@ def load_references_from_dir(folder: Path) -> list[Reference]:
             vocal_range=v.get("range"),
             is_trend=(r.get("source") == "trend"),
             weight=float(sheet.get("weight", 1.0)),
+            usable_slots=set(sheet["usable_slots"]) if sheet.get("usable_slots") else None,
+            trend_week=sheet.get("trend_week"),
             raw=sheet,
         ))
     print(f"  解析シートを {len(refs)} 件読み込みました（{folder}）")
@@ -258,7 +266,7 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
     slot_weights = slot_weights or {}
 
     for slot in SLOT_ORDER:
-        pool = [r for r in refs if r.id not in used]
+        pool = [r for r in refs if r.id not in used and (not r.usable_slots or slot in r.usable_slots)]
         if slot in VOCAL_SLOTS:
             vocal_slots_left = sum(1 for s in VOCAL_SLOTS if s not in result)
             strict_pool = [r for r in pool if vocal_compatible(r, artist, strict=True)]
@@ -401,6 +409,9 @@ def main() -> None:
     ap.add_argument("--hints", type=Path, help="analyze_growth.py が出した hints.json（組ごとのヒント）")
     ap.add_argument("--seed", type=int, help="乱数の種（同じ結果を再現したいとき）")
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "briefs", help="出力フォルダ")
+    ap.add_argument("--force", action="store_true", help="デビュー前・隔週の休み・休止の組も作る")
+    ap.add_argument("--overwrite", action="store_true",
+                    help="Claude が書き足し済みのブリーフも作り直す（既定では守る）")
     args = ap.parse_args()
 
     if not args.artist and not args.all and not args.demo and not args.label:
@@ -421,6 +432,11 @@ def main() -> None:
 
     slot_weights: dict[str, float] = {}
     hints_all: dict[str, dict] = {}
+    # 今週の話題曲レポート（fetch_trends.py）があれば、トレンド言語をそこから読む
+    trend_file = ROOT / "out" / "trends" / f"{week_monday}.json"
+    if not args.trend_language and trend_file.exists():
+        args.trend_language = json.loads(trend_file.read_text(encoding="utf-8")).get("trend_language")
+        print(f"  今週のトレンド言語: {args.trend_language or 'なし'}（{trend_file.relative_to(ROOT)} から）")
     if args.weights and args.weights.exists():
         slot_weights = json.loads(args.weights.read_text(encoding="utf-8"))
         print(f"  成績由来の重みを {len(slot_weights)} 件読み込みました（{args.weights}）")
@@ -429,6 +445,12 @@ def main() -> None:
         print(f"  組ごとのヒントを {len(hints_all)} 件読み込みました（{args.hints}）")
 
     refs = demo_references(seed) if args.demo else load_references_from_dir(args.references)
+    # 話題曲は取り込んだ週から 2 週間だけ「トレンド」として優先する（それ以降は普通の参考曲）
+    for r in refs:
+        if r.is_trend and r.trend_week:
+            age = (week_monday - date.fromisoformat(r.trend_week)).days
+            if age > 14 or age < 0:
+                r.is_trend = False
     if len(refs) < len(SLOT_ORDER):
         print(f"  [注意] 参考曲が {len(refs)} 件しかありません。11 枠を埋めるには 11 件以上必要です。")
 
@@ -459,8 +481,22 @@ def main() -> None:
         else:
             artist = demo_artist() if slug == "demo" else load_artist(slug)
         print(f"\n--- {slug}（{artist['name']}）---")
+        if slug != "demo" and not args.force:
+            go, why = production_status(artist, week_monday)
+            if not go:
+                print(f"  今週は作りません：{why}")
+                continue
+        out_path = args.out / f"{week_monday}_{slug}.json"
+        if out_path.exists() and not args.overwrite:
+            old = json.loads(out_path.read_text(encoding="utf-8"))
+            if old.get("suno_style_prompt") or old.get("title_candidates"):
+                print(f"  既に Claude が書き足したブリーフがあるので守ります（作り直すときは --overwrite）: {out_path.relative_to(ROOT)}")
+                continue
         try:
-            slots = assign_slots(artist, refs, rng, slot_weights=slot_weights)
+            # 成長分析のヒント：横ばい（flat）や方針転換レベル 1 の組は、トレンド曲の枠を 2 → 3 に増やす
+            h = hints_all.get(slug) or {}
+            quota = 3 if h.get("artist_trend") == "flat" or (h.get("pivot") or {}).get("level") == 1 else 2
+            slots = assign_slots(artist, refs, rng, trend_quota=quota, slot_weights=slot_weights)
         except RuntimeError as e:
             print(f"  [失敗] {e}")
             failed.append(slug)
@@ -469,7 +505,6 @@ def main() -> None:
         brief["references_dir"] = str(args.references.resolve()) if args.references else None   # write_brief.py が解析シートを探す場所
         c = brief["artist_constraints"]
         print(f"    固定の制約: 作曲の癖 {len(c['composition_habits'])} 項目 / 声の仕様 {len(c['voice_spec'])} 項目 / 得意な歌い方 {len(c['signature_techniques'])} 項目")
-        out_path = args.out / f"{week_monday}_{slug}.json"
         out_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"  → ブリーフの骨組みを書き出しました: {out_path.relative_to(ROOT)}")
 

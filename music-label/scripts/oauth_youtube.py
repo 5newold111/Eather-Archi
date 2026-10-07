@@ -33,7 +33,8 @@ from _common import ROOT, load_dotenv, ssl_context  # noqa: E402
 
 load_dotenv()
 ENV = ROOT / ".env"
-SCOPE = "https://www.googleapis.com/auth/youtube.upload"
+# 投稿（upload）と、投稿した動画の再生数の読み取り（readonly）
+SCOPE = "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly"
 
 
 def save_env(name: str, value: str) -> None:

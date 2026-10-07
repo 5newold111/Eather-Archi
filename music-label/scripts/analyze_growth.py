@@ -173,14 +173,38 @@ PIVOT_MIN_TRACKS = 8         # これ以上出していて
 PIVOT_REACHED_RATE = 0.3     # 1,000 再生到達率がこれ未満なら転換
 
 
-def detect_pivots(artists: dict[str, dict], history: dict[str, list[str]]) -> dict[str, dict]:
+PIVOT_COOLDOWN_DAYS = 56    # 転換から 8 週は再判定しない
+
+
+def last_pivot_dates() -> dict[str, date]:
+    """設定書の concept_history から、組ごとの最後の転換日を読む"""
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        from _common import all_artists
+    except ImportError:
+        return {}
+    out = {}
+    for a in all_artists():
+        hist = (a.get("concept_history") or {})
+        hist = hist.get("history", []) if isinstance(hist, dict) else hist
+        dates = [h.get("date") for h in hist if isinstance(h, dict) and h.get("date")]
+        if dates:
+            out[a["slug"]] = date.fromisoformat(max(dates))
+    return out
+
+
+def detect_pivots(artists: dict[str, dict], history: dict[str, list[str]], today: date | None = None) -> dict[str, dict]:
     """
     伸び悩みの判定 → 方針転換の提案（docs/06_growth.md「方針転換」）
     history[slug] = 過去の trend の並び（新しい順）。無ければ今回だけで判定。
     レベル 1：音の微調整（枠の組み合わせ・テンポ）／ レベル 2：コンセプト転換（場面・色・空間を変え、写真を撮り直す）
     """
     pivots = {}
+    recent = last_pivot_dates()
     for slug, a in artists.items():
+        if today and slug in recent and (today - recent[slug]).days < PIVOT_COOLDOWN_DAYS:
+            continue   # 転換から 8 週は効果を待つ
         past = history.get(slug, [])
         streak = 1 if a["trend"] == "down" else 0
         for t in past:
@@ -286,8 +310,12 @@ def main() -> None:
     weights, top = slot_weights(tracks, sources)
     hints = make_hints(artists, top)
     hist_path = args.out / "trend_history.json"
-    history = json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else {}
-    pivots = detect_pivots(artists, history)
+    raw_hist = json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else {}
+    # 履歴は [週の月曜, 傾向] の並び（新しい順）。同じ週に何度実行しても 1 回分として数える
+    week_key = (today - timedelta(days=today.weekday())).isoformat()
+    hist_rows = {k: [e if isinstance(e, list) else [None, e] for e in v] for k, v in raw_hist.items()}
+    history = {k: [t for w, t in v if w != week_key] for k, v in hist_rows.items()}
+    pivots = detect_pivots(artists, history, today)
     for slug, h in hints.items():
         if slug in pivots:
             h["pivot"] = pivots[slug]
@@ -295,9 +323,9 @@ def main() -> None:
 
     args.out.mkdir(parents=True, exist_ok=True)
     for slug, a in artists.items():
-        history.setdefault(slug, []).insert(0, a["trend"])
-        history[slug] = history[slug][:12]
-    hist_path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
+        rows = [e for e in hist_rows.get(slug, []) if e[0] != week_key]
+        hist_rows[slug] = ([[week_key, a["trend"]]] + rows)[:12]
+    hist_path.write_text(json.dumps(hist_rows, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "pivots.json").write_text(json.dumps(pivots, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "weights.json").write_text(json.dumps(weights, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "hints.json").write_text(json.dumps(hints, ensure_ascii=False, indent=2), encoding="utf-8")
