@@ -15,12 +15,20 @@ const HEADERS = ['ID', '日付', '区分', '金額', 'カテゴリ', '支払方�
 const FIXED_SHEET_NAME = '固定費';
 const FIXED_HEADERS = ['ID', '名前', '金額', 'カテゴリ', '支払方法', '引落日'];
 
+// 支出の4分類と、それぞれに入るカテゴリ。カテゴリを足したり別の分類へ移したりするときは、ここを書き換えます
+const TIERS = [
+  { id: 1, name: '敵1', label: '毎月の固定費', categories: ['住居', '水道光熱', '社会保険', '通信', 'サブスク', '保険'] },
+  { id: 2, name: '敵2', label: '変動費', categories: ['食費', '日用品', '被服', '交通', '医療', '趣味娯楽', '交際', '教育', 'その他'] },
+  { id: 3, name: '敵3', label: '不定期の固定費', categories: ['税金', '年会費'] },
+  { id: 4, name: '敵4', label: '変動費2', categories: ['家電家具', '旅行', '冠婚葬祭', '治療', '引越し'] },
+];
+// 以前の版のカテゴリ名で登録済みの行を、どの分類で集計するか（一覧に無いカテゴリは敵2）
+const LEGACY_TIERS = { '衣服美容': 2 };
+
 const CATEGORIES = {
-  '支出': ['食費', '日用品', '住居', '水道光熱', '通信', '保険', '交通', '趣味娯楽', '衣服美容', '医療', '教育', '交際', 'その他'],
+  '支出': TIERS.reduce(function (all, t) { return all.concat(t.categories); }, []),
   '収入': ['給与', '事業', 'その他'],
 };
-// 集計で「固定費」として扱う支出カテゴリ。これ以外の支出は「変動費」になります
-const FIXED_CATEGORIES = ['住居', '水道光熱', '通信', '保険'];
 const METHODS = ['現金', 'クレジット', '電子マネー', '口座振替', 'その他'];
 const SOURCES = ['手入力', 'チャット'];
 
@@ -42,7 +50,7 @@ function include_(name) {
 
 /** 画面の選択肢（カテゴリ・支払方法）を返す */
 function getConfig() {
-  return { categories: CATEGORIES, fixedCategories: FIXED_CATEGORIES, methods: METHODS, today: today_() };
+  return { categories: CATEGORIES, tiers: TIERS, methods: METHODS, today: today_() };
 }
 
 /**

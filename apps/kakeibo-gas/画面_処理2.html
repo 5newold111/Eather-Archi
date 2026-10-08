@@ -53,10 +53,20 @@
       return METHOD_ALIASES[s.toLowerCase()] || 'その他';
     }
 
+    // よくある言い方を、家計簿のカテゴリ名に読み替える
+    const CATEGORY_ALIASES = { '家賃': '住居', '住宅ローン': '住居', 'ローン': '住居', '電気': '水道光熱', 'ガス': '水道光熱', '水道': '水道光熱',
+      '光熱費': '水道光熱', '携帯': '通信', 'スマホ': '通信', 'インターネット': '通信', '通信費': '通信', '服': '被服', '衣服': '被服', '被服費': '被服',
+      '衣服美容': '被服', '税': '税金', '住民税': '税金', '固定資産税': '税金', '自動車税': '税金', '国民健康保険': '社会保険', '国民年金': '社会保険',
+      '健康保険': '社会保険', '年金': '社会保険', '家電': '家電家具', '家具': '家電家具', '引っ越し': '引越し', '食料品': '食費', '外食': '食費',
+      '医療費': '医療', '治療費': '治療', '交通費': '交通', '日用品費': '日用品', '旅行費': '旅行', 'サブスクリプション': 'サブスク' };
+
     function toPreviewRow(raw) {
       const flags = [];
       const type = normalizeType(raw.type);
       let category = String(raw.category || '').trim();
+      if (!state.config.categories[type].includes(category) && state.config.categories[type].includes(CATEGORY_ALIASES[category])) {
+        category = CATEGORY_ALIASES[category];
+      }
       if (!state.config.categories[type].includes(category)) {
         if (category) flags.push('カテゴリ「' + category + '」は一覧にないため「その他」にしました');
         category = 'その他';

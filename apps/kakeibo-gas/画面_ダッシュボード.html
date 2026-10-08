@@ -1,0 +1,69 @@
+<script>
+'use strict';
+    // ───── 01 ダッシュボード ─────
+    function pct(v, total) { return total ? Math.round(v / total * 100) : 0; }
+
+    function renderMonth(data) {
+      const s = data.summary, p = data.prevSummary;
+      const tiers = state.config.tiers || [];
+      // 総額・収入・差額
+      $('sExpense').textContent = yen(s.expense);
+      $('sIncome').textContent = yen(s.income);
+      $('sBalance').textContent = (s.balance < 0 ? '−' : '') + yen(Math.abs(s.balance));
+      $('sExpensePrev').textContent = diffText(s.expense, p.expense);
+      $('sIncomePrev').textContent = diffText(s.income, p.income);
+      $('sBalancePrev').textContent = diffText(s.balance, p.balance);
+      $('sBusiness').textContent = s.business ? '事業按分の合計（経費に回せる見込み額）: ' + yen(s.business) : '';
+
+      // 4分類の割合の帯。幅は金額に比例し、注記「敵1 42%」が収まる幅の区切りにだけ下に添える
+      const shown = tiers.filter((t) => s.byTier[t.id] > 0);
+      const bandWidth = $('band').clientWidth || 700;
+      const seg = (t) => {
+        const v = s.byTier[t.id];
+        const i = el('i', { className: 'sw t' + t.id, title: t.name + ' ' + t.label + '　' + yen(v) + '（' + pct(v, s.expense) + '%）' });
+        i.style.flexGrow = v;
+        return i;
+      };
+      const label = (t) => {
+        const share = pct(s.byTier[t.id], s.expense);
+        const span = el('span', { textContent: share / 100 * bandWidth >= 52 ? t.name + ' ' + share + '%' : '' });
+        span.style.flexGrow = s.byTier[t.id];
+        return span;
+      };
+      $('band').replaceChildren(...(shown.length ? shown.map(seg) : [el('span', { className: 'none', textContent: 'この月の支出はまだありません' })]));
+      $('bandLabels').replaceChildren(...shown.map(label));
+      $('band').setAttribute('aria-label', '支出の内訳: ' + (shown.map((t) => t.name + ' ' + pct(s.byTier[t.id], s.expense) + '%').join('、') || 'なし'));
+
+      // 4分類のカード（凡例を兼ねる）
+      $('tiers').replaceChildren(...tiers.map((t) => {
+        const v = s.byTier[t.id] || 0;
+        return el('div', { className: 'tier' }, [
+          el('p', { className: 'tier__h' }, [el('i', { className: 'sw t' + t.id }), el('span', { className: 'label', textContent: t.name }), t.label]),
+          el('b', { textContent: yen(v) }),
+          el('small', { textContent: '支出の' + pct(v, s.expense) + '%　' + diffText(v, (p.byTier || {})[t.id]) }),
+        ]);
+      }));
+
+      // 分類ごとのカテゴリ内訳（棒の長さは全カテゴリの最大値を基準にそろえる）
+      const byTierCat = {};
+      data.entries.filter((e) => e.type !== '収入').forEach((e) => {
+        const m = byTierCat[e.tier] || (byTierCat[e.tier] = {});
+        m[e.category] = (m[e.category] || 0) + e.amount;
+      });
+      const max = Math.max(0, ...Object.values(s.byCategory));
+      const bar = (t) => ([name, v]) => {
+        const fill = el('i', { className: 'sw t' + t.id });
+        fill.style.width = Math.max(2, Math.round(v / max * 100)) + '%';
+        return el('div', { className: 'bar', title: name + '　' + yen(v) }, [
+          el('span', { textContent: name }),
+          el('div', { className: 'track' }, [fill]),
+          el('span', { className: 'num mo', textContent: yen(v) + '　' + pct(v, s.expense) + '%' }),
+        ]);
+      };
+      const groups = shown.map((t) => [el('h3', {}, [t.name + ' ' + t.label, el('span', { textContent: yen(s.byTier[t.id]) })])]
+        .concat(Object.entries(byTierCat[t.id] || {}).sort((a, b) => b[1] - a[1]).map(bar(t))));
+      $('bars').replaceChildren(...(groups.length ? [].concat(...groups) : [el('p', { className: 'empty', textContent: 'この月の記録はまだありません。' })]));
+
+      renderList(data);
+    }
+</script>

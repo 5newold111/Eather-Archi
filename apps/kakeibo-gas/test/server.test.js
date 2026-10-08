@@ -45,7 +45,7 @@ test('1件でも不正なら何も登録しない', () => {
 
 test('不正な入力をそれぞれ弾く', () => {
   const bad = [
-    { amount: 1.5 }, { amount: '580' + 'x' }, { amount: 0 }, { type: '貯金' }, { category: '旅行' },
+    { amount: 1.5 }, { amount: '580' + 'x' }, { amount: 0 }, { type: '貯金' }, { category: '宇宙旅行' },
     { method: 'ツケ' }, { business_ratio: 101 }, { date: '2026/10/03' }, { type: '収入', category: '食費' },
   ];
   bad.forEach((b) => {
@@ -120,34 +120,44 @@ test('固定費より前に作られたシート（列Kなし）にも見出し�
   // 10列だけの旧形式の行を用意して、シート名を差し替える
   old.rows.push(['ID', '日付', '区分', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元', '登録日時']);
   old.rows.push(['old1', '2026-08-01', '支出', 900, '通信', '口座振替', '', 0, '手入力', run('new Date()')]);
+  // 以前の版のカテゴリ名（衣服美容）と、一覧に無いカテゴリ（手で書き換えた行など）
+  old.rows.push(['old2', '2026-08-02', '支出', 4000, '衣服美容', '現金', '', 0, '手入力', run('new Date()')]);
+  old.rows.push(['old3', '2026-08-03', '支出', 50, '謎の出費', '現金', '', 0, '手入力', run('new Date()')]);
   const current = ss.sheets['家計簿'];
   ss.sheets['家計簿'] = old;
   run('getSheet_()');
   assert.strictEqual(old.rows[0][10], '固定費ID');
   assert.strictEqual(old.rows[1][4], '通信');
   const m = json("getMonth('2026-08')");
-  assert.strictEqual(m.entries[0].fixedId, '');
-  assert.strictEqual(m.summary.fixed, 900);
+  assert.strictEqual(m.entries.find((e) => e.id === 'old1').fixedId, '');
+  assert.deepStrictEqual(m.summary.byTier, { 1: 900, 2: 4050, 3: 0, 4: 0 });
   ss.sheets['家計簿'] = current;
 });
 
-test('設定に固定費カテゴリと「保険」が入っている', () => {
+test('設定に4分類（敵1〜敵4）があり、支出カテゴリは分類から作られる', () => {
   const c = json('getConfig()');
-  assert.deepStrictEqual(c.fixedCategories, ['住居', '水道光熱', '通信', '保険']);
-  assert.ok(c.categories['支出'].includes('保険'));
+  assert.deepStrictEqual(c.tiers.map((t) => t.name + ' ' + t.label), ['敵1 毎月の固定費', '敵2 変動費', '敵3 不定期の固定費', '敵4 変動費2']);
+  assert.deepStrictEqual(c.categories['支出'], [].concat(...c.tiers.map((t) => t.categories)));
+  ['社会保険', 'サブスク', '被服', '税金', '年会費', '家電家具', '旅行', '冠婚葬祭', '治療', '引越し'].forEach((n) => assert.ok(c.categories['支出'].includes(n), n));
+  assert.ok(!c.categories['支出'].includes('衣服美容'));
+  // 同じカテゴリが2つの分類に入っていない
+  assert.strictEqual(new Set(c.categories['支出']).size, c.categories['支出'].length);
 });
 
-test('集計で固定費と変動費に分かれる', () => {
+test('集計で4分類に分かれ、収入は分類に入らない', () => {
   add([
     { date: '2027-03-01', type: '支出', amount: 80000, category: '住居', method: '口座振替' },
-    { date: '2027-03-02', type: '支出', amount: 3000, category: '保険', method: 'クレジット' },
+    { date: '2027-03-02', type: '支出', amount: 1200, category: 'サブスク', method: 'クレジット' },
     { date: '2027-03-03', type: '支出', amount: 1500, category: '食費', method: '現金' },
+    { date: '2027-03-04', type: '支出', amount: 12000, category: '年会費', method: 'クレジット' },
+    { date: '2027-03-05', type: '支出', amount: 60000, category: '旅行', method: 'クレジット' },
     { date: '2027-03-25', type: '収入', amount: 250000, category: '給与', method: '口座振替' },
   ]);
-  const s = json("getMonth('2027-03')").summary;
-  assert.strictEqual(s.fixed, 83000);
-  assert.strictEqual(s.variable, 1500);
-  assert.strictEqual(s.fixed + s.variable, s.expense);
+  const m = json("getMonth('2027-03')");
+  assert.deepStrictEqual(m.summary.byTier, { 1: 81200, 2: 1500, 3: 12000, 4: 60000 });
+  assert.strictEqual(Object.values(m.summary.byTier).reduce((a, b) => a + b, 0), m.summary.expense);
+  assert.strictEqual(m.entries.find((e) => e.type === '収入').tier, 0);
+  assert.strictEqual(m.entries.find((e) => e.category === '旅行').tier, 4);
 });
 
 test('固定費リストの追加と不正な入力の拒否', () => {
@@ -175,8 +185,9 @@ test('固定費を月ごとにまとめて登録し、2回目は二重にしな�
   assert.strictEqual(rent.date, '2027-04-27');
   assert.strictEqual(rent.source, '固定費');
   assert.strictEqual(m.entries.find((e) => e.memo === '動画配信').date, '2027-04-30');
-  assert.strictEqual(m.summary.fixed, 85000);
-  assert.strictEqual(m.summary.variable, 990);
+  // 家賃（住居）は敵1、動画配信（趣味娯楽で登録）は敵2
+  assert.strictEqual(m.summary.byTier[1], 85000);
+  assert.strictEqual(m.summary.byTier[2], 990);
   // 別の月は別に登録できる
   assert.deepStrictEqual(json("registerFixedCosts('2027-05')"), { added: 2, skipped: 0 });
 });

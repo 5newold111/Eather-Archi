@@ -50,12 +50,13 @@
     function fillSelect(select, options, value) {
       select.replaceChildren(...options.map((o) => el('option', { value: o, textContent: o, selected: o === value })));
     }
-    // カテゴリの選択肢。固定費として集計されるカテゴリには「（固定）」と添える（値はカテゴリ名のまま）
+    // カテゴリの選択肢。支出は4分類（敵1〜敵4）ごとのグループに分けて並べる
     function fillCategories(select, type, value) {
-      fillSelect(select, state.config.categories[type], value);
-      [...select.options].forEach((o) => { if (type === '支出' && isFixed(o.value)) o.textContent = o.value + '（固定）'; });
+      const tiers = type === '支出' ? (state.config.tiers || []) : [];
+      if (!tiers.length) return fillSelect(select, state.config.categories[type], value);
+      const opt = (c) => el('option', { value: c, textContent: c, selected: c === value });
+      select.replaceChildren(...tiers.map((t) => el('optgroup', { label: t.name + ' ' + t.label }, t.categories.map(opt))));
     }
-    function isFixed(category) { return (state.config.fixedCategories || []).includes(category); }
     function refreshCategories() {
       fillCategories($('fCategory'), state.type);
     }

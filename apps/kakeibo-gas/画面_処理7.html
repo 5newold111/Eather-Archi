@@ -1,13 +1,13 @@
 <script>
 'use strict';
     function buildCsv(entries) {
-      const head = ['日付', '区分', '固定/変動', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元'];
+      const head = ['日付', '区分', '分類', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元'];
       const q = (v) => {
         let s = String(v);
         if (/^[=+\-@]/.test(s)) s = "'" + s;
         return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
-      const lines = entries.slice().reverse().map((e) => [e.date, e.type, e.type === '収入' ? '' : (e.fixed ? '固定' : '変動'), e.amount, e.category, e.method, e.memo, e.business_ratio, e.source].map(q).join(','));
+      const lines = entries.slice().reverse().map((e) => [e.date, e.type, e.type === '収入' ? '' : '敵' + e.tier, e.amount, e.category, e.method, e.memo, e.business_ratio, e.source].map(q).join(','));
       return [head.join(',')].concat(lines).join('\r\n');
     }
     $('csvSave').addEventListener('click', () => {
@@ -44,8 +44,8 @@
       } catch (err) {
         show('importMsg', '設定の読み込みに失敗しました: ' + (err && err.message || err), true);
       }
-      let tab = 'import';
-      try { tab = localStorage.getItem('kakeibo.tab') || 'import'; } catch (e) { /* 既定のタブで開く */ }
-      openTab(['import', 'input', 'fixed', 'month'].includes(tab) ? tab : 'import');
+      let tab = 'month';
+      try { tab = localStorage.getItem('kakeibo.tab') || 'month'; } catch (e) { /* 既定のタブ（ダッシュボード）で開く */ }
+      openTab(['month', 'import', 'input', 'fixed'].includes(tab) ? tab : 'month');
     })();
 </script>

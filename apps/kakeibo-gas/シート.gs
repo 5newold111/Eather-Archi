@@ -63,33 +63,9 @@ function readAll_() {
         source: String(r[8]),
         createdAt: r[9] instanceof Date ? r[9].getTime() : 0,
         fixedId: r[10] ? String(r[10]) : '',
-        fixed: r[2] !== '収入' && FIXED_CATEGORIES.indexOf(String(r[4])) >= 0,
+        tier: r[2] === '収入' ? 0 : tierOf_(String(r[4])),
       };
     });
-}
-
-/** 収入・支出・差額とカテゴリ別合計を計算する */
-function summarize_(entries) {
-  const s = { income: 0, expense: 0, fixed: 0, variable: 0, balance: 0, business: 0, byCategory: {} };
-  entries.forEach(function (e) {
-    if (e.type === '収入') {
-      s.income += e.amount;
-    } else {
-      s.expense += e.amount;
-      if (e.fixed) s.fixed += e.amount; else s.variable += e.amount;
-      s.byCategory[e.category] = (s.byCategory[e.category] || 0) + e.amount;
-      s.business += Math.round(e.amount * e.business_ratio / 100);
-    }
-  });
-  s.balance = s.income - s.expense;
-  return s;
-}
-
-function shiftMonth_(yyyyMm, delta) {
-  const y = Number(yyyyMm.slice(0, 4));
-  const m = Number(yyyyMm.slice(5, 7)) - 1 + delta;
-  const d = new Date(y, m, 1);
-  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
 }
 
 function today_() {

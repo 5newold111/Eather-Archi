@@ -32,7 +32,7 @@
       }
     });
 
-    // ───── 04 月の集計 ─────
+    // ───── 月の切り替え・読み込み（ダッシュボード） ─────
     function shiftMonth(ym, delta) {
       const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + delta, 1);
       return d.getFullYear() + '-' + pad(d.getMonth() + 1);
