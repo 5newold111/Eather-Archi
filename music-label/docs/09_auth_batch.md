@@ -3,6 +3,11 @@
 仕組みは鍵が無くても「下書き」まで動くように作ってある。ここに並べた作業を一度に済ませると、
 テイク選び・登録シート・データベース・SNS 投稿までが本番で動く。
 
+> **いちばん簡単な進め方**：`python3 scripts/setup_keys.py` を実行する。サービスごとに手順を表示し、
+> ブラウザで設定画面を開き、鍵を受け取って保存し、実際に接続して確かめる（Supabase の SQL もクリップボードに入れる）。
+> 途中でやめても、次回は続きから進む。確認だけなら `python3 scripts/setup_keys.py --check`。
+> 契約が必要なプラン（Suno Premier・DistroKid Ultimate など）と費用は `docs/11_plans_and_costs.md`。
+
 > **共通のルール**
 > - 鍵は `music-label/.env` にだけ置く（Git に入らない）。チャットや画面共有に貼らない
 > - 入れるときは `python3 scripts/set_key.py 鍵の名前`（画面に表示されない入力欄で受け取る）
@@ -13,13 +18,13 @@
 | # | サービス | 何に使う | 所要 | 入れる鍵 | 済 |
 |---|---|---|---|---|---|
 | 1 | Supabase | データベース・音源の保管 | 15 分 | `SUPABASE_URL` `SUPABASE_SERVICE_ROLE_KEY` | [ ] |
-| 2 | OpenAI | ロゴ・写真・ジャケット | 5 分 | 残高の追加だけ（鍵は設定済み） | [ ] |
+| 2 | OpenAI | ロゴ・写真・ジャケット | 5 分 | 残高の追加だけ（鍵は設定済み）。画像モデルは自動で選ぶ（gpt-image-1 は 10/23 終了） | [ ] |
 | 3 | YouTube | ショート投稿 | 30 分 | `YOUTUBE_CLIENT_ID` `YOUTUBE_CLIENT_SECRET` → 自動で `YOUTUBE_REFRESH_TOKEN` | [ ] |
 | 4 | Instagram | リール投稿 | 30 分 | `IG_USER_ID` `IG_ACCESS_TOKEN` | [ ] |
 | 5 | TikTok | 動画投稿 | 30 分＋審査待ち | `TIKTOK_CLIENT_KEY` `TIKTOK_CLIENT_SECRET` `TIKTOK_REFRESH_TOKEN` | [ ] |
 | 6 | Cloudflare R2 | 予備の保管 | 10 分 | `R2_*` | [ ] |
-| 7 | DistroKid | 配信 | 15 分 | 鍵なし（アカウントとプランだけ） | [ ] |
-| 8 | Suno | 声の固定（Persona） | 1 組 10 分 | 鍵なし（Persona ID を設定書へ） | [ ] |
+| 7 | DistroKid | 配信 | 15 分 | 鍵なし。Ultimate（5 組）を契約 | [ ] |
+| 8 | Suno | 作曲 | 10 分 | 鍵なし。Premier を契約（月 60 曲までダウンロード）。Persona は最初の 1 曲の後 | [ ] |
 
 ## 1. Supabase（データベース）
 

@@ -34,7 +34,8 @@ music-label/
 │   ├── 07_sublabels.md           ← 子レーベル構造（場面ごとに別アカウント）で上限なく増やす。自動化の段階
 │   ├── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
 │   ├── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
-│   └── 10_automation.md          ← 自動運転の全体像（定期実行の時間割・人がやること・自動で決めていること）
+│   ├── 10_automation.md          ← 自動運転の全体像（定期実行の時間割・人がやること・自動で決めていること）
+│   └── 11_plans_and_costs.md     ← 契約するプランと月の費用（Suno のダウンロード上限・DistroKid の組数）
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -69,7 +70,8 @@ music-label/
     ├── post_social.py            ← 縦動画（サビ 30 秒）と説明文を作り、配信時刻に YouTube / Instagram / TikTok へ投稿
     ├── oauth_youtube.py          ← YouTube 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
     ├── oauth_tiktok.py           ← TikTok 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
-    ├── set_key.py                ← 鍵を .env に安全に書き込む / 確認する
+    ├── setup_keys.py             ← 鍵の一括設定ウィザード（手順表示 → ブラウザ → 保存 → 実際に接続して確認）
+    ├── set_key.py                ← 鍵を .env に 1 つずつ安全に書き込む / 入っているか確認する
     ├── debut.py                  ← デビューの段取り（デビュー週の設定 → 名前確認 → ロゴ・写真 → DB → 準備状況）
     ├── run_week.py               ← 1 週間ぶんを段階ごとに全組まとめて流す（brief / lyrics / takes / finish / status / auto）
     ├── schedule.py               ← 定期実行の登録（Mac の launchd）。時間割は docs/10_automation.md

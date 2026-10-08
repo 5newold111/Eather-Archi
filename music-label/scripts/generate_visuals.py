@@ -6,7 +6,8 @@
   1. 設定書（visual / persona / profile）とブリーフから、画像の指示文（プロンプト）を組み立てる
      - 実在アーティスト名（favorite_artists_real、influences.name）は絶対に渡さない
      - 顔を出さない方法（face_concealment）を必ず指示文に含める
-  2. 画像 API で候補を生成（OPENAI_API_KEY があれば ChatGPT 側の gpt-image-1。無ければ指示文だけ書き出す＝ドライラン）
+  2. 画像 API で候補を生成（OPENAI_API_KEY があれば OpenAI の画像モデル。gpt-image-1 は 2026-10-23 終了のため、
+     後継を自動で選ぶ。無ければ指示文だけ書き出す＝ドライラン）
   3. Claude が画像を見て採点（5 観点 1〜5 点）し、顔・他社ロゴ・余計な文字などの禁止ルールに当たる候補を外す
      （ANTHROPIC_API_KEY が無いときは仮の点）
   4. 重み付きの合計点（templates/visual_criteria.json の重み）。5 回の判断がそろったら、Claude が重みと好みを学び直す
@@ -23,7 +24,7 @@
 標準ライブラリだけで動く（画像 API 呼び出しは urllib）。
 """
 from __future__ import annotations
-import argparse, base64, json, os, sys, urllib.error, urllib.request
+import argparse, base64, json, os, re, sys, urllib.error, urllib.request
 from datetime import date
 from pathlib import Path
 
@@ -178,18 +179,50 @@ def prompts_reshoot(artist: dict, pivot_reason: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 画像生成（ChatGPT 側の画像 API）
 # ---------------------------------------------------------------------------
+# gpt-image-1 は 2026-10-23 に提供終了。後継の候補を上から順に試し、使えたものを .env の OPENAI_IMAGE_MODEL に覚える
+IMAGE_MODELS = ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-1.5", "gpt-image-1"]
+_BAD_MODELS: set[str] = set()
+
+
+def image_model_candidates() -> list[str]:
+    first = os.environ.get("OPENAI_IMAGE_MODEL")
+    return [m for m in dict.fromkeys(([first] if first else []) + IMAGE_MODELS) if m not in _BAD_MODELS]
+
+
+def _remember_model(model: str) -> None:
+    if os.environ.get("OPENAI_IMAGE_MODEL") == model:
+        return
+    os.environ["OPENAI_IMAGE_MODEL"] = model
+    env = ROOT / ".env"
+    lines = env.read_text(encoding="utf-8").splitlines() if env.exists() else []
+    lines = [l for l in lines if not l.startswith("OPENAI_IMAGE_MODEL=")] + [f"OPENAI_IMAGE_MODEL={model}"]
+    env.write_text("\n".join(lines).rstrip("\n") + "\n", encoding="utf-8")
+    print(f"    （画像モデル {model} を使います。.env の OPENAI_IMAGE_MODEL に記録しました）")
+
+
 def generate_image(prompt: str, out_path: Path, size: str = "1024x1024") -> bool:
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
         return False
-    body = json.dumps({"model": "gpt-image-1", "prompt": prompt, "size": size, "n": 1}).encode()
-    req = urllib.request.Request("https://api.openai.com/v1/images/generations", data=body,
-                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=180, context=ssl_context()) as r:
-        data = json.loads(r.read())
-    b64 = data["data"][0]["b64_json"]
-    out_path.write_bytes(base64.b64decode(b64))
-    return True
+    for model in image_model_candidates():
+        body = json.dumps({"model": model, "prompt": prompt, "size": size, "n": 1}).encode()
+        req = urllib.request.Request("https://api.openai.com/v1/images/generations", data=body,
+                                     headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=300, context=ssl_context()) as r:
+                data = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            msg = e.read().decode("utf-8", "replace")[:300]
+            # モデルが無い・終了した・この鍵では使えない → 次の候補へ
+            if e.code in (404, 400) and re.search(r"model|does not exist|not found|deprecated", msg, re.I) and "safety" not in msg.lower():
+                _BAD_MODELS.add(model)
+                print(f"    （画像モデル {model} は使えないので次の候補を試します）")
+                continue
+            raise RuntimeError(f"HTTP {e.code}: {msg}") from None
+        _remember_model(model)
+        out_path.write_bytes(base64.b64decode(data["data"][0]["b64_json"]))
+        return True
+    raise RuntimeError("使える画像モデルが見つかりません（OpenAI の Models 画面で利用できる画像モデルを確認し、.env の OPENAI_IMAGE_MODEL に書く）")
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +502,7 @@ def main() -> None:
         hint = (SSL_HINT if "CERTIFICATE_VERIFY_FAILED" in first or "SSL" in first else
                 "鍵が無効です。.env の OPENAI_API_KEY を確認（前後の空白・改行、sk- で始まるか。`python3 scripts/set_key.py --check`）" if "401" in first else
                 "OpenAI 側の残高不足か回数制限です。platform.openai.com の Billing を確認" if "429" in first else
-                "画像モデルの利用が許可されていません。OpenAI の組織設定で gpt-image-1 の利用（本人確認）を確認" if "403" in first or "verif" in first.lower() else
+                "画像モデルの利用が許可されていません。OpenAI の組織設定で画像モデルの利用（本人確認）を確認" if "403" in first or "verif" in first.lower() else
                 "指示文が内容ポリシーで拒否されました。該当候補だけ除外して続行できます" if "safety" in first.lower() or "content_policy" in first.lower() else
                 "ネットワークか API の一時的な問題の可能性。少し待って再実行")
         print(f"  → 対処のヒント: {hint}")

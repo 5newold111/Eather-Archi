@@ -145,7 +145,7 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             f"- Language：`{r['language']}`" + ("・Instrumental にチェック" if r["instrumental"] else ""),
             f"- Primary genre：`{r['primary_genre']}` / Secondary：`{r['secondary_genre']}`",
             f"- Explicit lyrics：{r['explicit']}",
-            f"- AI の申告：{r['ai_disclosure']}（画面に項目があれば必ず申告。無ければ bio と説明文で公表済み）",
+            f"- AI の申告：{r['ai_disclosure']}。アップロード画面の AI の質問で、歌詞・ボーカル・演奏・作曲のうち使ったものをすべて選ぶ",
             f"- Songwriter：{r['songwriter']}",
             f"- 音源：`{r['audio']}`",
             f"- ジャケット：`{r['cover'] or '未作成'}`",
