@@ -200,3 +200,29 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
         if n % 2:
             return False, "隔週の休みの週"
     return True, "制作する週"
+
+
+# ---------------------------------------------------------------------------
+# デビュー週：毎月 1 日のある週（月曜始まり）
+#   例）2026 年 12 月 → 12/1（火）のある週 ＝ 11/30 の週。本体の配信は水曜 12/2 17:00 ET
+#   1 日が日曜の月は、その前の月曜からの週になる（例 2026 年 11 月 → 10/26 の週、配信は 10/28）
+# ---------------------------------------------------------------------------
+def debut_week_of_month(year: int, month: int):
+    from datetime import date
+    return monday_of(date(year, month, 1))
+
+
+def next_debut_week(not_before):
+    """not_before 以降で最初の「1 日のある週」の月曜"""
+    y, m = not_before.year, not_before.month
+    for _ in range(24):
+        w = debut_week_of_month(y, m)
+        if w >= not_before:
+            return w
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    raise RuntimeError("デビュー週が見つかりません")
+
+
+def is_debut_week(monday) -> bool:
+    from datetime import timedelta
+    return any((monday + timedelta(days=i)).day == 1 for i in range(7))

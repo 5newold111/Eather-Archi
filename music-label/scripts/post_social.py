@@ -191,7 +191,10 @@ def post_youtube(p: dict, a_slug: str, l_slug: str) -> dict:
                form={"client_id": cid, "client_secret": csec, "refresh_token": rtok, "grant_type": "refresh_token"})["access_token"]
     when = datetime.fromisoformat(p["scheduled_at"].replace("Z", "+00:00"))
     future = when > datetime.now(timezone.utc)
-    status = {"privacyStatus": "private" if future else "public", "selfDeclaredMadeForKids": False,
+    if p.get("force_private"):
+        future = False                                  # 試運転：公開予約もせず、非公開のまま置く
+    status = {"privacyStatus": "private" if (future or p.get("force_private")) else "public",
+              "selfDeclaredMadeForKids": False,
               "containsSyntheticMedia": True}       # AI で作った（合成）コンテンツであることを申告
     if future:
         status["publishAt"] = when.strftime("%Y-%m-%dT%H:%M:%SZ")   # 配信時刻に自動で公開
@@ -315,7 +318,10 @@ def cmd_plan(week: str) -> None:
         step(f"   → {folder.relative_to(ROOT)}/（clip_vertical.mp4・captions.md・plan.json）")
 
 
-def cmd_post(week: str, dry: bool) -> None:
+STALE_DAYS = 14   # 配信時刻から 2 週間以上たった投稿は出さない（古い計画の出し忘れや、試運転の過去の日付を誤って公開しない）
+
+
+def cmd_post(week: str, dry: bool, only: set[str] | None = None, private: bool = False, trial: bool = False) -> None:
     # week="all"：まだ投稿していない計画をすべて見る（定期実行はこれ）
     plans = sorted((OUT / "social").glob("*/*/plan.json")) if week == "all" else sorted((OUT / "social" / week).glob("*/plan.json"))
     if not plans:
@@ -326,12 +332,19 @@ def cmd_post(week: str, dry: bool) -> None:
     now = datetime.now(timezone.utc)
     for pp in plans:
         plan = read_json(pp)
+        if plan.get("trial") and not trial:
+            continue          # 試運転の計画は定期実行では出さない
         if all(p["status"] == "done" for p in plan["posts"]):
             continue
         for p in plan["posts"]:
             if p["status"] == "done":
                 continue
+            if only and p["platform"] not in only:
+                continue
             when = datetime.fromisoformat(p["scheduled_at"].replace("Z", "+00:00"))
+            if (now - when).days > STALE_DAYS and not trial:
+                print(f"   － {plan['artist']} / {p['platform']}：配信時刻から {STALE_DAYS} 日以上たっているので出しません")
+                continue
             # YouTube は公開予約ができるので前もって上げる。他は時刻を過ぎてから投稿する
             if p["platform"] != "youtube" and when > now:
                 print(f"   … {plan['artist']} / {p['platform']}：投稿時刻 {p['scheduled_at']} を待っています")
@@ -340,7 +353,8 @@ def cmd_post(week: str, dry: bool) -> None:
                 print(f"   [ドライラン] {plan['artist']} / {p['platform']} に投稿します：{p['caption'][:60].replace(chr(10), ' ')}…")
                 continue
             try:
-                res = POSTERS[p["platform"]](p, p["artist_slug"], p.get("label_slug") or "drive")
+                res = POSTERS[p["platform"]]({**p, "force_private": private or bool(plan.get("trial"))},
+                                             p["artist_slug"], p.get("label_slug") or "drive")
             except Exception as e:  # noqa: BLE001
                 res = {"error": str(e)}
             if res.get("skipped"):
@@ -373,6 +387,9 @@ def main() -> None:
     ap.add_argument("--week", help="制作週の月曜（plan / post）")
     ap.add_argument("--for", dest="target", help="refresh-ig：組かレーベル（例 light / focus）。省略で共通")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--only", help="post：この SNS だけ（カンマ区切り。youtube,instagram,tiktok）")
+    ap.add_argument("--private", action="store_true", help="post：YouTube を非公開のまま置く（公開予約もしない）")
+    ap.add_argument("--trial", action="store_true", help="post：試運転の計画も対象にする（trial.py が使う。必ず非公開）")
     args = ap.parse_args()
     if args.command == "refresh-ig":
         cmd_refresh_ig(args.target)
@@ -382,7 +399,7 @@ def main() -> None:
     if args.command == "plan":
         cmd_plan(args.week)
     else:
-        cmd_post(args.week, args.dry_run)
+        cmd_post(args.week, args.dry_run, set(args.only.split(",")) if args.only else None, args.private, args.trial)
 
 
 if __name__ == "__main__":

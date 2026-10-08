@@ -9,9 +9,12 @@
   5. 準備状況の一覧を書き出す（out/debut/<デビュー週>/readiness.md）
 
 使い方
-  python scripts/debut.py --launch-week 2026-11-02                      # 本体 5 組を同時デビュー
-  python scripts/debut.py --label focus --launch-week 2026-11-09        # 子レーベルの 3 組
-  python scripts/debut.py --artist focus_newcomer --label focus --launch-week 2026-12-07   # 新人 1 組
+  デビュー週は「毎月 1 日のある週」（月曜始まり）。--month で月を指定すると、その週を自動で計算する
+  python scripts/debut.py --month 2026-12                               # 本体 5 組を 12 月デビュー（11/30 の週）
+  python scripts/debut.py --next                                        # 2 週間の仕込みが取れる、いちばん近いデビュー週
+  python scripts/debut.py --label focus --month 2027-02                 # 子レーベルの 3 組
+  python scripts/debut.py --artist focus_newcomer --label focus --month 2027-03   # 新人 1 組
+  python scripts/debut.py --launch-week 2026-11-30                      # 週を直接（1 日のある週でなければ次のデビュー週に合わせる）
   python scripts/debut.py --status                                      # 全組の準備状況だけ見る
 
   --skip-visuals  ロゴ・写真の生成を飛ばす / --skip-names  名前確認を飛ばす（再実行のとき）
@@ -26,8 +29,9 @@ from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (LEAD_WEEKS, MAIN_LABEL, OUT, ROOT, all_artists, as_date, load_artist, load_dotenv,  # noqa: E402
-                     load_label, release_at_utc, release_schedule, save_artist, step, write_json)
+from _common import (LEAD_WEEKS, MAIN_LABEL, OUT, ROOT, all_artists, as_date, debut_week_of_month,  # noqa: E402
+                     is_debut_week, load_artist, load_dotenv, load_label, next_debut_week, release_at_utc,
+                     release_schedule, save_artist, step, write_json)
 
 load_dotenv()
 
@@ -120,6 +124,8 @@ def write_readiness(path: Path, arts: list[dict]) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(description="デビューの段取りをまとめて行う")
     ap.add_argument("--launch-week", help="デビュー曲が配信される週の月曜（YYYY-MM-DD）")
+    ap.add_argument("--month", help="デビューする月（YYYY-MM）。その月の 1 日のある週になる")
+    ap.add_argument("--next", action="store_true", help="2 週間の仕込みが取れる、いちばん近いデビュー週")
     ap.add_argument("--label", help="子レーベル（focus など）。省略で本体")
     ap.add_argument("--artist", help="1 組だけ（月 1 組の新人など）")
     ap.add_argument("--status", action="store_true", help="準備状況だけ表示")
@@ -136,14 +142,23 @@ def main() -> None:
         step(f"一覧を書き出しました: out/debut/status.md（未完了 {ng} 項目）")
         return
 
-    if not args.launch_week:
-        sys.exit("[エラー] --launch-week を指定してください（デビュー曲が配信される週の月曜。例 2026-11-02）")
-    week = date.fromisoformat(args.launch_week)
-    if week.weekday() != 0:
+    this_monday = date.today() - timedelta(days=date.today().weekday())
+    if args.month:
+        y, m = map(int, args.month.split("-"))
+        week = debut_week_of_month(y, m)
+    elif args.next:
+        week = next_debut_week(this_monday + timedelta(weeks=LEAD_WEEKS + 1))   # 来週から制作を始められる週
+    elif args.launch_week:
+        week = date.fromisoformat(args.launch_week)
         week = week - timedelta(days=week.weekday())
-        print(f"   （月曜ではなかったので、その週の月曜 {week} に合わせました）")
+        if not is_debut_week(week):
+            nxt = next_debut_week(week)
+            print(f"   （{week} の週には 1 日が無いので、次のデビュー週 {nxt} に合わせました）")
+            week = nxt
+    else:
+        sys.exit("[エラー] --month 2026-12 / --next / --launch-week のどれかを指定してください（デビューは毎月 1 日のある週）")
     first_production = week - timedelta(weeks=LEAD_WEEKS)
-    if first_production < date.today() - timedelta(days=date.today().weekday()):
+    if first_production < this_monday:
         print(f"   ⚠ 制作開始週 {first_production} がもう過ぎています。2 週間の仕込みが取れないので、デビュー週を遅らせることを勧めます")
 
     arts = targets(args)

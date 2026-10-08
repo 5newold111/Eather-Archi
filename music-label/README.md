@@ -120,4 +120,4 @@ music-label/
 6. `pip install -r requirements.txt` のあと `scripts/select_references.py --demo` → `scripts/write_brief.py out/briefs/<週>_demo.json` で、骨組み → ブリーフの流れを確かめる
 7. ffmpeg（音と動画の変換ソフト）を入れる（Mac：`brew install ffmpeg`）。そのあと `scripts/select_takes.py --demo` → `scripts/master_track.py --demo` → `scripts/finalize_cover.py --demo` で、テイク選び → 音量 → ジャケットを合成音で確かめる
 8. コマンドの順番は `docs/01_pipeline.md` の「コマンドの順番」、鍵の設定は `docs/09_auth_batch.md`
-9. 立ち上げ：`scripts/debut.py --launch-week <デビュー週の月曜>` → `scripts/schedule.py install`（自動運転の開始。`docs/10_automation.md`）
+9. 立ち上げ：`scripts/setup_keys.py`（鍵）→ `scripts/trial.py --artist light`（1 組の通し運転）→ `scripts/debut.py --month <YYYY-MM>`（デビューは毎月 1 日のある週）→ `scripts/schedule.py install`（自動運転の開始。`docs/10_automation.md`）

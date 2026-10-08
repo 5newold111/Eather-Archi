@@ -123,3 +123,16 @@ class Client:
     def signed_url(self, bucket: str, path: str, expires: int = 3600) -> str:
         r = self._req("POST", f"/storage/v1/object/sign/{bucket}/{urllib.parse.quote(path)}", {"expiresIn": expires})
         return self.url + "/storage/v1" + r["signedURL"]
+
+    # 試運転の後片付け（trial.py --cleanup）で使う
+    def select(self, table: str, query: str) -> list:
+        return self._req("GET", f"/rest/v1/{table}?{query}") or []
+
+    def delete(self, table: str, query: str) -> list:
+        """条件に合う行を消す（query は PostgREST の書き方。例 week_start=eq.2000-01-03）"""
+        return self._req("DELETE", f"/rest/v1/{table}?{query}", headers={"Prefer": "return=representation"}) or []
+
+    def remove(self, bucket: str, paths: list[str]) -> None:
+        """保管庫のファイルを消す"""
+        if paths:
+            self._req("DELETE", f"/storage/v1/object/{bucket}", {"prefixes": paths})

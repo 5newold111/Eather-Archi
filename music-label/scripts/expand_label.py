@@ -4,14 +4,15 @@
 
   check            各レーベルの週の曲数と、月 1 組の追加の時期を確かめる
   check --apply    ・週の曲数が上限（既定 8）を超えたら、デビューが古い組から隔週（biweekly）に切り替える
-                   ・追加の時期が来たレーベルには、Claude が新しい組の設定書を下書きし、4 週間後のデビューを予約する
+                   ・追加の時期が来たレーベルには、Claude が新しい組の設定書を下書きし、4 週間以上あとの
+                     「1 日のある週」にデビューを予約する（毎月 1 日に動かすと、翌月 1 日の週のデビューになる）
                      （予約したら debut.py が名前確認・ロゴと写真の候補作りまで進める。気に入らなければ cancel で取り消す）
                    ・全部のレーベルが上限に達していたら、新しい子レーベルの候補をレポートに書く（アカウント作成は人）
   propose          今すぐ 1 組を下書きする（--label を指定）
   cancel           予約した新人を取り消す（--artist を指定）
 
   追加の条件
-    本体（drive）     : 前回のデビューから 4 週以上たっていれば毎月
+    本体（drive）     : 毎月（1 日のある週ごとに 1 組。予約済みの新人がいる間は増やさない）
     子レーベル        : 立ち上げから 3 か月たち、1,000 再生に届いた曲の割合が 50% を超えていること
 
 使い方
@@ -34,10 +35,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json_free, dry_run_file  # noqa: E402
 from _common import (MAIN_LABEL, OUT, ROOT, all_artists, as_date, load_artist, load_label, monday_of,  # noqa: E402
-                     read_json, save_artist, step, write_json)
+                     next_debut_week, read_json, save_artist, step, write_json)
 
 DEFAULT_CAP = 8
-MONTH_DAYS = 28
 SUBLABEL_MIN_DAYS = 90
 SUBLABEL_REACH = 0.5
 DEBUT_LEAD_WEEKS = 4      # 下書きからデビューまで（名前確認・ロゴと写真・オーナーの見直しの時間）
@@ -85,7 +85,6 @@ def status(label: str, today: date) -> dict:
     debuted = [a for a in arts if as_date(a.get("debut_week")) and as_date(a["debut_week"]) <= today]
     scheduled = [a for a in arts if as_date(a.get("debut_week")) and as_date(a["debut_week"]) > today]
     first = min((as_date(a["debut_week"]) for a in debuted), default=None)
-    last = max((as_date(a["debut_week"]) for a in debuted + scheduled), default=None)
     load = load_of(arts)
     due, why = False, ""
     if not debuted:
@@ -94,8 +93,6 @@ def status(label: str, today: date) -> dict:
         why = f"デビュー予約あり（{', '.join(a['name'] for a in scheduled)}）"
     elif load + 1 > cap and not any(a.get("cadence") == "weekly" for a in debuted):
         why = "週の曲数が上限で、隔週にできる組も無い"
-    elif (today - last).days < MONTH_DAYS:
-        why = f"前回のデビューから {(today - last).days} 日（{MONTH_DAYS} 日たったら追加）"
     elif label != MAIN_LABEL:
         rate, n = reach_rate(debuted)
         if (today - first).days < SUBLABEL_MIN_DAYS:
@@ -230,7 +227,8 @@ def draft_artist(label: str, direction: str | None) -> dict | None:
 
 
 def schedule_debut(artist: dict) -> date:
-    debut = monday_of(date.today()) + timedelta(weeks=DEBUT_LEAD_WEEKS)
+    # デビューは毎月 1 日のある週。下書きから 4 週間（名前確認・ロゴと写真・取り消しの猶予）以上あとの最初のデビュー週
+    debut = next_debut_week(monday_of(date.today()) + timedelta(weeks=DEBUT_LEAD_WEEKS))
     save_artist(artist)
     cmd = [sys.executable, str(ROOT / "scripts" / "debut.py"), "--artist", artist["slug"], "--launch-week", debut.isoformat()]
     if artist["label_slug"] != MAIN_LABEL:
