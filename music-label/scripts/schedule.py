@@ -45,7 +45,7 @@ PATH_ENV = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"   # 
 
 # 仕事の中身：(説明, 実行するコマンドの並び)
 JOBS: dict[str, tuple[str, list[list[str]]]] = {
-    "post":    ("SNS 投稿（配信時刻を過ぎたもの）", [["post_social.py", "post", "--week", "all"]]),
+    "post":    ("SNS 投稿（配信時刻を過ぎたもの）と管理画面の更新", [["post_social.py", "post", "--week", "all"], ["dashboard.py"]]),
     "trends":  ("今週の話題曲・トレンド言語", [["fetch_trends.py", "--week", "this"]]),
     "brief":   ("今週のブリーフ（全組）", [["run_week.py", "brief", "--week", "this"]]),
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),

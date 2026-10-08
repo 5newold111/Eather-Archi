@@ -3,8 +3,8 @@
 EtherArchi の 5 つの軸（**形・質・光・時・自**）を 5 組のアーティストに見立て、
 毎週水曜に 5 曲を世界配信するための「設計図」と「土台ファイル」をまとめたフォルダです。
 
-> このフォルダは公式サイト（リポジトリのルート）とは独立しています。
-> 運用が本格化したら、このフォルダだけを別リポジトリへ切り出せます。
+> **このフォルダは公式サイトに合流させないこと。** 公式サイトはリポジトリ全体を公開する設定なので、合流すると設定書や戦略資料が公開されます。
+> 非公開の別リポジトリに切り出す手順は `docs/12_decisions.md`。
 
 ## 用語の説明（初めて読む人向け）
 
@@ -35,7 +35,8 @@ music-label/
 │   ├── 08_visuals.md             ← ロゴ・顔を出さないアーティスト写真・ジャケットの自動生成と選択（最初の 5 回は聞く）
 │   ├── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
 │   ├── 10_automation.md          ← 自動運転の全体像（定期実行の時間割・人がやること・自動で決めていること）
-│   └── 11_plans_and_costs.md     ← 契約するプランと月の費用（Suno のダウンロード上限・DistroKid の組数）
+│   ├── 11_plans_and_costs.md     ← 契約するプランと月の費用（Suno のダウンロード上限・DistroKid の組数）
+│   └── 12_decisions.md           ← 決めたこと（非公開リポジトリへの切り出し・SNS はレーベル単位・新人は自動予約＋取り消し猶予）
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -70,7 +71,6 @@ music-label/
     ├── post_social.py            ← 縦動画（サビ 30 秒）と説明文を作り、配信時刻に YouTube / Instagram / TikTok へ投稿
     ├── oauth_youtube.py          ← YouTube 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
     ├── oauth_tiktok.py           ← TikTok 投稿用の合鍵を取得して .env に保存（一括設定のとき 1 回）
-    ├── setup_keys.py             ← 鍵の一括設定ウィザード（手順表示 → ブラウザ → 保存 → 実際に接続して確認）
     ├── set_key.py                ← 鍵を .env に 1 つずつ安全に書き込む / 入っているか確認する
     ├── debut.py                  ← デビューの段取り（デビュー週の設定 → 名前確認 → ロゴ・写真 → DB → 準備状況）
     ├── run_week.py               ← 1 週間ぶんを段階ごとに全組まとめて流す（brief / lyrics / takes / finish / status / auto）
@@ -82,6 +82,11 @@ music-label/
     ├── expand_label.py           ← 月 1 組の追加（Claude が設定書を下書きしデビュー予約）と隔週への切り替え
     ├── plan_quarterly.py         ← 四半期の EP・コンピレーションの計画と登録シート
     ├── backup_r2.py              ← Cloudflare R2 への予備保管（変わったファイルだけ）
+    ├── setup_keys.py             ← 鍵の一括設定ウィザード（手順 → ブラウザ → 保存 → 実際に接続して確認）
+    ├── trial.py                  ← 1 組の試運転（本物の鍵で 1 週間分。YouTube は非公開。--cleanup で片付け）
+    ├── dashboard.py              ← 管理画面 out/dashboard.html（人がやること・制作の進み具合・配信予定・組の伸び）
+    ├── store_profiles.py         ← ストアと SNS のプロフィール文（文字数の上限つき）
+    ├── render_roomtour.py        ← Blender のルームツアーを書き出し、SNS の縦動画の背景にする
     └── _common.py, _supabase.py, _claude.py  ← 上のスクリプトが共通で使う部品
 ```
 

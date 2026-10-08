@@ -417,6 +417,91 @@ def write_review(path: Path, artist: dict, cands: list[dict], note: str) -> None
     path.write_text("\n".join(lines), encoding="utf-8")
 
 
+REVIEW_CSS = """
+:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--line:#e2ddd2;--accent:#a07a3c;--ng:#b3412e}
+@media (prefers-color-scheme: dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--line:#34322d;--accent:#d2ad6b;--ng:#e07a66}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:32px 16px 64px}h1{font-weight:500;letter-spacing:.04em;margin:0 0 4px}
+.note{color:var(--sub);margin:0 0 28px}h2{font-weight:500;border-bottom:1px solid var(--line);padding-bottom:6px;margin:36px 0 16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;background:var(--line)}
+.empty{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px;padding:12px;text-align:center}
+.body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
+.top{display:flex;justify-content:space-between;align-items:baseline}.no{font-weight:600}.score{color:var(--accent);font-variant-numeric:tabular-nums}
+.meta{color:var(--sub);font-size:13px}.ng{color:var(--ng);font-size:13px}.chosen{outline:2px solid var(--accent)}
+input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink);font:inherit;font-size:14px}
+button{margin-top:auto;padding:9px 10px;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:6px;font:inherit;cursor:pointer}
+button:hover{background:var(--accent);color:var(--card)}code{font-size:12px;word-break:break-all;color:var(--sub)}
+"""
+
+
+def write_review_html(path: Path, artist: dict, cands: list[dict], note: str, kind_arg: str, brief: Path | None) -> None:
+    """候補を並べて見比べ、理由を書いて『選ぶ』を押すとコマンドがコピーされるページ（ブラウザで開く）"""
+    import html as _h
+    base = f"python3 scripts/generate_visuals.py --artist {artist['slug']} --kind {kind_arg}"
+    if artist.get("label_slug") and artist["label_slug"] != "drive":
+        base += f" --label {artist['label_slug']}"
+    if brief:
+        try:
+            base += f" --brief {brief.resolve().relative_to(ROOT)}"
+        except ValueError:
+            base += f" --brief {brief}"
+    chosen = {}
+    for sp in path.parent.glob("selection_*.json"):
+        d = json.loads(sp.read_text(encoding="utf-8"))
+        chosen[d.get("kind")] = int(d.get("chosen", 0))
+    parts = [f"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+             f"<title>候補 {_h.escape(artist['name'])}</title><style>{REVIEW_CSS}</style></head><body><main>",
+             f"<h1>{_h.escape(artist['name'])}</h1><p class='note'>{_h.escape(note)}。理由を一言書いて「選ぶ」を押すと、"
+             "記録用のコマンドがコピーされます。ターミナルに貼って Enter。</p>"]
+    for kind in sorted({c["kind"] for c in cands}):
+        parts.append(f"<h2>{_h.escape(kind)}</h2><div class='grid'>")
+        for c in sorted([c for c in cands if c["kind"] == kind], key=lambda c: -c["total"]):
+            img = (f"<img src='{_h.escape(c['file'])}' alt='{kind} {c['no']}'>" if c.get("file")
+                   else "<div class='empty'>未生成（指示文のみ）</div>")
+            ng = f"<div class='ng'>除外：{_h.escape('、'.join(c.get('violations', [])))}</div>" if c.get("compliance_ok") is False else ""
+            cmd = f"{base} --choose {kind}:{c['no']} --reason"
+            sel = " chosen" if chosen.get(kind) == c["no"] else ""
+            parts.append(
+                f"<div class='card{sel}'>{img}<div class='body'><div class='top'><span class='no'>#{c['no']}</span>"
+                f"<span class='score'>{c['total']} 点</span></div>"
+                f"<div class='meta'>{_h.escape(c.get('method', '') or '')}</div>"
+                f"<div class='meta'>{_h.escape(c.get('claude_note', c.get('scores_note', '')) or '')}</div>{ng}"
+                f"<input placeholder='選んだ理由（例：余白が多く線が細い）' data-cmd='{_h.escape(cmd)}'>"
+                f"<button onclick='pick(this)'>{'選択済み' if sel else 'これを選ぶ'}</button></div></div>")
+        parts.append("</div>")
+    parts.append("""<script>
+function pick(btn){const i=btn.parentElement.querySelector('input');const r=(i.value||'').replace(/"/g,'”');
+const cmd=i.dataset.cmd+' "'+(r||'理由なし')+'"';const done=()=>{btn.textContent='コピーしました';setTimeout(()=>btn.textContent='これを選ぶ',2500)};
+if(navigator.clipboard){navigator.clipboard.writeText(cmd).then(done,()=>fallback(cmd,done))}else{fallback(cmd,done)}}
+function fallback(t,done){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();
+try{document.execCommand('copy');done()}catch(e){prompt('このコマンドをコピーしてください',t)}a.remove()}
+</script></main></body></html>""")
+    path.write_text("".join(parts), encoding="utf-8")
+    write_review_index()
+
+
+def write_review_index() -> None:
+    """全組の候補ページへの入り口（out/visuals/index.html）"""
+    import html as _h
+    root = ROOT / "out" / "visuals"
+    rows = []
+    for page in sorted(root.glob("*/*/review.html")) + sorted(root.glob("*/cover/*/review.html")):
+        rel = page.relative_to(root).as_posix()
+        folder = page.parent
+        kinds = {json.loads(p.read_text(encoding="utf-8")).get("kind") for p in folder.glob("selection_*.json")}
+        cands = json.loads((folder / "candidates.json").read_text(encoding="utf-8")) if (folder / "candidates.json").exists() else []
+        need = sorted({c["kind"] for c in cands} - kinds)
+        state = "選択済み" if not need else f"未選択：{'、'.join(need)}"
+        rows.append(f"<li><a href='{_h.escape(rel)}'>{_h.escape(rel.replace('/review.html', ''))}</a> <span class='meta'>— {state}</span></li>")
+    (root / "index.html").write_text(
+        f"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>ビジュアル候補</title><style>{REVIEW_CSS} li{{margin:8px 0}} a{{color:var(--accent)}}</style></head><body><main>"
+        f"<h1>ビジュアル候補</h1><p class='note'>組ごとのページで見比べて選びます。最初の 5 回の理由が、以後の自動採点の基準になります。</p>"
+        f"<ul>{''.join(rows) or '<li>まだ候補がありません</li>'}</ul></main></body></html>", encoding="utf-8")
+
+
 # ---------------------------------------------------------------------------
 def main() -> None:
     ap = argparse.ArgumentParser(description="ロゴ・顔を出さないアーティスト写真・ジャケットの候補を生成して選ぶ")
@@ -460,6 +545,7 @@ def main() -> None:
         print(f"  選択を記録しました：{kind} #{no}（{args.reason}）")
         print(f"  基準の学習：{criteria['decisions_asked']}/{criteria['decisions_required_before_lock']} 回。"
               f"{'自動選択に切り替わりました' if criteria['locked'] else 'まだオーナーに聞きます'}")
+        write_review_html(outdir / "review.html", artist, cands, "選択を記録しました", args.kind, args.brief)
         return
 
     if args.kind == "debut":
@@ -522,7 +608,10 @@ def main() -> None:
         if chosen:
             (outdir / f"selection_{kind}.json").write_text(json.dumps({"kind": kind, "chosen": chosen["no"], "by": "auto",
                 "total": chosen["total"], "date": date.today().isoformat()}, ensure_ascii=False, indent=2), encoding="utf-8")
-    write_review(outdir / "review.md", artist, cands, "候補を確認して --choose で選んでください" if not criteria["locked"] else "自動選択済み（確信度が低いものだけ確認）")
+    note = "候補を確認して選んでください" if not criteria["locked"] else "自動選択済み（確信度が低いものだけ確認）"
+    write_review(outdir / "review.md", artist, cands, note)
+    write_review_html(outdir / "review.html", artist, cands, note, args.kind, args.brief)
+    print(f"  → ブラウザで見比べる：open {(outdir / 'review.html').relative_to(ROOT)}（全組の一覧は out/visuals/index.html）")
     print(f"  → {outdir.relative_to(ROOT)}/review.md を書き出しました")
     print("=== 完了 ===")
 

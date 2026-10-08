@@ -39,7 +39,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import OUT, ROOT, load_artist, load_dotenv, read_json, ssl_context, step, write_json  # noqa: E402
+from _common import OUT, ROOT, load_artist, load_dotenv, notify, read_json, ssl_context, step, write_json  # noqa: E402
 
 load_dotenv()
 PLATFORMS = ["youtube", "instagram", "tiktok"]
@@ -115,21 +115,38 @@ def esc_drawtext(s: str) -> str:
     return s.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\u2019").replace("%", "\\%")
 
 
-def make_clip(master: Path, cover: Path, start: float, title: str, artist: str, dst: Path) -> None:
+def roomtour_loop(slug: str, artist: dict) -> Path | None:
+    """render_roomtour.py が作った Blender のルームツアー（その組の今の世代）があれば使う"""
+    hist = artist.get("concept_history") or {}
+    ver = hist.get("concept_version", 1) if isinstance(hist, dict) else 1
+    p = OUT / "roomtour" / slug / f"v{ver}" / "loop.mp4"
+    return p if p.exists() else None
+
+
+def make_clip(master: Path, cover: Path, start: float, title: str, artist: str, dst: Path, bg_video: Path | None = None) -> None:
     if not shutil.which("ffmpeg"):
         sys.exit("[エラー] ffmpeg が見つかりません（Mac：brew install ffmpeg）")
     dst.parent.mkdir(parents=True, exist_ok=True)
     font = find_font()
-    vf = ("[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=40,eq=brightness=-0.08[bg];"
-          "[1:v]scale=960:960[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-80")
-    if font:
-        t, a = esc_drawtext(title), esc_drawtext(artist)
-        vf += (f",drawtext=fontfile='{font}':text='{t}':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h/2+480"
-               f",drawtext=fontfile='{font}':text='{a}':fontcolor=white@0.8:fontsize=44:x=(w-text_w)/2:y=h/2+570")
+    t, a = esc_drawtext(title), esc_drawtext(artist)
+    if bg_video:
+        # Blender のルームツアーを背景に、左下にジャケットと曲名
+        vf = ("[2:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30[bg];"
+              "[1:v]scale=360:360[fg];[bg][fg]overlay=64:H-h-300")
+        if font:
+            vf += (f",drawtext=fontfile='{font}':text='{t}':fontcolor=white:fontsize=56:x=64:y=h-250:shadowcolor=black@0.4:shadowx=2:shadowy=2"
+                   f",drawtext=fontfile='{font}':text='{a}':fontcolor=white@0.85:fontsize=40:x=64:y=h-180:shadowcolor=black@0.4:shadowx=2:shadowy=2")
+    else:
+        vf = ("[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=40,eq=brightness=-0.08[bg];"
+              "[1:v]scale=960:960[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-80")
+        if font:
+            vf += (f",drawtext=fontfile='{font}':text='{t}':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h/2+480"
+                   f",drawtext=fontfile='{font}':text='{a}':fontcolor=white@0.8:fontsize=44:x=(w-text_w)/2:y=h/2+570")
     vf += ",format=yuv420p[v]"
     af = f"afade=t=in:st=0:d=1,afade=t=out:st={CLIP_SEC - 2}:d=2"
     cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.2f}", "-t", str(CLIP_SEC), "-i", str(master),
            "-loop", "1", "-framerate", "30", "-t", str(CLIP_SEC), "-i", str(cover),
+           *(["-stream_loop", "-1", "-t", str(CLIP_SEC), "-i", str(bg_video)] if bg_video else []),
            "-filter_complex", vf, "-map", "[v]", "-map", "0:a", "-af", af,
            "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-r", "30",
            "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest", "-movflags", "+faststart", str(dst)]
@@ -294,11 +311,15 @@ def cmd_plan(week: str) -> None:
         folder = OUT / "social" / week / slug
         video = folder / "clip_vertical.mp4"
         start = chorus_start(week, slug)
-        if video.exists() and video.stat().st_mtime > max(master.stat().st_mtime, cover.stat().st_mtime, mp.stat().st_mtime):
+        loop = roomtour_loop(slug, artist)
+        sources = [master, cover, mp] + ([loop] if loop else [])
+        if video.exists() and video.stat().st_mtime > max(f.stat().st_mtime for f in sources):
             print(f"   － {artist['name']}：縦動画は最新なので作り直しません")
         else:
             step(f"{artist['name']}：縦動画（サビ {start:.0f} 秒地点から {CLIP_SEC} 秒）を書き出しています")
-            make_clip(master, cover, start, m["title"], artist["name"], video)
+            if loop:
+                print(f"     （背景に Blender のルームツアーを使います：{loop.relative_to(ROOT)}）")
+            make_clip(master, cover, start, m["title"], artist["name"], video, loop)
         feat = load_artist(m["featured_artist_slug"])["name"] if m.get("featured_artist_slug") else None
         cap = captions(artist, m["title"], feat)
         for v in cap.values():
@@ -363,6 +384,8 @@ def cmd_post(week: str, dry: bool, only: set[str] | None = None, private: bool =
             p["result"] = res
             p["status"] = "error" if res.get("error") else "done"
             mark = "✕" if res.get("error") else "○"
+            if res.get("error"):
+                notify("EtherArchi：SNS 投稿に失敗", f"{plan['artist']} / {p['platform']}：{str(res['error'])[:80]}")
             print(f"   {mark} {plan['artist']} / {p['platform']}：{res.get('error') or res}")
         write_json(pp, plan)
 

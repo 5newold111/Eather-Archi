@@ -14,8 +14,12 @@ Suno で作った数テイクを機械で計測し、レーベルの自動化段
   5. 癖の有無    ooh / la la / hum など、文字で確かめられる癖が入っているか
   6. 終わり方    途中で切れていない（最後が大きな音のまま終わっていない）
 
+Suno のダウンロード上限（2026-09 から Pro 月 20 曲・Premier 月 60 曲）について
+  ふだんは Suno の画面で聴いて選び、選んだ 1 本だけをダウンロードして置く。1 本だけのときは「最終確認」になる。
+  複数を置いた場合（Tier B / C の機械選び）は、置いた本数だけダウンロード枠を使う。
+
 使い方
-  # テイクを out/takes/<ブリーフ名>/ に置く（take_01.mp3, take_02.mp3 …）
+  # テイクを out/takes/<ブリーフ名>/ に置く（take_01.mp3 … ふだんは選んだ 1 本だけ）
   python scripts/select_takes.py out/briefs/2026-10-05_light.json
   python scripts/select_takes.py out/briefs/2026-10-05_light.json --takes ~/Downloads/light_takes
   python scripts/select_takes.py out/briefs/2026-10-05_light.json --choose 3 --note "サビの裏声がいちばん細い"
@@ -374,6 +378,14 @@ def main() -> None:
 
     seed_key = f"{brief.get('week_start')}|{brief.get('artist_slug')}|spot_check"
     decision = decide(results, tier, seed_key)
+    if len(results) == 1:
+        # Suno の月のダウンロード上限のため、ふだんは Suno の画面で聴いて選んだ 1 本だけを置く。
+        # その場合は「選ぶ」のではなく、配信の条件を満たすかの最終確認になる
+        r = results[0]
+        decision.update(action="single", selected=r["take"], chosen_by="human",
+                        message=("Suno で選んだ 1 本は配信の条件を満たしています" if r["passed"] else
+                                 f"Suno で選んだ 1 本が条件を外れています（{'、'.join(r['hard_fail'])}）。"
+                                 "別のテイクを選び直すか、このまま進めるかを決めてください（このまま進めると音量調整に回ります）"))
 
     print()
     print(f"{'テイク':<14}{'判定':<6}{'点':>6}  落ちた理由")
@@ -396,7 +408,7 @@ def main() -> None:
 
     out = {"brief": str(brief_path) if brief_path else "demo", "artist_slug": brief["artist_slug"],
            "label_slug": brief.get("label_slug"), "spec": spec, "takes": results, "decision": decision}
-    if decision.get("selected"):
+    if decision.get("selected") and decision.get("action") != "single":
         decision["chosen_by"] = "machine"
     prev_path = folder / "selection.json"
     if prev_path.exists():

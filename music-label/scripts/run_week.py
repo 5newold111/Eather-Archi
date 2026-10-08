@@ -153,7 +153,8 @@ def stage_takes(week: date, a) -> None:
         step(f"{p.stem}：テイクを計測しています")
         run([S / "select_takes.py", p], quiet=False)
     if waiting:
-        print("\n■ 人の作業：Suno のテイクを次のフォルダに take_01.mp3 … の名前で置いてください")
+        print("\n■ 人の作業：Suno の画面で聴いて選んだ 1 本だけをダウンロードし、次のフォルダに take_01.mp3 の名前で置いてください")
+        print("   （Suno は月のダウンロード数に上限があるので、選ばないテイクは落とさない。機械で比べたいときだけ複数置く）")
         for w in waiting:
             print(f"   out/takes/{w}/")
 
@@ -220,6 +221,33 @@ def status_rows(week: date) -> list[dict]:
     return rows
 
 
+SUNO_CAP = {MAIN_LABEL: 60}      # Premier。子レーベルは既定で Pro の 20（設定書の suno_download_cap で変えられる）
+
+
+def downloads_this_month() -> dict[str, tuple[int, int]]:
+    """今月 Suno からダウンロードしたテイクの数（out/takes に置いた音源の数で数える）と上限"""
+    from datetime import datetime
+    now = datetime.now()
+    used: dict[str, int] = {}
+    for folder in (OUT / "takes").glob("*_*"):
+        if folder.name.startswith("2000-") or not folder.is_dir():
+            continue   # 試運転は数えない
+        bp = OUT / "briefs" / f"{folder.name}.json"
+        if not bp.exists():
+            continue
+        label = read_json(bp).get("label_slug") or MAIN_LABEL
+        for f in folder.iterdir():
+            t = datetime.fromtimestamp(f.stat().st_mtime)
+            if f.suffix.lower() in AUDIO_EXT and (t.year, t.month) == (now.year, now.month):
+                used[label] = used.get(label, 0) + 1
+    out = {}
+    for label, n in used.items():
+        cap = SUNO_CAP.get(label) or int((read_json(ROOT / "templates" / "labels" / f"{label}.json").get("suno_download_cap") or 20)
+                                         if (ROOT / "templates" / "labels" / f"{label}.json").exists() else 20)
+        out[label] = (n, cap)
+    return out
+
+
 def stage_status(week: date, a) -> None:
     rows = status_rows(week)
     if not rows:
@@ -230,11 +258,22 @@ def stage_status(week: date, a) -> None:
     cols = list(rows[0])
     lines = [f"# 制作週 {week} の進み具合", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
     lines += ["| " + " | ".join(str(r[c]) for c in cols) + " |" for r in rows]
+    dl = downloads_this_month()
+    if dl:
+        lines += ["", "**今月の Suno のダウンロード**（上限は Premier 60・Pro 20。超えると追加購入）", ""]
+        for label, (n, cap) in sorted(dl.items()):
+            warn = "　⚠ 残りわずか" if n >= cap * 0.8 else ""
+            lines.append(f"- {label}：{n} / {cap}{warn}")
     path = OUT / "weeks" / week.isoformat() / "status.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
     step(f"書き出しました: {path.relative_to(ROOT)}")
+    try:
+        from dashboard import build
+        step(f"管理画面も更新しました: {build().relative_to(ROOT)}")
+    except Exception as e:  # noqa: BLE001
+        print(f"   （管理画面の更新に失敗：{e}）")
 
 
 STAGES = {"brief": stage_brief, "lyrics": stage_lyrics, "takes": stage_takes, "finish": stage_finish, "status": stage_status}

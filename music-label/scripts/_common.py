@@ -226,3 +226,15 @@ def next_debut_week(not_before):
 def is_debut_week(monday) -> bool:
     from datetime import timedelta
     return any((monday + timedelta(days=i)).day == 1 for i in range(7))
+
+
+def notify(title: str, message: str) -> None:
+    """Mac の通知センターに知らせる（Mac 以外では何もしない）。定期実行で人の判断が要るときに使う"""
+    import platform
+    import shutil
+    import subprocess
+    if platform.system() != "Darwin" or not shutil.which("osascript"):
+        return
+    esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')  # noqa: E731
+    subprocess.run(["osascript", "-e", f'display notification "{esc(message)}" with title "{esc(title)}"'],
+                   capture_output=True, check=False)

@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json, dry_run_file  # noqa: E402
-from _common import MAIN_LABEL, OUT, ROOT, load_artist, monday_of, read_json, save_artist, step, write_json  # noqa: E402
+from _common import MAIN_LABEL, OUT, ROOT, load_artist, monday_of, notify, read_json, save_artist, step, write_json  # noqa: E402
 
 PIVOT_SYSTEM = """You plan a concept pivot for a virtual music act at EtherArchi (AI-generated music x spatial design).
 The act is not growing. Move its SCENE one step sideways to an adjacent scene (e.g. morning highway -> evening drive
@@ -143,6 +143,7 @@ def level2(a: dict, reason: str, dry: bool) -> dict | None:
     h["concept_version"] = version
     h["history"].append(change)
     save_artist(a)
+    notify("EtherArchi：方針転換", f"{a['name']} の場面を『{plan['new_scene']}』へ。撮り直しの候補を選んでください（out/visuals/index.html）")
     step(f"{a['name']}：アーティスト写真とロゴの撮り直し候補を作っています（選ぶのはオーナー）")
     cmd = [sys.executable, str(ROOT / "scripts" / "generate_visuals.py"), "--artist", a["slug"], "--kind", "reshoot",
            "--pivot-reason", f"{reason}。{plan['summary_ja']}"]

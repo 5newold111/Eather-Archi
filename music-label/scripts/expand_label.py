@@ -35,7 +35,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json_free, dry_run_file  # noqa: E402
 from _common import (MAIN_LABEL, OUT, ROOT, all_artists, as_date, load_artist, load_label, monday_of,  # noqa: E402
-                     next_debut_week, read_json, save_artist, step, write_json)
+                     next_debut_week, notify, read_json, save_artist, step, write_json)
 
 DEFAULT_CAP = 8
 SUBLABEL_MIN_DAYS = 90
@@ -281,6 +281,8 @@ def main() -> None:
                 d = draft_artist(r["label"], None)
                 if d:
                     debut = schedule_debut(d)
+                    notify("EtherArchi：新しい組を予約しました",
+                           f"{d['name']}（{r['name']}）を {debut} の週にデビュー予約。取り消しは expand_label.py cancel --artist {d['slug']}")
                     actions.append(f"{r['name']}：新しい組 {d['name']}（{d['slug']}）を下書きし、{debut} の週にデビューを予約"
                                    f"（取り消し：expand_label.py cancel --artist {d['slug']}）")
     launched = [r for r in rows if r["debuted"]]

@@ -72,6 +72,9 @@ python3 scripts/oauth_youtube.py --for focus  # 子レーベル用チャンネ�
   公開投稿したいなら、Google の「YouTube API Services - Audit and Quota Extension Form」から申請する（数週間）
 - 1 日の上限（10,000 ユニット）で、アップロードは 1 日 6 本まで。本体 5 組は水曜に 5 本なので収まる。子レーベルは曜日が分かれている
 
+> **アカウントの単位**：YouTube・Instagram・TikTok は、まずレーベル単位で 1 組ずつ作る（`docs/12_decisions.md`）。
+> 伸びた組を独立させるときだけ、組専用の鍵を `名前__組`（例 `IG_ACCESS_TOKEN__LIGHT`）で足す。
+
 ## 4. Instagram（リール）
 
 1. Instagram アカウントを **プロアカウント**（クリエイター）に切り替える
