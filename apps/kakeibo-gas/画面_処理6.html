@@ -1,0 +1,89 @@
+<script>
+'use strict';
+    // ───── 03 固定費 ─────
+    state.fixedMonth = localToday().slice(0, 7);
+    function monthJa(ym) { return Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5, 7)) + '月'; }
+
+    async function loadFixed() {
+      $('fixedMonthLabel').textContent = state.fixedMonth.replace('-', '.');
+      $('registerFixed').textContent = monthJa(state.fixedMonth) + '分の固定費を登録';
+      try {
+        renderFixed(await call('getFixedCosts'));
+      } catch (err) {
+        show('fixedMsg', '読み込みに失敗しました: ' + (err && err.message || err), true);
+      }
+    }
+
+    function renderFixed(items) {
+      items.sort((a, b) => a.day - b.day);
+      const tbody = $('fixedList').tBodies[0];
+      tbody.replaceChildren(...(items.length ? items.map((f) => {
+        const del = el('button', { className: 'x', textContent: '×', title: 'リストから外す' });
+        del.setAttribute('aria-label', f.name + ' をリストから外す');
+        del.addEventListener('click', () => removeFixed(f));
+        return el('tr', {}, [
+          el('td', { className: 'num', textContent: f.day + '日' }),
+          el('td', { textContent: f.name }),
+          el('td', { textContent: f.category }),
+          el('td', { textContent: f.method }),
+          el('td', { className: 'num', textContent: yen(f.amount) }),
+          el('td', {}, [del]),
+        ]);
+      }) : [el('tr', {}, [el('td', { colSpan: 6, className: 'empty', textContent: 'まだ登録されていません。下のフォームから追加してください。' })])]));
+      $('fixedTotal').textContent = yen(items.reduce((sum, f) => sum + f.amount, 0));
+      $('registerFixed').disabled = items.length === 0;
+    }
+
+    async function removeFixed(f) {
+      if (!confirm(f.name + '　' + yen(f.amount) + '\nこの固定費をリストから外しますか？\n（これまでに家計簿へ登録した分は消えません）')) return;
+      try {
+        await call('deleteFixedCost', f.id);
+        loadFixed();
+      } catch (err) {
+        show('fixedMsg', '削除に失敗しました: ' + (err && err.message || err), true);
+      }
+    }
+
+    $('addFixed').addEventListener('click', async () => {
+      const item = {
+        name: $('xName').value, amount: normalizeAmount($('xAmount').value), day: Number($('xDay').value),
+        category: $('xCategory').value, method: $('xMethod').value,
+      };
+      const btn = $('addFixed');
+      btn.disabled = true;
+      try {
+        const res = await call('saveFixedCost', item);
+        if (res.error) return show('fixedMsg', res.error, true);
+        show('fixedMsg', res.item.name + '（毎月' + res.item.day + '日・' + yen(res.item.amount) + '）をリストに追加しました。');
+        $('xName').value = '';
+        $('xAmount').value = '';
+        loadFixed();
+      } catch (err) {
+        show('fixedMsg', '追加に失敗しました: ' + (err && err.message || err), true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('registerFixed').addEventListener('click', async () => {
+      const btn = $('registerFixed');
+      btn.disabled = true;
+      show('fixedMsg', '登録しています…');
+      try {
+        const res = await call('registerFixedCosts', state.fixedMonth);
+        const parts = [];
+        if (res.added) parts.push(monthJa(state.fixedMonth) + 'の固定費を' + res.added + '件登録しました。');
+        if (res.skipped) parts.push(res.skipped + '件はこの月に登録済みのため、二重にならないよう飛ばしました。');
+        show('fixedMsg', parts.join('\n') || '登録する固定費がありません。');
+        state.month = state.fixedMonth;
+      } catch (err) {
+        show('fixedMsg', '登録に失敗しました: ' + (err && err.message || err), true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    $('fixedPrev').addEventListener('click', () => { state.fixedMonth = shiftMonth(state.fixedMonth, -1); loadFixed(); });
+    $('fixedNext').addEventListener('click', () => { state.fixedMonth = shiftMonth(state.fixedMonth, 1); loadFixed(); });
+
+    // CSV（Excelで開いても文字化けしないよう先頭にBOMを付ける）
+</script>

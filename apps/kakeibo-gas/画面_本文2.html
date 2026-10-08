@@ -1,0 +1,62 @@
+    <!-- 03 固定費 -->
+    <section id="tab-fixed" role="tabpanel" hidden>
+      <h2>毎月の固定費</h2>
+      <p class="note">家賃・保険・通信費など、毎月決まって出ていくものを登録しておくと、ボタン一つでその月の家計簿にまとめて記録できます。同じ月に二重には登録されません。</p>
+      <div class="scroll">
+        <table id="fixedList">
+          <thead><tr><th>引落日</th><th>名前</th><th>カテゴリ</th><th>支払方法</th><th class="num">金額</th><th></th></tr></thead>
+          <tbody></tbody>
+          <tfoot><tr><td colspan="4">毎月の合計</td><td class="num" id="fixedTotal">¥0</td><td></td></tr></tfoot>
+        </table>
+      </div>
+      <div class="month" style="margin-top:24px">
+        <button class="btn ghost" id="fixedPrev" aria-label="前の月">←</button>
+        <strong id="fixedMonthLabel"></strong>
+        <button class="btn ghost" id="fixedNext" aria-label="次の月">→</button>
+      </div>
+      <div class="row"><button class="btn" id="registerFixed">この月の固定費を登録</button></div>
+      <div class="msg" id="fixedMsg" hidden></div>
+
+      <h2 class="sp">固定費を追加</h2>
+      <form id="fixedForm" class="grid" autocomplete="off">
+        <label class="f full"><span>名前</span><input type="text" id="xName" maxlength="50" placeholder="家賃"></label>
+        <label class="f"><span>金額（円）</span><input type="text" id="xAmount" inputmode="numeric" placeholder="85000"></label>
+        <label class="f"><span>引落日（毎月）</span><input type="number" id="xDay" min="1" max="31" step="1" value="27"></label>
+        <label class="f"><span>カテゴリ</span><select id="xCategory"></select></label>
+        <label class="f"><span>支払方法</span><select id="xMethod"></select></label>
+      </form>
+      <div class="row"><button class="btn ghost" id="addFixed">リストに追加</button></div>
+    </section>
+
+    <!-- 04 月の集計 -->
+    <section id="tab-month" role="tabpanel" hidden>
+      <div class="month">
+        <button class="btn ghost" id="prevMonth" aria-label="前の月">←</button>
+        <strong id="monthLabel"></strong>
+        <button class="btn ghost" id="nextMonth" aria-label="次の月">→</button>
+      </div>
+      <div class="stats">
+        <div><span class="label">収入</span><b id="sIncome">—</b><small id="sIncomePrev"></small></div>
+        <div><span class="label">支出</span><b id="sExpense">—</b><small id="sExpensePrev"></small></div>
+        <div><span class="label">差額</span><b id="sBalance">—</b><small id="sBalancePrev"></small></div>
+      </div>
+      <div class="stats two">
+        <div><span class="label">うち固定費</span><b id="sFixed">—</b><small id="sFixedPrev"></small></div>
+        <div><span class="label">うち変動費</span><b id="sVariable">—</b><small id="sVariablePrev"></small></div>
+      </div>
+      <p class="sub" id="sBusiness"></p>
+      <div class="bars" id="bars"></div>
+
+      <div class="scroll">
+        <table id="list">
+          <thead><tr><th>日付</th><th>カテゴリ</th><th>メモ</th><th class="num">金額</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="csvSave">CSVを保存</button>
+        <button class="btn ghost" id="csvShow">CSVを表示</button>
+      </div>
+      <textarea id="csvText" readonly hidden style="margin-top:12px"></textarea>
+      <div class="msg" id="monthMsg" hidden></div>
+    </section>

@@ -1,0 +1,60 @@
+<script>
+'use strict';
+    // ───── 02 手で入力 ─────
+    document.querySelectorAll('#typeSeg button').forEach((b) => b.addEventListener('click', () => {
+      state.type = b.dataset.type;
+      document.querySelectorAll('#typeSeg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      refreshCategories();
+    }));
+
+    $('saveInput').addEventListener('click', async () => {
+      const entry = {
+        date: $('fDate').value, type: state.type, amount: normalizeAmount($('fAmount').value),
+        category: $('fCategory').value, method: $('fMethod').value, memo: $('fMemo').value,
+        business_ratio: $('fRatio').value === '' ? 0 : Number($('fRatio').value), source: '手入力',
+      };
+      const btn = $('saveInput');
+      btn.disabled = true;
+      show('inputMsg', '登録しています…');
+      try {
+        const res = await call('addEntries', [entry]);
+        if (res.errors.length) return show('inputMsg', res.errors.map((e) => e.message).join('\n'), true);
+        show('inputMsg', entry.date + '　' + entry.category + '　' + yen(entry.amount) + ' を登録しました。');
+        $('fAmount').value = '';
+        $('fMemo').value = '';
+        $('fRatio').value = '';
+        $('fAmount').focus();
+        state.month = entry.date.slice(0, 7);
+      } catch (err) {
+        show('inputMsg', '登録に失敗しました: ' + (err && err.message || err), true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ───── 04 月の集計 ─────
+    function shiftMonth(ym, delta) {
+      const d = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + delta, 1);
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1);
+    }
+    function diffText(now, prev) {
+      if (!prev) return '前月 —';
+      const d = now - prev;
+      return '前月比 ' + (d >= 0 ? '+' : '−') + yen(Math.abs(d)).slice(1);
+    }
+
+    async function loadMonth() {
+      $('monthLabel').textContent = state.month.replace('-', '.');
+      $('csvText').hidden = true;
+      show('monthMsg', '読み込み中…');
+      try {
+        const data = await call('getMonth', state.month);
+        state.monthData = data;
+        renderMonth(data);
+        show('monthMsg', '');
+      } catch (err) {
+        show('monthMsg', '読み込みに失敗しました: ' + (err && err.message || err), true);
+      }
+    }
+
+</script>

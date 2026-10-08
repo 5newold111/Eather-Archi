@@ -1,0 +1,96 @@
+<script>
+'use strict';
+    function renderPreview() {
+      const tbody = $('preview').tBodies[0];
+      tbody.replaceChildren(...state.preview.map((r, i) => {
+        const date = el('input', { type: 'date', value: r.date, className: 'w-date' });
+        date.addEventListener('change', () => { r.date = date.value; });
+        const type = el('select', { className: 'w-type' });
+        fillSelect(type, ['支出', '収入'], r.type);
+        const cat = el('select', { className: 'w-sel' });
+        fillCategories(cat, r.type, r.category);
+        type.addEventListener('change', () => {
+          r.type = type.value;
+          if (!state.config.categories[r.type].includes(r.category)) r.category = 'その他';
+          fillCategories(cat, r.type, r.category);
+        });
+        cat.addEventListener('change', () => { r.category = cat.value; });
+        const amount = el('input', { type: 'text', inputMode: 'numeric', value: isNaN(r.amount) ? '' : String(r.amount), className: 'w-amt' });
+        amount.addEventListener('change', () => { r.amount = normalizeAmount(amount.value); });
+        const method = el('select', { className: 'w-sel' });
+        fillSelect(method, state.config.methods, r.method);
+        method.addEventListener('change', () => { r.method = method.value; });
+        const memo = el('input', { type: 'text', value: r.memo, maxLength: 200, className: 'w-memo' });
+        memo.addEventListener('change', () => { r.memo = memo.value; });
+        const ratio = el('input', { type: 'number', min: 0, max: 100, value: String(r.business_ratio), className: 'w-ratio' });
+        ratio.addEventListener('change', () => { r.business_ratio = ratio.value === '' ? 0 : Number(ratio.value); });
+        const del = el('button', { className: 'x', textContent: '×', title: 'この行を外す' });
+        del.setAttribute('aria-label', 'この行を外す');
+        del.addEventListener('click', () => { state.preview.splice(i, 1); renderPreview(); });
+
+        const notes = r.flags.concat(r.error ? [r.error] : []);
+        const memoCell = el('td', {}, [memo].concat(notes.map((t) => el('span', { className: 'flag', textContent: t }))));
+        return el('tr', { className: r.error ? 'bad' : '' }, [
+          el('td', {}, [date]), el('td', {}, [type]), el('td', { className: 'num' }, [amount]), el('td', {}, [cat]),
+          el('td', {}, [method]), memoCell, el('td', { className: 'num' }, [ratio]), el('td', {}, [del]),
+        ]);
+      }));
+      const has = state.preview.length > 0;
+      $('previewWrap').hidden = !has;
+      $('previewActions').hidden = !has;
+      const total = state.preview.reduce((s, r) => s + (r.type === '支出' && !isNaN(r.amount) ? r.amount : 0), 0);
+      $('previewCount').textContent = state.preview.length + '件 ／ 支出合計 ' + yen(total);
+    }
+
+    $('parse').addEventListener('click', () => {
+      const text = $('paste').value.trim();
+      if (!text) return show('importMsg', '貼り付け欄が空です', true);
+      const items = extractJson(text);
+      if (!items || !items.length) {
+        state.preview = [];
+        renderPreview();
+        return show('importMsg', '登録用のデータが見つかりませんでした。\nClaudeに「登録用のJSONで出して」と頼むと、読み取れる形で返ってきます。', true);
+      }
+      state.preview = items.filter((x) => x && typeof x === 'object').map(toPreviewRow);
+      renderPreview();
+      show('importMsg', state.preview.length + '件を読み取りました。内容を確認して「この内容で登録」を押してください。');
+    });
+    $('clearPaste').addEventListener('click', () => {
+      $('paste').value = '';
+      state.preview = [];
+      renderPreview();
+      show('importMsg', '');
+    });
+
+    $('saveImport').addEventListener('click', async () => {
+      const btn = $('saveImport');
+      btn.disabled = true;
+      show('importMsg', '登録しています…');
+      try {
+        const entries = state.preview.map((r) => ({
+          date: r.date, type: r.type, amount: r.amount, category: r.category, method: r.method,
+          memo: r.memo, business_ratio: r.business_ratio, source: 'チャット',
+        }));
+        const res = await call('addEntries', entries);
+        state.preview.forEach((r) => { r.error = ''; });
+        if (res.errors.length) {
+          res.errors.forEach((e) => { if (state.preview[e.index]) state.preview[e.index].error = e.message; });
+          renderPreview();
+          show('importMsg', '登録できない行があったため、まだ何も登録していません。\n'
+            + res.errors.map((e) => (e.index >= 0 ? (e.index + 1) + '行目: ' : '') + e.message).join('\n'), true);
+          return;
+        }
+        state.preview = [];
+        $('paste').value = '';
+        renderPreview();
+        show('importMsg', res.added + '件を家計簿に登録しました。');
+        state.month = entriesMonth(entries);
+      } catch (err) {
+        show('importMsg', '登録に失敗しました: ' + (err && err.message || err), true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+    function entriesMonth(entries) { return (entries[entries.length - 1].date || state.month).slice(0, 7); }
+
+</script>

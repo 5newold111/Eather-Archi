@@ -58,5 +58,10 @@
     },
   };
   root.Session = { getScriptTimeZone: () => 'Asia/Tokyo' };
-  root.HtmlService = { createHtmlOutputFromFile: () => { const o = { setTitle: () => o, addMetaTag: () => o }; return o; } };
+  // HTMLファイルの中身は、テスト側が root.__html = { ファイル名: 中身 } に用意する
+  const output = (content) => { const o = { setTitle: () => o, addMetaTag: () => o, getContent: () => content }; return o; };
+  root.HtmlService = {
+    createHtmlOutputFromFile: (name) => output((root.__html || {})[name]),
+    createTemplateFromFile: (name) => ({ evaluate: () => output((root.__html || {})[name]) }),
+  };
 })(typeof window !== 'undefined' ? window : globalThis);

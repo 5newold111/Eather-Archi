@@ -1,4 +1,4 @@
-// コード.gs のサーバー処理のテスト。実行: node apps/kakeibo-gas/test/server.test.js
+// サーバー処理（.gs）のテスト。実行: node apps/kakeibo-gas/test/server.test.js
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -6,7 +6,7 @@ const assert = require('assert');
 
 const ctx = vm.createContext({ console });
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'gas-stub.js'), 'utf8'), ctx);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'コード.gs'), 'utf8'), ctx);
+require('./gs-files').forEach((f) => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), ctx));
 const run = (code) => vm.runInContext(code, ctx);
 
 let failed = 0;
@@ -202,6 +202,22 @@ test('固定費をリストから外しても登録済みの明細は残る', ()
   assert.strictEqual(json('getFixedCosts()').length, 1);
   assert.ok(json("getMonth('2027-04')").entries.some((e) => e.memo === '動画配信'));
   assert.throws(() => run("registerFixedCosts('2027-4')"));
+});
+
+// ───── 画面の組み立て ─────
+test('index が読み込む画面ファイルがすべて存在し、各ファイルは100行未満', () => {
+  const dir = path.join(__dirname, '..');
+  const index = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const names = [...index.matchAll(/include_\('([^']+)'\)/g)].map((m) => m[1]);
+  const files = fs.readdirSync(dir).filter((f) => f.startsWith('画面_')).map((f) => f.replace(/\.html$/, ''));
+  assert.deepStrictEqual(names.slice().sort(), files.slice().sort(), 'index と「画面_」ファイルの対応');
+  // include_ が本物と同じようにファイルの中身を返すこと
+  ctx.__html = Object.fromEntries(names.map((n) => [n, fs.readFileSync(path.join(dir, n + '.html'), 'utf8')]));
+  assert.strictEqual(run("include_('画面_処理1')"), ctx.__html['画面_処理1']);
+  run('doGet()');
+  const tooLong = fs.readdirSync(dir).filter((f) => /\.(gs|html)$/.test(f))
+    .filter((f) => fs.readFileSync(path.join(dir, f), 'utf8').split('\n').length > 100);
+  assert.deepStrictEqual(tooLong, [], '100行以上のファイル');
 });
 
 console.log(failed ? '\n' + failed + '件失敗' : '\nすべて成功');

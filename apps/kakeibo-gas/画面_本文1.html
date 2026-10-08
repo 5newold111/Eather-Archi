@@ -1,0 +1,60 @@
+    <header>
+      <h1><span class="label">Kakeibo</span>家計簿</h1>
+      <span class="label" id="today"></span>
+    </header>
+
+    <nav role="tablist">
+      <button role="tab" data-tab="import" aria-selected="true"><span class="label">01</span>チャットから取り込む</button>
+      <button role="tab" data-tab="input" aria-selected="false"><span class="label">02</span>手で入力</button>
+      <button role="tab" data-tab="fixed" aria-selected="false"><span class="label">03</span>固定費</button>
+      <button role="tab" data-tab="month" aria-selected="false"><span class="label">04</span>月の集計</button>
+    </nav>
+
+    <!-- 01 チャットから取り込む -->
+    <section id="tab-import" role="tabpanel">
+      <h2>Claudeの返答を貼り付け</h2>
+      <p class="note">Claudeが出した登録用テキストを、説明文ごとそのまま貼り付けてかまいません。中のデータだけを読み取ります。</p>
+      <textarea id="paste" placeholder='例）
+```json
+[{"date":"2026-10-03","type":"支出","amount":580,"category":"食費","method":"現金","memo":"カフェ"}]
+```'></textarea>
+      <div class="row">
+        <button class="btn" id="parse">読み取る</button>
+        <button class="btn ghost" id="clearPaste">クリア</button>
+      </div>
+      <div class="msg" id="importMsg" hidden></div>
+      <div id="previewWrap" hidden>
+      <p class="swipe">表は横にスクロールできます →</p>
+      <div class="scroll">
+        <table id="preview">
+          <thead><tr><th>日付</th><th>区分</th><th class="num">金額</th><th>カテゴリ</th><th>支払方法</th><th>メモ</th><th class="num">按分%</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      </div>
+      <div class="row" id="previewActions" hidden>
+        <button class="btn" id="saveImport">この内容で登録</button>
+        <span class="sub" id="previewCount"></span>
+      </div>
+    </section>
+
+    <!-- 02 手で入力 -->
+    <section id="tab-input" role="tabpanel" hidden>
+      <h2>1件ずつ入力</h2>
+      <p class="note">レシートを見ながら、その場で記録するときに。</p>
+      <form id="form" class="grid" autocomplete="off">
+        <div class="full seg" id="typeSeg">
+          <button type="button" data-type="支出" aria-pressed="true">支出</button>
+          <button type="button" data-type="収入" aria-pressed="false">収入</button>
+        </div>
+        <label class="f"><span>日付</span><input type="date" id="fDate" required></label>
+        <label class="f"><span>金額（円）</span><input type="text" id="fAmount" inputmode="numeric" placeholder="580" required></label>
+        <label class="f"><span>カテゴリ</span><select id="fCategory"></select></label>
+        <label class="f"><span>支払方法</span><select id="fMethod"></select></label>
+        <label class="f full"><span>メモ</span><input type="text" id="fMemo" maxlength="200" placeholder="カフェ"></label>
+        <label class="f"><span>事業按分（%・任意）</span><input type="number" id="fRatio" min="0" max="100" step="1" placeholder="0"></label>
+      </form>
+      <div class="row"><button class="btn" id="saveInput">登録</button></div>
+      <div class="msg" id="inputMsg" hidden></div>
+    </section>
+
