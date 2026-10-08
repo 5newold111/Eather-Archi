@@ -25,6 +25,7 @@
 | 6 | Cloudflare R2 | 予備の保管 | 10 分 | `R2_*` | [ ] |
 | 7 | DistroKid | 配信 | 15 分 | 鍵なし。Ultimate（5 組）を契約 | [ ] |
 | 8 | Suno | 作曲 | 10 分 | 鍵なし。Premier を契約（月 60 曲までダウンロード）。Persona は最初の 1 曲の後 | [ ] |
+| 9 | Google スプレッドシート（任意） | アーティスト台帳をスマホ・共同で書く | 15 分 | `ARTIST_BOOK_GSHEET_ID` `GOOGLE_SERVICE_ACCOUNT_FILE`（無ければ `artists.xlsx` を使う） | [ ] |
 
 ## 1. Supabase（データベース）
 
@@ -36,7 +37,7 @@
 4. 確認と初回登録
 
 ```
-python3 scripts/supabase_sync.py seed --apply          # レーベル 4・アーティスト 17 組を登録
+python3 scripts/supabase_sync.py seed --apply          # レーベル 4 と、台帳で採用して pull した組を登録
 python3 scripts/supabase_sync.py references --apply    # 解析シートがあれば
 ```
 
@@ -48,7 +49,7 @@ platform.openai.com → Settings → Billing で残高を追加（月 $10〜20 �
 画像モデルで 403 が出たら、同じ画面の Organization → Verification（本人確認）を済ませる。
 
 ```
-python3 scripts/generate_visuals.py --artist light --kind debut     # 5 組同時デビューのロゴと写真
+python3 scripts/generate_visuals.py --artist <ID> --kind debut     # 台帳で採用した組のロゴと写真（例 nao_easterly）
 ```
 
 ## 3. YouTube（ショート）

@@ -199,7 +199,9 @@ def status_rows(week: date) -> list[dict]:
     rows = []
     for p in briefs_of(week):
         b = read_json(p)
-        a = load_artist(b["artist_slug"], b.get("label_slug"))
+        a = load_artist(b["artist_slug"], b.get("label_slug"), missing_ok=True)
+        if a is None:   # 保管庫へ移した組の古いブリーフは表に出さない
+            continue
         mode = b.get("lyrics_mode") or (a.get("lyrics") or {}).get("mode", "core_fixed")
         sel_path = OUT / "takes" / p.stem / "selection.json"
         sel = read_json(sel_path) if sel_path.exists() else {}

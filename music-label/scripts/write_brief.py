@@ -21,6 +21,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MODEL = "claude-opus-5-5"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _life import life_context, real_names  # noqa: E402  台帳の人生（実名は伏せた要約）
 
 
 def load_dotenv(path: Path) -> None:
@@ -118,6 +120,12 @@ Hard rules (never break):
    in this artist's sound (tempo, groove, instruments, structure). The first title candidate must be exactly
    remix_of.title_rule; the others may vary only after the original title. State in notes_ja that the owner can use
    Suno's cover/remix of the original take if they prefer.
+12. Life moment (brief has life_moment): the act is a person (or group) living a specific life, and this song comes
+   from that moment - an event from their recent life ("近況") or a song seed from their past ("歌の種"). Write the
+   song as THEIR feeling at that moment, in their point of view, with concrete things from artist.life_context
+   (places, objects, people's roles, their way of speaking). Keep it understated and specific, never melodramatic.
+   If life_moment.owner_sketch exists, the owner adopted that sketch: keep its title idea and build the chorus from
+   its lines (you may tighten wording and meter). Explain in notes_ja which moment you used and how.
 
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
@@ -181,6 +189,10 @@ def public_safe_artist(artist: dict) -> dict:
     """Claude に渡す設定書。実在アーティスト名（favorite_artists_real / influences.name）は落とす"""
     a = json.loads(json.dumps(artist))
     a.pop("profile", None); a.pop("distribution", None); a.pop("name_check", None); a.pop("concept_history", None)
+    a.pop("life", None); a.pop("source", None)
+    ctx = life_context(artist)   # 台帳の人生の要約（影響・参考曲の候補＝実名は入れない）
+    if ctx:
+        a["life_context"] = ctx
     for inf in a.get("persona", {}).get("influences", []):
         inf.pop("name", None); inf.pop("reference_id", None)
     for k in list(a.keys()):
@@ -204,6 +216,7 @@ def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
 def banned_terms(artist: dict) -> list[str]:
     terms = list(artist.get("profile", {}).get("favorite_artists_real", []))
     terms += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
+    terms += real_names(artist)   # 台帳の『影響』『参考曲の候補』の実名
     return [t for t in terms if t and t not in ("（bio のみ）",)]
 
 

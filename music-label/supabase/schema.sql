@@ -16,7 +16,7 @@ create extension if not exists "pgcrypto";   -- gen_random_uuid() 用
 -- 共通の型（選択肢を固定しておくと入力ミスが防げる）
 -- -----------------------------------------------------------------------------
 create type axis_t        as enum ('shape', 'quality', 'light', 'time', 'self');   -- 形・質・光・時・自
-create type formation_t   as enum ('solo', 'duo', 'band', 'producer');
+create type formation_t   as enum ('solo', 'duo', 'band', 'vocal_group', 'producer');   -- 既に作った DB には：alter type formation_t add value if not exists 'vocal_group';
 create type vocal_range_t as enum ('low', 'mid', 'high');
 create type vocal_sex_t   as enum ('female', 'male', 'mixed', 'none');
 create type ref_source_t  as enum ('own', 'chart', 'manual', 'trend');            -- 自作 / チャート / 手動 / 今週のトレンド

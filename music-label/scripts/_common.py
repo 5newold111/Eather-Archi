@@ -58,8 +58,9 @@ def load_label(slug: str | None) -> dict:
     return read_json(p)
 
 
-def load_artist(slug: str, label: str | None = None) -> dict:
-    """アーティスト設定書を探す。label が無ければ本体 → 子レーベルの順に探す"""
+def load_artist(slug: str, label: str | None = None, missing_ok: bool = False) -> dict | None:
+    """アーティスト設定書を探す。label が無ければ本体 → 子レーベルの順に探す。
+    missing_ok なら、見つからないとき（保管庫へ移した組の古い記録など）に None を返す"""
     if not label or label == MAIN_LABEL:
         p = ROOT / "templates" / "artists" / f"{slug}.json"
         if p.exists():
@@ -74,6 +75,8 @@ def load_artist(slug: str, label: str | None = None) -> dict:
             if a.get("slug") == slug:
                 a["label_slug"] = lab
                 return a
+    if missing_ok:
+        return None
     sys.exit(f"[エラー] アーティスト {slug} の設定書が見つかりません（templates/artists か templates/labels を確認）")
 
 

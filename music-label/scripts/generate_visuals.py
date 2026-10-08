@@ -28,6 +28,9 @@ import argparse, base64, json, os, re, sys, urllib.error, urllib.request
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _life import real_names  # noqa: E402  台帳の実名（指示文に混ぜない）
+
 ROOT = Path(__file__).resolve().parent.parent
 CRITERIA_PATH = ROOT / "templates" / "visual_criteria.json"
 
@@ -103,6 +106,7 @@ def scrub(text: str, artist: dict) -> str:
     """実名・禁止語を落とす。favorite_artists_real / influences.name は最初から使わないが、念のため検査する"""
     names = list(artist.get("profile", {}).get("favorite_artists_real", []))
     names += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
+    names += real_names(artist)   # 台帳の『影響』『参考曲の候補』の実名
     for n in names + BANNED_IN_PROMPT:
         if n and n not in ("（bio のみ）",) and n in text:
             raise RuntimeError(f"指示文に渡してはいけない語が含まれています: {n}")
@@ -118,6 +122,24 @@ def visual_base(artist: dict) -> str:
         f"Taste: {pd.get('taste','')}. Composition: {pd.get('composition','')}. Brightness: {pd.get('brightness','')}, "
         f"contrast: {pd.get('contrast','')}, color temperature: {pd.get('color_temperature','')}. Background: {pd.get('background','')}."
     )
+
+
+def appearance_clause(artist: dict) -> str:
+    """台帳のメンバーの見た目（髪・服・体格・見える傷やタトゥー）。顔は描かないので、後ろ姿やシルエットで伝わる部分だけ"""
+    members = (artist.get("life") or {}).get("members", [])
+    marks = (artist.get("life") or {}).get("marks", [])
+    parts = []
+    for m in members:
+        hair = " ".join(x for x in (m.get("hair_length"), m.get("hair_color"), m.get("hair_style")) if x)
+        body = f"about {m['height']} cm tall" if m.get("height") else ""
+        tat = [f"{k.get('what', '')} on the {k.get('where', '')}" for k in marks
+               if k.get("member_id") == m.get("id") and k.get("kind") not in ("なし", "", None) and k.get("what")]
+        bits = [x for x in (f"{m.get('gender', '')}, around {m['age']}" if m.get("age") else m.get("gender", ""),
+                            body, f"hair: {hair}" if hair else "", f"clothes: {m.get('fashion', '')}" if m.get("fashion") else "",
+                            f"visible mark: {'; '.join(tat)}" if tat else "") if x]
+        if bits:
+            parts.append("(" + "; ".join(bits) + ")")
+    return ("People (describe through silhouette, hair, posture and clothes only): " + " ".join(parts) + ". ") if parts else ""
 
 
 def concealment_clause(method: str) -> str:
@@ -144,7 +166,7 @@ def prompts_debut(artist: dict) -> list[dict]:
     for i, m in enumerate(methods[:N_PHOTO]):
         out.append({"kind": "photo", "no": i + 1, "method": m, "prompt": scrub(
             f"Artist photograph for a music act ({artist['formation']}; {len(artist['persona'].get('members', [])) or 1} member(s)). "
-            f"{visual_base(artist)} Positioning: {pd.get('positioning','')}. Gesture: {pd.get('gesture','')}. "
+            f"{visual_base(artist)} {appearance_clause(artist)}Positioning: {pd.get('positioning','')}. Gesture: {pd.get('gesture','')}. "
             f"Location type: {pd.get('location_type','')}. {concealment_clause(m)} Photorealistic, editorial quality, square 1:1.", artist)})
     return out
 

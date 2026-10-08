@@ -9,6 +9,9 @@
                          → concept_version を +1 → アーティスト写真とロゴの撮り直し候補を作る（選ぶのは毎回オーナー）
   2 回目のレベル 2：その組を隔週に落とす（空いた枠は expand_label.py が新しい組で埋める）。3 回目は休止
 
+  ・アーティスト台帳で管理している組（artist_book.py pull で作った設定書）は、設定書を直接は書き換えず、
+    台帳の「変更の提案」タブに行を足して知らせるだけ（採用 → artist_book.py apply-changes → pull で反映）。
+    制作の頻度（隔週・休止）は機械が持つ項目なので、台帳の組でもそのまま切り替える
   ・転換から 8 週は再判定しない（analyze_growth.py が見ている）
   ・同じ週の同じ提案は 1 回だけ適用する（out/growth/applied_pivots.json に記録）
 
@@ -59,6 +62,43 @@ PIVOT_SCHEMA = {
 }
 
 
+# 設定書の項目 → 台帳の（タブ, 見出し）。台帳で管理している組の転換は、この欄への「変更の提案」になる
+BOOK_FIELD = {
+    "persona.drive_scene": ("アーティスト", "聴かれる場面"), "persona.scene": ("アーティスト", "聴かれる場面"),
+    "visual.space": ("見た目", "空間"), "visual.light": ("見た目", "光"), "visual.materials": ("見た目", "素材"),
+    "visual.palette": ("見た目", "色"), "visual.camera": ("見た目", "カメラ"), "visual.cover_series_rule": ("見た目", "ジャケットの決まり"),
+    "sound.bpm_min": ("声と曲づくり", "BPM 最低"), "sound.bpm_max": ("声と曲づくり", "BPM 最高"),
+    "sound.dna_tags": ("声と曲づくり", "DNA タグ"), "lyrics.themes": ("声と曲づくり", "歌詞のテーマ"),
+    **{f"composition_habits.{k}": ("声と曲づくり", h) for k, h in (
+        ("modulation", "転調"), ("intro", "イントロ"), ("outro", "アウトロ"), ("phrase_endings", "フレーズの終わり方"),
+        ("structure", "構成"), ("instruments_rule", "楽器のルール"), ("rhythm", "リズム"), ("lyrics_tic", "歌詞の癖"),
+        ("always", "毎曲必ず"), ("never", "使わない"))},
+}
+
+
+def in_book(a: dict) -> bool:
+    """アーティスト台帳から作った設定書か（台帳が正本なので、直接は書き換えない）"""
+    return bool(a.get("source"))
+
+
+def propose_in_book(a: dict, changes: dict, reason: str) -> int:
+    """変更を台帳の『変更の提案』タブに足す。足した行数を返す"""
+    from _artist_book import open_book
+
+    def txt(v):
+        return "、".join(map(str, v)) if isinstance(v, list) else ("" if v is None else str(v))
+    rows = []
+    for key, (old, new) in changes.items():
+        if key not in BOOK_FIELD:
+            continue
+        tab, field = BOOK_FIELD[key]
+        rows.append({"act_id": a["slug"], "status": "提案", "date": date.today().isoformat(), "tab": tab, "field": field,
+                     "current": txt(old), "proposed": txt(new), "reason": reason})
+    if rows:
+        open_book().append("changes", rows)
+    return len(rows)
+
+
 def history_of(a: dict) -> dict:
     h = a.get("concept_history")
     if not isinstance(h, dict):
@@ -79,7 +119,13 @@ def level1(a: dict, reason: str, dry: bool) -> dict:
     change = {"date": date.today().isoformat(), "level": 1, "reason": reason, "bpm_shift": shift,
               "changes": {"sound.bpm_min": [s.get("bpm_min"), lo], "sound.bpm_max": [s.get("bpm_max"), hi]},
               "note": "枠の組み合わせを大きく変える・トレンド曲の枠を 3 にするのは次週の割り当てで自動"}
-    if not dry:
+    if not dry and in_book(a):
+        n = propose_in_book(a, change["changes"], f"方針転換 レベル 1：{reason}")
+        change["proposed_in_book"] = True
+        h["history"].append(change)   # 判定の間隔（8 週）を守るため、提案した日も履歴に残す
+        save_artist(a)
+        notify("EtherArchi：方針転換の提案", f"{a['name']} の BPM を {shift:+d} する提案を台帳に入れました（{n} 行）")
+    elif not dry:
         s["bpm_min"], s["bpm_max"] = lo, hi
         h["history"].append(change)
         save_artist(a)
@@ -132,6 +178,15 @@ def level2(a: dict, reason: str, dry: bool) -> dict | None:
     change = {"version": version, "date": date.today().isoformat(), "level": 2, "reason": reason,
               "summary_ja": plan["summary_ja"], "changes": changes, "photos_reshot": True}
     if dry:
+        return change
+    if in_book(a):
+        n = propose_in_book(a, changes, f"方針転換 レベル 2：{reason}。{plan['summary_ja']}")
+        change.update(proposed_in_book=True, photos_reshot=False)
+        h["history"].append(change)   # 世代（concept_version）は採用して pull したときに上がる
+        save_artist(a)
+        notify("EtherArchi：方針転換の提案", f"{a['name']} の場面を『{plan['new_scene']}』へ移す提案を台帳に入れました（{n} 行）")
+        step(f"{a['name']}：台帳の『変更の提案』に {n} 行を足しました。採用 → artist_book.py apply-changes → pull で反映、"
+             "そのあと写真を撮り直します")
         return change
     persona[scene_key] = plan["new_scene"]
     a["persona"] = persona

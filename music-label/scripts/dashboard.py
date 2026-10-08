@@ -66,6 +66,8 @@ def todos() -> list[tuple[str, str, list[str], str]]:
         kinds = {c["kind"] for c in read_json(cand) if c.get("file")}
         chosen = {read_json(p).get("kind") for p in folder.glob("selection_*.json")}
         need = kinds - chosen
+        if folder.relative_to(OUT / "visuals").parts[0] not in names:   # 保管庫へ移した組の古い候補
+            continue
         if need and (not crit.get("locked") or "reshoot" in folder.parts):
             rel = folder.relative_to(OUT / "visuals").as_posix()
             add("normal", "ロゴ・写真・ジャケットを選ぶ", f"{names.get(folder.relative_to(OUT / 'visuals').parts[0], rel)}（{'・'.join(sorted(need))}）",
@@ -75,6 +77,8 @@ def todos() -> list[tuple[str, str, list[str], str]]:
         if "." in bp.stem:
             continue
         b = read_json(bp)
+        if b.get("artist_slug") not in names:
+            continue
         who = names.get(b["artist_slug"], b["artist_slug"])
         if b.get("lyrics_mode") in ("core_fixed", "topic_only") and not bp.with_suffix(".lyrics_final.txt").exists():
             add("normal", "Suno の Write Lyrics で節を書かせて保存", who, f"out/briefs/{week}_<組>.verses.txt")
@@ -92,6 +96,8 @@ def todos() -> list[tuple[str, str, list[str], str]]:
         if mp.parent.name.startswith("2000-"):
             continue
         m = read_json(mp)
+        if m.get("artist_slug") not in names:
+            continue
         who = names.get(m["artist_slug"], m["artist_slug"])
         days = (datetime.fromisoformat(m["release_at_utc"].replace("Z", "+00:00")) - now).days
         untitled = str(m.get("title", "")).startswith("（")
@@ -105,9 +111,50 @@ def todos() -> list[tuple[str, str, list[str], str]]:
             add("normal", "登録後の ISRC を書く", f"{who}「{m.get('title')}」", "out/distrokid/<週>/<組>.metadata.json")
     for a in all_artists():
         d = as_date(a.get("debut_week"))
-        if d and d > date.today() and a.get("expansion"):
+        if d and d > date.today() and (a.get("expansion") or a.get("source")):
             add("normal", "新人のデビュー予約（取り消すなら今）", f"{a['name']}（{d} の週）", "expand_label.py cancel --artist <組>")
+    for sev, what, who, where in book_todos(names):
+        add(sev, what, who, where)
     return [(sev, what, who, where) for (sev, what, where), who in groups.items()]
+
+
+def book_todos(names: dict[str, str]) -> list[tuple[str, str, str, str]]:
+    """アーティスト台帳の返事待ち（提案）と、採用したのに入手していない参考曲"""
+    try:
+        from _artist_book import TAB_ORDER, TABS, open_book
+        b = open_book()
+        if hasattr(b, "path") and not b.path.exists():
+            return [("normal", "アーティスト台帳を作る", "（まだ無い）", "artist_book.py init → import-json proposals/<日付>")]
+        data = b.read()
+    except Exception as e:  # noqa: BLE001
+        return [("normal", "アーティスト台帳を読めない（共有設定か鍵を確認）", str(e)[:60], "docs/13_artist_book.md")]
+    out = []
+    acts = {r["id"]: r for r in data["acts"]}
+    st = lambda r: str(r.get("status") or "").strip()  # noqa: E731
+    for r in data["acts"]:
+        if st(r) == "提案":
+            out.append(("normal", "新しい組の提案を読んで、採用・保留・却下を決める", r.get("name", r["id"]),
+                        f"proposals/{r['id']}.md（artist_book.py adopt {r['id']}）"))
+        elif st(r) in ("", "採用") and r["id"] not in names:
+            out.append(("normal", "採用した組を設定書に反映（火曜の朝に自動でも動く）", r.get("name", r["id"]), "artist_book.py pull"))
+    for tab in TAB_ORDER:
+        if tab in ("acts", "changes"):
+            continue
+        for r in data[tab]:
+            act = acts.get(r.get("act_id"), {})
+            if st(r) == "提案" and st(act) != "提案":   # 組ごと提案中のものは上でまとめて出す
+                out.append(("normal", f"『{TABS[tab][0]}』の提案に返事（採用・却下）", act.get("name", r.get("act_id")),
+                            "artists.xlsx の状態の列"))
+    for r in data["changes"]:
+        if st(r) == "提案":
+            out.append(("normal", "変更の提案（方針転換など）に返事", f"{acts.get(r.get('act_id'), {}).get('name', r.get('act_id'))}"
+                        f"（{r.get('tab')}『{r.get('field')}』）", "採用 → artist_book.py apply-changes → pull"))
+    for r in data["choices"]:
+        act = acts.get(r.get("act_id"), {})
+        if st(r) in ("", "採用") and st(act) in ("", "採用") and not r.get("acquired"):
+            out.append(("normal", "参考曲を正規に入手して解析（入手に ○）", f"{r.get('title')}／{r.get('artist')}（{act.get('name', '')}）",
+                        "out/references/ → analyze_track.py"))
+    return out
 
 
 def week_table(week: date) -> str:

@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json  # noqa: E402
 from _common import OUT, all_artists, load_label, step, write_json  # noqa: E402
+from _life import real_names, scrub  # noqa: E402
 
 LIMITS = {"spotify_bio_en": 1500, "short_bio_en": 300, "youtube_description_en": 1000,
           "instagram_bio": 150, "tiktok_bio": 80, "bio_ja": 500}
@@ -57,6 +58,18 @@ def card(a: dict, with_fav: bool) -> dict:
          "visual": {k: (a.get("visual") or {}).get(k) for k in ("space", "light", "palette")},
          "profile": {k: v for k, v in prof.items() if k != "favorite_artists_real" and not k.startswith("_")},
          "existing_bio_en": (a.get("distribution") or {}).get("bio_en")}
+    life = a.get("life") or {}
+    if life:   # 台帳の人生：生い立ち・デビューの経緯・ファンのつき方・人柄（影響と参考曲の候補は実名なので既定では渡さない）
+        act = life.get("act", {})
+        c["life"] = scrub({
+            "act": {k: act.get(k) for k in ("origin", "base_now", "culture", "strengths", "debut_summary", "fan_growth",
+                                             "values", "future", "current_chapter", "expression") if act.get(k)},
+            "members": [{k: m.get(k) for k in ("name", "role", "age", "birthplace", "roots", "languages", "personality",
+                                               "holidays", "expression", "likes") if m.get(k)} for m in life.get("members", [])],
+            "debut_steps": life.get("debut_steps", []),
+        }, [] if with_fav else real_names(a))
+        if with_fav:
+            c["favorite_works_allowed"] = [f"{i.get('title')} / {i.get('author')}" for i in life.get("influences", [])]
     if with_fav:
         c["favorite_artists_allowed"] = prof.get("favorite_artists_real", [])
     return c
@@ -82,7 +95,7 @@ def check(texts: dict, a: dict, with_fav: bool) -> list[str]:
             probs.append(f"{LABELS_JA[k]} に AI の明記が無い")
     if "AI" not in texts.get("bio_ja", ""):
         probs.append("日本語の紹介に AI の明記が無い")
-    for n in (a.get("profile") or {}).get("favorite_artists_real", []):
+    for n in sorted(set((a.get("profile") or {}).get("favorite_artists_real", [])) | set(real_names(a))):
         for k, v in texts.items():
             if n and n.lower() in v.lower() and not (with_fav and k == "spotify_bio_en"):
                 probs.append(f"{LABELS_JA[k]} に実在アーティスト名（{n}）")

@@ -3,6 +3,10 @@ certifi
 librosa>=0.10
 soundfile
 numpy
+openpyxl          # アーティスト台帳（artists.xlsx）の読み書き
+
+# 任意：アーティスト台帳を Google スプレッドシートで使うとき（サービスアカウントの署名）
+# cryptography
 
 # 任意：テイクの歌詞照合（select_takes.py）。入れると自動で文字起こしする（初回にモデルを数百 MB ダウンロード）
 # faster-whisper

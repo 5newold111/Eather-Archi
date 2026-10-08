@@ -8,6 +8,7 @@
     ・ジャケットの完成品（cover_final.jpg）と、選ばれたロゴ・写真
     ・ブリーフ・最終歌詞・登録データ・成績・傾向レポート・成長分析
     ・設定書（templates/）… アーティストやレーベルの設定そのもの
+    ・アーティスト台帳（artists.xlsx）と提案（proposals/）、台帳の読み込みの記録
   上げないもの：鍵（.env）、没テイクの音源、ログ
 
   R2 側の置き場所：<バケット>/label/<music-label からの相対パス>
@@ -49,9 +50,11 @@ PATTERNS = [
     "out/growth/*.json", "out/growth/*.md", "out/trends/*.json", "out/trends/*.md",
     "out/references/*.json", "out/collabs/*.json", "out/social/*/*/plan.json",
     "templates/**/*.json",
+    "artists.xlsx", "proposals/**/*.json", "proposals/**/*.md", "out/artist_book/snapshots/*.json",
 ]
 CTYPE = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json",
-         ".md": "text/markdown; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv; charset=utf-8"}
+         ".md": "text/markdown; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv; charset=utf-8",
+         ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
 
 
 # ---------------------------------------------------------------------------

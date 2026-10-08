@@ -61,17 +61,17 @@ python3 scripts/run_week.py status --week <週>    # 組ごとの進み具合
 ```
 # 火曜の朝
 python3 scripts/select_references.py --all --week <週> --references out/references   # 骨組み
-python3 scripts/write_brief.py out/briefs/<週>_light.json                             # 指示文・核・タイトル候補（組ごと）
-python3 scripts/merge_lyrics.py out/briefs/<週>_light.json --verses <Suno の節.txt>   # 最終歌詞
+python3 scripts/write_brief.py out/briefs/<週>_<ID>.json                             # 指示文・核・タイトル候補（組ごと）
+python3 scripts/merge_lyrics.py out/briefs/<週>_<ID>.json --verses <Suno の節.txt>   # 最終歌詞
 
 # 火曜の日中：Suno のテイクを out/takes/<週>_light/take_01.mp3 … に保存して
-python3 scripts/select_takes.py out/briefs/<週>_light.json                            # 計測と聴く順番（Tier A）
-python3 scripts/select_takes.py out/briefs/<週>_light.json --choose 3 --note "理由"   # 選んだテイクを記録
+python3 scripts/select_takes.py out/briefs/<週>_<ID>.json                            # 計測と聴く順番（Tier A）
+python3 scripts/select_takes.py out/briefs/<週>_<ID>.json --choose 3 --note "理由"   # 選んだテイクを記録
 
 # 火曜の夕方
-python3 scripts/master_track.py out/briefs/<週>_light.json                            # -14 LUFS / -1 dBTP の WAV
-python3 scripts/generate_visuals.py --artist light --kind cover --brief out/briefs/<週>_light.json
-python3 scripts/finalize_cover.py out/briefs/<週>_light.json                          # 3000×3000 JPEG
+python3 scripts/master_track.py out/briefs/<週>_<ID>.json                            # -14 LUFS / -1 dBTP の WAV
+python3 scripts/generate_visuals.py --artist <ID> --kind cover --brief out/briefs/<週>_<ID>.json
+python3 scripts/finalize_cover.py out/briefs/<週>_<ID>.json                          # 3000×3000 JPEG
 
 # 水曜
 python3 scripts/distrokid_sheet.py --week <週> --title light="決めたタイトル"          # 登録シート
