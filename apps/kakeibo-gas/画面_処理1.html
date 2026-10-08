@@ -1,0 +1,64 @@
+<script>
+'use strict';
+    // ───── 状態 ─────
+    const state = {
+      config: { categories: { '支出': ['その他'], '収入': ['その他'] }, methods: ['その他'], today: localToday() },
+      type: '支出',
+      month: localToday().slice(0, 7),
+      monthData: null,
+      preview: [],
+    };
+    const $ = (id) => document.getElementById(id);
+
+    // サーバー側（コード.gs）の関数を呼ぶ。結果を Promise で受け取れるようにする
+    function call(name, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](...args);
+      });
+    }
+
+    function localToday() {
+      const d = new Date();
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+    function pad(n) { return ('0' + n).slice(-2); }
+    function yen(n) { return '¥' + Number(n).toLocaleString('ja-JP'); }
+    function el(tag, props, children) {
+      const node = document.createElement(tag);
+      Object.assign(node, props || {});
+      (children || []).forEach((c) => node.append(c));
+      return node;
+    }
+    function show(id, text, isError) {
+      const m = $(id);
+      m.textContent = text;
+      m.classList.toggle('err', !!isError);
+      m.hidden = !text;
+    }
+
+    // ───── タブ切り替え（最後に開いたタブを覚える） ─────
+    function openTab(name) {
+      document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+      document.querySelectorAll('section[role="tabpanel"]').forEach((s) => { s.hidden = s.id !== 'tab-' + name; });
+      try { localStorage.setItem('kakeibo.tab', name); } catch (e) { /* 保存できない環境でも動作に支障なし */ }
+      if (name === 'month') loadMonth();
+      if (name === 'fixed') loadFixed();
+    }
+    document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => openTab(b.dataset.tab)));
+
+    // ───── 選択肢の組み立て ─────
+    function fillSelect(select, options, value) {
+      select.replaceChildren(...options.map((o) => el('option', { value: o, textContent: o, selected: o === value })));
+    }
+    // カテゴリの選択肢。支出は4分類（敵1〜敵4）ごとのグループに分けて並べる
+    function fillCategories(select, type, value) {
+      const tiers = type === '支出' ? (state.config.tiers || []) : [];
+      if (!tiers.length) return fillSelect(select, state.config.categories[type], value);
+      const opt = (c) => el('option', { value: c, textContent: c, selected: c === value });
+      select.replaceChildren(...tiers.map((t) => el('optgroup', { label: t.name + ' ' + t.label }, t.categories.map(opt))));
+    }
+    function refreshCategories() {
+      fillCategories($('fCategory'), state.type);
+    }
+
+</script>

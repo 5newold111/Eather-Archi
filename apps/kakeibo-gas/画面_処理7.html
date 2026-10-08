@@ -1,0 +1,51 @@
+<script>
+'use strict';
+    function buildCsv(entries) {
+      const head = ['日付', '区分', '分類', '金額', 'カテゴリ', '支払方法', 'メモ', '事業按分(%)', '登録元'];
+      const q = (v) => {
+        let s = String(v);
+        if (/^[=+\-@]/.test(s)) s = "'" + s;
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = entries.slice().reverse().map((e) => [e.date, e.type, e.type === '収入' ? '' : '敵' + e.tier, e.amount, e.category, e.method, e.memo, e.business_ratio, e.source].map(q).join(','));
+      return [head.join(',')].concat(lines).join('\r\n');
+    }
+    $('csvSave').addEventListener('click', () => {
+      if (!state.monthData) return;
+      const blob = new Blob(['﻿' + buildCsv(state.monthData.entries)], { type: 'text/csv' });
+      const a = el('a', { href: URL.createObjectURL(blob), download: '家計簿_' + state.month + '.csv' });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    $('csvShow').addEventListener('click', () => {
+      if (!state.monthData) return;
+      const t = $('csvText');
+      t.value = buildCsv(state.monthData.entries);
+      t.hidden = false;
+      t.select();
+      show('monthMsg', '保存がうまくいかない場合は、この内容をコピーしてスプレッドシートやメモに貼り付けてください。');
+    });
+
+    // ───── 起動 ─────
+    (async function init() {
+      $('today').textContent = localToday().replace(/-/g, '.');
+      $('fDate').value = localToday();
+      fillSelect($('fMethod'), state.config.methods);
+      refreshCategories();
+      try {
+        state.config = await call('getConfig');
+        $('fDate').value = state.config.today;
+        fillSelect($('fMethod'), state.config.methods, '現金');
+        refreshCategories();
+        fillCategories($('xCategory'), '支出', '住居');
+        fillSelect($('xMethod'), state.config.methods, '口座振替');
+      } catch (err) {
+        show('importMsg', '設定の読み込みに失敗しました: ' + (err && err.message || err), true);
+      }
+      let tab = 'month';
+      try { tab = localStorage.getItem('kakeibo.tab') || 'month'; } catch (e) { /* 既定のタブ（ダッシュボード）で開く */ }
+      openTab(['month', 'import', 'input', 'fixed'].includes(tab) ? tab : 'month');
+    })();
+</script>

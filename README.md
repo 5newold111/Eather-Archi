@@ -44,6 +44,8 @@ Google Fonts の配信CSSを取得し直して `fonts/` ごと作り直してく
 ├── fonts/                            # セルフホストしたwoff2（500ファイル）
 ├── js/
 │   └── main.js                       # 方眼描画・ヘッダー・メニュー・出現演出
+├── apps/
+│   └── kakeibo-gas/                  # 家計簿アプリ（GAS・Claudeチャット連携）→ 中の README を参照
 └── .github/workflows/
     └── static.yml                    # GitHub Pages への自動デプロイ
 ```

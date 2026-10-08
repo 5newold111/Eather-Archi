@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<!-- 組み立て用の画面ファイル。中身は「画面_」で始まる各ファイルにあり、コード.gs の include_ で読み込んで1枚の画面にする。
+     （1ファイルが長いと貼り付け時に途中で切れることがあるため、100行未満に分けている） -->
+<html lang="ja">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <?!= include_('画面_スタイル1') ?>
+  <?!= include_('画面_スタイル2') ?>
+</head>
+<body>
+  <div class="wrap">
+  <?!= include_('画面_本文1') ?>
+  <?!= include_('画面_本文2') ?>
+  <?!= include_('画面_本文3') ?>
+  </div>
+  <?!= include_('画面_処理1') ?>
+  <?!= include_('画面_処理2') ?>
+  <?!= include_('画面_処理3') ?>
+  <?!= include_('画面_処理4') ?>
+  <?!= include_('画面_ダッシュボード') ?>
+  <?!= include_('画面_処理5') ?>
+  <?!= include_('画面_処理6') ?>
+  <?!= include_('画面_処理7') ?>
+</body>
+</html>

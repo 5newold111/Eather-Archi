@@ -1,0 +1,34 @@
+<script>
+'use strict';
+    // 月の明細一覧（新しい順）。分類の列は「敵1」などの名前で表示
+    function renderList(data) {
+      const tierName = (n) => ((state.config.tiers || []).find((t) => t.id === n) || { name: '' }).name;
+      $('list').tBodies[0].replaceChildren(...data.entries.map((e) => {
+        const del = el('button', { className: 'x', textContent: '×', title: '削除' });
+        del.setAttribute('aria-label', e.date + ' ' + e.category + ' ' + yen(e.amount) + ' を削除');
+        del.addEventListener('click', () => removeEntry(e));
+        const amount = (e.type === '収入' ? '+' : '') + yen(e.amount);
+        return el('tr', {}, [
+          el('td', { className: 'num', textContent: e.date.slice(5).replace('-', '/') }),
+          el('td', { className: 'mo', textContent: e.type === '収入' ? '収入' : tierName(e.tier) }),
+          el('td', { textContent: e.category }),
+          el('td', { textContent: e.memo }),
+          el('td', { className: 'num', textContent: amount }),
+          el('td', {}, [del]),
+        ]);
+      }));
+    }
+
+    async function removeEntry(e) {
+      if (!confirm(e.date + '　' + e.category + '　' + yen(e.amount) + '\nこの記録を削除しますか？')) return;
+      try {
+        await call('deleteEntry', e.id);
+        loadMonth();
+      } catch (err) {
+        show('monthMsg', '削除に失敗しました: ' + (err && err.message || err), true);
+      }
+    }
+
+    $('prevMonth').addEventListener('click', () => { state.month = shiftMonth(state.month, -1); loadMonth(); });
+    $('nextMonth').addEventListener('click', () => { state.month = shiftMonth(state.month, 1); loadMonth(); });
+</script>

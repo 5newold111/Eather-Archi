@@ -1,0 +1,52 @@
+    <header>
+      <h1><span class="label">Kakeibo</span>家計簿</h1>
+      <span class="label" id="today"></span>
+    </header>
+
+    <nav role="tablist">
+      <button role="tab" data-tab="month" aria-selected="true"><span class="label">01</span>ダッシュボード</button>
+      <button role="tab" data-tab="import" aria-selected="false"><span class="label">02</span>チャットから取り込む</button>
+      <button role="tab" data-tab="input" aria-selected="false"><span class="label">03</span>手で入力</button>
+      <button role="tab" data-tab="fixed" aria-selected="false"><span class="label">04</span>固定費</button>
+    </nav>
+
+    <!-- 01 ダッシュボード（月ごとの総額と、敵1〜敵4の内訳） -->
+    <section id="tab-month" role="tabpanel">
+      <div class="month">
+        <button class="btn ghost" id="prevMonth" aria-label="前の月">←</button>
+        <strong id="monthLabel"></strong>
+        <button class="btn ghost" id="nextMonth" aria-label="次の月">→</button>
+      </div>
+      <div class="hero">
+        <span class="label">支出の総額</span>
+        <b id="sExpense">—</b>
+        <small id="sExpensePrev"></small>
+      </div>
+      <div class="stats two">
+        <div><span class="label">収入</span><b id="sIncome">—</b><small id="sIncomePrev"></small></div>
+        <div><span class="label">差額（収入−支出）</span><b id="sBalance">—</b><small id="sBalancePrev"></small></div>
+      </div>
+
+      <h3 class="dh">支出の内訳</h3>
+      <div class="band" id="band" role="img"></div>
+      <div class="band band--labels" id="bandLabels" aria-hidden="true"></div>
+      <div class="tiers" id="tiers"></div>
+      <p class="sub" id="sBusiness"></p>
+
+      <h3 class="dh">カテゴリ別</h3>
+      <div class="bars" id="bars"></div>
+
+      <h3 class="dh">明細</h3>
+      <div class="scroll">
+        <table id="list">
+          <thead><tr><th>日付</th><th>分類</th><th>カテゴリ</th><th>メモ</th><th class="num">金額</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="csvSave">CSVを保存</button>
+        <button class="btn ghost" id="csvShow">CSVを表示</button>
+      </div>
+      <textarea id="csvText" readonly hidden style="margin-top:12px"></textarea>
+      <div class="msg" id="monthMsg" hidden></div>
+    </section>
