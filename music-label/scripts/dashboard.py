@@ -133,8 +133,10 @@ def book_todos(names: dict[str, str]) -> list[tuple[str, str, str, str]]:
     st = lambda r: str(r.get("status") or "").strip()  # noqa: E731
     for r in data["acts"]:
         if st(r) == "提案":
+            docs = sorted((ROOT / "proposals").glob(f"*/{r['id']}.md")) or sorted((ROOT / "proposals").glob(f"{r['id']}.md"))
+            where = docs[-1].relative_to(ROOT).as_posix() if docs else "artist_book.py render で資料を作る"
             out.append(("normal", "新しい組の提案を読んで、採用・保留・却下を決める", r.get("name", r["id"]),
-                        f"proposals/{r['id']}.md（artist_book.py adopt {r['id']}）"))
+                        f"{where}（まとめて採用：artist_book.py adopt <ID>）"))
         elif st(r) in ("", "採用") and r["id"] not in names:
             out.append(("normal", "採用した組を設定書に反映（火曜の朝に自動でも動く）", r.get("name", r["id"]), "artist_book.py pull"))
     for tab in TAB_ORDER:
