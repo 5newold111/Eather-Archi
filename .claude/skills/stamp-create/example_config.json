@@ -1,0 +1,81 @@
+{
+  "inputs": [
+    "/path/to/key0_eyes_open.png",
+    "/path/to/key1_eyes_closed.png"
+  ],
+  "output": "/home/user/Eather-Arch/assets/gif/example.gif",
+  "background": "auto",
+  "size": 240,
+  "outline_px": 3,
+  "frame_ms": 200,
+  "max_bytes": 1000000,
+  "tween_squash": 0.03,
+  "text": {
+    "enabled": true,
+    "source": 0,
+    "color": [
+      70,
+      25,
+      10
+    ],
+    "color_tol": 70,
+    "max_y_ratio": 0.37,
+    "pulse": 0.13,
+    "cycles": 2
+  },
+  "sequence": [
+    {
+      "key": 0
+    },
+    {
+      "tween": [
+        0,
+        1,
+        0.5
+      ]
+    },
+    {
+      "key": 1
+    },
+    {
+      "key": 1
+    },
+    {
+      "tween": [
+        1,
+        0,
+        0.5
+      ]
+    },
+    {
+      "key": 0
+    },
+    {
+      "tween": [
+        0,
+        1,
+        0.5
+      ]
+    },
+    {
+      "key": 1
+    },
+    {
+      "key": 1
+    },
+    {
+      "tween": [
+        1,
+        0,
+        0.5
+      ]
+    },
+    {
+      "key": 0
+    },
+    {
+      "key": 0
+    }
+  ],
+  "margin": 0.05
+}
