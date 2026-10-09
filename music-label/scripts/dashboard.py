@@ -119,16 +119,21 @@ def todos() -> list[tuple[str, str, list[str], str]]:
 
 
 def book_todos(names: dict[str, str]) -> list[tuple[str, str, str, str]]:
-    """アーティスト台帳の返事待ち（提案）と、採用したのに入手していない参考曲"""
+    """アーティスト管理表の返事待ち（提案）と、採用したのに入手していない参考曲"""
     try:
-        from _artist_book import TAB_ORDER, TABS, open_book
+        from _artist_book import PENDING, TAB_ORDER, TABS, XlsxBook, open_book
         b = open_book()
         if hasattr(b, "path") and not b.path.exists():
-            return [("normal", "アーティスト台帳を作る", "（まだ無い）", "artist_book.py init → import-json proposals/<日付>")]
+            return [("normal", "アーティスト管理表を作る", "（まだ無い）", "artist_book.py init → import-json proposals/<日付>")]
         data = b.read()
     except Exception as e:  # noqa: BLE001
-        return [("normal", "アーティスト台帳を読めない（共有設定か鍵を確認）", str(e)[:60], "docs/13_artist_book.md")]
+        return [("normal", "アーティスト管理表を読めない（共有設定か鍵を確認）", str(e)[:60], "docs/13_artist_book.md")]
     out = []
+    if PENDING.exists():   # Google の表を閲覧のみで読んでいる間に貯まった機械の提案
+        n = sum(len(v) for v in XlsxBook(PENDING).read().values())
+        if n:
+            out.append(("normal", f"Google の管理表に入れていない機械の提案が {n} 件", PENDING.name,
+                        "中身を Google の表に貼る（サービスアカウントを設定すると直接入る：docs/13）"))
     acts = {r["id"]: r for r in data["acts"]}
     st = lambda r: str(r.get("status") or "").strip()  # noqa: E731
     for r in data["acts"]:

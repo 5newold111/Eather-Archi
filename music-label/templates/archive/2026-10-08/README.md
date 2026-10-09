@@ -1,6 +1,6 @@
 # 保管庫：2026-10-08 に白紙にした組
 
-アーティスト台帳（`artists.xlsx`、`docs/13_artist_book.md`）で一から作り直すため、それまでの 17 組をここへ移した。
+アーティスト管理表（`artists.xlsx`、`docs/13_artist_book.md`）で一から作り直すため、それまでの 17 組をここへ移した。
 制作の流れ（`templates/artists/`・`templates/labels/*.json` の `artists`）からは外れているので、どのスクリプトも読まない。
 
 | 場所 | 中身 |

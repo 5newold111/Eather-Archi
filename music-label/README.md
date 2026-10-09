@@ -1,7 +1,7 @@
 # 音楽レーベル 自動制作・配信パイプライン
 
-EtherArchi の 5 つの軸（**形・質・光・時・自**）を 5 組のアーティストに見立て、
-毎週水曜に 5 曲を世界配信するための「設計図」と「土台ファイル」をまとめたフォルダです。
+EtherArchi の音楽レーベル。所属アーティストそれぞれの人生から曲をつくり、
+毎週水曜に世界配信するための「設計図」と「土台ファイル」をまとめたフォルダです。
 
 > **このフォルダは公式サイトに合流させないこと。** 公式サイトはリポジトリ全体を公開する設定なので、合流すると設定書や戦略資料が公開されます。
 > 非公開の別リポジトリに切り出す手順は `docs/12_decisions.md`。
@@ -36,10 +36,10 @@ music-label/
 │   ├── 09_auth_batch.md          ← 鍵とアカウントの一括設定（Supabase・OpenAI・YouTube・Instagram・TikTok・DistroKid・Suno）
 │   ├── 10_automation.md          ← 自動運転の全体像（定期実行の時間割・人がやること・自動で決めていること）
 │   ├── 11_plans_and_costs.md     ← 契約するプランと月の費用（Suno のダウンロード上限・DistroKid の組数）
-│   ├── 12_decisions.md           ← 決めたこと（非公開リポジトリへの切り出し・SNS はレーベル単位・アーティストは台帳が正本で自動生成は提案まで）
-│   └── 13_artist_book.md         ← アーティスト台帳（スプレッドシート）。人生・近況・参考曲の候補を書き足し、毎週の曲のテーマに使う
-├── artists.xlsx                  ← アーティスト台帳（正本）。Excel・Numbers・Google スプレッドシートで開ける
-├── proposals/                    ← 機械の提案（新しい組の JSON と、読みやすい資料 .md）。採用は台帳で決める
+│   ├── 12_decisions.md           ← 決めたこと（非公開リポジトリへの切り出し・SNS はレーベル単位・アーティストは管理表が正本で自動生成は提案まで）
+│   └── 13_artist_book.md         ← アーティスト管理表（スプレッドシート）。人生・近況・参考曲の候補を書き足し、毎週の曲のテーマに使う
+├── artists.xlsx                  ← アーティスト管理表（正本）。Excel・Numbers・Google スプレッドシートで開ける
+├── proposals/                    ← 機械の提案（新しい組の JSON と、読みやすい資料 .md）。採用は管理表で決める
 ├── supabase/
 │   ├── schema.sql                ← テーブル定義（ルールをデータベース側でも強制する）
 │   └── storage.sql               ← 非公開バケットとアクセス制御
@@ -49,10 +49,10 @@ music-label/
 │   ├── artist_sheet.schema.json     ← アーティスト設定書の型定義
 │   ├── brief.schema.json            ← ブリーフの型定義
 │   ├── visual_criteria.json         ← ビジュアル候補の採点基準（オーナーの判断で育つ）
-│   ├── artists/                     ← 本体レーベル（ドライブ）の設定書。台帳から artist_book.py pull で作る（直接は書き換えない）
+│   ├── artists/                     ← 本体レーベル（ドライブ）の設定書。管理表から artist_book.py pull で作る（直接は書き換えない）
 │   │   └── _template.json           ← 設定書の項目の見本
 │   ├── archive/2026-10-08/          ← 白紙にする前の 17 組（読まれない保管庫）
-│   └── labels/                      ← 子レーベル（場面ごと）。組は台帳で採用すると artists に入る
+│   └── labels/                      ← 子レーベル（場面ごと）。組は管理表で採用すると artists に入る
 │       ├── _template.json
 │       ├── sleep.json               ← 眠り
 │       ├── morning.json             ← 朝のコーヒー
@@ -81,8 +81,8 @@ music-label/
     ├── fetch_trends.py           ← 今週の話題曲・トレンド言語を Claude が Web で調べ、話題曲の解析シートを作る
     ├── plan_collabs.py           ← その週のコラボ（feat. / remix）を決めてブリーフに書く
     ├── collect_metrics.py        ← 成績を集める（DistroKid・Spotify for Artists の書き出し、SNS の API）→ 成長分析へ
-    ├── apply_pivot.py            ← 方針転換（台帳の組は『変更の提案』に足すだけ。頻度の切り替えは直接）
-    ├── expand_label.py           ← 月 1 組の追加（Claude が台帳に提案 → 採用された組をデビュー予約）と隔週への切り替え
+    ├── apply_pivot.py            ← 方針転換（管理表の組は『変更の提案』に足すだけ。頻度の切り替えは直接）
+    ├── expand_label.py           ← 月 1 組の追加（Claude が管理表に提案 → 採用された組をデビュー予約）と隔週への切り替え
     ├── plan_quarterly.py         ← 四半期の EP・コンピレーションの計画と登録シート
     ├── backup_r2.py              ← Cloudflare R2 への予備保管（変わったファイルだけ）
     ├── setup_keys.py             ← 鍵の一括設定ウィザード（手順 → ブラウザ → 保存 → 実際に接続して確認）
@@ -90,15 +90,15 @@ music-label/
     ├── dashboard.py              ← 管理画面 out/dashboard.html（人がやること・制作の進み具合・配信予定・組の伸び）
     ├── store_profiles.py         ← ストアと SNS のプロフィール文（文字数の上限つき）
     ├── render_roomtour.py        ← Blender のルームツアーを書き出し、SNS の縦動画の背景にする
-    ├── artist_book.py            ← アーティスト台帳の管理（作成・提案の取り込み・採用・設定書への反映・Claude の提案）
-    ├── render_profile.py         ← 台帳の 1 組ぶんを読みやすい資料（Markdown）にする
+    ├── artist_book.py            ← アーティスト管理表の管理（作成・提案の取り込み・採用・設定書への反映・Claude の提案）
+    ├── render_profile.py         ← 管理表の 1 組ぶんを読みやすい資料（Markdown）にする
     └── _common.py, _supabase.py, _claude.py, _artist_book.py, _life.py  ← 上のスクリプトが共通で使う部品
 ```
 
 ## 決まっていること（設計の前提）
 
-- **アーティスト**：情報の正本は **アーティスト台帳**（`artists.xlsx`、`docs/13_artist_book.md`）。機械は提案まで、採用はオーナー。
-  本体 5 枠（光・時・形・質・自）の新しい提案は `proposals/2026-10-08/`（2026-10-08 に以前の 17 組は白紙にした）
+- **アーティスト**：情報の正本は **アーティスト管理表**（`artists.xlsx`、`docs/13_artist_book.md`）。機械は提案まで、採用はオーナー。
+  新しい 5 組の提案は `proposals/2026-10-08/`（2026-10-08 に以前の 17 組は白紙にし、2026-10-09 に軸は廃止した）
 - **曲のテーマ**：組ごとの人生（年表・近況・歌の種）から、その時々の想いを歌にする。毎週「まだ歌にしていない近況 → 歌の種」の順に選ばれる
 - **配信**：毎週水曜 17:00 ET（米国東部時間）に 5 アーティスト × 1 曲 ＝ 5 曲
 - **仕込み期間**：2 週間（火曜に作った曲は、2 週間後の水曜に配信）

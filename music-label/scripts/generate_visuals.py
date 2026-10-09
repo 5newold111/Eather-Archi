@@ -29,7 +29,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _life import real_names  # noqa: E402  台帳の実名（指示文に混ぜない）
+from _life import real_names  # noqa: E402  管理表の実名（指示文に混ぜない）
 
 ROOT = Path(__file__).resolve().parent.parent
 CRITERIA_PATH = ROOT / "templates" / "visual_criteria.json"
@@ -106,7 +106,7 @@ def scrub(text: str, artist: dict) -> str:
     """実名・禁止語を落とす。favorite_artists_real / influences.name は最初から使わないが、念のため検査する"""
     names = list(artist.get("profile", {}).get("favorite_artists_real", []))
     names += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
-    names += real_names(artist)   # 台帳の『影響』『参考曲の候補』の実名
+    names += real_names(artist)   # 管理表の『影響』『参考曲の候補』の実名
     for n in names + BANNED_IN_PROMPT:
         if n and n not in ("（bio のみ）",) and n in text:
             raise RuntimeError(f"指示文に渡してはいけない語が含まれています: {n}")
@@ -125,7 +125,7 @@ def visual_base(artist: dict) -> str:
 
 
 def appearance_clause(artist: dict) -> str:
-    """台帳のメンバーの見た目（髪・服・体格・見える傷やタトゥー）。顔は描かないので、後ろ姿やシルエットで伝わる部分だけ"""
+    """管理表のメンバーの見た目（髪・服・体格・見える傷やタトゥー）。顔は描かないので、後ろ姿やシルエットで伝わる部分だけ"""
     members = (artist.get("life") or {}).get("members", [])
     marks = (artist.get("life") or {}).get("marks", [])
     parts = []

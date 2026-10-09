@@ -1,30 +1,32 @@
 #!/usr/bin/env python3
 """
-アーティスト台帳（スプレッドシート）を中心にした管理。
+アーティスト管理表（スプレッドシート）を中心にした管理。
 
-  台帳がアーティスト情報の「正本」。オーナーが書き足し、機械は読んで曲づくりに使う。
-  機械が作るものは、すべて「状態＝提案」の行として台帳に足すだけ。採用するかはオーナーが決める。
+  管理表がアーティスト情報の「正本」。オーナーが書き足し、機械は読んで曲づくりに使う。
+  機械が作るものは、すべて「状態＝提案」の行として管理表に足すだけ。採用するかはオーナーが決める。
 
-  init            台帳を新しく作る（music-label/artists.xlsx。Google スプレッドシートに取り込んでもよい）
-  check           提案の JSON を台帳に入れる前に確かめる（項目名・型・実名の混入）
-  import-json     提案の JSON（proposals/ の中）を「提案」の行として台帳に入れる
-  propose         Claude が新しいアーティストを丸ごと提案する（台帳に「提案」の行で入る）
+  init            管理表を新しく作る（music-label/artists.xlsx。Google スプレッドシートに取り込んでもよい）
+  check           提案の JSON を管理表に入れる前に確かめる（項目名・型・実名の混入）
+  import-json     提案の JSON（proposals/ の中）を「提案」の行として管理表に入れる
+  propose         Claude が新しいアーティストを丸ごと提案する（管理表に「提案」の行で入る）
   propose-update  Claude が組ごとに来月の近況と歌の種を提案する（その時々の想いを歌にするため）
   adopt           1 組ぶんの「提案」の行をまとめて「採用」にする（却下・保留にした行はそのまま）
-  pull            台帳の「採用」の行から、制作で使う設定書（templates/）を作り直す
+  pull            管理表の「採用」の行から、制作で使う設定書（templates/）を作り直す
   status          提案の数・空欄の多い項目・参考曲の入手状況
-  render          台帳の内容を、読みやすい資料（proposals/<組>.md）に書き出す
+  render          管理表の内容を、読みやすい資料（proposals/<組>.md）に書き出す
+  restyle         管理表の中身をそのまま、デザインを整えた Excel に書き出す（Google の表へは「インポート → 置換」で入れる）
   apply-changes   「変更の提案」タブで採用された変更を、該当する欄に書き込む
 
 使い方
   python3 scripts/artist_book.py init
   python3 scripts/artist_book.py import-json proposals/2026-10-08
-  python3 scripts/artist_book.py propose --label drive --axis 光 --note "日本とアメリカのハーフ、朝の歌"
+  python3 scripts/artist_book.py propose --label 本体 --note "日本とアメリカのハーフ、朝の歌"
+  python3 scripts/artist_book.py restyle                # 今の中身のまま、見やすいデザインの Excel に書き出し直す
   python3 scripts/artist_book.py pull
   python3 scripts/artist_book.py status
 
 状態の列：提案（機械の案）／採用（使う）／保留／却下。空欄は採用として扱う（オーナーが自分で書いた行）。
-台帳の場所：既定は music-label/artists.xlsx。.env に ARTIST_BOOK_GSHEET_ID と GOOGLE_SERVICE_ACCOUNT_FILE を入れると
+管理表の場所：既定は music-label/artists.xlsx。.env に ARTIST_BOOK_GSHEET_ID と GOOGLE_SERVICE_ACCOUNT_FILE を入れると
 Google スプレッドシートを読む（docs/13_artist_book.md）。
 """
 from __future__ import annotations
@@ -36,11 +38,10 @@ from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _artist_book import TAB_ORDER, TABS, adopted, open_book  # noqa: E402
+from _artist_book import PENDING, TAB_ORDER, TABS, ReadOnlyBook, XlsxBook, adopted, append_rows, open_book  # noqa: E402
 from _common import MAIN_LABEL, OUT, ROOT, all_artists, load_dotenv, load_label, read_json, save_artist, step, write_json  # noqa: E402
 
 load_dotenv()
-AXIS = {"光": "light", "時": "time", "形": "shape", "質": "quality", "自": "self"}
 FORMATION = {"ソロ": "solo", "デュオ": "duo", "バンド": "band", "ボーカルグループ": "vocal_group", "プロデューサー": "producer"}
 SEX = {"女性": "female", "男性": "male", "男女": "mixed", "なし": "none"}
 RANGE = {"高": "high", "中": "mid", "低": "low"}
@@ -49,32 +50,20 @@ LANG = {"英語": "en", "日本語": "ja", "スペイン語": "es", "韓国語":
 LABEL_JA = {"本体": MAIN_LABEL}
 PROPOSALS = ROOT / "proposals"
 
-GUIDE = [
-    ["アーティスト台帳の使い方"],
-    ["この台帳がアーティスト情報の正本です。書き足すたびに、次の曲づくりから反映されます（毎週火曜の朝に自動で読み込み）。"],
-    ["状態の列：提案＝機械の案／採用＝使う／保留＝あとで決める／却下＝使わない。空欄は採用として扱います。機械は『提案』の行を足すだけで、採用はしません。"],
-    ["1 組は『アーティスト』タブの 1 行。ID（英小文字と _）で、ほかのタブの行とつながります。メンバーは『メンバー』タブに 1 人 1 行、メンバーID でつなぎます。"],
-    ["人生年表・デビューの経緯・傷とタトゥー・影響・歌の種・近況・参考曲の候補は、1 つの出来事・1 項目を 1 行で。何行でも足せます。"],
-    ["複数の値は「、」か改行で区切ります（例：好きな色 → 朝の水色、生成り）。○ は『はい』の意味です。"],
-    ["実在のアーティスト名・曲名・本の題名は『影響』と『参考曲の候補』のタブにだけ書きます。ほかの欄に書くと、作曲の指示文に混ざるおそれがあります（機械は混ざらないように外しますが、念のため）。"],
-    ["毎週の歌のテーマは、『近況』で『歌にする』に ○ が付いた新しい出来事 → 『歌の種』の順に、まだ使っていないものから選ばれます。"],
-    ["参考曲の候補は、入手（正規に購入）して解析すると、その組の曲づくりで優先して参考にされます。"],
-    ["機械が設定を変えたいとき（方針転換など）は『変更の提案』タブに行を足します。採用にしたら apply-changes で該当の欄に書き込みます。"],
-]
 
 
 def book_or_die(if_exists: bool = False):
     b = open_book()
     if hasattr(b, "path") and not b.path.exists():
-        if if_exists:   # 定期実行から呼ばれたとき：台帳がまだ無ければ何もしない
-            print(f"   台帳がまだ無いので飛ばします（{b.path.name}）")
+        if if_exists:   # 定期実行から呼ばれたとき：管理表がまだ無ければ何もしない
+            print(f"   管理表がまだ無いので飛ばします（{b.path.name}）")
             sys.exit(0)
-        sys.exit(f"[案内] 台帳がまだありません。先に  python3 scripts/artist_book.py init  で作ってください（{b.path}）")
+        sys.exit(f"[案内] 管理表がまだありません。先に  python3 scripts/artist_book.py init  で作ってください（{b.path}）")
     return b
 
 
 # ---------------------------------------------------------------------------
-# 提案を台帳に入れる
+# 提案を管理表に入れる
 # ---------------------------------------------------------------------------
 def proposal_rows(p: dict, status: str = "提案") -> dict[str, list[dict]]:
     """提案の JSON（1 組ぶん）→ タブごとの行"""
@@ -93,8 +82,7 @@ def proposal_rows(p: dict, status: str = "提案") -> dict[str, list[dict]]:
 
 def append_proposal(book, p: dict) -> None:
     for tab, rows in proposal_rows(p).items():
-        if rows:
-            book.append(tab, rows)
+        append_rows(book, tab, rows)
 
 
 def cmd_import_json(a) -> None:
@@ -105,15 +93,15 @@ def cmd_import_json(a) -> None:
     for f in files:
         p = read_json(f)
         if p["act"]["id"] in existing and not a.force:
-            print(f"   － {p['act']['name']}（{p['act']['id']}）は台帳に既にあるので入れません（入れ直すなら --force）")
+            print(f"   － {p['act']['name']}（{p['act']['id']}）は管理表に既にあるので入れません（入れ直すなら --force）")
             continue
-        step(f"{p['act']['name']}（{p['act']['id']}）を『提案』として台帳に入れています")
+        step(f"{p['act']['name']}（{p['act']['id']}）を『提案』として管理表に入れています")
         append_proposal(book, p)
     step(f"入れ終わりました：{book.describe()}")
 
 
 # ---------------------------------------------------------------------------
-# 台帳 → 設定書
+# 管理表 → 設定書
 # ---------------------------------------------------------------------------
 def group(data: dict, aid: str, tab: str, only_adopted: bool = True) -> list[dict]:
     rows = [r for r in data.get(tab, []) if r.get("act_id") == aid]
@@ -121,7 +109,7 @@ def group(data: dict, aid: str, tab: str, only_adopted: bool = True) -> list[dic
 
 
 def strip_row(r: dict) -> dict:
-    return {k: v for k, v in r.items() if k not in ("_row", "status", "act_id") and v not in ("", None, [])}
+    return {k: v for k, v in r.items() if k not in ("_pos", "_row", "status", "act_id") and v not in ("", None, [])}
 
 
 def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str]]:
@@ -240,7 +228,6 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
         "source": {"pulled_at": datetime.now().isoformat(timespec="seconds")},
     }
     if label == MAIN_LABEL:
-        sheet["axis"] = AXIS.get(act.get("axis", ""), act.get("axis") or None)
         sheet["sound"]["drive_spec"] = (old.get("sound") or {}).get("drive_spec") or {
             "hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": True}
     for k in ("expansion",):
@@ -255,7 +242,7 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
             h = sheet["concept_history"]
             h["concept_version"] = int(h.get("concept_version", 1)) + 1
             h.setdefault("history", []).append({"version": h["concept_version"], "date": date.today().isoformat(),
-                                                "level": "owner", "reason": "台帳で場面・見た目を変更", "photos_reshot": False})
+                                                "level": "owner", "reason": "管理表で場面・見た目を変更", "photos_reshot": False})
             warn.append(f"場面か見た目が変わったので、コンセプトの世代を {h['concept_version']} にしました"
                         f"（写真の撮り直し：generate_visuals.py --artist {aid} --kind reshoot）")
     sheet["label_slug"] = label
@@ -264,7 +251,7 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
 
 def cmd_pull(a) -> None:
     book = book_or_die(a.if_exists)
-    step(f"台帳を読んでいます：{book.describe()}")
+    step(f"管理表を読んでいます：{book.describe()}")
     data = book.read()
     snap = OUT / "artist_book" / "snapshots" / f"{datetime.now():%Y%m%d-%H%M%S}.json"
     write_json(snap, data)
@@ -272,13 +259,8 @@ def cmd_pull(a) -> None:
     acts = adopted(data["acts"])
     if not acts:
         print("   採用の組がまだありません（『アーティスト』タブの状態を『採用』にすると、設定書が作られます）")
-    axes: dict[str, str] = {}
     for act in acts:
         sheet, warn = build_sheet(act, data, olds.get(act["id"]))
-        if sheet.get("axis"):
-            if sheet["axis"] in axes:
-                warn.append(f"軸 {act.get('axis')} が {axes[sheet['axis']]} と重なっている（本体は 1 軸 1 組）")
-            axes[sheet["axis"]] = act["id"]
         if a.dry_run:
             print(f"   [確認だけ] {sheet['name']}（{sheet['slug']}）")
         else:
@@ -288,7 +270,7 @@ def cmd_pull(a) -> None:
             print(f"      ⚠ {w}")
     gone = sorted(set(olds) - {x["id"] for x in acts})
     if gone:
-        print(f"   － 台帳で採用されていない組の設定書はそのまま残しています：{', '.join(gone)}")
+        print(f"   － 管理表で採用されていない組の設定書はそのまま残しています：{', '.join(gone)}")
     step(f"読み込みの記録：{snap.relative_to(ROOT)}")
 
 
@@ -367,7 +349,7 @@ def check_shape(p: dict) -> list[str]:
                     if not isinstance(val, list):
                         probs.append(f"{where} は配列で書く")
                     else:
-                        probs += [f"{where} の要素に「、」がある（台帳で分かれてしまう）：{x}" for x in val if "、" in str(x)]
+                        probs += [f"{where} の要素に「、」がある（管理表で分かれてしまう）：{x}" for x in val if "、" in str(x)]
                 elif kind == "int" and val is not None and not isinstance(val, int):
                     probs.append(f"{where} は整数で書く")
                 elif kind == "bool" and not isinstance(val, bool):
@@ -409,7 +391,7 @@ def cmd_propose(a) -> None:
     label = LABEL_JA.get(a.label, a.label)
     lab = load_label(label)
     user = json.dumps({"label": {k: lab.get(k) for k in ("slug", "name", "scene", "sound_center", "expansion_path", "scene_spec")},
-                       "axis": a.axis, "owner_note": a.note, "existing_acts": existing_summary(),
+                       "owner_note": a.note, "existing_acts": existing_summary(),
                        "template": template_for_prompt()}, ensure_ascii=False, indent=1)
     if not available():
         f = OUT / "artist_book" / f"propose_{label}_{date.today()}.prompt.md"
@@ -422,17 +404,18 @@ def cmd_propose(a) -> None:
         if not p:
             print(f"   ✕ 提案を作れませんでした：{msg}")
             continue
-        p.setdefault("act", {}).update(label="本体" if label == MAIN_LABEL else label, **({"axis": a.axis} if a.axis else {}))
+        p.setdefault("act", {}).update(label="本体" if label == MAIN_LABEL else label)
+        p["act"].pop("axis", None)
         probs = validate_proposal(p)
         if probs:
             bad = OUT / "artist_book" / f"rejected_{date.today()}_{n}.json"
             write_json(bad, {"problems": probs, "proposal": p})
-            print(f"   ✕ 提案に問題があるので台帳に入れません：{' / '.join(probs[:3])}（{bad.relative_to(ROOT)}）")
+            print(f"   ✕ 提案に問題があるので管理表に入れません：{' / '.join(probs[:3])}（{bad.relative_to(ROOT)}）")
             continue
         PROPOSALS.mkdir(parents=True, exist_ok=True)
         write_json(PROPOSALS / f"{date.today()}_{p['act']['id']}.json", p)
         append_proposal(book, p)
-        step(f"『{p['act']['name']}』を提案として台帳に入れました（状態を『採用』にすると使われます）")
+        step(f"『{p['act']['name']}』を提案として管理表に入れました（状態を『採用』にすると使われます）")
 
 
 UPDATE_SYSTEM = """You continue the life of a virtual music act from EtherArchi. Given the act's profile and timeline,
@@ -449,9 +432,9 @@ def cmd_propose_update(a) -> None:
     targets = [x for x in all_artists() if (a.all or x["slug"] == a.artist) and x.get("life")]
     if not targets:
         if a.if_exists:
-            print("   台帳から読み込んだ組がまだ無いので飛ばします")
+            print("   管理表から読み込んだ組がまだ無いので飛ばします")
             return
-        sys.exit("[案内] 台帳から読み込んだ組がありません（pull の後に使います）")
+        sys.exit("[案内] 管理表から読み込んだ組がありません（pull の後に使います）")
     pending = {r.get("act_id") for r in book.read()["updates"] if str(r.get("status") or "").strip() == "提案"}
     for x in targets:
         if x["slug"] in pending and not a.force:
@@ -471,8 +454,7 @@ def cmd_propose_update(a) -> None:
             continue
         for tab in ("updates", "seeds"):
             rows = [{**r, "act_id": x["slug"], "status": "提案"} for r in res.get(tab, [])]
-            if rows:
-                book.append(tab, rows)
+            append_rows(book, tab, rows)
         print(f"   ○ {x['name']}：近況 {len(res.get('updates', []))} 件・歌の種 {len(res.get('seeds', []))} 件を提案しました")
 
 
@@ -481,7 +463,7 @@ def cmd_status(a) -> None:
     book = book_or_die()
     data = book.read()
     names = {r["id"]: r.get("name", r["id"]) for r in data["acts"]}
-    print(f"=== 台帳の状態（{book.describe()}）===")
+    print(f"=== 管理表の状態（{book.describe()}）===")
     for r in data["acts"]:
         st = r.get("status") or "採用"
         counts = {TABS[t][0]: sum(1 for x in data[t] if x.get("act_id") == r["id"] and x.get("status") == "提案")
@@ -513,15 +495,19 @@ def cmd_apply_changes(a) -> None:
         if not field or not target:
             print(f"   ✕ 書き込み先が見つかりません：{c.get('act_id')} / {c.get('tab')} / {c.get('field')}")
             continue
-        book.update(tab, target["_row"], field, c.get("proposed"))
-        book.update("changes", c["_row"], "status", "反映済み")
+        try:
+            book.update(tab, target["_pos"], field, c.get("proposed"))
+            book.update("changes", c["_pos"], "status", "反映済み")
+        except ReadOnlyBook:
+            sys.exit("[案内] Google の表を閲覧のみで読んでいるので書き込めません。表の該当欄を直接書き換え、"
+                     "変更の提案の状態を『反映済み』にしてください（自動で書くにはサービスアカウント：docs/13）")
         print(f"   ○ {c.get('act_id')}：{c.get('tab')} の『{c.get('field')}』を書き換えました")
         done += 1
     step(f"{done} 件を反映しました。設定書に反映するには  artist_book.py pull")
 
 
 def cmd_check(a) -> None:
-    """提案の JSON を台帳に入れる前に確かめる（項目名・型・実名の混入・つながり）"""
+    """提案の JSON を管理表に入れる前に確かめる（項目名・型・実名の混入・つながり）"""
     src = Path(a.path)
     files = sorted(src.glob("*.json")) if src.is_dir() else [src]
     bad = 0
@@ -535,9 +521,7 @@ def cmd_check(a) -> None:
             probs.append(f"参考曲の候補が {len(p.get('choices', []))} 曲（6〜10 曲）")
         if len(p.get("seeds", [])) < 6:
             probs.append(f"歌の種が {len(p.get('seeds', []))} 件（6 件以上）")
-        act, music = p.get("act") or {}, p.get("music") or {}
-        if act.get("axis") == "自" and "remix" not in str(music.get("collab_style", "")).lower():
-            probs.append("自 の組はリミックス役：『コラボの形』に remix の語を入れる（plan_collabs.py がそれで見分ける）")
+        music = p.get("music") or {}
         for k in ("bpm_min", "bpm_max"):
             if not isinstance(music.get(k), int):
                 probs.append(f"声と曲づくりの {k} が数字でない")
@@ -565,10 +549,14 @@ def cmd_adopt(a) -> None:
         idkey = "id" if tab == "acts" else "act_id"
         for r in data[tab]:
             if r.get(idkey) == a.id and str(r.get("status") or "").strip() == "提案":
-                edits.append((tab, r["_row"], "status", "採用"))
+                edits.append((tab, r["_pos"], "status", "採用"))
     if not edits:
         sys.exit(f"[案内] {a.id} に『提案』の行はありません")
-    book.update_many(edits)
+    try:
+        book.update_many(edits)
+    except ReadOnlyBook:
+        sys.exit("[案内] Google の表を閲覧のみで読んでいるので書き込めません。表の『状態』を直接『採用』に変えてください"
+                 "（自動で書くにはサービスアカウント：docs/13）")
     by_tab: dict[str, int] = {}
     for tab, *_ in edits:
         by_tab[TABS[tab][0]] = by_tab.get(TABS[tab][0], 0) + 1
@@ -579,15 +567,42 @@ def cmd_adopt(a) -> None:
 def cmd_init(a) -> None:
     b = open_book()
     if not hasattr(b, "create"):
-        sys.exit("[案内] Google スプレッドシートを使う設定です。Excel の台帳を作ってから Google ドライブに取り込んでください（docs/13）")
+        sys.exit("[案内] Google スプレッドシートを使う設定です。空の表がほしいときは  restyle --out <ファイル>  で作り、"
+                 "Google ドライブで開いてください（docs/13）")
     if b.path.exists() and not a.force:
-        sys.exit(f"[案内] 台帳は既にあります：{b.path}（作り直すなら --force。中身は消えます）")
-    b.create(GUIDE)
-    step(f"台帳を作りました：{b.describe()}")
+        sys.exit(f"[案内] 管理表は既にあります：{b.path}（作り直すなら --force。中身は消えます）")
+    b.create()
+    step(f"管理表を作りました：{b.describe()}")
+
+
+def cmd_restyle(a) -> None:
+    """今の中身をそのまま、デザインを整えた Excel に書き出す（古い横型の表からの移し替えにも使う）"""
+    import shutil
+    book = book_or_die()
+    step(f"管理表を読んでいます：{book.describe()}")
+    data = book.read()
+    if a.with_pending and PENDING.exists():   # 閲覧のみの設定で貯まった機械の提案も一緒に入れる
+        pend = XlsxBook(PENDING).read()
+        for tab in TAB_ORDER:
+            data[tab] = data.get(tab, []) + pend.get(tab, [])
+        step(f"{PENDING.name} に貯まった提案も入れます")
+    local = getattr(book, "path", None)
+    out = Path(a.out) if a.out else (local or OUT / "artist_book" / "アーティスト管理表.xlsx")
+    if local and out.resolve() == local.resolve():
+        backup = OUT / "artist_book" / f"{local.stem}_{datetime.now():%Y%m%d-%H%M%S}{local.suffix}"
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(local, backup)
+        print(f"   （書き出す前の表を {backup.relative_to(ROOT)} に残しました）")
+    XlsxBook(out).create(data)
+    n = sum(len(v) for v in data.values())
+    step(f"デザインを整えた表を書き出しました：{out}（{len(data['acts'])} 組・{n} 件）")
+    if not local:
+        print("   Google の表に入れるには：Google スプレッドシートで『ファイル → インポート → アップロード』でこのファイルを選び、"
+              "『スプレッドシートを置換する』を選ぶ（URL と共有設定はそのまま）")
 
 
 def cmd_render(a) -> None:
-    """台帳の組ごとに、読みやすい資料を書き出す（提案の行も含めて全部）"""
+    """管理表の組ごとに、読みやすい資料を書き出す（提案の行も含めて全部）"""
     from render_profile import render_act
     book = book_or_die()
     data = book.read()
@@ -600,26 +615,28 @@ def cmd_render(a) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="アーティスト台帳（スプレッドシート）の管理")
+    ap = argparse.ArgumentParser(description="アーティスト管理表（スプレッドシート）の管理")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("init"); s.add_argument("--force", action="store_true")
     s = sub.add_parser("import-json"); s.add_argument("path"); s.add_argument("--force", action="store_true")
     s = sub.add_parser("check"); s.add_argument("path")
     s = sub.add_parser("adopt"); s.add_argument("id"); s.add_argument("--tabs", help="タブを絞る（例：近況,歌の種）")
-    s = sub.add_parser("propose"); s.add_argument("--label", default="本体"); s.add_argument("--axis", default="")
+    s = sub.add_parser("propose"); s.add_argument("--label", default="本体")
     s.add_argument("--note", default=""); s.add_argument("--count", type=int, default=1)
     s = sub.add_parser("propose-update"); s.add_argument("--artist"); s.add_argument("--all", action="store_true")
-    s.add_argument("--if-exists", action="store_true", help="台帳が無ければ何もしない（定期実行用）")
+    s.add_argument("--if-exists", action="store_true", help="管理表が無ければ何もしない（定期実行用）")
     s.add_argument("--force", action="store_true", help="返事待ちの提案があっても足す")
     s = sub.add_parser("pull"); s.add_argument("--dry-run", action="store_true")
-    s.add_argument("--if-exists", action="store_true", help="台帳が無ければ何もしない（定期実行用）")
+    s.add_argument("--if-exists", action="store_true", help="管理表が無ければ何もしない（定期実行用）")
     sub.add_parser("status")
     s = sub.add_parser("render"); s.add_argument("--out", default=str(PROPOSALS))
     sub.add_parser("apply-changes")
+    s = sub.add_parser("restyle"); s.add_argument("--out", help="書き出し先（省略：Excel の管理表ならその場所、Google なら out/artist_book/）")
+    s.add_argument("--with-pending", action="store_true", help="閲覧のみの設定で貯まった提案（out/artist_book/pending.xlsx）も入れる")
     a = ap.parse_args()
     {"init": cmd_init, "import-json": cmd_import_json, "propose": cmd_propose, "propose-update": cmd_propose_update,
      "pull": cmd_pull, "status": cmd_status, "render": cmd_render, "apply-changes": cmd_apply_changes,
-     "check": cmd_check, "adopt": cmd_adopt}[a.cmd](a)
+     "check": cmd_check, "adopt": cmd_adopt, "restyle": cmd_restyle}[a.cmd](a)
 
 
 if __name__ == "__main__":

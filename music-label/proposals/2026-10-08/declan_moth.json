@@ -2,7 +2,6 @@
   "act": {
     "id": "declan_moth",
     "label": "本体",
-    "axis": "時",
     "name": "DECLAN MOTH",
     "reading": "デクラン・モス",
     "name_meaning": "本名デクラン・トゥーミーの名に、祖父が夜更かしの孫を呼んだあだ名『leamhan beag（アイルランド語で小さな蛾）』を英語にして重ねた。街灯に集まる蛾のように、夜の灯りの下でいちばん落ち着く自分のこと。トロントのラジオ局でも、休憩に駐車場の街灯の下でサンドイッチを食べる姿から同僚に同じあだ名で呼ばれた。",
@@ -39,7 +38,7 @@
       "パン屋の一番窯の匂い"
     ],
     "bio_en": "DECLAN MOTH is Declan Twomey, a Cork-born baritone who has spent ten years working nights in Toronto — first driving a bakery van at 2 a.m., now running the overnight desk at a small community radio station. As a boy who wouldn't sleep, he rode along on his grandfather's late drives around Cork's ring road, a box of cassettes taped off late-night radio at his feet; when his grandfather died, those 43 tapes crossed the Atlantic in a shoebox, and their hiss is still in every mix. His songs are slow, warm synthwave for the stretch between last call and first light: analog pads, a gated snare, a voice that sounds like it's riding in the passenger seat, and always a time on the clock. Put it on when you're driving home and everyone else is asleep.",
-    "note": "テーマの軸は『時間の手触り』（夜勤の時刻・5 時間の時差・カセット）。80 年代の再現ではなく、今の夜を 80 年代の質感で歌う。顔出しなし。本名は設定の中だけで使い、配信名は DECLAN MOTH。",
+    "note": "テーマの中心は『時間の手触り』（夜勤の時刻・5 時間の時差・カセット）。80 年代の再現ではなく、今の夜を 80 年代の質感で歌う。顔出しなし。本名は設定の中だけで使い、配信名は DECLAN MOTH。",
     "updated": "2026-10-08"
   },
   "members": [

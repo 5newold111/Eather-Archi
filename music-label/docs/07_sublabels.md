@@ -78,7 +78,7 @@ DistroKid には公開 API がなく、ブラウザ自動操作は規約リス�
 
 ## 子レーベルの設計（下書き）
 
-各レーベルは `templates/labels/<slug>.json` に方針がある。代表アーティストは 2026-10-08 に白紙にした（以前の 3 組ずつは `templates/archive/2026-10-08/labels/`）。立ち上げるときに `artist_book.py propose --label <slug>` で台帳に提案させ、採用した組から使う。
+各レーベルは `templates/labels/<slug>.json` に方針がある。代表アーティストは 2026-10-08 に白紙にした（以前の 3 組ずつは `templates/archive/2026-10-08/labels/`）。立ち上げるときに `artist_book.py propose --label <slug>` で管理表に提案させ、採用した組から使う。
 3 組は「場面の中心」「少し外側」「もっと外側」の順に幅を取り、月 1 組ずつ隣の分野へ広げる。
 
 | レーベル | 場面 | 中心の音 | 広げる方向 | 代表 3 組（下書き） |

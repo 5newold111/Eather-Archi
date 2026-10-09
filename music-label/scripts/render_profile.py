@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-アーティスト台帳の 1 組ぶんを、読みやすい資料（Markdown）にする。
+アーティスト管理表の 1 組ぶんを、読みやすい資料（Markdown）にする。
 
-  python3 scripts/artist_book.py render            # 台帳の全組 → proposals/<組>.md
+  python3 scripts/artist_book.py render            # 管理表の全組 → proposals/<組>.md
   python3 scripts/render_profile.py proposals/2026-10-08/nao_easterly.json   # 提案の JSON 1 つを直接
 
 提案の行も採用の行も全部載せる。行の状態（提案・保留など）は見出しの横に【】で示す。
@@ -35,7 +35,7 @@ def _st(r: dict) -> str:
     return f"【{s}】" if s and s != "採用" else ""
 
 
-def _fields(tab: str, r: dict, keys: list[str] | None = None, skip=("id", "act_id", "member_id", "status", "_row")) -> list[str]:
+def _fields(tab: str, r: dict, keys: list[str] | None = None, skip=("id", "act_id", "member_id", "status", "_row", "_pos")) -> list[str]:
     h = _h(tab)
     out = []
     for k in keys or [k for k, _, _ in TABS[tab][1]]:
@@ -56,19 +56,19 @@ def render_act(act: dict, data: dict) -> str:
     members = _rows(data, "members", aid)
     mname = {m.get("id"): m.get("name", m.get("id")) for m in members}
     L = [f"# {act.get('name', aid)} {_st(act)}", ""]
-    meta = [act.get(k) for k in ("reading", "formation", "axis", "scene")]
-    L += [" ／ ".join(f"{x}" for x in [f"読み：{meta[0]}" if meta[0] else "", meta[1], f"軸：{meta[2]}" if meta[2] else "",
-                                       f"場面：{meta[3]}" if meta[3] else ""] if x), ""]
+    meta = [act.get(k) for k in ("reading", "formation", "scene")]
+    L += [" ／ ".join(f"{x}" for x in [f"読み：{meta[0]}" if meta[0] else "", meta[1],
+                                       f"場面：{meta[2]}" if meta[2] else ""] if x), ""]
     if act.get("bio_en"):
         L += [f"> {act['bio_en']}", ""]
 
-    L += ["## アーティスト", ""] + _fields("acts", act, skip=("id", "status", "_row", "bio_en", "name", "reading",
-                                                              "formation", "axis", "scene", "label")) + [""]
+    L += ["## アーティスト", ""] + _fields("acts", act, skip=("id", "status", "_row", "_pos", "bio_en", "name", "reading",
+                                                              "formation", "scene", "label")) + [""]
 
     for m in members:
         icon = GENDER_ICON.get(m.get("gender", ""), "")
         L += [f"## メンバー：{m.get('name', m.get('id'))} {icon} {_st(m)}", ""]
-        L += _fields("members", m, skip=("id", "act_id", "status", "_row", "name")) + [""]
+        L += _fields("members", m, skip=("id", "act_id", "status", "_row", "_pos", "name")) + [""]
         marks = [r for r in _rows(data, "marks", aid) if r.get("member_id") == m.get("id")]
         if marks:
             L += ["**傷・タトゥー**", ""]

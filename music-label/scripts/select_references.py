@@ -36,7 +36,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import production_status  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）
-from _life import choice_boost, pick_moment  # noqa: E402  台帳の人生（歌のもとになる瞬間・その組が選んだ参考曲）
+from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # 本体レーベル（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
 
@@ -94,7 +94,7 @@ def load_artist(slug: str) -> dict:
             f"        templates/artists/_template.json をコピーして {slug}.json を作ってください。"
         )
     sheet = json.loads(path.read_text(encoding="utf-8"))
-    # axis は本体の最初の 5 組だけが持つ（6 組目以降の追加の組は軸なし）ので、必須にはしない
+    # axis（軸）は 2026-10-09 に廃止したので、必須にはしない（古い設定書に残っていても無視する）
     missing = [k for k in ("slug", "name", "formation", "vocal", "sound", "lyrics") if not sheet.get(k)]
     if missing:
         sys.exit(f"[エラー] {path.name} に未記入の項目があります: {', '.join(missing)}")
@@ -249,7 +249,7 @@ def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
         w = 0.2 + dna_score(c, artist)      # タグが全く重ならなくても 0 にはしない（多様性のため）
         # ルール 5：成績の重み（analyze_growth.py の weights.json「枠|参考曲ID」）。最大 3 倍まで
         w *= min(slot_weights.get(f"{slot}|{c.id}", c.weight), 3.0)
-        w *= choice_boost(artist, c.title, c.artist_name, slot)   # その組が自分で選んだ参考曲（台帳の『参考曲の候補』）
+        w *= choice_boost(artist, c.title, c.artist_name, slot)   # その組が自分で選んだ参考曲（管理表の『参考曲の候補』）
         if c.is_trend:
             w *= 1.5                        # 今週のトレンド曲は少し優先
         weights.append(w)

@@ -4,12 +4,12 @@
 
   check            各レーベルの週の曲数と、月 1 組の追加の時期を確かめる
   check --apply    ・週の曲数が上限（既定 8）を超えたら、デビューが古い組から隔週（biweekly）に切り替える
-                   ・追加の時期が来たレーベルには、Claude が新しい組を丸ごと考えて、アーティスト台帳に「提案」の行で入れる
+                   ・追加の時期が来たレーベルには、Claude が新しい組を丸ごと考えて、アーティスト管理表に「提案」の行で入れる
                      （自動で決めるのは提案まで。採用するかはオーナー。採用 → artist_book.py pull のあと、
                      次の check --apply で 4 週間以上あとの「1 日のある週」にデビューを予約する）
-                   ・台帳で返事待ちの提案があるレーベルには、新しい提案を足さない
+                   ・管理表で返事待ちの提案があるレーベルには、新しい提案を足さない
                    ・全部のレーベルが上限に達していたら、新しい子レーベルの候補をレポートに書く（アカウント作成は人）
-  propose          今すぐ 1 組を台帳に提案する（--label を指定。--legacy で旧方式＝設定書を直接下書きして予約）
+  propose          今すぐ 1 組を管理表に提案する（--label を指定。--legacy で旧方式＝設定書を直接下書きして予約）
   cancel           予約した新人を取り消す（--artist を指定）
 
   追加の条件
@@ -220,7 +220,7 @@ def draft_artist(label: str, direction: str | None) -> dict | None:
     if label != MAIN_LABEL:
         d.pop("axis", None)
     else:
-        d["axis"] = None   # 本体の 5 軸は 1 組ずつ。追加の組は軸なし
+        d.pop("axis", None)   # アーティストの軸は 2026-10-09 に廃止
     d.update(name_status="draft", debut_week=None, cadence="weekly", label_slug=label,
              expansion={"date": date.today().isoformat(), "direction": direction, "by": "expand_label.py"})
     d.setdefault("concept_history", {"concept_version": 1, "history": []})
@@ -228,15 +228,15 @@ def draft_artist(label: str, direction: str | None) -> dict | None:
 
 
 def book_pending(label: str) -> list[str]:
-    """台帳で返事待ち（状態＝提案）の組の名前"""
+    """管理表で返事待ち（状態＝提案）の組の名前"""
     try:
         from _artist_book import open_book
         b = open_book()
         if hasattr(b, "path") and not b.path.exists():
             return []
         data = b.read()
-    except Exception as e:   # 台帳が読めなくても拡大の確認は止めない
-        print(f"   （台帳を読めませんでした：{e}）")
+    except Exception as e:   # 管理表が読めなくても拡大の確認は止めない
+        print(f"   （管理表を読めませんでした：{e}）")
         return []
     ja = "本体" if label == MAIN_LABEL else label
     return [r.get("name", r.get("id")) for r in data["acts"]
@@ -244,7 +244,7 @@ def book_pending(label: str) -> list[str]:
 
 
 def propose_to_book(label: str, direction: str | None) -> str | None:
-    """Claude が新しい組を丸ごと考えて台帳に『提案』として入れる（artist_book.py propose）"""
+    """Claude が新しい組を丸ごと考えて管理表に『提案』として入れる（artist_book.py propose）"""
     lab = load_label(label)
     path = lab.get("expansion_path") or []
     n_extra = max(0, len(members(label)) - (5 if label == MAIN_LABEL else 3))
@@ -256,12 +256,12 @@ def propose_to_book(label: str, direction: str | None) -> str | None:
     if r.returncode != 0:
         print(r.stderr[-600:])
         return None
-    m = re.search(r"『(.+?)』を提案として台帳に入れました", r.stdout)
+    m = re.search(r"『(.+?)』を提案として管理表に入れました", r.stdout)
     return m.group(1) if m else ("（依頼文だけ書き出し）" if "依頼文" in r.stdout else None)
 
 
 def adopted_unbooked(label: str) -> list[dict]:
-    """台帳で採用されて設定書になったが、まだデビュー週が決まっていない組（取り消し・休止は除く）"""
+    """管理表で採用されて設定書になったが、まだデビュー週が決まっていない組（取り消し・休止は除く）"""
     return [a for a in members(label) if a.get("source") and not as_date(a.get("debut_week"))
             and a.get("cadence", "weekly") != "paused"]
 
@@ -284,7 +284,7 @@ def main() -> None:
     ap.add_argument("--label")
     ap.add_argument("--artist")
     ap.add_argument("--direction", help="propose：広げる方向を手で指定")
-    ap.add_argument("--legacy", action="store_true", help="propose：台帳を通さず設定書を直接下書きして予約する（旧方式）")
+    ap.add_argument("--legacy", action="store_true", help="propose：管理表を通さず設定書を直接下書きして予約する（旧方式）")
     a = ap.parse_args()
     today = date.today()
 
@@ -303,7 +303,7 @@ def main() -> None:
         if not a.legacy:
             name = propose_to_book(a.label, a.direction)
             if name:
-                step(f"新しい組『{name}』を台帳に提案しました。採用するなら artist_book.py adopt <ID> → pull")
+                step(f"新しい組『{name}』を管理表に提案しました。採用するなら artist_book.py adopt <ID> → pull")
             return
         d = draft_artist(a.label, a.direction)
         if d:
@@ -323,22 +323,22 @@ def main() -> None:
             changed = switch_to_biweekly(r["label"], r["cap"])
             if changed:
                 actions.append(f"{r['name']}：{', '.join(changed)} を隔週に切り替え")
-            # 台帳で採用された新しい組は、ここでデビューを予約する（採用＝オーナーの決定）
+            # 管理表で採用された新しい組は、ここでデビューを予約する（採用＝オーナーの決定）
             for art in adopted_unbooked(r["label"]):
                 debut = schedule_debut(art)
                 notify("EtherArchi：採用した組のデビューを予約しました", f"{art['name']}（{r['name']}）を {debut} の週に予約")
-                actions.append(f"{r['name']}：台帳で採用された {art['name']}（{art['slug']}）を {debut} の週にデビュー予約"
+                actions.append(f"{r['name']}：管理表で採用された {art['name']}（{art['slug']}）を {debut} の週にデビュー予約"
                                f"（取り消し：expand_label.py cancel --artist {art['slug']}）")
             if r["due"]:
                 pending = book_pending(r["label"])
                 if pending:
-                    actions.append(f"{r['name']}：台帳に返事待ちの提案があるので、新しい提案は足しません（{', '.join(pending)}）")
+                    actions.append(f"{r['name']}：管理表に返事待ちの提案があるので、新しい提案は足しません（{', '.join(pending)}）")
                     continue
                 name = propose_to_book(r["label"], None)
                 if name:
                     notify("EtherArchi：新しい組の提案があります",
-                           f"{name}（{r['name']}）を台帳に提案しました。採用するかを決めてください")
-                    actions.append(f"{r['name']}：新しい組『{name}』を台帳に提案（採用するなら artist_book.py adopt <ID> → pull。"
+                           f"{name}（{r['name']}）を管理表に提案しました。採用するかを決めてください")
+                    actions.append(f"{r['name']}：新しい組『{name}』を管理表に提案（採用するなら artist_book.py adopt <ID> → pull。"
                                    "次の check --apply でデビューを予約）")
     launched = [r for r in rows if r["debuted"]]
     if launched and all(r["load"] >= r["cap"] for r in launched):

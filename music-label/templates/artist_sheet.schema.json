@@ -814,11 +814,11 @@
     },
     "life": {
       "type": "object",
-      "description": "アーティスト台帳（artists.xlsx）の人生の情報。artist_book.py pull が書く。act / members / timeline / debut_steps / marks / influences / seeds / lyric_sketches / updates / song_choices。influences と song_choices の実名は Suno・画像の指示文に渡さない"
+      "description": "アーティスト管理表（artists.xlsx）の人生の情報。artist_book.py pull が書く。act / members / timeline / debut_steps / marks / influences / seeds / lyric_sketches / updates / song_choices。influences と song_choices の実名は Suno・画像の指示文に渡さない"
     },
     "source": {
       "type": "object",
-      "description": "台帳から作った設定書の印（pulled_at）。この印がある組は台帳が正本なので、方針転換などは台帳の『変更の提案』になる"
+      "description": "管理表から作った設定書の印（pulled_at）。この印がある組は管理表が正本なので、方針転換などは管理表の『変更の提案』になる"
     }
   }
 }

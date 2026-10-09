@@ -9,9 +9,9 @@
                          → concept_version を +1 → アーティスト写真とロゴの撮り直し候補を作る（選ぶのは毎回オーナー）
   2 回目のレベル 2：その組を隔週に落とす（空いた枠は expand_label.py が新しい組で埋める）。3 回目は休止
 
-  ・アーティスト台帳で管理している組（artist_book.py pull で作った設定書）は、設定書を直接は書き換えず、
-    台帳の「変更の提案」タブに行を足して知らせるだけ（採用 → artist_book.py apply-changes → pull で反映）。
-    制作の頻度（隔週・休止）は機械が持つ項目なので、台帳の組でもそのまま切り替える
+  ・アーティスト管理表で管理している組（artist_book.py pull で作った設定書）は、設定書を直接は書き換えず、
+    管理表の「変更の提案」タブに行を足して知らせるだけ（採用 → artist_book.py apply-changes → pull で反映）。
+    制作の頻度（隔週・休止）は機械が持つ項目なので、管理表の組でもそのまま切り替える
   ・転換から 8 週は再判定しない（analyze_growth.py が見ている）
   ・同じ週の同じ提案は 1 回だけ適用する（out/growth/applied_pivots.json に記録）
 
@@ -62,7 +62,7 @@ PIVOT_SCHEMA = {
 }
 
 
-# 設定書の項目 → 台帳の（タブ, 見出し）。台帳で管理している組の転換は、この欄への「変更の提案」になる
+# 設定書の項目 → 管理表の（タブ, 見出し）。管理表で管理している組の転換は、この欄への「変更の提案」になる
 BOOK_FIELD = {
     "persona.drive_scene": ("アーティスト", "聴かれる場面"), "persona.scene": ("アーティスト", "聴かれる場面"),
     "visual.space": ("見た目", "空間"), "visual.light": ("見た目", "光"), "visual.materials": ("見た目", "素材"),
@@ -77,13 +77,13 @@ BOOK_FIELD = {
 
 
 def in_book(a: dict) -> bool:
-    """アーティスト台帳から作った設定書か（台帳が正本なので、直接は書き換えない）"""
+    """アーティスト管理表から作った設定書か（管理表が正本なので、直接は書き換えない）"""
     return bool(a.get("source"))
 
 
 def propose_in_book(a: dict, changes: dict, reason: str) -> int:
-    """変更を台帳の『変更の提案』タブに足す。足した行数を返す"""
-    from _artist_book import open_book
+    """変更を管理表の『変更の提案』タブに足す。足した行数を返す"""
+    from _artist_book import append_rows, open_book
 
     def txt(v):
         return "、".join(map(str, v)) if isinstance(v, list) else ("" if v is None else str(v))
@@ -95,7 +95,7 @@ def propose_in_book(a: dict, changes: dict, reason: str) -> int:
         rows.append({"act_id": a["slug"], "status": "提案", "date": date.today().isoformat(), "tab": tab, "field": field,
                      "current": txt(old), "proposed": txt(new), "reason": reason})
     if rows:
-        open_book().append("changes", rows)
+        append_rows(open_book(), "changes", rows)
     return len(rows)
 
 
@@ -124,7 +124,7 @@ def level1(a: dict, reason: str, dry: bool) -> dict:
         change["proposed_in_book"] = True
         h["history"].append(change)   # 判定の間隔（8 週）を守るため、提案した日も履歴に残す
         save_artist(a)
-        notify("EtherArchi：方針転換の提案", f"{a['name']} の BPM を {shift:+d} する提案を台帳に入れました（{n} 行）")
+        notify("EtherArchi：方針転換の提案", f"{a['name']} の BPM を {shift:+d} する提案を管理表に入れました（{n} 行）")
     elif not dry:
         s["bpm_min"], s["bpm_max"] = lo, hi
         h["history"].append(change)
@@ -184,8 +184,8 @@ def level2(a: dict, reason: str, dry: bool) -> dict | None:
         change.update(proposed_in_book=True, photos_reshot=False)
         h["history"].append(change)   # 世代（concept_version）は採用して pull したときに上がる
         save_artist(a)
-        notify("EtherArchi：方針転換の提案", f"{a['name']} の場面を『{plan['new_scene']}』へ移す提案を台帳に入れました（{n} 行）")
-        step(f"{a['name']}：台帳の『変更の提案』に {n} 行を足しました。採用 → artist_book.py apply-changes → pull で反映、"
+        notify("EtherArchi：方針転換の提案", f"{a['name']} の場面を『{plan['new_scene']}』へ移す提案を管理表に入れました（{n} 行）")
+        step(f"{a['name']}：管理表の『変更の提案』に {n} 行を足しました。採用 → artist_book.py apply-changes → pull で反映、"
              "そのあと写真を撮り直します")
         return change
     persona[scene_key] = plan["new_scene"]

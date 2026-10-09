@@ -59,7 +59,7 @@ def card(a: dict, with_fav: bool) -> dict:
          "profile": {k: v for k, v in prof.items() if k != "favorite_artists_real" and not k.startswith("_")},
          "existing_bio_en": (a.get("distribution") or {}).get("bio_en")}
     life = a.get("life") or {}
-    if life:   # 台帳の人生：生い立ち・デビューの経緯・ファンのつき方・人柄（影響と参考曲の候補は実名なので既定では渡さない）
+    if life:   # 管理表の人生：生い立ち・デビューの経緯・ファンのつき方・人柄（影響と参考曲の候補は実名なので既定では渡さない）
         act = life.get("act", {})
         c["life"] = scrub({
             "act": {k: act.get(k) for k in ("origin", "base_now", "culture", "strengths", "debut_summary", "fan_growth",

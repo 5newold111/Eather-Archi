@@ -22,7 +22,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MODEL = "claude-opus-5-5"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _life import life_context, real_names  # noqa: E402  台帳の人生（実名は伏せた要約）
+from _life import life_context, real_names  # noqa: E402  管理表の人生（実名は伏せた要約）
 
 
 def load_dotenv(path: Path) -> None:
@@ -190,7 +190,7 @@ def public_safe_artist(artist: dict) -> dict:
     a = json.loads(json.dumps(artist))
     a.pop("profile", None); a.pop("distribution", None); a.pop("name_check", None); a.pop("concept_history", None)
     a.pop("life", None); a.pop("source", None)
-    ctx = life_context(artist)   # 台帳の人生の要約（影響・参考曲の候補＝実名は入れない）
+    ctx = life_context(artist)   # 管理表の人生の要約（影響・参考曲の候補＝実名は入れない）
     if ctx:
         a["life_context"] = ctx
     for inf in a.get("persona", {}).get("influences", []):
@@ -216,7 +216,7 @@ def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
 def banned_terms(artist: dict) -> list[str]:
     terms = list(artist.get("profile", {}).get("favorite_artists_real", []))
     terms += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
-    terms += real_names(artist)   # 台帳の『影響』『参考曲の候補』の実名
+    terms += real_names(artist)   # 管理表の『影響』『参考曲の候補』の実名
     return [t for t in terms if t and t not in ("（bio のみ）",)]
 
 
