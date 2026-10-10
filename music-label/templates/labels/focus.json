@@ -1,0 +1,65 @@
+{
+  "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
+  "slug": "focus",
+  "name": "MONOTASK",
+  "name_status": "checked",
+  "parent": "etherarchi",
+  "scene": "仕事・勉強の集中",
+  "sound_center": [
+    "ミニマルなエレクトロニカ",
+    "ローファイビーツ（歌なし）"
+  ],
+  "expansion_path": [
+    "インストのポストロック",
+    "モジュラーシンセ",
+    "歌の少ないディープハウス",
+    "ピアノ＋ビート"
+  ],
+  "scene_spec": {
+    "bpm_min": 70,
+    "bpm_max": 120,
+    "length_sec_min": 180,
+    "length_sec_max": 300,
+    "hook_within_sec": 0,
+    "no_sudden_silence": true,
+    "_説明": "注意を引かないことが価値。サビの山を作らず、変化は緩やかに。歌詞は原則なし（言葉は集中を妨げる）"
+  },
+  "automation_tier": "C",
+  "_automation_tier": "歌詞がなく判定項目が少ないので、最初から自動選曲（人は 20% 抜き取り）",
+  "max_weekly_releases": 8,
+  "release_hour_et": 8,
+  "release_weekday": "tuesday",
+  "_release": "火曜 8:00 ET（日本 火曜 21:00/22:00）。米国の仕事始めに届く",
+  "accounts": {
+    "distrokid_email": "focus-label",
+    "spotify_for_artists_team": "focus-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "何もない作業机と、壁の一枚の光",
+    "palette": [
+      "無彩色",
+      "差し色 1 色（組ごと）"
+    ],
+    "cover_series_rule": "製図シートの方眼の上に、組ごとの 1 色の図形"
+  },
+  "artists": [],
+  "name_candidates": [
+    "MONOTASK"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 DEEP WORK DEPT. が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "一度に一つのことだけ。集中の定義"
+}

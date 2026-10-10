@@ -1,0 +1,26 @@
+# 鍵・接続情報（絶対に Git に入れない）
+.env
+.env.*
+!.env.example
+# Google のサービスアカウントの鍵（JSON）などを置くならここ（できればリポジトリの外に）
+secrets/
+
+# 音源・画像・Blender ファイルは Supabase / R2 に置く。Git には入れない
+*.wav
+*.mp3
+*.flac
+*.blend
+*.blend1
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.m4a
+
+# 作業中の出力
+out/
+__pycache__/
+
+# Excel・Numbers が開いている間にできる一時ファイル
+~$*
+.~lock.*
