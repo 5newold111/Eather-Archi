@@ -35,6 +35,8 @@ TABS: dict[str, tuple[str, list[tuple[str, str, str]]]] = {
         ("name", "名前", "text"), ("status", "状態", "text"), ("id", "ID", "text"),
         ("reading", "読み方", "text"), ("name_meaning", "名前の由来", "text"), ("formation", "構成", "text"),
         ("label", "レーベル", "text"), ("updated", "更新日", "text"),
+        ("gender", "性別", "text"), ("birth", "生年月日（現在の年齢）", "text"),
+        ("main_instrument", "曲で使用するメインの楽器", "text"),
         ("origin", "出身の設定", "text"), ("base_now", "今の拠点", "text"), ("culture", "文化", "text"),
         ("scene", "聴かれる場面", "text"), ("strengths", "強み", "list"),
         ("debut_summary", "デビューの経緯（まとめ）", "text"), ("fan_growth", "ファンのつき方", "text"),
@@ -146,7 +148,7 @@ SPLIT = re.compile(r"[、\n]+")
 # 縦型タブの見出し帯（■ の行）。ここに無い項目は「その他」に入る
 SECTIONS: dict[str, list[tuple[str, list[str]]]] = {
     "acts": [("", ["name", "status", "id"]),
-             ("基本", ["reading", "name_meaning", "formation", "label", "updated"]),
+             ("基本", ["reading", "name_meaning", "formation", "label", "gender", "birth", "main_instrument", "updated"]),
              ("生まれと暮らし", ["origin", "base_now", "culture"]),
              ("活動", ["scene", "strengths", "debut_summary", "fan_growth", "expression"]),
              ("人と関係", ["dynamics", "lyricist", "composer", "talk"]),
@@ -201,6 +203,8 @@ HELP = {
     ("acts", "id"): "英小文字と _ だけ（例 nao_easterly）。ほかのタブの行とつなぐ目印。あとから変えない",
     ("acts", "scene"): "この組の曲が聴かれる場面。毎週の曲づくりの前提になる",
     ("acts", "current_chapter"): "いまの暮らしと気持ち。ここを書き換えると、次の曲の空気が変わる",
+    ("acts", "birth"): "メンバーが複数なら「名前 年-月-日（年齢）」を「、」で並べる",
+    ("acts", "main_instrument"): "曲の中心になる楽器と声。機種名・ブランド名は書かない（作曲の指示文に渡るため。機種名はメンバーの『使う楽器』へ）",
     ("acts", "bio_en"): "ストアや SNS のプロフィールに使う英語の紹介文（3〜4 文）",
     ("members", "act_id"): "どの組のメンバーか（アーティストのタブの ID）",
     ("members", "work_before"): "デビューまでに働いてきた仕事。時期・場所・仕事の中身・そこで覚えたこと",

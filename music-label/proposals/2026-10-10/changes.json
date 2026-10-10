@@ -1,0 +1,82 @@
+[
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "名前の由来",
+    "current": "本名デクラン・トゥーミー。幼少期の頃、町で小さな発表会があったときに母のピアノに合わせて歌を披露し喝采を浴びた時のホームビデオで撮影していた父が「まるで妖精のようだ」と言っていた場面からFay（妖精の意）を掛け合わせた。。トロントのラジオ局で深夜の小さな番組のパーソナリティーを務めていた際に「夜の癒ややし担当＝Fay」深夜の小さな番組のパーソナリティーを務めていた際にとして、リスナーの間からあだ名でそう呼ばれていた。",
+    "proposed": "本名デクラン・トゥーミー。幼い頃、町の小さな発表会で母のピアノに合わせて歌い拍手を浴びたとき、ホームビデオを撮っていた父が『まるで妖精のようだ』と言った。その場面から Fay（妖精の意）を名前に掛け合わせた。トロントのラジオ局で深夜の小さな番組のパーソナリティーを務めていた頃、リスナーの間で『夜の癒やし担当＝Fay』というあだ名で呼ばれていたことも重なっている。",
+    "reason": "内容は変えず、同じ句（深夜の小さな番組の〜務めていた際に）の重なりと「癒ややし」の誤字だけを直す案。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "英語の紹介文",
+    "current": "DECLAN MOTH is Declan Twomey, a Cork-born baritone who has spent ten years working nights in Toronto — first driving a bakery van at 2 a.m., now running the overnight desk at a small community radio station. As a boy who wouldn't sleep, he rode along on his grandfather's late drives around Cork's ring road, a box of cassettes taped off late-night radio at his feet; when his grandfather died, those 43 tapes crossed the Atlantic in a shoebox, and their hiss is still in every mix. His songs are slow, warm synthwave for the stretch between last call and first light: analog pads, a gated snare, a voice that sounds like it's riding in the passenger seat, and always a time on the clock. Put it on when you're driving home and everyone else is asleep.",
+    "proposed": "DECLAN FAY is Declan Twomey, a Cork-born baritone who has spent ten years working nights in Toronto — first driving a newspaper delivery van at 2 a.m., now running the overnight desk at a small community radio station. His father drove a taxi through Cork's late hours and taped the radio as he went; he died when Declan was nine, and nineteen years later those 43 cassettes crossed the Atlantic in a shoebox. Their hiss is still in every mix. The name came to him twice: once from his father's voice on an old home video, and again from the night-shift listeners who started calling him their Fay. His songs are slow, warm synthwave for the stretch between last call and first light: analog pads, a gated snare, a voice that sounds like it's riding in the passenger seat, and always a time on the clock. Put it on when you're driving home and everyone else is asleep.",
+    "reason": "名前が DECLAN FAY になり、テープを残したのが祖父ではなく父になったため。配送の仕事は人生年表（朝刊の配送バン）に合わせた。オーナーが書き換えた『デビューの経緯（まとめ）』（幼い頃に亡くなった父が残したテープ）と『名前の由来』（父のホームビデオ・リスナーのあだ名）に合わせるため。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "作曲の担当",
+    "current": "本人。局の古い制作室と自宅の窓際の机で、4 つの和音のパッドを先に決め、ベースとアルペジオを重ねる。メロディは運転中の鼻歌をスマートフォンに録って拾う。祖父のテープのヒスや車内の音を薄く混ぜて仕上げる。",
+    "proposed": "本人。局の古い制作室と自宅の窓際の机で、4 つの和音のパッドを先に決め、ベースとアルペジオを重ねる。メロディは運転中の鼻歌をスマートフォンに録って拾う。父が残したテープのヒスや車内の音を薄く混ぜて仕上げる。",
+    "reason": "オーナーが書き換えた『デビューの経緯（まとめ）』（幼い頃に亡くなった父が残したテープ）と『名前の由来』（父のホームビデオ・リスナーのあだ名）に合わせるため。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "今の章（いまの暮らしと気持ち）",
+    "current": "トロントに来て 10 年目の秋。週 4 日、19 時から 3 時まで局の送出卓に座り、帰りにガーディナーを走ってから、金曜と土曜は 4 時過ぎにイネスをパン屋まで送る。昼に眠り午後に起きる暮らしには慣れたが、時差のせいでコークの家族と話せる時間は短く、父が朝 7 時に撮って送ってくる空の写真を深夜 2 時の休憩に見るのが日課になっている。祖父の 43 本のテープはすべてデジタルにし終え、そこから拾った音を曲に混ぜている。最初のシングルを出すと決め、毎晩の休憩に歌詞を 1 行ずつ直している。",
+    "proposed": "トロントに来て 10 年目の秋。週 4 日、19 時から 3 時まで局の送出卓に座り、帰りにガーディナーを走ってから、金曜と土曜は 4 時過ぎにイネスをパン屋まで送る。昼に眠り午後に起きる暮らしには慣れたが、時差のせいでコークの家族と話せる時間は短く、母が朝 7 時に撮って送ってくる空の写真を深夜 2 時の休憩に見るのが日課になっている。父が残した 43 本のテープはすべてデジタルにし終え、そこから拾った音を曲に混ぜている。最初のシングルを出すと決め、毎晩の休憩に歌詞を 1 行ずつ直している。",
+    "reason": "父が幼い頃に亡くなった設定では、毎朝写真を送ってくるのは母になるため。オーナーが書き換えた『デビューの経緯（まとめ）』（幼い頃に亡くなった父が残したテープ）と『名前の由来』（父のホームビデオ・リスナーのあだ名）に合わせるため。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "メモ",
+    "current": "テーマの中心は『時間の手触り』（夜勤の時刻・5 時間の時差・カセット）。80 年代の再現ではなく、今の夜を 80 年代の質感で歌う。顔出しなし。本名は設定の中だけで使い、配信名は DECLAN MOTH。",
+    "proposed": "テーマの中心は『時間の手触り』（夜勤の時刻・5 時間の時差・カセット）。80 年代の再現ではなく、今の夜を 80 年代の質感で歌う。顔出しなし。本名は設定の中だけで使い、配信名は DECLAN FAY。",
+    "reason": "名前が DECLAN FAY に変わったため（『軸』の言葉は指示どおり取り除き済み）。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "性別",
+    "current": "",
+    "proposed": "男性",
+    "reason": "オーナーが足した列が空欄のため。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "生年月日（現在の年齢）",
+    "current": "",
+    "proposed": "1993-02-04（33 歳）",
+    "reason": "メンバーのタブの誕生日から。2026-10-10 時点の年齢。"
+  },
+  {
+    "act_id": "declan_fay",
+    "status": "提案",
+    "date": "2026-10-10",
+    "tab": "アーティスト",
+    "field": "曲で使用するメインの楽器",
+    "current": "",
+    "proposed": "アナログ・ポリシンセのパッドとアルペジオ、1980 年代のドラムマシン（ゲートのかかったスネア）、低く温かいバリトンの声",
+    "reason": "声と曲づくりの『楽器の色』とメンバーの『使う楽器』から。作曲の指示文に渡る欄なので機種名は入れていない。"
+  }
+]

@@ -2,6 +2,9 @@
   "act": {
     "id": "hollowplan",
     "label": "本体",
+    "gender": "女性",
+    "birth": "1997-03-11（29 歳）",
+    "main_instrument": "1970 年代のエレクトリックピアノ（9th と 11th の和音）、サンプラーで切って並べた息と声の切れ端、柔らかい四つ打ちのドラム、丸いサブベース",
     "name": "HOLLOWPLAN",
     "reading": "ホロウプラン",
     "name_meaning": "plan（平面図）の真ん中にある何もない場所＝hollow（中庭・吹き抜け）から。模型の仕事で毎日カッターでくり抜いているのが、この空白。10 歳で見たクマシの祖母の家の中庭と、大学で出会った『部屋が役に立つのは何も無いところ』という古い言葉が重なって付けた。真ん中を空けておけば、人も音も入ってこられる、という意味。",
@@ -873,7 +876,7 @@
     "lyric_mode": "歌なし",
     "partners": [
       "nao_easterly",
-      "declan_moth",
+      "declan_fay",
       "soft_cantilever",
       "tidewool"
     ],
