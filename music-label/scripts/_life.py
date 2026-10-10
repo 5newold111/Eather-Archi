@@ -79,6 +79,8 @@ def real_names(artist: dict) -> list[str]:
     for i in life.get("influences", []):
         if str(i.get("kind", "")).startswith("音楽"):
             out.add(i.get("author") or i.get("title") or "")
+    for m in life.get("members", []):
+        out.update(m.get("fav_artists") or [])
     for c in life.get("song_choices", []):
         out.add(c.get("artist", ""))
         if len(str(c.get("title", "")).split()) >= 2:
@@ -100,7 +102,8 @@ def scrub(obj, names: list[str]):
 
 
 MEMBER_KEYS = ("name", "role", "age", "gender", "roots", "personality", "values", "speech", "catchphrases", "family",
-               "holidays", "likes", "like_words", "dislikes", "dislike_words")
+               "holidays", "work_now", "work_music", "technique", "play_strength", "play_preference",
+               "likes", "like_words", "dislikes", "dislike_words")   # 楽器の機種名・好きなアーティスト（実名）は渡さない
 ACT_KEYS = ("origin", "base_now", "culture", "values", "current_chapter", "landscape_words", "dynamics", "lyricist", "talk")
 
 

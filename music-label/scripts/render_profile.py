@@ -99,10 +99,12 @@ def render_act(act: dict, data: dict) -> str:
 
     inf = _rows(data, "influences", aid)
     if inf:
-        L += ["## 影響を受けたもの", "", "| 誰 | 種類 | 名前・題名 | 作者 | 受け取ったもの |", "|---|---|---|---|---|"]
+        L += ["## 影響を受けたもの", "", "| 誰 | 種類 | 名前・題名 | 作者 | 作品・時期 | 出会い | 受け取ったもの | どこに表れているか |",
+              "|---|---|---|---|---|---|---|---|"]
         for r in inf:
-            L.append("| " + " | ".join([mname.get(r.get("member_id"), "全員"), _v(r.get("kind")), _v(r.get("title")),
-                                          _v(r.get("author")), _v(r.get("taken")) + _st(r)]) + " |")
+            L.append("| " + " | ".join(c.replace("|", "／").replace("\n", " ") for c in [
+                mname.get(r.get("member_id"), "全員"), _v(r.get("kind")), _v(r.get("title")), _v(r.get("author")),
+                _v(r.get("work")), _v(r.get("when_met")), _v(r.get("taken")) + _st(r), _v(r.get("shows_in"))]) + " |")
         L.append("")
 
     seeds = _rows(data, "seeds", aid)

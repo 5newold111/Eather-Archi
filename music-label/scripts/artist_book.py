@@ -379,8 +379,12 @@ def validate_proposal(p: dict) -> list[str]:
         probs.append(f"名前 {act.get('name')} は既にある")
     real = {str(i.get("author") or i.get("title") or "").lower() for i in p.get("influences", []) if str(i.get("kind", "")).startswith("音楽")}
     real |= {str(c.get("artist", "")).lower() for c in p.get("choices", [])}
+    real |= {str(n).lower() for m in p.get("members", []) for n in (m.get("fav_artists") or [])}
     real.discard("")
-    body = json.dumps({k: v for k, v in p.items() if k not in ("influences", "choices")}, ensure_ascii=False).lower()
+    rest = {k: v for k, v in p.items() if k not in ("influences", "choices")}
+    rest["members"] = [{k: v for k, v in m.items() if k not in ("fav_artists", "instruments", "instruments_sub", "gear")}
+                       for m in p.get("members", [])]   # 実名・機種名を書いてよい欄
+    body = json.dumps(rest, ensure_ascii=False).lower()
     probs += [f"実在アーティスト名（{n}）が影響・参考曲以外に入っている" for n in real if len(n) > 3 and n in body]
     return probs
 
