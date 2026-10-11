@@ -2,10 +2,19 @@
   "slug": "declan_fay",
   "name": "DECLAN FAY",
   "name_status": "draft",
-  "name_check": {},
+  "name_check": {
+    "auto_checks": [
+      {
+        "verdict": "unverified",
+        "date": "2026-10-11",
+        "exact": [],
+        "near": []
+      }
+    ]
+  },
   "formation": "solo",
   "cadence": "weekly",
-  "debut_week": null,
+  "debut_week": "2026-10-26",
   "persona": {
     "members": [
       {
