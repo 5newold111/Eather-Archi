@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json_free, dry_run_file  # noqa: E402
-from _common import (MAIN_LABEL, OUT, ROOT, all_artists, as_date, load_artist, load_label, monday_of,  # noqa: E402
+from _common import (MAIN_LABEL, OUT, ROOT, all_artists, as_date, label_slug_of, load_artist, load_label, monday_of,  # noqa: E402
                      next_debut_week, notify, read_json, save_artist, step, write_json)
 
 DEFAULT_CAP = 8
@@ -238,9 +238,8 @@ def book_pending(label: str) -> list[str]:
     except Exception as e:   # 管理表が読めなくても拡大の確認は止めない
         print(f"   （管理表を読めませんでした：{e}）")
         return []
-    ja = "本体" if label == MAIN_LABEL else label
     return [r.get("name", r.get("id")) for r in data["acts"]
-            if str(r.get("status") or "").strip() == "提案" and (r.get("label") or "本体") in (ja, label)]
+            if str(r.get("status") or "").strip() == "提案" and label_slug_of(r.get("label")) == label]
 
 
 def propose_to_book(label: str, direction: str | None) -> str | None:

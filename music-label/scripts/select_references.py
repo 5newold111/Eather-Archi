@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import production_status  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）
+from _common import production_status, rel  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
 from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # 本体レーベル（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
@@ -439,7 +439,7 @@ def main() -> None:
     trend_file = ROOT / "out" / "trends" / f"{week_monday}.json"
     if not args.trend_language and trend_file.exists():
         args.trend_language = json.loads(trend_file.read_text(encoding="utf-8")).get("trend_language")
-        print(f"  今週のトレンド言語: {args.trend_language or 'なし'}（{trend_file.relative_to(ROOT)} から）")
+        print(f"  今週のトレンド言語: {args.trend_language or 'なし'}（{rel(trend_file)} から）")
     if args.weights and args.weights.exists():
         slot_weights = json.loads(args.weights.read_text(encoding="utf-8"))
         print(f"  成績由来の重みを {len(slot_weights)} 件読み込みました（{args.weights}）")
@@ -493,7 +493,7 @@ def main() -> None:
         if out_path.exists() and not args.overwrite:
             old = json.loads(out_path.read_text(encoding="utf-8"))
             if old.get("suno_style_prompt") or old.get("title_candidates"):
-                print(f"  既に Claude が書き足したブリーフがあるので守ります（作り直すときは --overwrite）: {out_path.relative_to(ROOT)}")
+                print(f"  既に Claude が書き足したブリーフがあるので守ります（作り直すときは --overwrite）: {rel(out_path)}")
                 continue
         try:
             # 成長分析のヒント：横ばい（flat）や方針転換レベル 1 の組は、トレンド曲の枠を 2 → 3 に増やす
@@ -513,7 +513,7 @@ def main() -> None:
         c = brief["artist_constraints"]
         print(f"    固定の制約: 作曲の癖 {len(c['composition_habits'])} 項目 / 声の仕様 {len(c['voice_spec'])} 項目 / 得意な歌い方 {len(c['signature_techniques'])} 項目")
         out_path.write_text(json.dumps(brief, ensure_ascii=False, indent=2), encoding="utf-8")
-        print(f"  → ブリーフの骨組みを書き出しました: {out_path.relative_to(ROOT)}")
+        print(f"  → ブリーフの骨組みを書き出しました: {rel(out_path)}")
 
     if failed:
         print(f"\n=== 一部失敗：{', '.join(failed)}。参考曲 DB を増やしてから再実行してください ===")

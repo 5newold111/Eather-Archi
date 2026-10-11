@@ -15,6 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
 MAIN_LABEL = "drive"
+MAIN_LABEL_NAME = "Postdog Records"   # 本体レーベルの公開名（配信のレーベル欄・プロフィールに出る名前）
 
 
 def load_dotenv(path: Path = ROOT / ".env") -> None:
@@ -38,6 +39,12 @@ def ssl_context():
         return ssl.create_default_context()
 
 
+def rel(p: Path) -> str:
+    """表示用の場所。music-label の中なら短く、外（一時フォルダなど）ならそのまま"""
+    p = Path(p).resolve()
+    return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(p)
+
+
 def read_json(p: Path) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
 
@@ -47,10 +54,23 @@ def write_json(p: Path, data) -> None:
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def label_slug_of(value) -> str:
+    """管理表の『レーベル』欄の書き方（本体・公開名・子レーベルの slug や名前）を slug にそろえる"""
+    v = str(value or "").strip()
+    if not v or v in ("本体", MAIN_LABEL) or v.casefold() == MAIN_LABEL_NAME.casefold():
+        return MAIN_LABEL
+    for p in sorted((ROOT / "templates" / "labels").glob("*.json")):
+        if p.stem.startswith("_"):
+            continue
+        if v.casefold() in (p.stem.casefold(), str(read_json(p).get("name", "")).casefold()):
+            return p.stem
+    return v
+
+
 def load_label(slug: str | None) -> dict:
     """子レーベルの設定書。本体（drive）は設定書ファイルが無いので既定値を返す"""
     if not slug or slug == MAIN_LABEL:
-        return {"slug": MAIN_LABEL, "name": "EtherArchi", "automation_tier": "A",
+        return {"slug": MAIN_LABEL, "name": MAIN_LABEL_NAME, "automation_tier": "A",
                 "release_hour_et": 17, "release_weekday": "wednesday", "accounts": {}}
     p = ROOT / "templates" / "labels" / f"{slug}.json"
     if not p.exists():

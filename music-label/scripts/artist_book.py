@@ -39,7 +39,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _artist_book import PENDING, TAB_ORDER, TABS, ReadOnlyBook, XlsxBook, adopted, append_rows, open_book  # noqa: E402
-from _common import MAIN_LABEL, OUT, ROOT, all_artists, load_dotenv, load_label, read_json, save_artist, step, write_json  # noqa: E402
+from _common import (MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, all_artists, label_slug_of, load_dotenv,  # noqa: E402
+                     load_label, read_json, save_artist, step, write_json)
 
 load_dotenv()
 FORMATION = {"ソロ": "solo", "デュオ": "duo", "バンド": "band", "ボーカルグループ": "vocal_group", "プロデューサー": "producer"}
@@ -47,7 +48,6 @@ SEX = {"女性": "female", "男性": "male", "男女": "mixed", "なし": "none"
 RANGE = {"高": "high", "中": "mid", "低": "low"}
 LYRIC_MODE = {"核を固定": "core_fixed", "全部書く": "full", "お題だけ": "topic_only", "歌なし": "instrumental"}
 LANG = {"英語": "en", "日本語": "ja", "スペイン語": "es", "韓国語": "ko", "ポルトガル語": "pt", "なし": "none"}
-LABEL_JA = {"本体": MAIN_LABEL}
 PROPOSALS = ROOT / "proposals"
 
 
@@ -115,7 +115,7 @@ def strip_row(r: dict) -> dict:
 def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str]]:
     aid = act["id"]
     warn = []
-    label = LABEL_JA.get(act.get("label", "本体"), act.get("label") or MAIN_LABEL)
+    label = label_slug_of(act.get("label"))
     members = group(data, aid, "members")
     music = (group(data, aid, "music") or [{}])[0]
     vis = (group(data, aid, "visual") or [{}])[0]
@@ -392,7 +392,7 @@ def validate_proposal(p: dict) -> list[str]:
 def cmd_propose(a) -> None:
     from _claude import available, call_json_free, dry_run_file
     book = book_or_die()
-    label = LABEL_JA.get(a.label, a.label)
+    label = label_slug_of(a.label)
     lab = load_label(label)
     user = json.dumps({"label": {k: lab.get(k) for k in ("slug", "name", "scene", "sound_center", "expansion_path", "scene_spec")},
                        "owner_note": a.note, "existing_acts": existing_summary(),
@@ -408,7 +408,7 @@ def cmd_propose(a) -> None:
         if not p:
             print(f"   ✕ 提案を作れませんでした：{msg}")
             continue
-        p.setdefault("act", {}).update(label="本体" if label == MAIN_LABEL else label)
+        p.setdefault("act", {}).update(label=MAIN_LABEL_NAME if label == MAIN_LABEL else label)
         p["act"].pop("axis", None)
         probs = validate_proposal(p)
         if probs:
