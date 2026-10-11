@@ -29,7 +29,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import (LEAD_WEEKS, MAIN_LABEL, OUT, ROOT, all_artists, as_date, debut_week_of_month,  # noqa: E402
+from _common import (LEAD_WEEKS, MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, all_artists, as_date, debut_week_of_month,  # noqa: E402
                      is_debut_week, load_artist, load_dotenv, load_label, next_debut_week, release_at_utc,
                      release_schedule, save_artist, step, write_json)
 
@@ -164,6 +164,17 @@ def main() -> None:
     arts = targets(args)
     step(f"{len(arts)} 組のデビューを準備します（デビュー週 {week}、制作開始 {first_production} の週）")
     stopped = []
+    if not args.skip_names and not args.artist and (args.label or MAIN_LABEL) == MAIN_LABEL:
+        # 本体のデビューでは、公開名（配信のレーベル欄に出る名前）も一度だけ確かめる。止めずに知らせるだけ
+        step(f"レーベル名 {MAIN_LABEL_NAME} の重複を確認しています")
+        try:
+            import check_names  # 同じフォルダのスクリプト
+            r = check_names.check_name(MAIN_LABEL_NAME)
+            hit = r["exact"][:1] or r["near"][:2]
+            print(f"     {r['verdict']}" + (f"：{', '.join(hit)}" if hit else "") +
+                  ("。同じ名前のレーベルが無いか、配信前に人が確かめる" if r["verdict"] != "clear" else ""))
+        except Exception as e:  # noqa: BLE001
+            print(f"     unverified：確認中にエラー（{e}）")
     for a in arts:
         step(f"{a['name']}：デビュー週を設定書に書いています")
         a["debut_week"] = week.isoformat()

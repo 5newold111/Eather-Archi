@@ -72,11 +72,13 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 管理表のデザインを作り直した：項目の多いタブ（アーティスト・メンバー・声と曲づくり・見た目）は **1 列 = 1 組の縦型**、
   タブの色分け・状態の色・組の色・■ の帯・プルダウン・見出しのメモ。中身をそのままデザインし直すのは `artist_book.py restyle`
 
-## 6. 本体レーベルの公開名は Postdog Records。DECLAN FAY を採用（2026-10-11）
+## 6. 本体レーベルの公開名は Postdog Records。本体の 5 組をすべて採用（2026-10-11）
 
 - 本体レーベル（ドライブ）の **配信・プロフィールに出る名前を Postdog Records** にした（`scripts/_common.py` の `MAIN_LABEL_NAME`）。
   中の呼び名（slug）は `drive` のまま。親の EtherArchi はそのまま
 - 管理表の『レーベル』欄は「Postdog Records」「本体」「空欄」のどれでも本体として読む。子レーベルは slug（sleep など）でも名前（SLACK WATER など）でもよい
-- オーナーが **DECLAN FAY を採用**。DECLAN の行と『変更の提案』8 件をすべて採用・反映し、設定書 `templates/artists/declan_fay.json` を作った。
-  デビュー週はまだ決めていない（`debut.py` で決めると制作が始まる）
+- オーナーが **本体の 5 組（DECLAN FAY・HOLLOWPLAN・NAO EASTERLY・SOFT CANTILEVER・TIDEWOOL）をすべて採用**。
+  DECLAN の『変更の提案』8 件も採用・反映した。5 組の設定書は `templates/artists/` にある。
+  デビュー週はまだ決めていない（5 組は同じ週。`debut.py --month <YYYY-MM>` で決めると、その 2 週間前の週から制作が始まる）
+- 名前の重複確認（`check_names.py --all` と `debut.py`）に、本体レーベルの公開名 Postdog Records も入れた
 

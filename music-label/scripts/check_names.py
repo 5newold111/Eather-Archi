@@ -183,6 +183,10 @@ def iter_targets(args) -> list[tuple[str, str, Path | None, str | None]]:
         if args.all:
             for p in sorted((ROOT / "templates" / "artists").glob("[!_]*.json")):
                 a = json.loads(p.read_text(encoding="utf-8")); t.append((a["slug"], a["name"], p, None))
+        if args.all:   # 本体レーベルの公開名（設定書ファイルは無いので結果は書き戻さない）
+            sys.path.insert(0, str(ROOT / "scripts"))
+            from _common import MAIN_LABEL, MAIN_LABEL_NAME
+            t.append((f"[レーベル] {MAIN_LABEL}", MAIN_LABEL_NAME, None, MAIN_LABEL))
         labels = [args.label] if args.label else [p.stem for p in sorted((ROOT / "templates" / "labels").glob("[!_]*.json"))]
         for ls in labels:
             p = ROOT / "templates" / "labels" / f"{ls}.json"; l = json.loads(p.read_text(encoding="utf-8"))
@@ -256,7 +260,9 @@ def main() -> None:
         lines.append("")
     (args.out / "report.md").write_text("\n".join(lines), encoding="utf-8")
     n = {v: sum(1 for r in results if r["verdict"] == v) for v in ("clear", "near", "collision", "unverified")}
-    print(f"\n=== 完了：clear {n['clear']} / near {n['near']} / collision {n['collision']} / unverified {n['unverified']} → {args.out.relative_to(ROOT)}/report.md ===")
+    out = args.out.resolve()
+    shown = out.relative_to(ROOT) if out.is_relative_to(ROOT) else out   # 外のフォルダならそのまま表示
+    print(f"\n=== 完了：clear {n['clear']} / near {n['near']} / collision {n['collision']} / unverified {n['unverified']} → {shown}/report.md ===")
     if n["unverified"]:
         errs = sorted({str(v.get("error", ""))[:60] for r in results for v in r["sources"].values() if "error" in v})
         print(f"    照合先に届きませんでした（{'; '.join(errs)[:200]}）。ネットワーク制限のない環境（手元の PC や GitHub Actions）で再実行してください")
