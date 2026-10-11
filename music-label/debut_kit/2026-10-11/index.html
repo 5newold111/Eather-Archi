@@ -1,0 +1,520 @@
+<title>Postdog Debut Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;700&display=swap">
+<style>
+/* layout: 1 枚の作業台。上に今日の流れ、下に 5 曲のカード（ジャケット左・作業右、狭い画面では縦に積む） */
+:root {
+  --paper: #EEF0EC;   /* 郵便の封筒の灰白 */
+  --sheet: #F8F9F6;
+  --ink: #1C2127;
+  --muted: #5D6670;
+  --line: #CFD4D0;
+  --post: #2B4C9B;    /* 消印の青 */
+  --stamp: #B4532A;   /* 封蝋の赤茶。人がする作業の印 */
+  --code: #E4E8E3;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans JP", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #121518; --sheet: #1A1E22; --ink: #E7E9E5; --muted: #A1A9B0; --line: #2F353A;
+  --post: #93ACEB; --stamp: #E0895F; --code: #23282D; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #121518; --sheet: #1A1E22; --ink: #E7E9E5; --muted: #A1A9B0; --line: #2F353A;
+  --post: #93ACEB; --stamp: #E0895F; --code: #23282D; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.7; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.wrap > * { min-width: 0; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .14em; color: var(--post); text-transform: uppercase; margin: 0; }
+h1 { font-family: var(--display); font-stretch: 72%; font-weight: 700; font-size: clamp(34px, 6vw, 58px); line-height: 1.02; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.lead { max-width: 64ch; margin: 0; color: var(--muted); }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.flow li { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+.flow b { font-family: var(--display); font-stretch: 80%; font-size: 19px; }
+.flow .t { font-family: var(--mono); font-size: 12px; color: var(--stamp); }
+.flow p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.notes { border-left: 3px solid var(--stamp); padding: 4px 0 4px 16px; display: grid; gap: 6px; max-width: 80ch; }
+.notes p { margin: 0; font-size: 14px; }
+.song { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 28px; background: var(--sheet); border: 1px solid var(--line); border-radius: 8px; padding: 24px; }
+@media (max-width: 820px) { .song { grid-template-columns: minmax(0, 1fr); padding: 18px; } }
+.cover { display: grid; gap: 8px; align-content: start; }
+.cover img { width: 100%; height: auto; aspect-ratio: 1; border-radius: 3px; display: block; background: var(--code); }
+.body { min-width: 0; display: grid; gap: 10px; align-content: start; }
+.cat { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .06em; }
+.cat span:first-child { color: var(--post); }
+h2 { margin: 0; display: grid; gap: 2px; text-wrap: balance; }
+h2 .artist { font-family: var(--display); font-stretch: 70%; font-weight: 700; font-size: 30px; letter-spacing: .04em; line-height: 1.05; }
+h2 .title { font-family: var(--display); font-stretch: 100%; font-weight: 400; font-size: 20px; color: var(--muted); }
+.why { margin: 0; max-width: 62ch; }
+.alts { margin: 0; font-size: 13px; color: var(--muted); }
+h3 { margin: 14px 0 0; font-size: 14px; letter-spacing: .04em; color: var(--stamp); }
+.fields { display: grid; gap: 8px; }
+.field { border: 1px solid var(--line); border-radius: 6px; background: var(--paper); min-width: 0; }
+.field summary { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; list-style: none; }
+.field summary::-webkit-details-marker { display: none; }
+.flabel { font-weight: 700; font-size: 13.5px; }
+.count { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-left: auto; }
+.field pre, .field .inline { margin: 0; padding: 10px 12px 12px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; background: var(--code); border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; max-height: 340px; overflow: auto; }
+button { font: inherit; }
+.copy { font-family: var(--mono); font-size: 12px; border: 1px solid var(--post); color: var(--post); background: transparent; border-radius: 4px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
+.copy:hover, .copy:focus-visible { background: var(--post); color: var(--sheet); outline: none; }
+.copy.done { background: var(--post); color: var(--sheet); }
+.ghost { font-size: 12.5px; border: 1px dashed var(--line); background: transparent; color: var(--muted); border-radius: 4px; padding: 6px 8px; cursor: pointer; }
+.ghost:focus-visible, .check input:focus-visible { outline: 2px solid var(--post); outline-offset: 2px; }
+.tip { margin: 0; font-size: 13px; color: var(--muted); }
+.listen { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; font-size: 14px; }
+.tablewrap { overflow-x: auto; }
+.dk { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+.dk th { text-align: left; font-weight: 500; color: var(--muted); padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; font-family: var(--mono); font-size: 12px; }
+.dk td { padding: 7px 0; border-bottom: 1px solid var(--line); }
+.dk .val { font-weight: 500; margin-right: 8px; }
+.dk .note { display: block; font-size: 12px; color: var(--muted); }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 18px; padding-top: 10px; border-top: 1px dashed var(--line); margin-top: 6px; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; cursor: pointer; }
+.check input { accent-color: var(--stamp); width: 16px; height: 16px; }
+footer { font-size: 13px; color: var(--muted); max-width: 80ch; display: grid; gap: 6px; }
+footer p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+<div class="wrap">
+<header>
+  <p class="eyebrow">Postdog Records · Debut 2026-10</p>
+  <h1>Postdog Debut Desk</h1>
+  <p class="lead">5 組のデビュー曲を、今日のうちに DistroKid へ出すための作業台です。各曲のカードの上から順に、コピーして貼るだけで進められます。作曲指示と歌詞には実在のアーティスト名・機種名は入れていません。</p>
+</header>
+
+<ol class="flow" aria-label="今日の流れ">
+  <li><span class="t">約 60 分</span><b>Suno で作る</b><p>Custom モードで 5 曲 × 2〜4 テイク。Pro か Premier のプランで作った曲だけが配信に使える。</p></li>
+  <li><span class="t">約 30 分</span><b>聴いて選ぶ</b><p>各曲の基準で 1 本ずつ選び、WAV で保存する。</p></li>
+  <li><span class="t">約 40 分</span><b>DistroKid に登録</b><p>5 つのアーティスト名を使うので、名前を 5 つ以上持てるプランが必要。公開日はいちばん早い日を選ぶ。</p></li>
+  <li><span class="t">登録の後</span><b>Claude に知らせる</b><p>選んだテイクと ISRC を教えてもらえれば、管理表と配信の予定を合わせる。</p></li>
+</ol>
+
+<div class="notes">
+  <p>ストアに並ぶまでは、登録から数日かかることがあります（サービスごとに審査があるため）。今日できるのは「登録して公開を予約する」ところまでです。</p>
+  <p>このあと自動の制作では 10/28 の配信枠が予定されています。今日の 5 曲を出したら、その枠は 2 曲目として作るよう私が合わせます。</p>
+  <p>ジャケットは画像生成の鍵なしで作った下書きです。写真のジャケットに差し替える場合は、配信の後でも DistroKid から変更できます。</p>
+</div>
+
+
+<article class="song" id="declan_fay">
+  <div class="cover">
+    <img src="covers/declan_fay_preview.jpg" data-full="covers/declan_fay.jpg" alt="DECLAN FAY『Side B』のジャケット" width="600" height="600" loading="lazy">
+    <button type="button" class="ghost full" data-img="declan_fay">フルサイズを表示（長押し・右クリックで保存）</button>
+  </div>
+  <div class="body">
+    <p class="cat"><span>PDR-001</span><span>96 BPM</span><span>solo</span></p>
+    <h2><span class="artist">DECLAN FAY</span><span class="title">Side B</span></h2>
+    <p class="why">父のカセットを 401 号線で初めて聴いた夜の歌。名前（Fay）と父のテープという、この人の始まりそのものなので 1 曲目に。</p>
+    <p class="alts">曲名の別案：Hold On Now, Lad／2:40 Through the Hiss</p>
+
+    <h3>1. Suno に貼る（Custom モード）</h3>
+    <div class="fields">
+      <details class="field" open><summary><span class="flabel">Song Title</span><span class="count">6 文字</span><button type="button" class="copy" data-target="declan_fay-title">コピー</button></summary><p class="inline" id="declan_fay-title">Side B</p></details>
+      <details class="field" open><summary><span class="flabel">Style of Music</span><span class="count">611 文字</span><button type="button" class="copy" data-target="declan_fay-style">コピー</button></summary><pre id="declan_fay-style">synthwave, night pop, sophisti-pop, 96 BPM, steady tempo, warm low male baritone crooner, close-mic, breathy, sung behind the beat, faint soft Irish lilt, spoken-word intro and bridge, warm analog polysynth pads with slow attack and gentle chorus, alternating 16th-note analog arpeggio, 1980s drum machine with gated reverb snare, kick on 1 and 3, round fat synth bass, thin bell-like synth counter-melody in the chorus, faint tape hiss and wow and flutter, one distant chorused clean guitar, radio tuning noise intro, minor key with a warm resolve, nocturnal, intimate, amber streetlights, slow fade-out ending</pre></details>
+      <details class="field" open><summary><span class="flabel">Exclude Styles（More Options の中）</span><span class="count">107 文字</span><button type="button" class="copy" data-target="declan_fay-exclude">コピー</button></summary><pre id="declan_fay-exclude">EDM drop, four-on-the-floor, shouting, guitar solo, saxophone, sudden silence, autotune, bright happy major</pre></details>
+      <details class="field"><summary><span class="flabel">Lyrics</span><span class="count">1274 文字</span><button type="button" class="copy" data-target="declan_fay-lyrics">コピー</button></summary><pre id="declan_fay-lyrics">[Intro]
+[Radio tuning noise, a cassette clicks in]
+[Spoken]
+Two-forty a.m. Westbound on the 401.
+Tape one of forty-three.
+
+[Verse 1]
+A shoebox came in April, brown tape across the lid
+Forty-three cassettes in your careful capitals
+FRIDAY, LATE — DON&#x27;T TAPE OVER
+I put the first one in on the 401
+
+[Pre-Chorus]
+Mile after mile of sodium light
+Hiss like the rain that isn&#x27;t falling tonight
+
+[Chorus]
+Flip it over, let it run
+Side B starts where the city&#x27;s done
+Your voice comes up at 2:40 through the hiss
+Hold on now, lad, I&#x27;m recording this
+
+[Verse 2]
+Nineteen years in Granddad&#x27;s garage
+Under a sheet with the green sedan
+Every label dated, every hour written down
+Like you knew somebody&#x27;d need the plan
+
+[Pre-Chorus]
+Exit signs counting down in green
+Somebody&#x27;s late-night radio in between
+
+[Chorus]
+Flip it over, let it run
+Side B starts where the city&#x27;s done
+Your voice comes up at 2:40 through the hiss
+Hold on now, lad, I&#x27;m recording this
+
+[Bridge]
+[Spoken]
+You&#x27;d be sixty-two this year.
+I left the counter where you stopped it.
+Rewind. Play.
+
+[Final Chorus]
+Flip it over, let it run
+Side B starts where the city&#x27;s done
+Your voice comes up at 2:40 through the hiss
+Hold on now, lad, I&#x27;m recording this
+
+[Outro]
+[Low humming of the chorus melody]
+[Tape hiss, slow fade]</pre></details>
+    </div>
+    <p class='tip'>声をこの先の曲でもそろえるため、気に入ったテイクから Suno の Persona を作っておく（2 曲目から使う）。</p>
+
+    <h3>2. 聴いて 1 本選ぶ</h3>
+    <ul class="listen"><li>30 秒以内にサビ（フック）が来る</li><li>長さが 2 分 30 秒〜3 分 30 秒</li><li>途中で急に無音にならない・最後が自然に終わる</li><li>入っていない：急な無音</li><li>入っていない：EDM のドロップ</li><li>入っていない：シャウト</li><li>入っていない：ギターソロとサックスソロ</li></ul>
+
+    <h3>3. DistroKid に入れる</h3>
+    <div class="tablewrap"><table class="dk"><tbody><tr><th scope="row">Artist / Band name</th><td><span class="val" id="declan_fay-dk0">DECLAN FAY</span><button type="button" class="copy" data-target="declan_fay-dk0">コピー</button><span class="note">初回は「新しいアーティスト」として作る。綴りは大文字のまま</span></td></tr><tr><th scope="row">Song title</th><td><span class="val" id="declan_fay-dk1">Side B</span><button type="button" class="copy" data-target="declan_fay-dk1">コピー</button><span class="note">feat. などは入れない</span></td></tr><tr><th scope="row">Record label</th><td><span class="val" id="declan_fay-dk2">Postdog Records</span><button type="button" class="copy" data-target="declan_fay-dk2">コピー</button></td></tr><tr><th scope="row">Language</th><td><span class="val" id="declan_fay-dk3">English</span><button type="button" class="copy" data-target="declan_fay-dk3">コピー</button></td></tr><tr><th scope="row">Primary genre</th><td><span class="val" id="declan_fay-dk4">Electronic</span><button type="button" class="copy" data-target="declan_fay-dk4">コピー</button></td></tr><tr><th scope="row">Secondary genre</th><td><span class="val" id="declan_fay-dk5">Pop</span><button type="button" class="copy" data-target="declan_fay-dk5">コピー</button></td></tr><tr><th scope="row">Explicit</th><td><span class="val" id="declan_fay-dk6">No（Clean）</span><button type="button" class="copy" data-target="declan_fay-dk6">コピー</button></td></tr><tr><th scope="row">Songwriter</th><td><span class="val" id="declan_fay-dk7">あなたの本名</span><span class="note">DistroKid の決まりで本名が必要</span></td></tr><tr><th scope="row">AI の申告</th><td><span class="val" id="declan_fay-dk8">作曲・ボーカル・演奏・歌詞の一部に AI を使用</span><span class="note">質問が出たら、使ったものをすべて選ぶ</span></td></tr><tr><th scope="row">Cover art</th><td><span class="val" id="declan_fay-dk9">covers/declan_fay.jpg（3000×3000）</span><span class="note">上のジャケットのフルサイズ</span></td></tr></tbody></table></div>
+
+    <div class="checks" role="group" aria-label="DECLAN FAY の進み具合"><label class="check"><input type="checkbox" id="declan_fay-c0" data-key="declan_fay-c0"> Suno で 2〜4 テイク作った</label><label class="check"><input type="checkbox" id="declan_fay-c1" data-key="declan_fay-c1"> 1 本選んで WAV で保存した</label><label class="check"><input type="checkbox" id="declan_fay-c2" data-key="declan_fay-c2"> DistroKid に登録した</label></div>
+  </div>
+</article>
+<article class="song" id="hollowplan">
+  <div class="cover">
+    <img src="covers/hollowplan_preview.jpg" data-full="covers/hollowplan.jpg" alt="HOLLOWPLAN『Services at Three』のジャケット" width="600" height="600" loading="lazy">
+    <button type="button" class="ghost full" data-img="hollowplan">フルサイズを表示（長押し・右クリックで保存）</button>
+  </div>
+  <div class="body">
+    <p class="cat"><span>PDR-002</span><span>112 BPM</span><span>producer</span></p>
+    <h2><span class="artist">HOLLOWPLAN</span><span class="title">Services at Three</span></h2>
+    <p class="why">父の入院中、隔週で乗った夜行バスの 4 時間半。歌わずに声の切れ端だけで場面を作る、この人のやり方がいちばん分かる曲。</p>
+    <p class="alts">曲名の別案：Still Here／Northbound, Still</p>
+
+    <h3>1. Suno に貼る（Custom モード）</h3>
+    <div class="fields">
+      <details class="field" open><summary><span class="flabel">Song Title</span><span class="count">17 文字</span><button type="button" class="copy" data-target="hollowplan-title">コピー</button></summary><p class="inline" id="hollowplan-title">Services at Three</p></details>
+      <details class="field" open><summary><span class="flabel">Style of Music</span><span class="count">564 文字</span><button type="button" class="copy" data-target="hollowplan-style">コピー</button></summary><pre id="hollowplan-style">deep house, lo-fi house, downtempo, 112 BPM, hypnotic and warm, soft rounded four-on-the-floor kick, 1970s electric piano playing soft 9th and 11th chords slightly behind the beat, chopped breath and wordless vocal fragments pitched in semitones, round sub bass, gentle tape wobble and faint vinyl crackle, swung 16th shaker and quiet rimshot ghost notes, muffled clean guitar two-note highlife riff, distant ventilation hum, late-night coach ride on a motorway, patient arrangement adding one element every 16 bars, mid-section where the kick drifts away, no drop</pre></details>
+      <details class="field" open><summary><span class="flabel">Exclude Styles（More Options の中）</span><span class="count">101 文字</span><button type="button" class="copy" data-target="hollowplan-exclude">コピー</button></summary><pre id="hollowplan-exclude">rap, supersaw lead, big riser, EDM drop, pitched-up chipmunk vocals, full sung verses, sudden silence</pre></details>
+      <details class="field"><summary><span class="flabel">Lyrics</span><span class="count">442 文字</span><button type="button" class="copy" data-target="hollowplan-lyrics">コピー</button></summary><pre id="hollowplan-lyrics">[Intro]
+[Soft kick, electric piano chords, distant engine hum]
+
+[Hook: whispered vocal chops]
+still here
+still here
+northbound, still
+still here
+
+[Groove]
+[Breath chops, swung shaker, sub bass enters]
+
+[Courtyard]
+[Kick drifts away, keys and breath only]
+
+[Hook: vocal chops, one semitone higher]
+still here
+still here
+northbound, still
+still here
+
+[Groove]
+[Muffled two-note guitar riff joins]
+
+[Outro]
+[Breath, keys and engine hum fade out]</pre></details>
+    </div>
+    <p class='tip'>歌のない曲。声の切れ端（still here）が言葉として聞き取れすぎるテイクは避ける。</p>
+
+    <h3>2. 聴いて 1 本選ぶ</h3>
+    <ul class="listen"><li>30 秒以内にサビ（フック）が来る</li><li>長さが 2 分 30 秒〜3 分 30 秒</li><li>途中で急に無音にならない・最後が自然に終わる</li><li>入っていない：文章になった歌詞</li><li>入っていない：急な無音</li><li>入っていない：ドロップ前の長い煽り</li><li>入っていない：派手なスーパーソーのリード</li></ul>
+
+    <h3>3. DistroKid に入れる</h3>
+    <div class="tablewrap"><table class="dk"><tbody><tr><th scope="row">Artist / Band name</th><td><span class="val" id="hollowplan-dk0">HOLLOWPLAN</span><button type="button" class="copy" data-target="hollowplan-dk0">コピー</button><span class="note">初回は「新しいアーティスト」として作る。綴りは大文字のまま</span></td></tr><tr><th scope="row">Song title</th><td><span class="val" id="hollowplan-dk1">Services at Three</span><button type="button" class="copy" data-target="hollowplan-dk1">コピー</button><span class="note">feat. などは入れない</span></td></tr><tr><th scope="row">Record label</th><td><span class="val" id="hollowplan-dk2">Postdog Records</span><button type="button" class="copy" data-target="hollowplan-dk2">コピー</button></td></tr><tr><th scope="row">Language</th><td><span class="val" id="hollowplan-dk3">English（短い声の切れ端だけ。Instrumental にはチェックしない）</span><button type="button" class="copy" data-target="hollowplan-dk3">コピー</button></td></tr><tr><th scope="row">Primary genre</th><td><span class="val" id="hollowplan-dk4">Dance</span><button type="button" class="copy" data-target="hollowplan-dk4">コピー</button></td></tr><tr><th scope="row">Secondary genre</th><td><span class="val" id="hollowplan-dk5">Electronic</span><button type="button" class="copy" data-target="hollowplan-dk5">コピー</button></td></tr><tr><th scope="row">Explicit</th><td><span class="val" id="hollowplan-dk6">No（Clean）</span><button type="button" class="copy" data-target="hollowplan-dk6">コピー</button></td></tr><tr><th scope="row">Songwriter</th><td><span class="val" id="hollowplan-dk7">あなたの本名</span><span class="note">DistroKid の決まりで本名が必要</span></td></tr><tr><th scope="row">AI の申告</th><td><span class="val" id="hollowplan-dk8">作曲・ボーカル・演奏・歌詞の一部に AI を使用</span><span class="note">質問が出たら、使ったものをすべて選ぶ</span></td></tr><tr><th scope="row">Cover art</th><td><span class="val" id="hollowplan-dk9">covers/hollowplan.jpg（3000×3000）</span><span class="note">上のジャケットのフルサイズ</span></td></tr></tbody></table></div>
+
+    <div class="checks" role="group" aria-label="HOLLOWPLAN の進み具合"><label class="check"><input type="checkbox" id="hollowplan-c0" data-key="hollowplan-c0"> Suno で 2〜4 テイク作った</label><label class="check"><input type="checkbox" id="hollowplan-c1" data-key="hollowplan-c1"> 1 本選んで WAV で保存した</label><label class="check"><input type="checkbox" id="hollowplan-c2" data-key="hollowplan-c2"> DistroKid に登録した</label></div>
+  </div>
+</article>
+<article class="song" id="nao_easterly">
+  <div class="cover">
+    <img src="covers/nao_easterly_preview.jpg" data-full="covers/nao_easterly.jpg" alt="NAO EASTERLY『Due East』のジャケット" width="600" height="600" loading="lazy">
+    <button type="button" class="ghost full" data-img="nao_easterly">フルサイズを表示（長押し・右クリックで保存）</button>
+  </div>
+  <div class="body">
+    <p class="cat"><span>PDR-003</span><span>116 BPM</span><span>solo</span></p>
+    <h2><span class="artist">NAO EASTERLY</span><span class="title">Due East</span></h2>
+    <p class="why">春分の日の出に生まれた自分の歌。名前（Easterly）の由来と、朝の高速のまっすぐな高揚をいちばん素直に伝えられる。</p>
+    <p class="alts">曲名の別案：Pointed the Same／Six-Oh-Eight</p>
+
+    <h3>1. Suno に貼る（Custom モード）</h3>
+    <div class="fields">
+      <details class="field" open><summary><span class="flabel">Song Title</span><span class="count">8 文字</span><button type="button" class="copy" data-target="nao_easterly-title">コピー</button></summary><p class="inline" id="nao_easterly-title">Due East</p></details>
+      <details class="field" open><summary><span class="flabel">Style of Music</span><span class="count">477 文字</span><button type="button" class="copy" data-target="nao_easterly-style">コピー</button></summary><pre id="nao_easterly-style">synth-pop, indie pop, electropop, 116 BPM, motorik steady pulse, clear bright high female vocal, crisp consonants, light falsetto only at the peak, bright analog-style 8th-note synth arpeggio, muted clean electric guitar 16th-note cuts, short bouncy synth bass, dry punchy snare and handclaps, high bell synth in the chorus only, filter slowly opening into each chorus, chorus by 0:30, catchy post-chorus ah-ah hook, sunrise on an open highway, optimistic, dry close production</pre></details>
+      <details class="field" open><summary><span class="flabel">Exclude Styles（More Options の中）</span><span class="count">95 文字</span><button type="button" class="copy" data-target="nao_easterly-exclude">コピー</button></summary><pre id="nao_easterly-exclude">rap, distorted guitar, heavy autotune, sudden silence, sad ending, dark nightclub, trap hi-hats</pre></details>
+      <details class="field"><summary><span class="flabel">Lyrics</span><span class="count">1652 文字</span><button type="button" class="copy" data-target="nao_easterly-lyrics">コピー</button></summary><pre id="nao_easterly-lyrics">[Intro]
+[Bright synth arpeggio plays the chorus melody]
+
+[Verse 1]
+Dad wrote it on the whiteboard the morning I was born
+Six-oh-eight, roads clear and dry, frost on the orchard floor
+Twenty-four years later I&#x27;m still up before the plow
+Cocoa in the cupholder, and the Gorge is waking now
+
+[Pre-Chorus]
+Ramp to eighty-four
+Light coming under the door
+
+[Chorus]
+March the twentieth, the sun is on the center line
+Visor up at sixty, I&#x27;m a minute ahead of time
+Twice a year it rises right where this road is aimed
+Due east, due east, me and the day are pointed the same
+
+[Post-Chorus]
+Ah-ah, ah-ah
+Pointed the same
+Ah-ah, ah-ah
+
+[Verse 2]
+Racks rolled out at half past three, twenty borrowed keys
+Bread left warm in every porch light, nobody sees me
+Now the river&#x27;s turning silver and the mile signs flicker by
+I don&#x27;t need a reason, I just like to meet it eye to eye
+
+[Pre-Chorus]
+Ramp to eighty-four
+Light coming under the door
+Hold it, hold it
+
+[Chorus]
+March the twentieth, the sun is on the center line
+Visor up at sixty, I&#x27;m a minute ahead of time
+Twice a year it rises right where this road is aimed
+Due east, due east, me and the day are pointed the same
+
+[Post-Chorus]
+Ah-ah, ah-ah
+Pointed the same
+Ah-ah, ah-ah
+
+[Bridge]
+[Phone call voice, filtered]
+Sunrise six-fifty-two. Roads clear and dry.
+Text me when you&#x27;re there.
+
+[Chorus]
+March the twentieth, the sun is on the center line
+Visor up at sixty, I&#x27;m a minute ahead of time
+Twice a year it rises right where this road is aimed
+Due east, due east, me and the day are pointed the same
+
+[Post-Chorus]
+Ah-ah, ah-ah
+Pointed the same
+Ah-ah, ah-ah
+
+[Outro]
+[Arpeggio alone, bright and steady, fades]</pre></details>
+    </div>
+    <p class='tip'>声をこの先の曲でもそろえるため、気に入ったテイクから Suno の Persona を作っておく（2 曲目から使う）。</p>
+
+    <h3>2. 聴いて 1 本選ぶ</h3>
+    <ul class="listen"><li>30 秒以内にサビ（フック）が来る</li><li>長さが 2 分 30 秒〜3 分 30 秒</li><li>途中で急に無音にならない・最後が自然に終わる</li><li>入っていない：ラップ</li><li>入っていない：急な無音</li><li>入っていない：歪んだギター</li><li>入っていない：強いピッチ補正の声</li></ul>
+
+    <h3>3. DistroKid に入れる</h3>
+    <div class="tablewrap"><table class="dk"><tbody><tr><th scope="row">Artist / Band name</th><td><span class="val" id="nao_easterly-dk0">NAO EASTERLY</span><button type="button" class="copy" data-target="nao_easterly-dk0">コピー</button><span class="note">初回は「新しいアーティスト」として作る。綴りは大文字のまま</span></td></tr><tr><th scope="row">Song title</th><td><span class="val" id="nao_easterly-dk1">Due East</span><button type="button" class="copy" data-target="nao_easterly-dk1">コピー</button><span class="note">feat. などは入れない</span></td></tr><tr><th scope="row">Record label</th><td><span class="val" id="nao_easterly-dk2">Postdog Records</span><button type="button" class="copy" data-target="nao_easterly-dk2">コピー</button></td></tr><tr><th scope="row">Language</th><td><span class="val" id="nao_easterly-dk3">English</span><button type="button" class="copy" data-target="nao_easterly-dk3">コピー</button></td></tr><tr><th scope="row">Primary genre</th><td><span class="val" id="nao_easterly-dk4">Pop</span><button type="button" class="copy" data-target="nao_easterly-dk4">コピー</button></td></tr><tr><th scope="row">Secondary genre</th><td><span class="val" id="nao_easterly-dk5">Electronic</span><button type="button" class="copy" data-target="nao_easterly-dk5">コピー</button></td></tr><tr><th scope="row">Explicit</th><td><span class="val" id="nao_easterly-dk6">No（Clean）</span><button type="button" class="copy" data-target="nao_easterly-dk6">コピー</button></td></tr><tr><th scope="row">Songwriter</th><td><span class="val" id="nao_easterly-dk7">あなたの本名</span><span class="note">DistroKid の決まりで本名が必要</span></td></tr><tr><th scope="row">AI の申告</th><td><span class="val" id="nao_easterly-dk8">作曲・ボーカル・演奏・歌詞の一部に AI を使用</span><span class="note">質問が出たら、使ったものをすべて選ぶ</span></td></tr><tr><th scope="row">Cover art</th><td><span class="val" id="nao_easterly-dk9">covers/nao_easterly.jpg（3000×3000）</span><span class="note">上のジャケットのフルサイズ</span></td></tr></tbody></table></div>
+
+    <div class="checks" role="group" aria-label="NAO EASTERLY の進み具合"><label class="check"><input type="checkbox" id="nao_easterly-c0" data-key="nao_easterly-c0"> Suno で 2〜4 テイク作った</label><label class="check"><input type="checkbox" id="nao_easterly-c1" data-key="nao_easterly-c1"> 1 本選んで WAV で保存した</label><label class="check"><input type="checkbox" id="nao_easterly-c2" data-key="nao_easterly-c2"> DistroKid に登録した</label></div>
+  </div>
+</article>
+<article class="song" id="soft_cantilever">
+  <div class="cover">
+    <img src="covers/soft_cantilever_preview.jpg" data-full="covers/soft_cantilever.jpg" alt="SOFT CANTILEVER『Two Lanes Over』のジャケット" width="600" height="600" loading="lazy">
+    <button type="button" class="ghost full" data-img="soft_cantilever">フルサイズを表示（長押し・右クリックで保存）</button>
+  </div>
+  <div class="body">
+    <p class="cat"><span>PDR-004</span><span>118 BPM</span><span>band</span></p>
+    <h2><span class="artist">SOFT CANTILEVER</span><span class="title">Two Lanes Over</span></h2>
+    <p class="why">工場の閉鎖のあとトラック運転手になった父と、Hume Freeway で並んで走る歌。昼の光と 3 人の演奏、明るく率直なこのバンドらしさが一番出る。</p>
+    <p class="alts">曲名の別案：Flash Them Back／The Whole Road Is Your Room</p>
+
+    <h3>1. Suno に貼る（Custom モード）</h3>
+    <div class="fields">
+      <details class="field" open><summary><span class="flabel">Song Title</span><span class="count">14 文字</span><button type="button" class="copy" data-target="soft_cantilever-title">コピー</button></summary><p class="inline" id="soft_cantilever-title">Two Lanes Over</p></details>
+      <details class="field" open><summary><span class="flabel">Style of Music</span><span class="count">652 文字</span><button type="button" class="copy" data-target="soft_cantilever-style">コピー</button></summary><pre id="soft_cantilever-style">city pop, sunlit indie rock, funk pop, jangle pop, 118 BPM, 16th-note groove, warm male mid-range lead sung slightly behind the beat, conversational, bright female harmony a third above in the chorus, clean single-coil electric guitar 16th-note cuts with light chorus, melodic fingerstyle electric bass with round short flatwound tone, 1970s drum kit with dry wooden snare, cross-stick in the verses, 16th hi-hats, soft bell-like electric piano, 12-string acoustic shimmering under the chorus, tambourine and shaker, two-bar guitar and bass unison riff after the second chorus, brief key change in the bridge, open highway in daylight, tight ending hit</pre></details>
+      <details class="field" open><summary><span class="flabel">Exclude Styles（More Options の中）</span><span class="count">79 文字</span><button type="button" class="copy" data-target="soft_cantilever-exclude">コピー</button></summary><pre id="soft_cantilever-exclude">EDM drop, horn section, heavy distortion, autotune effect, long silence, ballad</pre></details>
+      <details class="field"><summary><span class="flabel">Lyrics</span><span class="count">1457 文字</span><button type="button" class="copy" data-target="soft_cantilever-lyrics">コピー</button></summary><pre id="soft_cantilever-lyrics">[Intro]
+[Clean guitar cuts, bass and hi-hats]
+
+[Verse 1]
+You kept your plant badge in the glovebox
+Under the rosary and the fuel receipts
+You call me from Wallan at a quarter past one
+Just to tell me which pie you&#x27;d eat
+
+[Pre-Chorus]
+I&#x27;m heading north with the band in the back
+You&#x27;re heading home on the same black track
+
+[Chorus]
+Flash my lights and you flash them back
+Two lanes over on the Hume
+Twenty-two years you hung doors on cars
+Now the whole road is your room
+
+[Verse 2]
+The day they shut the gates you didn&#x27;t say much
+Wrote three years on the kitchen wall
+Now you know every servo from here to Sydney
+By the colour of the chairs in the hall
+
+[Pre-Chorus]
+I&#x27;m heading north with the band in the back
+You&#x27;re heading home on the same black track
+
+[Chorus]
+Flash my lights and you flash them back
+Two lanes over on the Hume
+Twenty-two years you hung doors on cars
+Now the whole road is your room
+
+[Instrumental Break]
+[Two-bar guitar and bass unison riff]
+
+[Bridge]
+March is coming, your last run north
+I&#x27;ll be beside you, I&#x27;ll keep the time
+One more pie at the Holbrook stop
+You on your side, me on mine
+
+[Final Chorus]
+Flash my lights and you flash them back
+Two lanes over on the Hume
+Twenty-two years you hung doors on cars
+Now the whole road is your room
+
+[Final Chorus]
+Flash my lights and you flash them back
+Two lanes over on the Hume
+Twenty-two years you hung doors on cars
+Now the whole road is your room
+
+[Outro]
+[Band hits together, end]</pre></details>
+    </div>
+    <p class='tip'>声をこの先の曲でもそろえるため、気に入ったテイクから Suno の Persona を作っておく（2 曲目から使う）。</p>
+
+    <h3>2. 聴いて 1 本選ぶ</h3>
+    <ul class="listen"><li>30 秒以内にサビ（フック）が来る</li><li>長さが 2 分 30 秒〜3 分 30 秒</li><li>途中で急に無音にならない・最後が自然に終わる</li><li>入っていない：1 拍より長い急な無音</li><li>入っていない：EDM 的なドロップ</li><li>入っていない：ボーカルのピッチ補正の効果</li><li>入っていない：重く歪んだギター</li></ul>
+
+    <h3>3. DistroKid に入れる</h3>
+    <div class="tablewrap"><table class="dk"><tbody><tr><th scope="row">Artist / Band name</th><td><span class="val" id="soft_cantilever-dk0">SOFT CANTILEVER</span><button type="button" class="copy" data-target="soft_cantilever-dk0">コピー</button><span class="note">初回は「新しいアーティスト」として作る。綴りは大文字のまま</span></td></tr><tr><th scope="row">Song title</th><td><span class="val" id="soft_cantilever-dk1">Two Lanes Over</span><button type="button" class="copy" data-target="soft_cantilever-dk1">コピー</button><span class="note">feat. などは入れない</span></td></tr><tr><th scope="row">Record label</th><td><span class="val" id="soft_cantilever-dk2">Postdog Records</span><button type="button" class="copy" data-target="soft_cantilever-dk2">コピー</button></td></tr><tr><th scope="row">Language</th><td><span class="val" id="soft_cantilever-dk3">English</span><button type="button" class="copy" data-target="soft_cantilever-dk3">コピー</button></td></tr><tr><th scope="row">Primary genre</th><td><span class="val" id="soft_cantilever-dk4">Pop</span><button type="button" class="copy" data-target="soft_cantilever-dk4">コピー</button></td></tr><tr><th scope="row">Secondary genre</th><td><span class="val" id="soft_cantilever-dk5">Alternative</span><button type="button" class="copy" data-target="soft_cantilever-dk5">コピー</button></td></tr><tr><th scope="row">Explicit</th><td><span class="val" id="soft_cantilever-dk6">No（Clean）</span><button type="button" class="copy" data-target="soft_cantilever-dk6">コピー</button></td></tr><tr><th scope="row">Songwriter</th><td><span class="val" id="soft_cantilever-dk7">あなたの本名</span><span class="note">DistroKid の決まりで本名が必要</span></td></tr><tr><th scope="row">AI の申告</th><td><span class="val" id="soft_cantilever-dk8">作曲・ボーカル・演奏・歌詞の一部に AI を使用</span><span class="note">質問が出たら、使ったものをすべて選ぶ</span></td></tr><tr><th scope="row">Cover art</th><td><span class="val" id="soft_cantilever-dk9">covers/soft_cantilever.jpg（3000×3000）</span><span class="note">上のジャケットのフルサイズ</span></td></tr></tbody></table></div>
+
+    <div class="checks" role="group" aria-label="SOFT CANTILEVER の進み具合"><label class="check"><input type="checkbox" id="soft_cantilever-c0" data-key="soft_cantilever-c0"> Suno で 2〜4 テイク作った</label><label class="check"><input type="checkbox" id="soft_cantilever-c1" data-key="soft_cantilever-c1"> 1 本選んで WAV で保存した</label><label class="check"><input type="checkbox" id="soft_cantilever-c2" data-key="soft_cantilever-c2"> DistroKid に登録した</label></div>
+  </div>
+</article>
+<article class="song" id="tidewool">
+  <div class="cover">
+    <img src="covers/tidewool_preview.jpg" data-full="covers/tidewool.jpg" alt="TIDEWOOL『The Low Part』のジャケット" width="600" height="600" loading="lazy">
+    <button type="button" class="ghost full" data-img="tidewool">フルサイズを表示（長押し・右クリックで保存）</button>
+  </div>
+  <div class="body">
+    <p class="cat"><span>PDR-005</span><span>90 BPM</span><span>duo</span></p>
+    <h2><span class="artist">TIDEWOOL</span><span class="title">The Low Part</span></h2>
+    <p class="why">12 時間の時差で暮らした 2 人が、声のファイルで 1 つのハモりを作っていた歌。男女のハモりというこの 2 人の核そのもの。</p>
+    <p class="alts">曲名の別案：Top for Me／Woolshed</p>
+
+    <h3>1. Suno に貼る（Custom モード）</h3>
+    <div class="fields">
+      <details class="field" open><summary><span class="flabel">Song Title</span><span class="count">12 文字</span><button type="button" class="copy" data-target="tidewool-title">コピー</button></summary><p class="inline" id="tidewool-title">The Low Part</p></details>
+      <details class="field" open><summary><span class="flabel">Style of Music</span><span class="count">595 文字</span><button type="button" class="copy" data-target="tidewool-style">コピー</button></summary><pre id="tidewool-style">acoustic pop, indie folk, folk pop, 90 BPM, gentle sway, intimate male-female duet, warm female lead with soft New Zealand vowels, low male harmony and oohs underneath, close-mic warm vocals with breath, fingerpicked steel-string acoustic guitar in open D tuning with thumb bass, small mahogany guitar soft strums, pump organ drone on the fifth, upright bass, brushed snare and floor tom, light mandolin chops in thirds, one cello holding long notes, faint rain and creaking wood field recording, chorus fragment hummed within 30 seconds, bridge with only two voices and organ, homely and tender</pre></details>
+      <details class="field" open><summary><span class="flabel">Exclude Styles（More Options の中）</span><span class="count">96 文字</span><button type="button" class="copy" data-target="tidewool-exclude">コピー</button></summary><pre id="tidewool-exclude">synth pads, electronic drop, belting, autotune effect, stadium chant, silence break, heavy drums</pre></details>
+      <details class="field"><summary><span class="flabel">Lyrics</span><span class="count">1314 文字</span><button type="button" class="copy" data-target="tidewool-lyrics">コピー</button></summary><pre id="tidewool-lyrics">[Intro]
+[Fingerpicked guitar and organ drone]
+[Humming the chorus melody]
+
+[Verse 1: Female]
+Frost on the gatepost, the dogs at my heel
+Seven o&#x27;clock and the paddocks are steel
+You&#x27;d be locking the boatyard, rain on the slip
+Humming a line with a pencil at your lip
+
+[Chorus: Duet]
+Your night comes in as a file on my phone
+I play it out loud in the woolshed alone
+Half a world of water and a cold cup of tea
+You sing the low part and leave the top for me
+
+[Verse 2: Male]
+Seven at night and the river&#x27;s gone grey
+I sing it twice and I send it away
+Somewhere it&#x27;s morning, you&#x27;re out with the sheep
+I leave the high line for you to keep
+
+[Chorus: Duet]
+Your night comes in as a file on my phone
+I play it out loud in the woolshed alone
+Half a world of water and a cold cup of tea
+You sing the low part and leave the top for me
+
+[Bridge: Voices and organ only]
+Twelve hours apart and the same little tune
+One of us up with the sun, one with the moon
+Ooh, ooh
+
+[Final Chorus: Duet]
+Your night comes in as a file on my phone
+I play it out loud in the woolshed alone
+Half a world of water and a cold cup of tea
+You sing the low part and leave the top for me
+
+[Final Chorus: Duet]
+Half a world of water and a cold cup of tea
+You sing the low part and leave the top for me
+
+[Outro]
+[Rain and creaking wood, guitar fades]</pre></details>
+    </div>
+    <p class='tip'>声をこの先の曲でもそろえるため、気に入ったテイクから Suno の Persona を作っておく（2 曲目から使う）。</p>
+
+    <h3>2. 聴いて 1 本選ぶ</h3>
+    <ul class="listen"><li>30 秒以内にサビ（フック）が来る</li><li>長さが 2 分 30 秒〜3 分 30 秒</li><li>途中で急に無音にならない・最後が自然に終わる</li><li>入っていない：シンセのパッドや電子音のドロップ</li><li>入っていない：急な無音のブレイク</li><li>入っていない：張り上げたロングトーン</li><li>入っていない：音程補正の効果を目立たせた声</li></ul>
+
+    <h3>3. DistroKid に入れる</h3>
+    <div class="tablewrap"><table class="dk"><tbody><tr><th scope="row">Artist / Band name</th><td><span class="val" id="tidewool-dk0">TIDEWOOL</span><button type="button" class="copy" data-target="tidewool-dk0">コピー</button><span class="note">初回は「新しいアーティスト」として作る。綴りは大文字のまま</span></td></tr><tr><th scope="row">Song title</th><td><span class="val" id="tidewool-dk1">The Low Part</span><button type="button" class="copy" data-target="tidewool-dk1">コピー</button><span class="note">feat. などは入れない</span></td></tr><tr><th scope="row">Record label</th><td><span class="val" id="tidewool-dk2">Postdog Records</span><button type="button" class="copy" data-target="tidewool-dk2">コピー</button></td></tr><tr><th scope="row">Language</th><td><span class="val" id="tidewool-dk3">English</span><button type="button" class="copy" data-target="tidewool-dk3">コピー</button></td></tr><tr><th scope="row">Primary genre</th><td><span class="val" id="tidewool-dk4">Singer/Songwriter</span><button type="button" class="copy" data-target="tidewool-dk4">コピー</button></td></tr><tr><th scope="row">Secondary genre</th><td><span class="val" id="tidewool-dk5">Folk</span><button type="button" class="copy" data-target="tidewool-dk5">コピー</button></td></tr><tr><th scope="row">Explicit</th><td><span class="val" id="tidewool-dk6">No（Clean）</span><button type="button" class="copy" data-target="tidewool-dk6">コピー</button></td></tr><tr><th scope="row">Songwriter</th><td><span class="val" id="tidewool-dk7">あなたの本名</span><span class="note">DistroKid の決まりで本名が必要</span></td></tr><tr><th scope="row">AI の申告</th><td><span class="val" id="tidewool-dk8">作曲・ボーカル・演奏・歌詞の一部に AI を使用</span><span class="note">質問が出たら、使ったものをすべて選ぶ</span></td></tr><tr><th scope="row">Cover art</th><td><span class="val" id="tidewool-dk9">covers/tidewool.jpg（3000×3000）</span><span class="note">上のジャケットのフルサイズ</span></td></tr></tbody></table></div>
+
+    <div class="checks" role="group" aria-label="TIDEWOOL の進み具合"><label class="check"><input type="checkbox" id="tidewool-c0" data-key="tidewool-c0"> Suno で 2〜4 テイク作った</label><label class="check"><input type="checkbox" id="tidewool-c1" data-key="tidewool-c1"> 1 本選んで WAV で保存した</label><label class="check"><input type="checkbox" id="tidewool-c2" data-key="tidewool-c2"> DistroKid に登録した</label></div>
+  </div>
+</article>
+
+<footer>
+  <p>チェックの状態は、この端末のブラウザにだけ残ります。</p>
+  <p>元のファイル：music-label/debut_kit/2026-10-11/（kit.json・covers/・make_covers.py）</p>
+</footer>
+</div>
+<script>
+(function () {
+  function copyText(el, btn) {
+    var text = el.textContent;
+    var done = function () { btn.textContent = "コピーしました"; btn.classList.add("done");
+      setTimeout(function () { btn.textContent = "コピー"; btn.classList.remove("done"); }, 1600); };
+    var fallback = function () { var r = document.createRange(); r.selectNodeContents(el);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "選択しました。コピーしてください"; };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+  }
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation();
+      var el = document.getElementById(b.dataset.target); var d = el.closest("details"); if (d) d.open = true; copyText(el, b); });
+  });
+  document.querySelectorAll(".full").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var img = document.querySelector("#" + b.dataset.img + " .cover img");
+      if (img.dataset.full && img.src.indexOf(img.dataset.full) === -1) { img.src = img.dataset.full; b.textContent = "フルサイズ（3000×3000）を表示中"; }
+    });
+  });
+  document.querySelectorAll(".check input").forEach(function (c) {
+    try { c.checked = localStorage.getItem("pdd:" + c.dataset.key) === "1"; } catch (e) {}
+    c.addEventListener("change", function () { try { localStorage.setItem("pdd:" + c.dataset.key, c.checked ? "1" : "0"); } catch (e) {} });
+  });
+})();
+</script>
