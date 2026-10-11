@@ -71,7 +71,7 @@ python3 scripts/oauth_youtube.py --for focus  # 子レーベル用チャンネ�
 **注意**
 - API でアップロードした動画は、プロジェクトが YouTube の監査（API Services Audit）を通るまで **非公開に制限**される。
   公開投稿したいなら、Google の「YouTube API Services - Audit and Quota Extension Form」から申請する（数週間）
-- 1 日の上限（10,000 ユニット）で、アップロードは 1 日 6 本まで。本体 5 組は水曜に 5 本なので収まる。子レーベルは曜日が分かれている
+- 1 日の上限（10,000 ユニット）で、アップロードは 1 日 6 本まで。Postdog Records の 5 組は水曜に 5 本なので収まる。子レーベルは曜日が分かれている
 
 > **アカウントの単位**：YouTube・Instagram・TikTok は、まずレーベル単位で 1 組ずつ作る（`docs/12_decisions.md`）。
 > 伸びた組を独立させるときだけ、組専用の鍵を `名前__組`（例 `IG_ACCESS_TOKEN__LIGHT`）で足す。
@@ -127,7 +127,7 @@ python3 scripts/backup_r2.py               # 毎晩 03:30 に自動（定期実�
 
 ## 7. DistroKid
 
-- 本体レーベル用アカウントを 1 つ。**5 組以上のアーティストを登録できるプラン**か確認する（プランごとにアーティスト数の上限がある）
+- Postdog Records 用のアカウントを 1 つ。**5 組以上のアーティストを登録できるプラン**か確認する（プランごとにアーティスト数の上限がある）
 - 子レーベルを始めるときは、レーベルごとに別アカウント（`templates/labels/*.json` の `accounts.distrokid_email` には**識別名だけ**を書き、メールアドレスは書かない）
 - 毎週の登録は `out/distrokid/<週>/sheet.md` を見ながら。登録後に ISRC / UPC を `<組>.metadata.json` に書き、`supabase_sync.py week --apply`
 

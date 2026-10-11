@@ -13,7 +13,7 @@
   cancel           予約した新人を取り消す（--artist を指定）
 
   追加の条件
-    本体（drive）     : 毎月（1 日のある週ごとに 1 組。予約済みの新人がいる間は増やさない）
+    Postdog Records（drive）     : 毎月（1 日のある週ごとに 1 組。予約済みの新人がいる間は増やさない）
     子レーベル        : 立ち上げから 3 か月たち、1,000 再生に届いた曲の割合が 50% を超えていること
 
 使い方
@@ -35,7 +35,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _claude import available, call_json_free, dry_run_file  # noqa: E402
-from _common import (MAIN_LABEL, OUT, ROOT, all_artists, as_date, label_slug_of, load_artist, load_label, monday_of,  # noqa: E402
+from _common import (MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, all_artists, as_date, label_slug_of, load_artist, load_label, monday_of,  # noqa: E402
                      next_debut_week, notify, read_json, save_artist, step, write_json)
 
 DEFAULT_CAP = 8
@@ -103,7 +103,7 @@ def status(label: str, today: date) -> dict:
         else:
             due, why = True, f"1,000 再生到達率 {rate:.0%}。月 1 組を追加"
     else:
-        due, why = True, "本体は毎月 1 組を追加"
+        due, why = True, "Postdog Records は毎月 1 組を追加"
     return {"label": label, "name": lab.get("name"), "cap": cap, "load": load, "debuted": len(debuted),
             "scheduled": len(scheduled), "due": due, "why": why}
 
@@ -249,7 +249,7 @@ def propose_to_book(label: str, direction: str | None) -> str | None:
     n_extra = max(0, len(members(label)) - (5 if label == MAIN_LABEL else 3))
     direction = direction or (path[n_extra % len(path)] if path else "")
     cmd = [sys.executable, str(ROOT / "scripts" / "artist_book.py"), "propose",
-           "--label", "本体" if label == MAIN_LABEL else label, "--note", f"広げる方向：{direction}" if direction else ""]
+           "--label", MAIN_LABEL_NAME if label == MAIN_LABEL else label, "--note", f"広げる方向：{direction}" if direction else ""]
     r = subprocess.run(cmd, capture_output=True, text=True)
     print(r.stdout.rstrip())
     if r.returncode != 0:

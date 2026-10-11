@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import production_status, rel  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
 from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
-ARTISTS_DIR = ROOT / "templates" / "artists"     # 本体レーベル（ドライブ）の設定書
+ARTISTS_DIR = ROOT / "templates" / "artists"     # Postdog Records（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
 
 # 借用の枠。順番は「埋めにくい枠から先に」。
@@ -313,7 +313,7 @@ WEEKDAY_OFFSET = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "fri
 
 def release_at_for_production_week(week_monday: date, weekday: str = "wednesday", hour_et: int = 17) -> datetime:
     """制作週の月曜 → 2 週間後の週の配信曜日・時刻（米国東部時間）を UTC に変換して返す。
-    本体は水曜 17:00。子レーベルは設定書の release_weekday / release_hour_et（例：集中は火曜 8:00）"""
+    Postdog Records は水曜 17:00。子レーベルは設定書の release_weekday / release_hour_et（例：集中は火曜 8:00）"""
     release_day = week_monday + timedelta(days=14 + WEEKDAY_OFFSET.get(str(weekday).lower(), 2))
     local = datetime.combine(release_day, time(int(hour_et), 0), tzinfo=ZoneInfo("America/New_York"))
     return local.astimezone(ZoneInfo("UTC"))

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-デビューの段取りを 1 回で流す（本体 5 組の同時デビュー / 子レーベルの立ち上げ / 月 1 組の新人）。
+デビューの段取りを 1 回で流す（Postdog Records の 5 組の同時デビュー / 子レーベルの立ち上げ / 月 1 組の新人）。
 
   1. デビュー週を設定書に書く（debut_week ＝ デビュー曲が配信される週の月曜。制作はその 2 週間前から）
   2. 名前の重複確認（照合先に届かなければ前回の確認結果を使い、その旨を残す）
@@ -10,7 +10,7 @@
 
 使い方
   デビュー週は「毎月 1 日のある週」（月曜始まり）。--month で月を指定すると、その週を自動で計算する
-  python scripts/debut.py --month 2026-12                               # 本体 5 組を 12 月デビュー（11/30 の週）
+  python scripts/debut.py --month 2026-12                               # Postdog Records の 5 組を 12 月デビュー（11/30 の週）
   python scripts/debut.py --next                                        # 2 週間の仕込みが取れる、いちばん近いデビュー週
   python scripts/debut.py --label focus --month 2027-02                 # 子レーベルの 3 組
   python scripts/debut.py --artist focus_newcomer --label focus --month 2027-03   # 新人 1 組
@@ -126,7 +126,7 @@ def main() -> None:
     ap.add_argument("--launch-week", help="デビュー曲が配信される週の月曜（YYYY-MM-DD）")
     ap.add_argument("--month", help="デビューする月（YYYY-MM）。その月の 1 日のある週になる")
     ap.add_argument("--next", action="store_true", help="2 週間の仕込みが取れる、いちばん近いデビュー週")
-    ap.add_argument("--label", help="子レーベル（focus など）。省略で本体")
+    ap.add_argument("--label", help="子レーベル（focus など）。省略で Postdog Records")
     ap.add_argument("--artist", help="1 組だけ（月 1 組の新人など）")
     ap.add_argument("--status", action="store_true", help="準備状況だけ表示")
     ap.add_argument("--skip-names", action="store_true")
@@ -165,7 +165,7 @@ def main() -> None:
     step(f"{len(arts)} 組のデビューを準備します（デビュー週 {week}、制作開始 {first_production} の週）")
     stopped = []
     if not args.skip_names and not args.artist and (args.label or MAIN_LABEL) == MAIN_LABEL:
-        # 本体のデビューでは、公開名（配信のレーベル欄に出る名前）も一度だけ確かめる。止めずに知らせるだけ
+        # Postdog Records のデビューでは、レーベル名も一度だけ確かめる。止めずに知らせるだけ
         step(f"レーベル名 {MAIN_LABEL_NAME} の重複を確認しています")
         try:
             import check_names  # 同じフォルダのスクリプト

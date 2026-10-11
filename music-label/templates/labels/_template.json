@@ -28,7 +28,7 @@
   "max_weekly_releases": 8,
   "release_hour_et": 17,
   "release_weekday": "wednesday",
-  "_release": "本体と配信曜日をずらすと、週の登録作業を分散できる（例：Sleep は日曜夜、Morning は月曜朝）",
+  "_release": "Postdog Records と配信曜日をずらすと、週の登録作業を分散できる（例：Sleep は日曜夜、Morning は月曜朝）",
 
   "accounts": {
     "distrokid_email": "",

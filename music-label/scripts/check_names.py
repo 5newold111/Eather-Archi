@@ -17,7 +17,7 @@
   commercial な配信登録は checked になった名前だけ行う。
 
 使い方：
-  python3 scripts/check_names.py --all                 # 本体 5 組 ＋ 子レーベル 4 ＋ 12 組
+  python3 scripts/check_names.py --all                 # Postdog Records の 5 組 ＋ 子レーベル 4 ＋ 12 組
   python3 scripts/check_names.py --artist light --apply
   python3 scripts/check_names.py --name "AURELINE"     # 単発
 """
@@ -183,7 +183,7 @@ def iter_targets(args) -> list[tuple[str, str, Path | None, str | None]]:
         if args.all:
             for p in sorted((ROOT / "templates" / "artists").glob("[!_]*.json")):
                 a = json.loads(p.read_text(encoding="utf-8")); t.append((a["slug"], a["name"], p, None))
-        if args.all:   # 本体レーベルの公開名（設定書ファイルは無いので結果は書き戻さない）
+        if args.all:   # Postdog Records（設定書ファイルは無いので結果は書き戻さない）
             sys.path.insert(0, str(ROOT / "scripts"))
             from _common import MAIN_LABEL, MAIN_LABEL_NAME
             t.append((f"[レーベル] {MAIN_LABEL}", MAIN_LABEL_NAME, None, MAIN_LABEL))

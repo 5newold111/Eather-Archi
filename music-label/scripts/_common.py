@@ -2,7 +2,7 @@
 新しいスクリプト（select_takes / master_track / distrokid_sheet / post_social / supabase_sync）で共通に使う小道具。
 
 - .env の読み込み（鍵はここからだけ読む。画面やログには出さない）
-- 設定書（本体レーベル / 子レーベル）の読み込み
+- 設定書（Postdog Records / 子レーベル）の読み込み
 - HTTPS 用の証明書設定（Mac の python.org 版 Python 対策）
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "out"
 MAIN_LABEL = "drive"
-MAIN_LABEL_NAME = "Postdog Records"   # 本体レーベルの公開名（配信のレーベル欄・プロフィールに出る名前）
+MAIN_LABEL_NAME = "Postdog Records"   # メインのレーベル（slug は drive）の公開名。配信のレーベル欄・プロフィールに出る
 
 
 def load_dotenv(path: Path = ROOT / ".env") -> None:
@@ -55,7 +55,7 @@ def write_json(p: Path, data) -> None:
 
 
 def label_slug_of(value) -> str:
-    """管理表の『レーベル』欄の書き方（本体・公開名・子レーベルの slug や名前）を slug にそろえる"""
+    """管理表の『レーベル』欄の書き方（Postdog Records・旧表記の「本体」・子レーベルの slug や名前）を slug にそろえる"""
     v = str(value or "").strip()
     if not v or v in ("本体", MAIN_LABEL) or v.casefold() == MAIN_LABEL_NAME.casefold():
         return MAIN_LABEL
@@ -68,7 +68,7 @@ def label_slug_of(value) -> str:
 
 
 def load_label(slug: str | None) -> dict:
-    """子レーベルの設定書。本体（drive）は設定書ファイルが無いので既定値を返す"""
+    """子レーベルの設定書。Postdog Records（drive）は設定書ファイルが無いので既定値を返す"""
     if not slug or slug == MAIN_LABEL:
         return {"slug": MAIN_LABEL, "name": MAIN_LABEL_NAME, "automation_tier": "A",
                 "release_hour_et": 17, "release_weekday": "wednesday", "accounts": {}}
@@ -79,7 +79,7 @@ def load_label(slug: str | None) -> dict:
 
 
 def load_artist(slug: str, label: str | None = None, missing_ok: bool = False) -> dict | None:
-    """アーティスト設定書を探す。label が無ければ本体 → 子レーベルの順に探す。
+    """アーティスト設定書を探す。label が無ければPostdog Records → 子レーベルの順に探す。
     missing_ok なら、見つからないとき（保管庫へ移した組の古い記録など）に None を返す"""
     if not label or label == MAIN_LABEL:
         p = ROOT / "templates" / "artists" / f"{slug}.json"
@@ -101,7 +101,7 @@ def load_artist(slug: str, label: str | None = None, missing_ok: bool = False) -
 
 
 def all_artists() -> list[dict]:
-    """本体 5 組 + 子レーベルの全アーティスト"""
+    """Postdog Records の 5 組 + 子レーベルの全アーティスト"""
     out = []
     for p in sorted((ROOT / "templates" / "artists").glob("*.json")):
         if p.stem.startswith("_"):
@@ -119,7 +119,7 @@ def all_artists() -> list[dict]:
 
 
 def length_spec(artist: dict, label: dict) -> dict:
-    """曲の尺・サビ位置などの仕様。本体は drive_spec、子レーベルは scene_spec"""
+    """曲の尺・サビ位置などの仕様。Postdog Records は drive_spec、子レーベルは scene_spec"""
     spec = dict(label.get("scene_spec") or {})
     spec.update((artist.get("sound") or {}).get("drive_spec") or {})
     spec.setdefault("length_sec_min", 150)
@@ -141,7 +141,7 @@ TRANSIENT_KEYS = ("label_slug", "label_visual")   # 読み込み時に足した�
 
 
 def save_artist(artist: dict) -> Path:
-    """設定書を元のファイルに書き戻す。本体は templates/artists/<slug>.json、子レーベルはレーベルの設定書の中"""
+    """設定書を元のファイルに書き戻す。Postdog Records は templates/artists/<slug>.json、子レーベルはレーベルの設定書の中"""
     a = {k: v for k, v in artist.items() if k not in TRANSIENT_KEYS}
     label = artist.get("label_slug") or MAIN_LABEL
     if label == MAIN_LABEL:
@@ -187,7 +187,7 @@ def as_date(v):
 
 
 def release_schedule(artist: dict, label: dict) -> tuple[str, int]:
-    """配信の曜日と時刻（ET）。本体は水曜 17:00、子レーベルは設定書の値"""
+    """配信の曜日と時刻（ET）。Postdog Records は水曜 17:00、子レーベルは設定書の値"""
     wd = artist.get("release_weekday") or label.get("release_weekday") or "wednesday"
     hr = artist.get("release_hour_et") or label.get("release_hour_et") or 17
     return str(wd).lower(), int(hr)
@@ -227,7 +227,7 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
 
 # ---------------------------------------------------------------------------
 # デビュー週：毎月 1 日のある週（月曜始まり）
-#   例）2026 年 12 月 → 12/1（火）のある週 ＝ 11/30 の週。本体の配信は水曜 12/2 17:00 ET
+#   例）2026 年 12 月 → 12/1（火）のある週 ＝ 11/30 の週。Postdog Records の配信は水曜 12/2 17:00 ET
 #   1 日が日曜の月は、その前の月曜からの週になる（例 2026 年 11 月 → 10/26 の週、配信は 10/28）
 # ---------------------------------------------------------------------------
 def debut_week_of_month(year: int, month: int):

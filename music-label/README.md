@@ -49,7 +49,7 @@ music-label/
 │   ├── artist_sheet.schema.json     ← アーティスト設定書の型定義
 │   ├── brief.schema.json            ← ブリーフの型定義
 │   ├── visual_criteria.json         ← ビジュアル候補の採点基準（オーナーの判断で育つ）
-│   ├── artists/                     ← 本体レーベル（ドライブ）の設定書。管理表から artist_book.py pull で作る（直接は書き換えない）
+│   ├── artists/                     ← Postdog Records（ドライブ）の設定書。管理表から artist_book.py pull で作る（直接は書き換えない）
 │   │   └── _template.json           ← 設定書の項目の見本
 │   ├── archive/2026-10-08/          ← 白紙にする前の 17 組（読まれない保管庫）
 │   └── labels/                      ← 子レーベル（場面ごと）。組は管理表で採用すると artists に入る

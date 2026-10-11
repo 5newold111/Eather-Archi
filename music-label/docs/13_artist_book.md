@@ -116,8 +116,8 @@
 | 1 組の提案をまとめて採用 | `python3 scripts/artist_book.py adopt nao_easterly`（却下・保留にした行はそのまま） |
 | 設定書に反映 | `python3 scripts/artist_book.py pull`（火曜 6:00 に自動） |
 | 管理表の状態 | `python3 scripts/artist_book.py status` |
-| 新しい組を Claude に提案させる | `python3 scripts/artist_book.py propose --label 本体 --note "日本とアメリカのハーフ"` |
-| （補足）レーベル欄の書き方 | 本体は「Postdog Records」「本体」「空欄」のどれでもよい。子レーベルは slug（sleep など）か名前（SLACK WATER など） |
+| 新しい組を Claude に提案させる | `python3 scripts/artist_book.py propose --label "Postdog Records" --note "日本とアメリカのハーフ"` |
+| （補足）レーベル欄の書き方 | 「Postdog Records」と書く（空欄・旧表記の「本体」も Postdog Records として読む）。子レーベルは slug（sleep など）か名前（SLACK WATER など） |
 | 来月の近況と歌の種を提案させる | `python3 scripts/artist_book.py propose-update --all`（毎月 1 日に自動） |
 | 採用した変更の提案を書き込む | `python3 scripts/artist_book.py apply-changes` |
 

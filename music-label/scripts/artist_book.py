@@ -20,7 +20,7 @@
 使い方
   python3 scripts/artist_book.py init
   python3 scripts/artist_book.py import-json proposals/2026-10-08
-  python3 scripts/artist_book.py propose --label 本体 --note "日本とアメリカのハーフ、朝の歌"
+  python3 scripts/artist_book.py propose --label "Postdog Records" --note "日本とアメリカのハーフ、朝の歌"
   python3 scripts/artist_book.py restyle                # 今の中身のまま、見やすいデザインの Excel に書き出し直す
   python3 scripts/artist_book.py pull
   python3 scripts/artist_book.py status
@@ -625,7 +625,7 @@ def main() -> None:
     s = sub.add_parser("import-json"); s.add_argument("path"); s.add_argument("--force", action="store_true")
     s = sub.add_parser("check"); s.add_argument("path")
     s = sub.add_parser("adopt"); s.add_argument("id"); s.add_argument("--tabs", help="タブを絞る（例：近況,歌の種）")
-    s = sub.add_parser("propose"); s.add_argument("--label", default="本体")
+    s = sub.add_parser("propose"); s.add_argument("--label", default=MAIN_LABEL_NAME)
     s.add_argument("--note", default=""); s.add_argument("--count", type=int, default=1)
     s = sub.add_parser("propose-update"); s.add_argument("--artist"); s.add_argument("--all", action="store_true")
     s.add_argument("--if-exists", action="store_true", help="管理表が無ければ何もしない（定期実行用）")

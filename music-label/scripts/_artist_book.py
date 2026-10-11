@@ -188,7 +188,7 @@ SECTIONS: dict[str, list[tuple[str, list[str]]]] = {
 # 選ぶ欄（プルダウン）
 CHOICES: dict[tuple[str, str], list[str]] = {
     ("acts", "formation"): ["ソロ", "デュオ", "バンド", "ボーカルグループ", "プロデューサー"],
-    ("acts", "label"): ["Postdog Records", "本体", "sleep", "morning", "focus", "move"],
+    ("acts", "label"): ["Postdog Records", "sleep", "morning", "focus", "move"],
     ("members", "gender"): ["女性", "男性", "ノンバイナリー"],
     ("marks", "kind"): ["傷", "タトゥー", "ピアス", "なし"],
     ("influences", "kind"): ["音楽", "本", "絵", "映画", "言葉"],

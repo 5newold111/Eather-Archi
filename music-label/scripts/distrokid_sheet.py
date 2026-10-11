@@ -99,7 +99,7 @@ def build_row(brief_path: Path, titles: dict[str, str]) -> dict:
 
     return {
         "label": label.get("name"), "label_slug": label.get("slug"),
-        "distrokid_account": (label.get("accounts") or {}).get("distrokid_email") or "本体アカウント",
+        "distrokid_account": (label.get("accounts") or {}).get("distrokid_email") or "Postdog Records のアカウント",
         "artist": artist["name"], "artist_slug": slug,
         "featured_artist": feat["name"] if feat else "",
         "featured_spotify": ((feat.get("distribution") or {}).get("spotify_uri") or "未登録（相手の最初の曲が配信された後に Spotify のアーティストリンクを設定書へ）") if feat else "",
@@ -157,7 +157,7 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             "- [ ] 名前の綴りが設定書と同じ（大文字・記号・スペース）",
             "- [ ] タイトルに feat. / ft. が入っていない",
             "- [ ] ジャケットの文字が曲名・アーティスト名と一致（他の文字・URL・SNS 名なし）",
-            "- [ ] 配信日が上の日付と同じ（本体は 2 週間後の水曜、子レーベルは設定書の曜日）",
+            "- [ ] 配信日が上の日付と同じ（Postdog Records は 2 週間後の水曜、子レーベルは設定書の曜日）",
             "- [ ] 登録後、DistroKid の画面で ISRC と UPC を控え、`" + f"out/distrokid/{week}/{r['artist_slug']}.metadata.json" + "` の isrc / upc に書く",
         ]
     out += ["", "---", "登録が終わったら：`python scripts/supabase_sync.py releases --week " + week + "`（鍵を入れた後）"]

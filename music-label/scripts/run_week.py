@@ -2,7 +2,7 @@
 """
 1 週間ぶんの処理を、段階ごとに全組まとめて流す。人の作業（Suno・テイクを聴く・DistroKid 登録）の間をつなぐ。
 
-  brief   話題曲の取得 → 参考曲の割り当て（本体＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
+  brief   話題曲の取得 → 参考曲の割り当て（Postdog Records＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
   lyrics  Suno が書いた節（<ブリーフ名>.verses.txt）があれば核と合体して最終歌詞に
   takes   Suno のテイク（out/takes/<ブリーフ名>/）があれば計測して選ぶ（Tier A/B/C）
   finish  音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備
@@ -93,7 +93,7 @@ def stage_brief(week: date, a) -> None:
         common += ["--hints", g / "hints.json"]
     if a.overwrite:
         common.append("--overwrite")
-    step("本体レーベルの参考曲を割り当てています")
+    step("Postdog Records の参考曲を割り当てています")
     run([S / "select_references.py", "--all", *common])
     for lab in labels_with_artists():
         step(f"子レーベル {lab} の参考曲を割り当てています")
