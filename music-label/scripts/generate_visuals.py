@@ -204,6 +204,7 @@ def prompts_reshoot(artist: dict, pivot_reason: str) -> list[dict]:
 # gpt-image-1 は 2026-10-23 に提供終了。後継の候補を上から順に試し、使えたものを .env の OPENAI_IMAGE_MODEL に覚える
 IMAGE_MODELS = ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-1.5", "gpt-image-1"]
 _BAD_MODELS: set[str] = set()
+_NO_QUALITY: set[str] = set()   # quality の指定を受け付けなかったモデル
 
 
 def image_model_candidates() -> list[str]:
@@ -226,8 +227,12 @@ def generate_image(prompt: str, out_path: Path, size: str = "1024x1024") -> bool
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
         return False
+    quality = os.environ.get("OPENAI_IMAGE_QUALITY", "high")   # 画質（high / medium / low）。high がいちばん細部まで描く
     for model in image_model_candidates():
-        body = json.dumps({"model": model, "prompt": prompt, "size": size, "n": 1}).encode()
+        payload = {"model": model, "prompt": prompt, "size": size, "n": 1}
+        if quality and model not in _NO_QUALITY:
+            payload["quality"] = quality
+        body = json.dumps(payload).encode()
         req = urllib.request.Request("https://api.openai.com/v1/images/generations", data=body,
                                      headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
         try:
@@ -235,6 +240,9 @@ def generate_image(prompt: str, out_path: Path, size: str = "1024x1024") -> bool
                 data = json.loads(r.read())
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")[:300]
+            if e.code == 400 and "quality" in msg.lower() and model not in _NO_QUALITY:   # 画質の指定に対応しないモデル → 指定なしでやり直す
+                _NO_QUALITY.add(model)
+                return generate_image(prompt, out_path, size)
             # モデルが無い・終了した・この鍵では使えない → 次の候補へ
             if e.code in (404, 400) and re.search(r"model|does not exist|not found|deprecated", msg, re.I) and "safety" not in msg.lower():
                 _BAD_MODELS.add(model)

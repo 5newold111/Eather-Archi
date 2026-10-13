@@ -76,7 +76,7 @@ def is_fitted(p: Path) -> bool:
 
 def fit(src: Path, dst: Path) -> str:
     """中央を正方形に切り出し、3000×3000・RGB の JPG にする（10MB を超えたら画質を下げる）"""
-    from PIL import Image
+    from PIL import Image, ImageFilter
     with Image.open(src) as im:
         im = im.convert("RGB")
         w, h = im.size
@@ -84,6 +84,8 @@ def fit(src: Path, dst: Path) -> str:
         im = im.crop(((w - s) // 2, (h - s) // 2, (w - s) // 2 + s, (h - s) // 2 + s))
         note = "" if s >= SIDE else f"（元は {s}×{s}。拡大したので、細部は元の画像の細かさのまま）"
         im = im.resize((SIDE, SIDE), Image.LANCZOS)
+        if s < SIDE:   # 拡大でぼやけた輪郭を少しだけ締める（かけすぎると縁が白く光るので弱め）
+            im = im.filter(ImageFilter.UnsharpMask(radius=2.2, percent=70, threshold=3))
         for q in (92, 88, 84, 80, 75):
             im.save(dst, "JPEG", quality=q, optimize=True, progressive=True)
             if dst.stat().st_size < MAX_BYTES:
@@ -147,7 +149,7 @@ def main() -> None:
                         continue
                     print(f"  … {label}を作っています")
                     try:
-                        gv.generate_image(prompt, raw)
+                        gv.generate_image(prompt, raw, size=gv.os.environ.get("OPENAI_IMAGE_SIZE", "1024x1024"))
                     except (RuntimeError, OSError) as e:  # OSError は接続できないとき（ネットワークの制限など）
                         print(f"  × {label}：{e}（api.openai.com に届くか、鍵と残高を確かめる）")
                         continue
