@@ -19,7 +19,7 @@
 |---|---|
 | アーティストの管理表（正本） | Google スプレッドシート「アーティスト情報」 https://docs.google.com/spreadsheets/d/1q_Zfo6kW4PNJRQjcNUJGzN9gfBNWJqrBxBR6PnEPSAA/edit |
 | 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
-| デビュー 5 曲の作業書・ChatGPT の依頼文 | Google ドライブ「Postdog Records デビュー 2026-10」フォルダ https://drive.google.com/drive/folders/1wYCdLFFFy7w2y23arVeCcQk1_BRYpqx- |
+| デビュー 5 曲の作業書・ChatGPT の依頼文 | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／最初の5曲」 https://docs.google.com/document/d/16Kl2HrVIh5rb6QQYC5l_Ym9LJsZ91GKk5ggQLzYcogs/edit （最初の版は別アカウントのドライブにあり、もう使わない） |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
 | 決めたこと | `docs/12_decisions.md`（1〜8） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
@@ -38,6 +38,12 @@
 10. 参考曲 11 曲以上の購入と解析 … 未着手（デビューには不要）
 11. 自動化の鍵の設定（`python3 scripts/setup_keys.py`）… 未着手（デビューには不要）
 12. 作業を Mac に移す … このメモ
+
+## Google のアカウント（2026-10-13 時点）
+
+- レーベル用の正しいアカウントは etherarchi@gmail.com。アーティスト情報のシートは 5newold111 の持ち物で、etherarchi が編集者
+- Claude のドライブのつなぎ先は 5newold111、カレンダーも 5newold111。ドキュメントのつなぎ先は不明（5newold111 ではない）
+- Claude が書き換えられるのは「リンクを知っている全員が編集可」のファイルか、Claude 自身が作ったファイル
 
 ## 守ること
 
