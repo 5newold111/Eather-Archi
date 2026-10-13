@@ -19,7 +19,7 @@
 |---|---|
 | アーティストの管理表（正本） | Google スプレッドシート「アーティスト情報」 https://docs.google.com/spreadsheets/d/1q_Zfo6kW4PNJRQjcNUJGzN9gfBNWJqrBxBR6PnEPSAA/edit |
 | 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
-| デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／最初の5曲」 https://docs.google.com/document/d/16Kl2HrVIh5rb6QQYC5l_Ym9LJsZ91GKk5ggQLzYcogs/edit 。今後の記入はすべてここ。「Postdog Records デビュー 5 曲 作業書」（1XUw…）はコピー元で、もう記入しない |
+| デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
 | 決めたこと | `docs/12_decisions.md`（1〜8） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
@@ -43,7 +43,7 @@
 
 - レーベル用の正しいアカウントは etherarchi@gmail.com。アーティスト情報のシートは 5newold111 の持ち物で、etherarchi が編集者
 - Claude のドライブのつなぎ先は 5newold111、カレンダーも 5newold111。ドキュメントのつなぎ先は不明（5newold111 ではない）
-- Claude が書き換えられるのは「リンクを知っている全員が編集可」のファイルか、Claude 自身が作ったファイル（アーティスト情報のシートはリンクで編集可。正本の作業書「最初の5曲」も同じ設定が必要）
+- Claude が書き換えられるのは「リンクを知っている全員が編集可」のファイルか、Claude 自身が作ったファイル（アーティスト情報のシートと正本の作業書は書き換えられることを確認済み）
 
 ## 守ること
 
