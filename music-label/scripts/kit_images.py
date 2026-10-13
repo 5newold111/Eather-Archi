@@ -9,6 +9,9 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   2. 管理表の実在の名前（影響・好きなアーティスト）が依頼文に混ざっていないか確かめる（混ざっていたら止める）
   3. 画像 API で 1 枚ずつ作り、images/<組の ID>_<cover|photo>_raw.png に保存する（鍵が無ければ依頼文だけ書き出す）
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
+  5. Google ドライブの「音楽レーベルアプリ/アーティスト情報/<アーティスト名>」フォルダに保存する
+     （同じ名前のフォルダがあればそこへ。無ければ作る。Mac の「Google ドライブ（パソコン版）」の同期フォルダを使う）
+     ドライブでの名前は <アーティスト名>_cover.jpg（ジャケット）と <アーティスト名>_photo.jpg（アーティスト写真）
 
 ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png のような名前で置いて --fit-only で整えられる。
 
@@ -17,6 +20,7 @@ ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png
   python3 scripts/kit_images.py --only nao_easterly --kind cover
   python3 scripts/kit_images.py --fit-only              # 画像は作らず、images/ にある画像を整えるだけ
   python3 scripts/kit_images.py --redo                  # 作り直す（今ある画像は _old を付けて残す）
+  python3 scripts/kit_images.py --no-drive              # Google ドライブには保存しない
 
 鍵は music-label/.env の OPENAI_API_KEY（会話には貼らない）。画像モデルは generate_visuals.py と同じ選び方。
 """
@@ -28,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _life import real_names  # noqa: E402  管理表の実名（指示文に混ぜない）
 import generate_visuals as gv  # noqa: E402  画像 API の呼び出し（モデルの自動選択つき）
 from _common import rel  # noqa: E402
+import _gdrive_local as gdrive  # noqa: E402  Google ドライブの同期フォルダへの保存
 
 ROOT = Path(__file__).resolve().parent.parent
 KIT_ROOT = ROOT / "debut_kit"
@@ -93,6 +98,7 @@ def main() -> None:
     ap.add_argument("--kind", choices=["cover", "photo", "both"], default="both")
     ap.add_argument("--fit-only", action="store_true", help="画像は作らず、images/ にある画像を整えるだけ")
     ap.add_argument("--redo", action="store_true", help="作り直す（今ある画像は _old を付けて残す）")
+    ap.add_argument("--no-drive", action="store_true", help="Google ドライブには保存しない")
     args = ap.parse_args()
 
     kit = args.kit or latest_kit()
@@ -110,6 +116,18 @@ def main() -> None:
 
     print(f"▶ 作業セット：{rel(kit)}")
     dry_lines = []
+    folders: dict[str, Path | None] = {}
+
+    def to_drive(act: dict, kind: str, out: Path) -> None:
+        """整えた画像を Google ドライブのアーティストのフォルダへ"""
+        if args.no_drive:
+            return
+        name = act["artist"]
+        if name not in folders:
+            folders[name], how = gdrive.artist_folder(name)
+            print(f"    ドライブ：{how}" if folders[name] else f"    ドライブには保存しませんでした：{how}")
+        if folders[name]:
+            print(f"    ドライブ：アーティスト情報/{folders[name].name}/{name}_{kind}.jpg を{gdrive.save(out, folders[name], f'{name}_{kind}.jpg')}")
     for act in acts:
         slug = act["slug"]
         for kind in kinds:
@@ -140,13 +158,14 @@ def main() -> None:
                 continue
             if out.exists() and out.stat().st_mtime >= src.stat().st_mtime and src != out:
                 print(f"  ○ {label}：整え済み（{out.name}）")
-                continue
-            print(f"  ○ {label}：{out.name} に整えました（{fit(src, out)}）")
+            else:
+                print(f"  ○ {label}：{out.name} に整えました（{fit(src, out)}）")
+            to_drive(act, kind, out)
 
     if dry_lines:
         (images / "prompts.txt").write_text("\n".join(dry_lines), encoding="utf-8")
         print(f"  依頼文：{rel(images / 'prompts.txt')}（{len(dry_lines)} 件）")
-    print("  次：images/ の画像を見て、顔・文字・透かしが無いか確かめる。良ければ作業書のフォルダへ")
+    print("  次：Claude に「画像を入れた」と伝える（ドライブのアーティスト情報のフォルダで、顔・文字・透かしが無いか確かめてもらう）")
 
 
 if __name__ == "__main__":
