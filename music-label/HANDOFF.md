@@ -9,7 +9,7 @@
   - 設定書は `templates/artists/<組>.json`。管理表から `python3 scripts/artist_book.py pull` で作る（直接は書き換えない）
 - オーナーは「できるだけ早く公開したい」。デビュー曲 5 曲は **自動の流れを使わず手作業で出す**
   - Suno で作曲（Pro プラン）→ 聴いて選ぶ → DistroKid に登録（公開日はいちばん早い日）
-  - ジャケットとアーティスト写真は **ChatGPT** で作る（`generate_visuals.py` は当面使わない）
+  - ジャケットとアーティスト写真は **自動で作る**（ChatGPT と同じ OpenAI の画像生成を API で呼ぶ。`python3 scripts/kit_images.py`。要 `.env` の `OPENAI_API_KEY`）
   - 材料：`debut_kit/2026-10-11/`（`kit.json` に曲名・Suno の指示文・歌詞、`chatgpt_prompts.json` に画像の依頼文）
 - 設定書のデビュー週は 2026-10-26（自動の配信枠は 10/28）。手作業の 5 曲が出たら、この枠を 2 曲目として作り直す
 
@@ -21,7 +21,7 @@
 | 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
 | デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜8） |
+| 決めたこと | `docs/12_decisions.md`（1〜9） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
 ## 詰まっているところ（2026-10-13 時点）
@@ -30,7 +30,7 @@
 2. DistroKid のプラン … **完了**（Ultimate・アーティスト名 5 つ。今の 5 組でちょうど埋まる）
 3. 名前の重複確認 … **完了**（オーナーが Spotify で確認。NAO EASTERLY は「NAO」と紛れるので VERNALIGHT に改名し、Claude が Web 検索で確認）
 4. Suno で 5 曲 … 未着手
-5. ChatGPT でジャケットと写真 … 未着手。届いた画像は 3000×3000・RGB・10MB 未満の JPG か PNG に整える
+5. ジャケットと写真 … 自動で作る仕組みはできた（`kit_images.py`）。OpenAI の鍵を `.env` に入れれば Mac で `python3 scripts/kit_images.py` 一発で 10 枚できる
 6. テイク選び … 未着手
 7. DistroKid に登録 … 未着手
 8. 配信後に ISRC と選んだテイクを記録 … 未着手

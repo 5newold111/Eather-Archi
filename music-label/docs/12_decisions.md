@@ -99,3 +99,14 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   vernal（春分の）＋ light（光）。春分の明け方に生まれた本人の設定と、デビュー曲「Due East」の意味はそのまま残す。HOLLOWPLAN・TIDEWOOL と同じ 2 語をつなげた造語
 - 中の呼び名（ID・slug）は `nao_easterly` のまま（ほかのタブや設定書とのつながりを切らないため）。表に出る名前・読み方・名前の由来・英語の紹介文・メンバー名・SOFT CANTILEVER のコラボの欄を書き換えた。旧名は管理表のメモ欄に残した
 - **これから新しい名前（組・曲・レーベル）を出すときは、Claude が先に Web 検索（Spotify・Bandcamp・SoundCloud を含む）で同じ名前のアーティストがいないか調べ、その結果を添えて見せる。** オーナーの手での確認は求めない。Mac で動かせるようになったら `check_names.py` も合わせて使う
+
+
+## 9. ジャケットとアーティスト写真は自動で作る（2026-10-13。7 の「オーナーが ChatGPT で作る」を置き換える）
+
+- オーナーの依頼で、画像づくりを自動にした。ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）から呼ぶ
+  - ChatGPT の画面をブラウザで自動操作する方法は採らない（OpenAI の利用規約が、自動の仕組みで出力を取り出すことを禁じているため。クラウドの作業環境からは chatgpt.com にも届かない）
+- デビュー用の作業セットは `python3 scripts/kit_images.py`（chatgpt_prompts.json の依頼文 → 画像 → 3000×3000・RGB・10MB 未満の JPG）。
+  毎週の流れ（ロゴ・写真・ジャケットの候補づくりと採点）は今までどおり `generate_visuals.py`
+- 必要なもの：`music-label/.env` の `OPENAI_API_KEY`（ChatGPT の月額とは別の、使った分だけの支払い）。
+  クラウドで動かすときは、環境の設定で api.openai.com への接続を許可し、鍵を環境変数 `OPENAI_API_KEY` に入れる。Mac ならどちらも不要（.env だけ）
+- ChatGPT の画面で手作りした画像も、`debut_kit/<日付>/images/<組の ID>_cover.png` のように置けば `--fit-only` で整えられる
