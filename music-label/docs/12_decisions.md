@@ -82,3 +82,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   デビュー週はまだ決めていない（5 組は同じ週。`debut.py --month <YYYY-MM>` で決めると、その 2 週間前の週から制作が始まる）
 - 名前の重複確認（`check_names.py --all` と `debut.py`）に、レーベル名 Postdog Records も入れた
 
+
+## 7. ジャケットとアーティスト写真は ChatGPT で作る（2026-10-13）
+
+- 画像はオーナーが ChatGPT で作る。依頼文は各組の設定書の visual（色・光・構図・顔を隠す決まり）から作り、
+  `debut_kit/2026-10-11/chatgpt_prompts.json` と Google ドライブの作業書に置いた（顔なし・文字なし・実在の人物に似せない）
+- 配信用のジャケットは 3000×3000・RGB・10MB 未満の JPG か PNG にそろえる（ChatGPT の画像が小さければ Claude が整える）
+- `generate_visuals.py`（画像 API で候補を作る）は当面使わない。`debut.py` の「ロゴと写真の候補を作る」段は、名前の確認が済んでいないと動かないので今は影響なし
+- 作業の置き場所は Google ドライブの「Postdog Records デビュー 2026-10」フォルダ（作業書と、詰まっているところ一覧）
