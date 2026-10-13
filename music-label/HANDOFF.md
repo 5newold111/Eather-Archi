@@ -45,6 +45,15 @@
 - Claude のドライブのつなぎ先は 5newold111、カレンダーも 5newold111。ドキュメントのつなぎ先は不明（5newold111 ではない）
 - Claude が書き換えられるのは「リンクを知っている全員が編集可」のファイルか、Claude 自身が作ったファイル（アーティスト情報のシートと正本の作業書は書き換えられることを確認済み）
 
+## OpenAI の鍵の登録（Mac のターミナル）
+
+```
+cd music-label
+python3 -m pip install -r requirements.txt
+python3 scripts/setup_keys.py --only openai    # 鍵を貼って Enter（画面には出ない）→ 実際に接続して確かめる
+python3 scripts/kit_images.py                  # 5 組 × 2 枚を自動で作り、3000×3000 に整える
+```
+
 ## 守ること
 
 - オーナーへの返事は日本語。専門用語はやさしく言い換え、何をしているかを日本語で書く

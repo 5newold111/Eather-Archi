@@ -4,6 +4,7 @@ librosa>=0.10
 soundfile
 numpy
 openpyxl          # アーティスト台帳（artists.xlsx）の読み書き
+pillow            # ジャケットと写真を 3000×3000 に整える（kit_images.py・make_covers.py）
 
 # 任意：アーティスト台帳を Google スプレッドシートで使うとき（サービスアカウントの署名）
 # cryptography
