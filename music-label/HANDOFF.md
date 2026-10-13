@@ -22,7 +22,7 @@
 | ジャケットとアーティスト写真 | 5newold111 のドライブ「音楽レーベルアプリ／アーティスト情報／<アーティスト名>」（kit_images.py が自動で保存。Mac にパソコン版の Google ドライブが必要） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜10） |
+| 決めたこと | `docs/12_decisions.md`（1〜11） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
 ## 詰まっているところ（2026-10-13 時点）
@@ -53,6 +53,7 @@ cd music-label
 python3 -m pip install -r requirements.txt
 python3 scripts/setup_keys.py --only openai    # 鍵を貼って Enter（画面には出ない）→ 実際に接続して確かめる
 python3 scripts/kit_images.py                  # 5 組 × 2 枚を自動で作り、3000×3000 に整え、ドライブの アーティスト情報/<アーティスト名>/ に保存
+python3 scripts/kit_images.py --kind photo2    # 2 枚目のアーティスト写真だけ（全身・サングラス・被り物・イラスト）
 python3 scripts/kit_images.py --redo           # 作り直す（前の画像は _old を付けて手元に残る。ドライブは上書きで、前の版は履歴に残る）
 ```
 

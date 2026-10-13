@@ -11,13 +11,14 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
   5. Google ドライブの「音楽レーベルアプリ/アーティスト情報/<アーティスト名>」フォルダに保存する
      （同じ名前のフォルダがあればそこへ。無ければ作る。Mac の「Google ドライブ（パソコン版）」の同期フォルダを使う）
-     ドライブでの名前は <アーティスト名>_cover.jpg（ジャケット）と <アーティスト名>_photo.jpg（アーティスト写真）
+     ドライブでの名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
 
 ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png のような名前で置いて --fit-only で整えられる。
 
 使い方：
   python3 scripts/kit_images.py                         # いちばん新しい作業セットの 5 組 × 2 枚
   python3 scripts/kit_images.py --only nao_easterly --kind cover
+  python3 scripts/kit_images.py --kind photo2           # 2 枚目のアーティスト写真だけ
   python3 scripts/kit_images.py --fit-only              # 画像は作らず、images/ にある画像を整えるだけ
   python3 scripts/kit_images.py --redo                  # 作り直す（今ある画像は _old を付けて残す）
   python3 scripts/kit_images.py --no-drive              # Google ドライブには保存しない
@@ -38,7 +39,8 @@ ROOT = Path(__file__).resolve().parent.parent
 KIT_ROOT = ROOT / "debut_kit"
 SIDE = 3000                    # 配信の基準に合わせた一辺
 MAX_BYTES = 10 * 1024 * 1024   # 10MB 未満
-KINDS = {"cover": ("cover", "common_cover", "ジャケット"), "photo": ("photo", "common_photo", "アーティスト写真")}
+KINDS = {"cover": ("cover", "common_cover", "ジャケット"), "photo": ("photo", "common_photo", "アーティスト写真"),
+         "photo2": ("photo2", "common_photo2", "アーティスト写真（2 枚目）")}
 SOURCE_EXT = (".png", ".jpg", ".jpeg", ".webp")
 
 
@@ -97,7 +99,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="作業セットからジャケットとアーティスト写真を自動で作る")
     ap.add_argument("--kit", type=Path, help="作業セットのフォルダ（省略時はいちばん新しいもの）")
     ap.add_argument("--only", help="この組だけ（組の ID。例 nao_easterly）")
-    ap.add_argument("--kind", choices=["cover", "photo", "both"], default="both")
+    ap.add_argument("--kind", choices=["cover", "photo", "photo2", "both", "all"], default="all",
+                    help="all＝ジャケット・写真・2 枚目の写真（既定）、both＝ジャケットと写真")
     ap.add_argument("--fit-only", action="store_true", help="画像は作らず、images/ にある画像を整えるだけ")
     ap.add_argument("--redo", action="store_true", help="作り直す（今ある画像は _old を付けて残す）")
     ap.add_argument("--no-drive", action="store_true", help="Google ドライブには保存しない")
@@ -107,7 +110,7 @@ def main() -> None:
     data = json.loads((kit / "chatgpt_prompts.json").read_text(encoding="utf-8"))
     images = kit / "images"
     images.mkdir(exist_ok=True)
-    kinds = ["cover", "photo"] if args.kind == "both" else [args.kind]
+    kinds = {"all": ["cover", "photo", "photo2"], "both": ["cover", "photo"]}.get(args.kind, [args.kind])
     acts = [a for a in data["acts"] if not args.only or a["slug"] == args.only]
     if not acts:
         sys.exit(f"組 {args.only} が作業セットにありません")
@@ -134,6 +137,8 @@ def main() -> None:
         slug = act["slug"]
         for kind in kinds:
             key, common_key, ja = KINDS[kind]
+            if key not in act:   # この作業セットに無い種類（古い作業セットの photo2 など）
+                continue
             prompt = f"{act[key]}{data.get(common_key, '')}"
             check_real_names(slug, prompt)
             raw = images / f"{slug}_{kind}_raw.png"
