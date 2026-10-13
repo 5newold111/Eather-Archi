@@ -1,17 +1,8 @@
 {
   "slug": "nao_easterly",
-  "name": "NAO EASTERLY",
+  "name": "VERNALIGHT",
   "name_status": "draft",
-  "name_check": {
-    "auto_checks": [
-      {
-        "verdict": "unverified",
-        "date": "2026-10-11",
-        "exact": [],
-        "near": []
-      }
-    ]
-  },
+  "name_check": {},
   "formation": "solo",
   "cadence": "weekly",
   "debut_week": "2026-10-26",
@@ -22,7 +13,7 @@
         "description": "女性・24 歳。時間に正確で、朝は誰より機嫌がいい。口数は少ないが、聞かれたことにはまっすぐ答え、乾いた冗談を真顔で言う。人に頼るのが下手で、手伝いを申し出るほうが楽。予定が崩れると静かに不機嫌になる。"
       }
     ],
-    "age_feel": "Nao Easterly（ナオ・イースタリー）／本名 Nao Kudo Harlan（工藤奈央） 24 歳",
+    "age_feel": "Nao（ナオ）／本名 Nao Kudo Harlan（工藤奈央） 24 歳",
     "story": "平日は午前 3 時に起き、3 時半から工業地区の卸のベーカリーで焼きたてのパンを配送バンに積み、市内 20 軒のカフェに届ける。ルートの最後は 84 号線の東行きで、冬はちょうどそこで日が昇る。昼に少し眠り、午後 1 時から 4 時が作曲の時間で、夜は 8 時半に寝る。父がこの冬を最後に除雪の仕事を引退すると聞き、最初のシングルをその季節の始まりに出したいと思っている。函館の祖母は 80 歳になり、電話の向こうの声が少しゆっくりになったのが気がかりだ。それでも配送の仕事はやめず、歌はこの生活の中から作り続けると決めている。",
     "drive_scene": "朝の高速・日の出・東へ走る",
     "origin": {
@@ -80,7 +71,7 @@
       "how": "人前で初めて自作曲を歌ったのは、祖父を亡くして暮らした函館の小さなライブバーの月 1 回のオープンマイクだった。ポートランドに移った 2023 年の秋から、パンの配送バンのダッシュボードにスマートフォンを置き、日の出の 30 秒と歌の断片を毎朝投稿し始める。映るのはハンドルを握る手とフロントガラスだけで、キャプションには毎回その朝の日の出時刻だけを書いた。2025 年 2 月、配送先のカフェの店主を通じてデモが地元のコミュニティ FM の早朝番組に渡り、3 週続けてかかった。同じ年、配送先のカフェ 3 軒が開店準備の時間に彼女のデモを流すようになり、客が店員に名前を尋ねるようになった。24 歳の誕生日の春分の朝、コロンビア川沿いの展望駐車場から日の出の 6 分間だけ車内ライブを配信し、それを見たレーベルから連絡が来て最初のシングルの配信が決まった。",
       "inspired_by_pattern": "",
       "first_release": "",
-      "name_meaning": "Easterly は英語で「東から吹く風」と「東へ向かう」の両方を指す。冬にコロンビア川の峡谷からポートランドへ吹き出す東風は冷たく乾いていて、決まって澄んだ晴れの朝を連れてくる。春分（太陽が真東から昇る日）に生まれ、毎朝東へ走る本人が、本名の Harlan より方角の名前のほうが自分に近いと感じて付けた。"
+      "name_meaning": "vernal（春の・春分の）と light（光）をつなげた造語。春分は太陽が真東から昇る日で、本人はその日の明け方に生まれた。毎朝東へ走り、配送ルートの終わりで日の出を迎える本人が、本名の Harlan より、自分が生まれた朝の光の名前のほうが自分に近いと感じて付けた。冬にコロンビア川の峡谷から吹き出す東風が連れてくる、澄んだ晴れの朝の光でもある。"
     }
   },
   "vocal": {
@@ -280,7 +271,7 @@
     }
   },
   "distribution": {
-    "bio_en": "Nao Easterly grew up between the pear orchards of Hood River, Oregon, and her grandmother's harbor town of Hakodate, Japan. Her first sunrise was seen from the passenger seat of her father's snowplow pickup, a thermos of cocoa between her knees, and she has been waking before dawn ever since. Now she drives a bakery delivery van through Portland at 3:30 a.m. and writes bright, clear-voiced synth-pop about the hour when only the early shift is awake. Her songs end where her route does: eastbound on the interstate, right as the sun comes up."
+    "bio_en": "VERNALIGHT is the solo project of Nao, who grew up between the pear orchards of Hood River, Oregon, and her grandmother's harbor town of Hakodate, Japan. She was born at dawn on the spring equinox, one of the two mornings a year the sun rises due east, and the name is for that light. The first sunrise she remembers was seen from the passenger seat of her father's snowplow pickup, a thermos of cocoa between her knees, and she has been waking before dawn ever since. Now she drives a bakery delivery van through Portland at 3:30 a.m. and writes bright, clear-voiced synth-pop about the hour when only the early shift is awake. Her songs end where her route does: eastbound on the interstate, right as the sun comes up."
   },
   "collab": {
     "preferred_partners": [
@@ -325,16 +316,16 @@
   },
   "life": {
     "act": {
-      "name": "NAO EASTERLY",
+      "name": "VERNALIGHT",
       "id": "nao_easterly",
-      "reading": "ナオ・イースタリー",
-      "name_meaning": "Easterly は英語で「東から吹く風」と「東へ向かう」の両方を指す。冬にコロンビア川の峡谷からポートランドへ吹き出す東風は冷たく乾いていて、決まって澄んだ晴れの朝を連れてくる。春分（太陽が真東から昇る日）に生まれ、毎朝東へ走る本人が、本名の Harlan より方角の名前のほうが自分に近いと感じて付けた。",
+      "reading": "ヴァーナライト",
+      "name_meaning": "vernal（春の・春分の）と light（光）をつなげた造語。春分は太陽が真東から昇る日で、本人はその日の明け方に生まれた。毎朝東へ走り、配送ルートの終わりで日の出を迎える本人が、本名の Harlan より、自分が生まれた朝の光の名前のほうが自分に近いと感じて付けた。冬にコロンビア川の峡谷から吹き出す東風が連れてくる、澄んだ晴れの朝の光でもある。",
       "formation": "ソロ",
       "label": "Postdog Records",
       "gender": "女性",
       "birth": "2002-03-20（24 歳）",
       "main_instrument": "明るいアナログ風シンセの 8 分のアルペジオ、クリーンなエレキギターのミュートカッティング、短く弾むシンセベース、本人の明るく澄んだ声",
-      "updated": "2026-10-08",
+      "updated": "2026-10-13",
       "origin": "米国オレゴン州フッドリバー郡オデル生まれ（梨とリンゴの果樹園の町）。母は北海道函館市の西部地区（弥生町）出身、父はオレゴン州ザ・ダルズ育ちの州の道路保守班の作業員。0〜9 歳はオデルで暮らし、6〜9 歳の夏は函館の小学校に体験入学。10〜11 歳は祖母のリハビリを手伝うため母と弟と函館で暮らし、12〜19 歳は再びフッドリバー。20 歳で祖父を亡くして函館の祖母の家に 11 か月住み、21 歳の春からポートランドで暮らしている。",
       "base_now": "米国オレゴン州ポートランド北東部のハリウッド地区。州間高速 84 号線の切り通しから 2 ブロックの、1920 年代のれんが造り 4 戸建てアパートの 2 階（1 寝室・約 42㎡・東向きの出窓）。",
       "culture": "家の中は英語と日本語が半々で、父とは英語、母と祖母とは函館の言葉が混じる日本語で話す。父の側はオレゴンの小さな町の働く人の文化（朝が早く・無口で・ピックアップと業務無線と魔法瓶）、母の側は港町の文化（漁の時間・朝市・塩ラーメン・正月の雑煮）。本人は 2 つの文化の共通点を「朝早く働く人の暮らし」だと思っていて、どちらの国にいても夜明け前に起きる。家では靴を脱ぎ、感謝祭の翌朝は母のおにぎりを持って父と山の道を見に行く。",
@@ -363,12 +354,12 @@
         "霜の降りた梨の果樹園",
         "84 号線のマイル標識"
       ],
-      "bio_en": "Nao Easterly grew up between the pear orchards of Hood River, Oregon, and her grandmother's harbor town of Hakodate, Japan. Her first sunrise was seen from the passenger seat of her father's snowplow pickup, a thermos of cocoa between her knees, and she has been waking before dawn ever since. Now she drives a bakery delivery van through Portland at 3:30 a.m. and writes bright, clear-voiced synth-pop about the hour when only the early shift is awake. Her songs end where her route does: eastbound on the interstate, right as the sun comes up.",
-      "note": "本名は Nao Kudo Harlan（日本の戸籍名は工藤奈央）。日米の二重国籍で、日本の国籍をどうするかの届けは書いたまま引き出しにしまってある。顔は出さないが、手元・後ろ姿・車内は毎回同じ人として撮る。投稿と配信は日本時間とアメリカ時間それぞれの朝 6 時に合わせる。"
+      "bio_en": "VERNALIGHT is the solo project of Nao, who grew up between the pear orchards of Hood River, Oregon, and her grandmother's harbor town of Hakodate, Japan. She was born at dawn on the spring equinox, one of the two mornings a year the sun rises due east, and the name is for that light. The first sunrise she remembers was seen from the passenger seat of her father's snowplow pickup, a thermos of cocoa between her knees, and she has been waking before dawn ever since. Now she drives a bakery delivery van through Portland at 3:30 a.m. and writes bright, clear-voiced synth-pop about the hour when only the early shift is awake. Her songs end where her route does: eastbound on the interstate, right as the sun comes up.",
+      "note": "本名は Nao Kudo Harlan（日本の戸籍名は工藤奈央）。日米の二重国籍で、日本の国籍をどうするかの届けは書いたまま引き出しにしまってある。顔は出さないが、手元・後ろ姿・車内は毎回同じ人として撮る。投稿と配信は日本時間とアメリカ時間それぞれの朝 6 時に合わせる。旧名 NAO EASTERLY（2026-10-13 に改名。イギリスの歌手「NAO」と検索で並ぶのを避けるため。VERNALIGHT は Web 検索で同じ名前なし）。"
     },
     "members": [
       {
-        "name": "Nao Easterly（ナオ・イースタリー）／本名 Nao Kudo Harlan（工藤奈央）",
+        "name": "Nao（ナオ）／本名 Nao Kudo Harlan（工藤奈央）",
         "id": "nao",
         "role": "ボーカル・シンセ・作詞作曲",
         "age": 24,
@@ -1014,6 +1005,6 @@
     ]
   },
   "source": {
-    "pulled_at": "2026-10-11T07:51:49"
+    "pulled_at": "2026-10-13T08:31:53"
   }
 }

@@ -5,7 +5,7 @@
 ## 今どこにいるか
 
 - レーベル名は **Postdog Records**（中の呼び名は drive）。所属は 5 組で、全員オーナーが採用済み
-  - DECLAN FAY・HOLLOWPLAN・NAO EASTERLY・SOFT CANTILEVER・TIDEWOOL
+  - DECLAN FAY・HOLLOWPLAN・VERNALIGHT（旧名 NAO EASTERLY、ID は nao_easterly のまま）・SOFT CANTILEVER・TIDEWOOL
   - 設定書は `templates/artists/<組>.json`。管理表から `python3 scripts/artist_book.py pull` で作る（直接は書き換えない）
 - オーナーは「できるだけ早く公開したい」。デビュー曲 5 曲は **自動の流れを使わず手作業で出す**
   - Suno で作曲（Pro プラン）→ 聴いて選ぶ → DistroKid に登録（公開日はいちばん早い日）
@@ -21,14 +21,14 @@
 | 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | Google ドライブ「Postdog Records デビュー 2026-10」フォルダ https://drive.google.com/drive/folders/1wYCdLFFFy7w2y23arVeCcQk1_BRYpqx- |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜7） |
+| 決めたこと | `docs/12_decisions.md`（1〜8） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
 ## 詰まっているところ（2026-10-13 時点）
 
 1. Suno のプラン … **完了**（Pro）
-2. DistroKid のプラン（アーティスト名を 5 つ以上持てるか）… オーナーが確認中
-3. 名前の重複確認（Postdog Records と 5 組）… 未着手。Mac なら `python3 scripts/check_names.py --all` で照合できる（クラウドからは届かなかった）
+2. DistroKid のプラン … **完了**（Ultimate・アーティスト名 5 つ。今の 5 組でちょうど埋まる）
+3. 名前の重複確認 … **完了**（オーナーが Spotify で確認。NAO EASTERLY は「NAO」と紛れるので VERNALIGHT に改名し、Claude が Web 検索で確認）
 4. Suno で 5 曲 … 未着手
 5. ChatGPT でジャケットと写真 … 未着手。届いた画像は 3000×3000・RGB・10MB 未満の JPG か PNG に整える
 6. テイク選び … 未着手
@@ -46,4 +46,5 @@
 - 鍵（API キー）は `.env` だけに書く。会話に貼らない・コミットしない
 - DistroKid にテスト用の曲を上げない
 - 管理表の「採用」はオーナーが決める。機械が足すのは「提案」の行だけ
+- 新しい名前を出すときは、同じ名前のアーティストがいないかを Claude が先に Web 検索で調べてから見せる（オーナーに確認を頼まない）
 - PR #5（このブランチ）は本体に合流させない（公開サイトに music-label が出てしまうため）。いずれ非公開の別リポジトリに切り出す（docs/12 の 1.）

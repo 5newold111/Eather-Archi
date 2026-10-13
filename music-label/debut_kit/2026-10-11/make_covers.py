@@ -184,7 +184,7 @@ def nao() -> Image.Image:
         w0, w1 = 3 + 30 * a, 3 + 30 * b
         d.polygon([(S * 0.5 - w0, y0), (S * 0.5 + w0, y0), (S * 0.5 + w1, y1), (S * 0.5 - w1, y1)], fill=amber + (255,))
     # 文字は左下に小さく、日の出時刻は右上の隅
-    tracked(d, (S * 0.07, S * 0.86), "NAO EASTERLY", font("sign", 86), frost + (255,), 0.32)
+    tracked(d, (S * 0.07, S * 0.86), "VERNALIGHT", font("sign", 86), frost + (255,), 0.32)
     tracked(d, (S * 0.07, S * 0.86 + 128), "DUE EAST", font("grot_light", 66), frost + (220,), 0.45)
     tracked(d, (S * 0.93, S * 0.06), "SUNRISE 06:08", font("grot_light", 54), frost + (230,), 0.35, anchor_right=True)
     return grain(img, 10)
