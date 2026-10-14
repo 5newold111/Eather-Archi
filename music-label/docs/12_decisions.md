@@ -163,3 +163,13 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 保管のタイミング：kit_images.py と finalize_cover.py が作った直後、毎週の流れの finish の最後、毎日 03:30 の定期実行（backup）。
   SSD がつながっていないときは飛ばし、次につないだときにまとめて追いつく（`python3 scripts/archive_sync.py` で手動でも可）
 - 試験用の週（2000-xx-xx）のものは保管しない
+
+
+## 14. 管理表（アーティスト情報のシート）と作業書も SSD に移す（2026-10-14）
+
+- オーナーの判断：Google スプレッドシートの管理表も移行の対象。Google の中身はオーナーが移す
+- 管理表の正本は SSD の `Postdog Records/管理表/アーティスト情報.xlsx`。最初は手元の `music-label/artists.xlsx`（Google のシートと同じ中身に合わせてある）を写して作る。
+  SSD がつながっていないときは手元の写しを読み、`archive_sync.py` が SSD と手元の新しいほうにそろえる（古いほうは _old で残す）
+- 「詰まっているところ」の一覧は、同じ Excel のタブに移した（2026-10-14 時点の 14 項目。13・14 番を追加）
+- デビュー 5 曲の作業書は Google ドキュメントから PDF に書き出し、`debut_kit/2026-10-11/作業書_デビュー5曲.pdf` と SSD の `管理表/デビュー_2026-10-11/` に置く
+- Google の読み書き（ARTIST_BOOK_GSHEET_ID）は既定では使わない。`ARTIST_BOOK_SOURCE=gsheet` を .env に入れたときだけ読む

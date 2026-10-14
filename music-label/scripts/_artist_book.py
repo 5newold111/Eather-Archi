@@ -2,11 +2,11 @@
 アーティスト管理表（スプレッドシート）の読み書き部品。
 
 管理表はアーティストの情報の「正本」。オーナーが書き足し、機械は読むだけ（提案は「状態＝提案」として足す）。
-  ・Google スプレッドシート … .env に ARTIST_BOOK_GSHEET_ID があればこちらを読む（正本）
-        GOOGLE_SERVICE_ACCOUNT_FILE（サービスアカウントの鍵）もあれば書き込みもできる。
-        鍵が無ければ「リンクを知っている全員が閲覧可」の共有で読み込みだけ行い、機械の提案は
-        out/artist_book/pending.xlsx に貯める（Google の表へは人が貼るか、鍵を設定する）
-  ・Excel ファイル（music-label/artists.xlsx）… Google の設定が無いときの正本。デザインの見本も兼ねる
+  ・外付け SSD の Excel（Postdog Records/管理表/アーティスト情報.xlsx）… 正本（2026-10-14 から。docs/12 の決定 14）
+        SSD に無ければ、手元の music-label/artists.xlsx を写して作る
+  ・手元の Excel（music-label/artists.xlsx）… SSD がつながっていないときに読む写し（archive_sync.py が新しいほうにそろえる）
+  ・Google スプレッドシート … 移行前の正本。.env に ARTIST_BOOK_SOURCE=gsheet と ARTIST_BOOK_GSHEET_ID があるときだけ読む
+  ・.env の ARTIST_BOOK_XLSX で Excel の場所を直接指定することもできる
 
 タブには 2 つの向きがある
   縦型（1 列 = 1 組・1 人）：アーティスト／メンバー／声と曲づくり／見た目 … 項目が多いので、組を横に並べて見比べる
@@ -517,6 +517,30 @@ def write_col(ws, tab: str, c: int, d: dict, rows: dict[str, int], acts: dict[st
             cell.fill = st["fill"](acts[act])
 
 
+
+def carry_extra_sheets(path: Path, wb) -> None:
+    """作り直す前の Excel にあった、管理表の決まったタブ以外のタブ（値・書式・列幅）を新しい Excel の末尾に写す"""
+    from copy import copy
+    if not Path(path).exists():
+        return
+    from openpyxl import load_workbook
+    old = load_workbook(path)
+    known = {TABS[t][0] for t in TAB_ORDER} | {"はじめに"}
+    for src in old.worksheets:
+        if src.title in known or src.title in wb.sheetnames:
+            continue
+        dst = wb.create_sheet(src.title)
+        for row in src.iter_rows():
+            for c in row:
+                d = dst.cell(row=c.row, column=c.column, value=c.value)
+                if c.has_style:
+                    d.font, d.fill, d.border = copy(c.font), copy(c.fill), copy(c.border)
+                    d.alignment, d.number_format = copy(c.alignment), c.number_format
+        for k, dim in src.column_dimensions.items():
+            dst.column_dimensions[k].width = dim.width
+        dst.freeze_panes = src.freeze_panes
+
+
 def write_designed(path: Path, data: dict[str, list[dict]]) -> None:
     """管理表を、デザイン付きで丸ごと書き出す（中身は data）"""
     from openpyxl import Workbook
@@ -682,6 +706,7 @@ def write_designed(path: Path, data: dict[str, list[dict]]) -> None:
         r += 1
     wb.calculation.fullCalcOnLoad = True   # 開いたときに件数の数式を計算し直す
     path.parent.mkdir(parents=True, exist_ok=True)
+    carry_extra_sheets(path, wb)   # 決まったタブ以外（詰まっているところ など）は前の Excel から引き継ぐ
     wb.save(path)
 
 
@@ -807,11 +832,34 @@ class GSheetBook:
 
 
 def open_book():
-    """.env に Google スプレッドシートの ID があればそれ（鍵があれば読み書き、無ければ閲覧のみ）、無ければ Excel ファイル"""
+    """管理表を開く。ARTIST_BOOK_XLSX → SSD の正本 → 手元の写しの順。Google は ARTIST_BOOK_SOURCE=gsheet のときだけ"""
     sid, sa = os.environ.get("ARTIST_BOOK_GSHEET_ID"), os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE")
-    if sid:
+    if os.environ.get("ARTIST_BOOK_SOURCE", "").lower() == "gsheet" and sid:
         return GSheetBook(sheet_id_of(sid), Path(sa) if sa else None)
-    return XlsxBook(Path(os.environ.get("ARTIST_BOOK_XLSX") or ROOT / "artists.xlsx"))
+    if os.environ.get("ARTIST_BOOK_XLSX"):
+        return XlsxBook(Path(os.environ["ARTIST_BOOK_XLSX"]).expanduser())
+    ssd = ssd_book_path(seed=True)
+    if ssd:
+        return XlsxBook(ssd)
+    print("   （SSD がつながっていないので、手元の写し music-label/artists.xlsx を使います）")
+    return XlsxBook(ROOT / "artists.xlsx")
+
+
+BOOK_NAME = "アーティスト情報.xlsx"
+
+
+def ssd_book_path(seed: bool = False) -> Path | None:
+    """SSD の管理表の場所（Postdog Records/管理表/アーティスト情報.xlsx）。seed なら、無いときに手元の写しを置く"""
+    import shutil
+    import _archive as archive
+    base, _ = archive.root()
+    if base is None:
+        return None
+    p = archive.child(base, "管理表") / BOOK_NAME
+    if not p.exists() and seed and (ROOT / "artists.xlsx").exists():
+        shutil.copy2(ROOT / "artists.xlsx", p)
+        print(f"   （SSD に管理表を作りました：{p}）")
+    return p if p.exists() else None
 
 
 def sheet_id_of(v: str) -> str:

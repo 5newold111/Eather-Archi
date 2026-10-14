@@ -3,6 +3,8 @@
 アーティストの情報・写真・ジャケット・楽曲を、外付け SSD（DS72）の保管庫にまとめて保管する
 
 保管するもの（Postdog Records の全組と子レーベルの組。試験用の週 2000-xx-xx は除く）：
+  管理表/      アーティスト情報.xlsx（管理表の正本。手元の music-label/artists.xlsx と新しいほうにそろえる）
+              デビュー_<日付>/ 作業書（PDF）・曲の情報（kit.json）・画像の依頼文（chatgpt_prompts.json）
   情報/        設定書（templates/artists/<組>.json）とプロフィール（out/profiles/<組>.md・.json）
   写真/        デビュー用の作業セットの写真（<アーティスト名>_photo.jpg・_photo2.jpg）と、選ばれたデビュー写真・ロゴ
   ジャケット/   デビュー曲のジャケットと、毎週仕上げたジャケット（<アーティスト名>_<配信日>_cover.jpg）
@@ -89,6 +91,50 @@ def _release_day(slug: str, week: str) -> str | None:
     return None
 
 
+def sync_book(base: Path, check: bool) -> None:
+    """SSD の管理表と手元の写し（artists.xlsx）を、新しいほうにそろえる。古いほうは _old で残す"""
+    import shutil
+    from _artist_book import BOOK_NAME
+    ssd = archive.child(base, "管理表") / BOOK_NAME
+    local = ROOT / "artists.xlsx"
+    if not local.exists() and not ssd.exists():
+        return
+    if not ssd.exists():
+        print(f"  ■ 管理表：SSD に {BOOK_NAME} を作ります（手元の artists.xlsx から）")
+        if not check:
+            shutil.copy2(local, ssd)
+        return
+    if local.exists() and archive.filecmp.cmp(ssd, local, shallow=False):
+        return
+    newer, older = (ssd, local) if not local.exists() or ssd.stat().st_mtime >= local.stat().st_mtime else (local, ssd)
+    side = "SSD → 手元" if newer == ssd else "手元 → SSD"
+    print(f"  ■ 管理表：{side} にそろえます（古いほうは {older.stem}_old{older.suffix} で残します）")
+    if check:
+        return
+    if older.exists():
+        shutil.copy2(older, older.with_name(f"{older.stem}_old{older.suffix}"))
+    shutil.copy2(newer, older)
+
+
+def sync_kits(base: Path, check: bool) -> int:
+    """デビュー用の作業セットの書類（作業書の PDF・曲の情報・依頼文）を 管理表/デビュー_<日付>/ へ"""
+    n = 0
+    for kit in sorted(p for p in KIT_ROOT.iterdir() if p.is_dir()):
+        files = [f for f in kit.iterdir() if f.suffix.lower() in (".pdf", ".json", ".md")]
+        if not files:
+            continue
+        folder = archive.child(archive.child(base, "管理表"), f"デビュー_{kit.name}")
+        for f in files:
+            dst = folder / f.name
+            if check:
+                n += 0 if dst.exists() else 1
+                continue
+            if not archive.save(f, folder, f.name).startswith("保管済み"):
+                n += 1
+                print(f"    ○ 管理表/デビュー_{kit.name}/{f.name} を保管")
+    return n
+
+
 def setup(path: str) -> None:
     p = Path(path).expanduser()
     if not p.exists():
@@ -116,8 +162,10 @@ def main() -> None:
         print(f"－ SSD には保管しませんでした：{how}")
         return
     print(f"▶ 保管庫：{base}")
+    sync_book(base, args.check)
+    kit_changed = sync_kits(base, args.check)
     acts = [a for a in all_artists() if a.get("slug") and (not args.only or a["slug"] == args.only)]
-    total = changed = 0
+    total, changed = 0, kit_changed
     for a in acts:
         name = a.get("name") or a["slug"]
         rows = items_for(a)

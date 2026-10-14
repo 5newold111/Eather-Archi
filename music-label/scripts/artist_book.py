@@ -26,8 +26,8 @@
   python3 scripts/artist_book.py status
 
 状態の列：提案（機械の案）／採用（使う）／保留／却下。空欄は採用として扱う（オーナーが自分で書いた行）。
-管理表の場所：既定は music-label/artists.xlsx。.env に ARTIST_BOOK_GSHEET_ID と GOOGLE_SERVICE_ACCOUNT_FILE を入れると
-Google スプレッドシートを読む（docs/13_artist_book.md）。
+管理表の場所：外付け SSD の Postdog Records/管理表/アーティスト情報.xlsx（正本）。SSD がつながっていなければ
+手元の写し music-label/artists.xlsx。Google スプレッドシートは移行前の正本で、ARTIST_BOOK_SOURCE=gsheet のときだけ読む。
 """
 from __future__ import annotations
 

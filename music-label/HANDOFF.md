@@ -17,15 +17,15 @@
 
 | もの | 場所 |
 |---|---|
-| アーティストの管理表（正本） | Google スプレッドシート「アーティスト情報」 https://docs.google.com/spreadsheets/d/1q_Zfo6kW4PNJRQjcNUJGzN9gfBNWJqrBxBR6PnEPSAA/edit |
-| 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
+| アーティストの管理表（正本） | 外付け SSD「DS72」の「Postdog Records／管理表／アーティスト情報.xlsx」。SSD が無いときは手元の写し `music-label/artists.xlsx` を読む（`archive_sync.py` が新しいほうにそろえる）。Google スプレッドシートは移行前の版（オーナーが移行・もう使わない） |
+| 詰まっているところの一覧（進み具合） | 同じ Excel の「詰まっているところ」タブ |
 | アーティストの情報・写真・ジャケット・楽曲 | 外付け SSD「DS72」の「Postdog Records／アーティスト情報／<アーティスト名>／写真・ジャケット・楽曲・情報」（自動で保管。`python3 scripts/archive_sync.py`）。Google ドライブの分はオーナーが SSD に移す |
-| デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
+| デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／管理表／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜13） |
+| 決めたこと | `docs/12_decisions.md`（1〜14） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
-## 詰まっているところ（2026-10-13 時点）
+## 詰まっているところ（2026-10-13 時点。最新は管理表の「詰まっているところ」タブ）
 
 1. Suno のプラン … **完了**（Pro）
 2. DistroKid のプラン … **完了**（Ultimate・アーティスト名 5 つ。今の 5 組でちょうど埋まる）

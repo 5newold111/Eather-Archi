@@ -24,3 +24,6 @@ __pycache__/
 # Excel・Numbers が開いている間にできる一時ファイル
 ~$*
 .~lock.*
+
+# 管理表をそろえるときに残る古い写し（archive_sync.py）
+artists_old.xlsx
