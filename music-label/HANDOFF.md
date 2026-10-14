@@ -24,6 +24,7 @@
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
 | 決めたこと | `docs/12_decisions.md`（1〜14） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
+| 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 
 ## 詰まっているところ（2026-10-13 時点。最新は管理表の「詰まっているところ」タブ）
 
