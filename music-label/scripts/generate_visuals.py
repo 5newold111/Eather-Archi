@@ -139,12 +139,52 @@ def appearance_clause(artist: dict) -> str:
                             f"visible mark: {'; '.join(tat)}" if tat else "") if x]
         if bits:
             parts.append("(" + "; ".join(bits) + ")")
-    return ("People (describe through silhouette, hair, posture and clothes only): " + " ".join(parts) + ". ") if parts else ""
+    return ("People (describe through hair, posture, hands and clothes; the eyes stay hidden): " + " ".join(parts) + ". ") if parts else ""
 
 
 def concealment_clause(method: str) -> str:
     return (f"The person's face is never visible: {method}. No recognizable facial features, no eyes, no identifiable likeness. "
             "No text, no logos, no brand marks, no watermarks. Not a real person.")
+
+
+# アーティスト写真の決まり（docs/12 の決定 10・11。管理表の face_concealment の「後ろ姿・仮面は使わない」より優先する）
+PHOTO_RULE = ("The person is the clear subject and fills the frame; never a small figure in a wide landscape, never only seen from behind. "
+              "Hide the eyes and the centre of the face; the jawline, ears and hair may show.")
+FRAMINGS = {"bust": "bust-up, from the chest to the top of the head",
+            "hip": "hip-up, from the hips to the top of the head",
+            "full": "head-to-toe full body, the person filling about 90% of the frame height"}
+CONCEALS = {"hand": "one hand raised in front of the face so the palm and fingers cover the eyes",
+            "prop": "holding {prop} up in front of the face so it covers the eyes",
+            "glasses": "wearing sunglasses that completely hide the eyes",
+            "mask": "an original full-head covering or mask designed for this act, not resembling any existing artist's helmet, mask or character",
+            "shadow": "a hard shadow falling across the eyes from the key light ({light})"}
+PHOTO_PLAN = [(FRAMINGS[f], CONCEALS[c]) for f, c in
+              [("bust", "hand"), ("bust", "prop"), ("hip", "glasses"), ("hip", "shadow"),
+               ("full", "mask"), ("full", "glasses"), ("bust", "mask"), ("hip", "prop")]]
+
+
+def _prop(artist: dict) -> str:
+    """その組らしい小物（設定書の materials の最初のもの）"""
+    mats = artist.get("visual", {}).get("materials", [])
+    return mats[0] if mats else "an object from their daily work"
+
+
+def fc_hint(fc: dict) -> str:
+    """管理表の隠し方の副案は、雰囲気の参考として添える（後ろ姿・仮面の禁止は使わない）"""
+    sec = [m for m in fc.get("secondary", []) if m][:2]
+    return f"Mood references from the act's notes: {'; '.join(sec)}. " if sec else ""
+
+
+def photo_base(artist: dict) -> str:
+    """写真用の場所・光・色。管理表の構図・立ち位置（引きの構図や後ろ姿の指定）は使わない"""
+    v = artist["visual"]
+    pd = v.get("photo_direction", {})
+    return (
+        f"Setting: {v.get('space','')}. Light: {v.get('light','')}. Materials: {', '.join(v.get('materials', []))}. "
+        f"Palette: {', '.join(v.get('palette', []))}. Camera: {v.get('camera','')}. Taste: {pd.get('taste','')}. "
+        f"Brightness: {pd.get('brightness','')}, contrast: {pd.get('contrast','')}, color temperature: {pd.get('color_temperature','')}. "
+        f"Background: {pd.get('background','')}."
+    )
 
 
 def prompts_debut(artist: dict) -> list[dict]:
@@ -160,14 +200,16 @@ def prompts_debut(artist: dict) -> list[dict]:
             f"Mark type: {lg.get('mark_type','')}. Color rule: {lg.get('color_rule','')}. Typography: {lg.get('typography','')}. "
             "Flat vector style, high contrast, legible at small size, centered on a plain background, no mockups, no extra text, "
             "original lettering (do not imitate any existing logo).", artist)})
-    # 写真：主の方法 4 枚、副の方法 2 枚ずつ
-    methods = [fc.get("primary", "seen from behind")] * 4 + [m for m in fc.get("secondary", [])[:2] for _ in range(2)]
-    pd = v.get("photo_direction", {})
-    for i, m in enumerate(methods[:N_PHOTO]):
-        out.append({"kind": "photo", "no": i + 1, "method": m, "prompt": scrub(
+    # 写真：人物が主役（決定 10・11）。構図 3 種類 × 顔の隠し方 5 種類を組み合わせて 8 枚
+    for i, (framing, conceal) in enumerate(PHOTO_PLAN[:N_PHOTO]):
+        method = conceal.format(prop=_prop(artist), light=v.get("light", "the single key light"))
+        out.append({"kind": "photo", "no": i + 1, "method": method, "framing": framing, "prompt": scrub(
             f"Artist photograph for a music act ({artist['formation']}; {len(artist['persona'].get('members', [])) or 1} member(s)). "
-            f"{visual_base(artist)} {appearance_clause(artist)}Positioning: {pd.get('positioning','')}. Gesture: {pd.get('gesture','')}. "
-            f"Location type: {pd.get('location_type','')}. {concealment_clause(m)} Photorealistic, editorial quality, square 1:1.", artist)})
+            f"{photo_base(artist)} {appearance_clause(artist)}Framing: {framing}. {PHOTO_RULE} "
+            f"How the face is hidden: {method}. {fc_hint(fc)}"
+            "No text, no logos, no brand marks, no watermarks. Not a real person and not resembling any real person. "
+            "Photorealistic editorial music press photo, medium-format film look, 85mm, shallow depth of field, "
+            "crisp texture on skin, fabric and hair, high detail, square 1:1.", artist)})
     return out
 
 
@@ -186,7 +228,7 @@ def prompts_cover(artist: dict, brief: dict) -> list[dict]:
             f"Song theme: {theme}. {seed} {variants[i]}"
             + (f" (title: '{title}')" if 'title only' in variants[i] and title else "") +
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
-            "not explicit. Original artwork, not a copy of any existing cover.", artist)})
+            "not explicit. Original artwork, not a copy of any existing cover. High detail, crisp textures, not looking like CGI.", artist)})
     return out
 
 
@@ -259,7 +301,7 @@ def generate_image(prompt: str, out_path: Path, size: str = "1024x1024") -> bool
 # チェックと採点
 # ---------------------------------------------------------------------------
 def compliance_checklist(kind: str) -> list[str]:
-    common = ["顔が判別できない", "第三者のロゴ・商標・キャラクターなし", "実在の建物・看板が特定できない", "露骨な性的・残虐表現なし"]
+    common = ["顔が判別できない（目元と顔の中央は隠れている。輪郭・顎・耳・髪は見えてよい）", "第三者のロゴ・商標・キャラクターなし", "実在の建物・看板が特定できない", "露骨な性的・残虐表現なし"]
     if kind == "cover":
         return common + ["3000×3000 に拡大しても粗くない", "URL・SNS 名・価格・宣伝文なし", "文字があれば曲名 / アーティスト名と一致"]
     if kind == "logo":

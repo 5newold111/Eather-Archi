@@ -22,7 +22,7 @@
 | ジャケットとアーティスト写真 | 5newold111 のドライブ「音楽レーベルアプリ／アーティスト情報／<アーティスト名>」（kit_images.py が自動で保存。Mac にパソコン版の Google ドライブが必要） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜11） |
+| 決めたこと | `docs/12_decisions.md`（1〜12） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
 ## 詰まっているところ（2026-10-13 時点）
@@ -56,6 +56,16 @@ python3 scripts/kit_images.py                  # 5 組 × 2 枚を自動で作�
 python3 scripts/kit_images.py --kind photo2    # 2 枚目のアーティスト写真だけ（全身・サングラス・被り物・イラスト）
 python3 scripts/kit_images.py --redo           # 作り直す（前の画像は _old を付けて手元に残る。ドライブは上書きで、前の版は履歴に残る）
 ```
+
+## 毎週の自動の流れを試す（Mac のターミナル）
+
+```
+cd music-label
+python3 scripts/trial.py --all --skip-youtube --cleanup-after   # 全組を試験用の週で通し、終わったら跡を消す（結果は out/trial/report_all.md）
+python3 scripts/schedule.py install                             # 試験が ✕ 0 件なら、定期実行を Mac に登録
+```
+- 人の作業として残るのは 2 つ：Suno で作ってテイクを out/takes/<週>_<組>/ に置くこと、DistroKid への登録（どちらも規約で自動操作が禁止）
+- 進み具合は out/weeks/<週>/status.md と out/dashboard.html
 
 ## 守ること
 

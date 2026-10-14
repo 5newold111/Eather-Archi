@@ -19,6 +19,8 @@
   python3 scripts/trial.py --artist light
   python3 scripts/trial.py --artist light --takes ~/Downloads/suno_light      # Suno のテイク（1 本でも可）
   python3 scripts/trial.py --artist focus_beats --label focus
+  python3 scripts/trial.py --all            # Postdog Records の全組を順に試す（結果は out/trial/report_all.md）
+  python3 scripts/trial.py --all --skip-youtube --cleanup-after   # 全組を試して、終わったら跡を消す
   python3 scripts/trial.py --cleanup        # 試運転のデータを消す（データベース・保管庫・手元のファイル）
 """
 from __future__ import annotations
@@ -272,14 +274,41 @@ def main() -> None:
     ap.add_argument("--skip-images", action="store_true", help="画像の生成を飛ばす（費用をかけずに試す）")
     ap.add_argument("--skip-youtube", action="store_true")
     ap.add_argument("--with-tiktok", action="store_true", help="TikTok も試す（審査前は自分だけに公開）")
+    ap.add_argument("--all", action="store_true", help="Postdog Records の全組を順に試す")
+    ap.add_argument("--cleanup-after", action="store_true", help="--all のあと、試運転の跡を消す")
     ap.add_argument("--cleanup", action="store_true")
     a = ap.parse_args()
     if a.cleanup:
         cleanup()
+    elif a.all:
+        trial_all(a)
     elif a.artist:
         trial(a)
     else:
-        ap.error("--artist か --cleanup を指定してください")
+        ap.error("--artist か --all か --cleanup を指定してください")
+
+
+def trial_all(a) -> None:
+    """全組を 1 組ずつ試運転し、各組の結果を 1 枚にまとめる（試験用の週なので本番とは混ざらない）"""
+    from _common import all_artists
+    acts = [x for x in all_artists() if x.get("label_slug") == MAIN_LABEL and x.get("slug")]
+    parts, bad = [f"# 全組の試運転（{date.today().isoformat()}・試験用の週 {WEEK}）\n"], 0
+    for x in acts:
+        cmd = [S / "trial.py", "--artist", x["slug"]]
+        cmd += ["--takes", a.takes] if a.takes else []
+        cmd += ["--skip-images"] if a.skip_images else []
+        cmd += ["--skip-youtube"] if a.skip_youtube else []
+        print(f"\n########## {x.get('name', x['slug'])} ##########")
+        code = subprocess.run([PY, *map(str, cmd)]).returncode
+        rep = OUT / "trial" / "report.md"
+        body = rep.read_text(encoding="utf-8") if rep.exists() else "（報告がありません）"
+        bad += body.count("✕") + (1 if code else 0)
+        parts.append(f"\n## {x.get('name', x['slug'])}\n\n" + body.split("\n", 1)[-1])
+    out = OUT / "trial" / "report_all.md"
+    out.write_text("\n".join(parts), encoding="utf-8")
+    print(f"\n=== 全 {len(acts)} 組の試運転おわり：✕ {bad} 件 → {out.relative_to(ROOT)} ===")
+    if a.cleanup_after:
+        cleanup()
 
 
 if __name__ == "__main__":
