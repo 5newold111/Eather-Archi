@@ -151,3 +151,15 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   管理表の face_concealment の「後ろ姿」「仮面は使わない」より、この決まりを優先する
 - 試験：`python3 scripts/trial.py --all` で Postdog Records の全組を試験用の週（2000-01-03）で通す。合成音のテイク・本物の鍵（あれば）を使い、結果は out/trial/report_all.md。
   `--cleanup-after` で跡を消す。DistroKid には何も上げない（決まり）
+
+
+## 13. 保管先を外付け SSD（Silicon Power DS72）にする（2026-10-14。9・11・12 のドライブ保存を置き換える）
+
+- オーナーの判断：アーティストの情報・写真・ジャケット・生成した楽曲は、Mac につないだ外付け SSD「DS72」に物理的に保管する。
+  Google ドライブにあるものはオーナーが移す。これからの自動の保存先は SSD だけにする（ドライブには保存しない）
+- 保管庫：SSD の中の「Postdog Records/アーティスト情報/<アーティスト名>/」。その下に 写真・ジャケット・楽曲/<週>・情報 の 4 つ。
+  同じ名前のフォルダ（大文字・小文字や全角・半角の違いは同じとみなす）があればそこへ入れる。中身が変わったファイルは前の版を _old で残す
+- SSD は、名前に「DS72」を含むドライブを自動で見つける。見つからなければ `python3 scripts/archive_sync.py --setup /Volumes/<SSD の名前>` で .env の ARCHIVE_ROOT に書く
+- 保管のタイミング：kit_images.py と finalize_cover.py が作った直後、毎週の流れの finish の最後、毎日 03:30 の定期実行（backup）。
+  SSD がつながっていないときは飛ばし、次につないだときにまとめて追いつく（`python3 scripts/archive_sync.py` で手動でも可）
+- 試験用の週（2000-xx-xx）のものは保管しない

@@ -99,7 +99,7 @@ def main() -> None:
     ap.add_argument("--input")
     ap.add_argument("--out")
     ap.add_argument("--demo", action="store_true")
-    ap.add_argument("--no-drive", action="store_true", help="Google ドライブには保存しない")
+    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="SSD には保管しない")
     args = ap.parse_args()
 
     if args.input:
@@ -125,25 +125,24 @@ def main() -> None:
     rep = finalize(src, dst)
     rel = dst.resolve().relative_to(ROOT) if dst.resolve().is_relative_to(ROOT) else dst
     step(("仕上がりました" if rep["ok"] else "仕上げましたが ✕ があります") + f": {rel}")
-    if args.brief and not args.demo and rep["ok"] and not args.no_drive:
-        to_drive(read_json(Path(args.brief)), dst)
+    if args.brief and not args.demo and rep["ok"] and not args.no_archive:
+        to_archive(read_json(Path(args.brief)), dst)
 
 
-def to_drive(b: dict, dst: Path) -> None:
-    """Google ドライブの 音楽レーベルアプリ/アーティスト情報/<アーティスト名>/ に <アーティスト名>_<配信日>_cover.jpg で保存（試験の週は保存しない）"""
+def to_archive(b: dict, dst: Path) -> None:
+    """SSD の アーティスト情報/<アーティスト名>/ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管（試験用の週は保管しない）"""
     if str(b.get("week_start", "")).startswith("2000-"):
         return
-    import _gdrive_local as gdrive
+    import _archive as archive
     from _common import load_artist
     name = load_artist(b["artist_slug"], b.get("label_slug")).get("name") or b["artist_slug"]
-    folder, how = gdrive.artist_folder(name)
+    folder, how = archive.artist_folder(name, "cover")
     if not folder:
-        print(f"   － ドライブには保存しませんでした：{how}")
+        print(f"   － SSD には保管しませんでした：{how}")
         return
     day = str(b.get("release_at") or b["week_start"])[:10]
     fname = f"{name}_{day}_cover.jpg"
-    print(f"   ○ ドライブ：アーティスト情報/{folder.name}/{fname} を{gdrive.save(dst, folder, fname)}（{how}）")
-
+    print(f"   ○ SSD：{archive.label(folder)}/{fname} を{archive.save(dst, folder, fname)}")
 
 if __name__ == "__main__":
     main()

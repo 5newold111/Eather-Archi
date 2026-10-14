@@ -9,9 +9,9 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   2. 管理表の実在の名前（影響・好きなアーティスト）が依頼文に混ざっていないか確かめる（混ざっていたら止める）
   3. 画像 API で 1 枚ずつ作り、images/<組の ID>_<cover|photo>_raw.png に保存する（鍵が無ければ依頼文だけ書き出す）
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
-  5. Google ドライブの「音楽レーベルアプリ/アーティスト情報/<アーティスト名>」フォルダに保存する
-     （同じ名前のフォルダがあればそこへ。無ければ作る。Mac の「Google ドライブ（パソコン版）」の同期フォルダを使う）
-     ドライブでの名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
+  5. 外付け SSD（DS72）の「Postdog Records/アーティスト情報/<アーティスト名>/写真・ジャケット」に保管する
+     （同じ名前のフォルダがあればそこへ。無ければ作る。SSD がつながっていなければ保管だけ飛ばす。_archive.py）
+     保管庫での名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
 
 ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png のような名前で置いて --fit-only で整えられる。
 
@@ -21,7 +21,7 @@ ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png
   python3 scripts/kit_images.py --kind photo2           # 2 枚目のアーティスト写真だけ
   python3 scripts/kit_images.py --fit-only              # 画像は作らず、images/ にある画像を整えるだけ
   python3 scripts/kit_images.py --redo                  # 作り直す（今ある画像は _old を付けて残す）
-  python3 scripts/kit_images.py --no-drive              # Google ドライブには保存しない
+  python3 scripts/kit_images.py --no-archive            # SSD には保管しない
 
 鍵は music-label/.env の OPENAI_API_KEY（会話には貼らない）。画像モデルは generate_visuals.py と同じ選び方。
 """
@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _life import real_names  # noqa: E402  管理表の実名（指示文に混ぜない）
 import generate_visuals as gv  # noqa: E402  画像 API の呼び出し（モデルの自動選択つき）
 from _common import rel  # noqa: E402
-import _gdrive_local as gdrive  # noqa: E402  Google ドライブの同期フォルダへの保存
+import _archive as archive  # noqa: E402  外付け SSD への保管
 
 ROOT = Path(__file__).resolve().parent.parent
 KIT_ROOT = ROOT / "debut_kit"
@@ -103,7 +103,7 @@ def main() -> None:
                     help="all＝ジャケット・写真・2 枚目の写真（既定）、both＝ジャケットと写真")
     ap.add_argument("--fit-only", action="store_true", help="画像は作らず、images/ にある画像を整えるだけ")
     ap.add_argument("--redo", action="store_true", help="作り直す（今ある画像は _old を付けて残す）")
-    ap.add_argument("--no-drive", action="store_true", help="Google ドライブには保存しない")
+    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="SSD には保管しない")
     args = ap.parse_args()
 
     kit = args.kit or latest_kit()
@@ -121,18 +121,22 @@ def main() -> None:
 
     print(f"▶ 作業セット：{rel(kit)}")
     dry_lines = []
-    folders: dict[str, Path | None] = {}
+    warned: list[str] = []
 
-    def to_drive(act: dict, kind: str, out: Path) -> None:
-        """整えた画像を Google ドライブのアーティストのフォルダへ"""
-        if args.no_drive:
+    def to_archive(act: dict, kind: str, out: Path) -> None:
+        """整えた画像を SSD の アーティスト情報/<アーティスト名>/写真・ジャケット へ"""
+        if args.no_archive:
             return
         name = act["artist"]
-        if name not in folders:
-            folders[name], how = gdrive.artist_folder(name)
-            print(f"    ドライブ：{how}" if folders[name] else f"    ドライブには保存しませんでした：{how}")
-        if folders[name]:
-            print(f"    ドライブ：アーティスト情報/{folders[name].name}/{name}_{kind}.jpg を{gdrive.save(out, folders[name], f'{name}_{kind}.jpg')}")
+        folder, how = archive.artist_folder(name, "cover" if kind == "cover" else "photo")
+        if folder is None:
+            if not warned:
+                print(f"    SSD には保管しませんでした：{how}")
+                warned.append(how)
+            return
+        fname = f"{name}_{kind}.jpg"
+        print(f"    SSD：{archive.label(folder)}/{fname} を{archive.save(out, folder, fname)}")
+
     for act in acts:
         slug = act["slug"]
         for kind in kinds:
@@ -167,12 +171,12 @@ def main() -> None:
                 print(f"  ○ {label}：整え済み（{out.name}）")
             else:
                 print(f"  ○ {label}：{out.name} に整えました（{fit(src, out)}）")
-            to_drive(act, kind, out)
+            to_archive(act, kind, out)
 
     if dry_lines:
         (images / "prompts.txt").write_text("\n".join(dry_lines), encoding="utf-8")
         print(f"  依頼文：{rel(images / 'prompts.txt')}（{len(dry_lines)} 件）")
-    print("  次：Claude に「画像を入れた」と伝える（ドライブのアーティスト情報のフォルダで、顔・文字・透かしが無いか確かめてもらう）")
+    print("  次：SSD の アーティスト情報/<アーティスト名>/写真・ジャケット で、顔・文字・透かしが無いか確かめる")
 
 
 if __name__ == "__main__":

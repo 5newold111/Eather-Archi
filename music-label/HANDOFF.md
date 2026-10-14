@@ -19,10 +19,10 @@
 |---|---|
 | アーティストの管理表（正本） | Google スプレッドシート「アーティスト情報」 https://docs.google.com/spreadsheets/d/1q_Zfo6kW4PNJRQjcNUJGzN9gfBNWJqrBxBR6PnEPSAA/edit |
 | 詰まっているところの一覧（進み具合） | 同じスプレッドシートの「詰まっているところ」タブ |
-| ジャケットとアーティスト写真 | 5newold111 のドライブ「音楽レーベルアプリ／アーティスト情報／<アーティスト名>」（kit_images.py が自動で保存。Mac にパソコン版の Google ドライブが必要） |
+| アーティストの情報・写真・ジャケット・楽曲 | 外付け SSD「DS72」の「Postdog Records／アーティスト情報／<アーティスト名>／写真・ジャケット・楽曲・情報」（自動で保管。`python3 scripts/archive_sync.py`）。Google ドライブの分はオーナーが SSD に移す |
 | デビュー 5 曲の作業書・ChatGPT の依頼文（正本） | 5newold111 のドライブ「音楽レーベルアプリ／作業手順書（AI）／Postdog Records デビュー 5 曲 作業書」 https://docs.google.com/document/d/1sPgnW-T5qcLVu6bTcYVUxyiwjMmOCHPaO07jARiUBZs/edit 。今後の記入はすべてここ（Claude も書き換えられる）。同じフォルダの「最初の5曲」と、etherarch.official 持ちの同名の作業書（1XUw…）は古い版で、もう記入しない |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜12） |
+| 決めたこと | `docs/12_decisions.md`（1〜13） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 
 ## 詰まっているところ（2026-10-13 時点）
@@ -52,9 +52,9 @@
 cd music-label
 python3 -m pip install -r requirements.txt
 python3 scripts/setup_keys.py --only openai    # 鍵を貼って Enter（画面には出ない）→ 実際に接続して確かめる
-python3 scripts/kit_images.py                  # 5 組 × 2 枚を自動で作り、3000×3000 に整え、ドライブの アーティスト情報/<アーティスト名>/ に保存
+python3 scripts/kit_images.py                  # 5 組 × 3 種類を自動で作り、3000×3000 に整え、SSD の アーティスト情報/<アーティスト名>/ に保管
 python3 scripts/kit_images.py --kind photo2    # 2 枚目のアーティスト写真だけ（全身・サングラス・被り物・イラスト）
-python3 scripts/kit_images.py --redo           # 作り直す（前の画像は _old を付けて手元に残る。ドライブは上書きで、前の版は履歴に残る）
+python3 scripts/kit_images.py --redo           # 作り直す（前の画像は手元にも SSD にも _old を付けて残る）
 ```
 
 ## 毎週の自動の流れを試す（Mac のターミナル）
@@ -63,6 +63,7 @@ python3 scripts/kit_images.py --redo           # 作り直す（前の画像は 
 cd music-label
 python3 scripts/trial.py --all --skip-youtube --cleanup-after   # 全組を試験用の週で通し、終わったら跡を消す（結果は out/trial/report_all.md）
 python3 scripts/schedule.py install                             # 試験が ✕ 0 件なら、定期実行を Mac に登録
+python3 scripts/archive_sync.py --check                         # SSD の場所と、まだ保管していないものを見る
 ```
 - 人の作業として残るのは 2 つ：Suno で作ってテイクを out/takes/<週>_<組>/ に置くこと、DistroKid への登録（どちらも規約で自動操作が禁止）
 - 進み具合は out/weeks/<週>/status.md と out/dashboard.html

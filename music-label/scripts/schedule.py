@@ -13,7 +13,7 @@
     brief    火 06:00       今週の全組のブリーフを作る（参考曲の割り当て → コラボ → Claude）
     auto     火〜木 8〜23 時の毎時   歌詞の合体・テイクの計測・音量・ジャケット・登録シート・DB・SNS 準備（変化が無ければ何もしない）
     growth   木 10:00       成績を集めて成長分析（重み・ヒント・方針転換の提案）→ 転換の適用
-    backup   毎日 03:30     音源・ジャケット・記録を Cloudflare R2 に予備保管
+    backup   毎日 03:30     情報・写真・ジャケット・楽曲を外付け SSD（DS72）に保管し、Cloudflare R2 にも予備保管
     monthly  毎月 1 日 09:00  月 1 組の追加と週の曲数の確認、Instagram の鍵の延長、四半期の EP 計画（1・4・7・10 月）
 
 使い方
@@ -51,7 +51,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
                 [["artist_book.py", "pull", "--if-exists"], ["run_week.py", "brief", "--week", "this"]]),
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
     "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"]]),
-    "backup":  ("R2 への予備保管", [["backup_r2.py"]]),
+    "backup":  ("外付け SSD への保管と R2 への予備保管", [["archive_sync.py"], ["backup_r2.py"]]),
     "monthly": ("新しい組と来月の近況の提案（管理表へ）・曲数の確認・Instagram の鍵の延長・四半期の EP 計画",
                 [["artist_book.py", "pull", "--if-exists"], ["expand_label.py", "check", "--apply"],
                  ["artist_book.py", "propose-update", "--all", "--if-exists"],

@@ -5,7 +5,7 @@
   brief   話題曲の取得 → 参考曲の割り当て（Postdog Records＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
   lyrics  Suno が書いた節（<ブリーフ名>.verses.txt）があれば核と合体して最終歌詞に
   takes   Suno のテイク（out/takes/<ブリーフ名>/）があれば計測して選ぶ（Tier A/B/C）
-  finish  音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備
+  finish  音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備 → 外付け SSD に保管
   status  組ごとの進み具合を一覧にする（out/weeks/<週>/status.md）
   auto    lyrics → takes → finish → status（ブリーフは作らない。毎時の定期実行向け。変化が無ければほぼ何もしない）
   all     brief → lyrics → takes → finish を順に。準備ができていない組は飛ばす
@@ -192,6 +192,8 @@ def stage_finish(week: date, a) -> None:
     run([S / "supabase_sync.py", "week", "--week", week.isoformat()] + (["--apply"] if has_db else []))
     step("SNS 投稿の準備（縦動画と説明文）をしています")
     run([S / "post_social.py", "plan", "--week", week.isoformat()])
+    step("外付け SSD に保管しています（つながっていなければ飛ばします）")
+    run([S / "archive_sync.py"])
 
 
 # ---------------------------------------------------------------------------
