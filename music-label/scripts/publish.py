@@ -436,7 +436,8 @@ def cmd_track(args) -> int:
 
 # ---------------------------------------------------------------------------
 # Suno に貼る内容のページ
-def cmd_suno(args) -> int:
+def suno_page() -> tuple[str, int]:
+    """Suno に貼る内容のページ（HTML）と曲数。webapp.py も使う"""
     todo = [s for s in _songs.all_songs() if s.get("title") and s.get("style") and not str(s["week"]).startswith("2000-")
             and not _songs.state(s).get("status")]
     E = html.escape
@@ -464,11 +465,17 @@ ol{{padding-left:1.2em}}</style></head><body><main>
 <li>できた 2 つのテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードする（WAV がおすすめ）</li>
 <li>ダウンロードしたファイルを「ダウンロード → SUNO楽曲」に入れる。ここから先は自動で公開の準備まで進みます</li></ol>
 {''.join(cards) or '<p>いま Suno で作る曲はありません。</p>'}
-</main><script>function cp(id,b){{navigator.clipboard.writeText(document.getElementById(id).value);b.textContent='コピーしました';setTimeout(()=>b.textContent='コピー',1500)}}</script></body></html>"""
+</main><script>function cp(id,b){{const t=document.getElementById(id);const done=()=>{{b.textContent='コピーしました';setTimeout(()=>b.textContent='コピー',1500)}};
+if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(t.value).then(done)}}else{{t.removeAttribute('readonly');t.select();document.execCommand('copy');t.setAttribute('readonly','');done()}}}}</script></body></html>"""
+    return page, len(todo)
+
+
+def cmd_suno(args) -> int:
+    page, n = suno_page()
     p = PUB / "suno.html"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(page, encoding="utf-8")
-    print(f"▶ Suno に貼る内容のページ：{p}（{len(todo)} 曲）")
+    print(f"▶ Suno に貼る内容のページ：{p}（{n} 曲）")
     if args.open and shutil.which("open"):
         subprocess.run(["open", str(p)])
     return 0

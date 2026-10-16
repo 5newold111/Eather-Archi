@@ -1,7 +1,7 @@
 {
   "slug": "soft_cantilever",
   "name": "SOFT CANTILEVER",
-  "name_status": "draft",
+  "name_status": "checked",
   "name_check": {
     "auto_checks": [
       {
@@ -10,7 +10,10 @@
         "exact": [],
         "near": []
       }
-    ]
+    ],
+    "verdict": "clear",
+    "checked_at": "2026-10-13",
+    "by": "オーナーが Spotify で確認（同じ名前なし）"
   },
   "formation": "band",
   "cadence": "weekly",

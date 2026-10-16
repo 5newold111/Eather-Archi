@@ -1,8 +1,12 @@
 {
   "slug": "nao_easterly",
   "name": "VERNALIGHT",
-  "name_status": "draft",
-  "name_check": {},
+  "name_status": "checked",
+  "name_check": {
+    "verdict": "clear",
+    "checked_at": "2026-10-13",
+    "by": "オーナーが Spotify で確認（同じ名前なし）。改名後の VERNALIGHT は Claude が Web 検索でも確認"
+  },
   "formation": "solo",
   "cadence": "weekly",
   "debut_week": "2026-10-26",

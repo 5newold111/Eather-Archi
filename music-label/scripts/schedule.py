@@ -18,6 +18,7 @@
                             デビューから 6 か月ごとのアーティスト写真の刷新（refresh_photos.py）
     intake   「SUNO楽曲」に曲が入ったとき＋10 分ごと  いいねしてダウンロードした曲を取り込み、音量・ジャケット・DistroKid の下書き・公開セットまで進める（publish.py scan）
     release  毎日 10:15     DistroKid に登録した曲が Spotify に出たかを確かめ、ISRC・UPC・配信 URL を楽曲管理シートに記録（publish.py track）
+    webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
 
 使い方
   python scripts/schedule.py list                 # 仕事の一覧と次の実行時刻
@@ -94,8 +95,17 @@ CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "
         "release": "15 10 * * *"}
 
 
+# 動かしたままにする仕事（決まった時刻に動く仕事とは別）
+SERVICES = {"webapp": ("ダッシュボードのウェブアプリ（http://localhost:8765）", ["webapp.py"])}
+
+
 def plist_for(job: str) -> dict:
     logs = OUT / "logs"
+    if job in SERVICES:
+        return {"Label": f"{PREFIX}.{job}", "ProgramArguments": [PY, str(S / SERVICES[job][1][0]), *SERVICES[job][1][1:]],
+                "WorkingDirectory": str(ROOT), "EnvironmentVariables": {"PATH": PATH_ENV, "PYTHONUNBUFFERED": "1"},
+                "StandardOutPath": str(logs / f"{job}.launchd.log"), "StandardErrorPath": str(logs / f"{job}.launchd.log"),
+                "RunAtLoad": True, "KeepAlive": True}
     return {
         "Label": f"{PREFIX}.{job}",
         "ProgramArguments": [PY, str(S / "schedule.py"), "run", job],
@@ -151,11 +161,13 @@ def main() -> None:
     ap.add_argument("job", nargs="?", help="run のときの仕事の名前")
     ap.add_argument("--only", help="install / write をこの仕事だけに（カンマ区切り）")
     a = ap.parse_args()
-    jobs = a.only.split(",") if a.only else list(JOBS)
+    jobs = a.only.split(",") if a.only else [*JOBS, *SERVICES]
 
     if a.command == "list":
         for j in JOBS:
             print(f"  {j:<8} {CRON[j]:<16} {JOBS[j][0]}")
+        for j, (desc, _) in SERVICES.items():
+            print(f"  {j:<8} {'いつも':<14} {desc}")
         print("  （左から 分 時 日 月 曜日。曜日は 1=月 … 0=日）")
         return
     if a.command == "run":
@@ -166,6 +178,9 @@ def main() -> None:
     if a.command == "cron":
         print("# crontab -e で貼り付ける行（Mac 以外向け）")
         for j in jobs:
+            if j in SERVICES:
+                print(f"@reboot cd {ROOT} && {PY} scripts/{SERVICES[j][1][0]}")
+                continue
             print(f"{CRON[j]} cd {ROOT} && {PY} scripts/schedule.py run {j}")
         return
 
@@ -199,6 +214,8 @@ def main() -> None:
         r = subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(dst)], capture_output=True, text=True)
         step(f"登録しました: {label}" + (f"（警告: {r.stderr.strip()}）" if r.returncode else ""))
     if a.command == "install":
+        if "webapp" in jobs:
+            print("   ダッシュボード：ブラウザで http://localhost:8765 を開く（ブックマークしておくと便利）")
         print("   Mac がスリープ中に時刻が過ぎた仕事は、起きたときに 1 回だけ動きます")
         print("   ログ: out/logs/<仕事>.log  ／  外すとき: python scripts/schedule.py uninstall")
 

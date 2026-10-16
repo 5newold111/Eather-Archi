@@ -48,6 +48,8 @@ Suno の「Create」と DistroKid の登録ボタンを機械が押さないの�
 
 ## 5. 使うコマンド
 
+ふだんはダッシュボード（ブラウザで http://localhost:8765）のボタンで同じことができる。
+
 ```
 python3 scripts/publish.py suno --open    # Suno に貼る内容のページ
 python3 scripts/publish.py status         # 曲ごとの進み具合
@@ -65,4 +67,4 @@ python3 scripts/refresh_photos.py --list  # 写真の次の刷新日
 | 音量を整える道具を入れる | `brew install ffmpeg` |
 | Spotify の鍵と、作詞作曲者の欄の本名を入れる | `python3 scripts/setup_keys.py --only spotify,owner` |
 | 「ダウンロード」を自動の処理から読めるようにする | システム設定 → プライバシーとセキュリティ → フルディスクアクセス に python3 を追加 |
-| 定期実行に取り込み・配信の確認を加える | `python3 scripts/schedule.py install` |
+| 定期実行に取り込み・配信の確認・ダッシュボードを加える | `python3 scripts/schedule.py install`（そのあと http://localhost:8765 をブックマーク） |

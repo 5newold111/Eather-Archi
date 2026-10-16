@@ -2,6 +2,10 @@
 """
 管理画面（out/dashboard.html）を作る。ブラウザで開くと、レーベル全体の今の状態が 1 枚で分かる。
 
+  ・アーティストごとの進み具合：名前の確認 → 写真・ジャケット → デビュー曲 → 毎週の制作 → 写真の刷新 の段階と、
+    いま止まっているところ・担当（あなた／Claude／自動）・何日止まっているか・次の一歩（_status.py）
+  ・仕組みの詰まり：鍵・ffmpeg・SSD・定期実行の登録とエラー・「ダウンロード」を読む許可
+  ・管理表の「詰まっているところ」タブのうち、完了していないもの
   ・人がやること（今すぐ）：ロゴや写真の選択待ち、Suno の節・テイク待ち、最終確認の ✕、DistroKid 登録の期限、ISRC の記入
   ・今週と来週の制作の進み具合（組ごと）
   ・これから配信される曲と、最近配信した曲
@@ -11,7 +15,9 @@
 使い方
   python3 scripts/dashboard.py            # 作る
   python3 scripts/dashboard.py --open     # 作ってブラウザで開く
-  （定期実行では 15 分ごとに自動で作り直す）
+  python3 scripts/dashboard.py --text     # ターミナルに、組ごとの詰まりだけを表示
+  （定期実行では 15 分ごとと、曲を取り込んだときに自動で作り直す。
+    同じものを「ダウンロード/SUNO楽曲/ローカル保存（一時保存）/ダッシュボード.html」と、SSD の 01_管理表 にも置く）
 """
 from __future__ import annotations
 
@@ -44,6 +50,17 @@ ul.todo li.ng{border-left-color:var(--ng)}code{font-size:12px;color:var(--sub);w
 .tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 th{color:var(--sub);font-weight:500}tr:last-child td{border-bottom:none}.ok{color:var(--ok)}.ngc{color:var(--ng)}.empty{color:var(--sub)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px}
+.acts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px}
+.act{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:14px 16px}
+.act.ng{border-left-color:var(--ng)}.act.wait{border-left-color:var(--accent)}.act.run{border-left-color:var(--sub)}.act.ok{border-left-color:var(--ok)}
+.act h3{margin:0 0 8px;font-weight:500;font-size:16px}.act h3 small{color:var(--sub);font-weight:400;margin-left:6px;font-size:12px}
+.steps{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 10px}.st{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub)}
+.st.ok{background:var(--ok);border-color:var(--ok);color:var(--card)}.st.ng{background:var(--ng);border-color:var(--ng);color:var(--card)}
+.st.wait{border-color:var(--accent);color:var(--accent);font-weight:600}.st.run{border-style:dashed;color:var(--ink)}
+.do{font-size:13px;margin:6px 0 0;padding-top:6px;border-top:1px dashed var(--line)}.who{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:6px;color:var(--sub)}
+.days{color:var(--ng);font-size:12px;margin-left:4px}
+.wrap td{white-space:normal;min-width:90px}
 """
 
 
@@ -218,7 +235,7 @@ def growth_cards() -> str:
 
 
 def key_cards() -> str:
-    groups = {"Claude": ["ANTHROPIC_API_KEY"], "OpenAI": ["OPENAI_API_KEY"], "Supabase": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+    groups = {"Claude": ["ANTHROPIC_API_KEY"], "OpenAI": ["OPENAI_API_KEY"], "Spotify": ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"], "Supabase": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
               "R2": ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"],
               "YouTube": ["YOUTUBE_REFRESH_TOKEN"], "Instagram": ["IG_ACCESS_TOKEN"], "TikTok": ["TIKTOK_REFRESH_TOKEN"]}
     cards = []
@@ -231,7 +248,7 @@ def key_cards() -> str:
 def schedule_cards() -> str:
     logs = OUT / "logs"
     cards = []
-    for job in ("post", "trends", "brief", "auto", "growth", "backup", "monthly"):
+    for job in ("intake", "release", "post", "trends", "brief", "auto", "growth", "backup", "monthly"):
         f = logs / f"{job}.log"
         if not f.exists():
             cards.append(f"<div class='card'><div class='label'>{job}</div><div class='empty'>まだ動いていません</div></div>")
@@ -258,6 +275,98 @@ def downloads_cards() -> str:
         for l, (n, cap) in sorted(dl.items())) + "</div>"
 
 
+STATE_JA = {"ok": "済み", "run": "自動で進行中", "wait": "番を待っている", "ng": "止まっている", "off": "まだ先"}
+
+
+def artist_section() -> str:
+    """アーティストごとの進み具合と詰まり"""
+    from _status import artists_overview
+    rows = artists_overview()
+    if not rows:
+        return "<p class='empty'>組がまだありません</p>"
+    count: dict[str, int] = {}
+    for r in rows:
+        b = r["blocker"]
+        k = "すべて順調" if not b else ("止まっている" if b["state"] == "ng" else f"{b['who']}の番" if b["state"] == "wait" else "自動で進行中")
+        count[k] = count.get(k, 0) + 1
+    chips = "".join(f"<span class='chip'>{esc(k)}：{v} 組</span>" for k, v in count.items())
+    cards = []
+    for r in rows:
+        b = r["blocker"]
+        strip = "".join(f"<span class='st {s['state']}' title='{esc(STATE_JA[s['state']])}：{esc(s['detail'])}'>{esc(s['name'])}</span>"
+                        for s in r["steps"])
+        todo = ""
+        for s in r["steps"]:
+            if s["state"] in ("ok", "off"):
+                continue
+            days = (date.today() - s["since"]).days if s["since"] else None
+            stuck = f"<span class='days'>{days} 日</span>" if days and days > 0 else ""
+            todo += (f"<div class='do'><span class='who'>{esc(s['who'] or '—')}</span><b>{esc(s['name'])}</b>：{esc(s['detail'])}{stuck}"
+                     + (f"<br><code>{esc(s['action'])}</code>" if s["action"] else "") + "</div>")
+        if not todo:
+            todo = "<div class='do ok'>すべて順調です</div>"
+        cards.append(f"<div class='act {b['state'] if b else 'ok'}'><h3>{esc(r['name'])}<small>{esc(r['label'])}</small></h3>"
+                     f"<div class='steps'>{strip}</div>{todo}</div>")
+    legend = "<p class='sub'>丸の色：緑＝済み・赤＝止まっている・金の枠＝だれかの番・点線＝自動で進行中・灰＝まだ先。日数は止まっている日数</p>"
+    return f"<div class='chips'>{chips}</div><div class='acts'>{''.join(cards)}</div>{legend}"
+
+
+def system_section() -> str:
+    from _status import system_blockers
+    items = system_blockers()
+    if not items:
+        return "<p class='empty'>仕組みの詰まりはありません</p>"
+    return "<ul class='todo'>" + "".join(f"<li class='{sev}'><b>{esc(what)}</b><br><code>{esc(how)}</code></li>"
+                                         for sev, what, how in sorted(items, key=lambda x: x[0] != "ng")) + "</ul>"
+
+
+def tracker_section() -> str:
+    from _status import tracker_rows
+    rows, src = tracker_rows()
+    if not rows:
+        return f"<p class='empty'>完了していない項目はありません（{esc(src)}）</p>"
+    cols = [c for c in ("順番", "詰まっていること", "担当", "次の一歩", "状態") if c in rows[0]]
+    body = "".join("<tr>" + "".join(f"<td>{esc(r.get(c, ''))}</td>" for c in cols) + "</tr>" for r in rows)
+    return (f"<div class='tbl'><table class='wrap'><tr>{''.join(f'<th>{esc(c)}</th>' for c in cols)}</tr>{body}</table></div>"
+            f"<p class='sub'>読んだ場所：{esc(src)}。書き換えは管理表の「詰まっているところ」タブで</p>")
+
+
+def text_report() -> str:
+    """ターミナル用：組ごとの詰まり"""
+    from _status import artists_overview, system_blockers
+    lines = ["■ アーティストごとの詰まり"]
+    for r in artists_overview():
+        strip = " → ".join(f"{s['name']}{ {'ok': '○', 'run': '…', 'wait': '●', 'ng': '✕', 'off': '－'}[s['state']] }" for s in r["steps"])
+        lines.append(f"  {r['name']}：{strip}")
+        for s in r["steps"]:
+            if s["state"] in ("wait", "ng", "run"):
+                days = f"（{(date.today() - s['since']).days} 日）" if s["since"] else ""
+                lines.append(f"     [{s['who'] or '—'}] {s['name']}：{s['detail']}{days}" + (f"  → {s['action']}" if s["action"] else ""))
+    sb = system_blockers()
+    if sb:
+        lines.append("■ 仕組みの詰まり")
+        lines += [f"  {'✕' if sev == 'ng' else '・'} {what}  → {how}" for sev, what, how in sb]
+    return "\n".join(lines)
+
+
+def copies(page: str) -> list[str]:
+    """同じ画面をローカル保存と SSD にも置く（Finder から開けるように）"""
+    out = []
+    try:
+        import _archive as archive
+        p = archive.local_root() / "ダッシュボード.html"
+        p.write_text(page, encoding="utf-8")
+        out.append(f"{archive.LOCAL_NAME}/{p.name}")
+        base, _ = archive.root()
+        if base is not None:
+            q = archive.child(base, archive.BOOK_DIR) / "ダッシュボード.html"
+            q.write_text(page, encoding="utf-8")
+            out.append(f"SSD の {archive.BOOK_DIR}/{q.name}")
+    except Exception:  # noqa: BLE001  置けなくても本体の画面は作る
+        pass
+    return out
+
+
 def build() -> Path:
     now = datetime.now(JST)
     week = monday_of(date.today())
@@ -267,7 +376,10 @@ def build() -> Path:
     page = (f"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
             f"<meta http-equiv='refresh' content='900'><title>EtherArchi Label</title><style>{CSS}</style></head><body><main>"
             f"<h1>EtherArchi Label</h1><p class='sub'>{now:%Y-%m-%d %H:%M} 時点（15 分ごとに自動で作り直し）</p>"
-            f"<h2>人がやること</h2><ul class='todo'>{todo_html}</ul>"
+            f"<h2>アーティストごとの進み具合</h2>{artist_section()}"
+            f"<h2>仕組みの詰まり</h2>{system_section()}"
+            f"<h2>管理表の「詰まっているところ」（完了していないもの）</h2>{tracker_section()}"
+            f"<h2>人がやること（毎週の制作）</h2><ul class='todo'>{todo_html}</ul>"
             f"<h2>今週の制作（{week} の週）</h2>{week_table(week)}"
             f"<h2>来週の制作（{week + timedelta(weeks=1)} の週）</h2>{week_table(week + timedelta(weeks=1))}"
             f"<h2>配信の予定と最近の配信</h2>{releases_table()}"
@@ -279,15 +391,20 @@ def build() -> Path:
     p = OUT / "dashboard.html"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(page, encoding="utf-8")
+    build.copies = copies(page)
     return p
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="管理画面（out/dashboard.html）を作る")
     ap.add_argument("--open", action="store_true")
+    ap.add_argument("--text", action="store_true", help="組ごとの詰まりをターミナルに表示（画面は作らない）")
     a = ap.parse_args()
+    if a.text:
+        print(text_report())
+        return
     p = build()
-    print(f"▶ 管理画面を作りました: {p.relative_to(ROOT)}")
+    print(f"▶ 管理画面を作りました: {p.relative_to(ROOT)}" + (f"（{'・'.join(build.copies)} にも）" if getattr(build, "copies", None) else ""))
     if a.open:
         webbrowser.open(p.resolve().as_uri())
 
