@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-アーティストの情報・写真・ジャケット・楽曲を、まず Mac の「ローカル保管庫」に、つぎに外付け SSD（DS72）にまとめて保管する
+アーティストの情報・写真・ジャケット・楽曲を、まず Mac の「ローカル保存（一時保存）」に、つぎに外付け SSD（DS72）にまとめて保管する
 
-  1. ローカル保管庫（music-label/ローカル保管庫/）… いつでも。SSD が無くても公開に要るものがここにそろう
-  2. SSD … つながっていれば、ローカル保管庫から同じ並びのまま写す。無ければ後回し（次につないだときに追いつく）
+  1. ローカル保存（一時保存）… ダウンロード/SUNO楽曲/ローカル保存（一時保存）/<アーティスト名>/。いつでも。SSD が無くても公開に要るものがここにそろう
+  2. SSD … つながっていれば、ローカル保存の <アーティスト名>/ を SSD の 02_アーティスト/<アーティスト名>/ へ写す。無ければ後回し（次につないだときに追いつく）
 
 保管するもの（Postdog Records の全組と子レーベルの組。試験用の週 2000-xx-xx は除く。並びは _archive.py）：
   01_管理表/       アーティスト情報.xlsx（SSD に無いときだけ見本を置く。以後は SSD の正本を触らない）
@@ -169,7 +169,7 @@ def setup(path: str) -> None:
 
 
 def to_local(acts: list[dict], check: bool) -> tuple[int, int]:
-    """1 段目：ローカル保管庫へ（いつでも）。(対象の数, 新しく入れた・変わった数)"""
+    """1 段目：ローカル保存へ（いつでも）。(対象の数, 新しく入れた・変わった数)"""
     total = changed = 0
     for a in acts:
         name = a.get("name") or a["slug"]
@@ -191,7 +191,7 @@ def to_local(acts: list[dict], check: bool) -> tuple[int, int]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="アーティストの情報・写真・ジャケット・楽曲を、ローカル保管庫と外付け SSD に保管する")
+    ap = argparse.ArgumentParser(description="アーティストの情報・写真・ジャケット・楽曲を、ローカル保存（一時保存）と外付け SSD に保管する")
     ap.add_argument("--only", help="この組だけ（組の ID）")
     ap.add_argument("--check", action="store_true", help="SSD にまだ写していないファイルを見るだけ")
     ap.add_argument("--setup", metavar="PATH", help="SSD の保管庫の場所を .env に書く（例 /Volumes/DS72）")
@@ -201,7 +201,7 @@ def main() -> None:
         return
 
     acts = [a for a in all_artists() if a.get("slug") and (not args.only or a["slug"] == args.only)]
-    print(f"▶ 1. ローカル保管庫：{archive.local_root()}")
+    print(f"▶ 1. ローカル保存（一時保存）：{archive.local_root()}")
     total, changed = to_local(acts, args.check)
     print(f"   対象 {total} 件のうち、新しく入れた・変わったもの {changed} 件")
 
@@ -209,7 +209,7 @@ def main() -> None:
     if base is None:
         n = len(archive.pending())
         print(f"▶ 2. SSD：写すのは後回しにします（{how}）")
-        print(f"   SSD にまだ写していないもの {n} 件。公開に要るもの（04_楽曲/<週>/）はローカル保管庫にそろっています")
+        print(f"   SSD にまだ写していないもの {n} 件。公開に要るもの（<アーティスト名>/04_楽曲/<週>/）はローカル保存にそろっています")
         print("   管理表（アーティスト情報・楽曲管理）への書き込みも、SSD をつなぐまで保留します")
         return
     print(f"▶ 2. SSD：{base}")

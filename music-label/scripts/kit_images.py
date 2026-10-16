@@ -9,7 +9,7 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   2. 管理表の実在の名前（影響・好きなアーティスト）が依頼文に混ざっていないか確かめる（混ざっていたら止める）
   3. 画像 API で 1 枚ずつ作り、images/<組の ID>_<cover|photo>_raw.png に保存する（鍵が無ければ依頼文だけ書き出す）
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
-  5. ローカル保管庫と外付け SSD（DS72）の「02_アーティスト/<アーティスト名>/02_写真・03_ジャケット」に保管する
+  5. ローカル保存（ダウンロード/SUNO楽曲/ローカル保存（一時保存）/<アーティスト名>/）と外付け SSD（DS72）の 02_写真・03_ジャケット に保管する
      （同じ名前のフォルダがあればそこへ。無ければ作る。SSD がつながっていなければローカルにだけ入れ、SSD へは後で写す。_archive.py）
      保管庫での名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
 
@@ -21,7 +21,7 @@ ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png
   python3 scripts/kit_images.py --kind photo2           # 2 枚目のアーティスト写真だけ
   python3 scripts/kit_images.py --fit-only              # 画像は作らず、images/ にある画像を整えるだけ
   python3 scripts/kit_images.py --redo                  # 作り直す（今ある画像は _old を付けて残す）
-  python3 scripts/kit_images.py --no-archive            # 保管庫（ローカル・SSD）には入れない
+  python3 scripts/kit_images.py --no-archive            # ローカル保存にも SSD にも入れない
 
 鍵は music-label/.env の OPENAI_API_KEY（会話には貼らない）。画像モデルは generate_visuals.py と同じ選び方。
 """
@@ -103,7 +103,7 @@ def main() -> None:
                     help="all＝ジャケット・写真・2 枚目の写真（既定）、both＝ジャケットと写真")
     ap.add_argument("--fit-only", action="store_true", help="画像は作らず、images/ にある画像を整えるだけ")
     ap.add_argument("--redo", action="store_true", help="作り直す（今ある画像は _old を付けて残す）")
-    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="保管庫（ローカル・SSD）には入れない")
+    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="ローカル保存にも SSD にも入れない")
     args = ap.parse_args()
 
     kit = args.kit or latest_kit()
@@ -124,7 +124,7 @@ def main() -> None:
     warned: list[str] = []
 
     def to_archive(act: dict, kind: str, out: Path) -> None:
-        """整えた画像を、ローカル保管庫と SSD の 02_アーティスト/<アーティスト名>/02_写真・03_ジャケット へ"""
+        """整えた画像を、ローカル保存と SSD の 02_アーティスト/<アーティスト名>/02_写真・03_ジャケット へ"""
         if args.no_archive:
             return
         name = act["artist"]

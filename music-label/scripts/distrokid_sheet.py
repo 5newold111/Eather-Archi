@@ -147,7 +147,7 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             f"- Explicit lyrics：{r['explicit']}",
             f"- AI の申告：{r['ai_disclosure']}。アップロード画面の AI の質問で、歌詞・ボーカル・演奏・作曲のうち使ったものをすべて選ぶ",
             f"- Songwriter：{r['songwriter']}",
-            f"- 公開セット（音源・ジャケット・このシートが 1 か所に）：`ローカル保管庫/02_アーティスト/{r['artist']}/04_楽曲/{r['week_start']}/`"
+            f"- 公開セット（音源・ジャケット・このシートが 1 か所に）：`ダウンロード/SUNO楽曲/ローカル保存（一時保存）/{r['artist']}/04_楽曲/{r['week_start']}/`"
             "（archive_sync.py のあとに。SSD にも同じ並びで入る）",
             f"- 音源：`{r['audio']}`",
             f"- ジャケット：`{r['cover'] or '未作成'}`",

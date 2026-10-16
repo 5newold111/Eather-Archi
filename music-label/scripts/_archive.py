@@ -1,11 +1,13 @@
 """
-アーティストの情報・写真・ジャケット・楽曲を、まず Mac の「ローカル保管庫」に、つぎに外付け SSD（Silicon Power DS72）に保管する部品
+アーティストの情報・写真・ジャケット・楽曲を、まず Mac の「ローカル保存（一時保存）」に、つぎに外付け SSD（Silicon Power DS72）に保管する部品
 
 2 段構え：
-  1. ローカル保管庫（music-label/ローカル保管庫/。.env の LOCAL_ARCHIVE で変えられる）… いつでも必ず入れる。
+  1. ローカル保存（一時保存）… いつでも必ず入れる。場所はダウンロードの中の
+       ~/Downloads/SUNO楽曲/ローカル保存（一時保存）/<アーティスト名>/01_情報〜04_楽曲
+     （SUNO楽曲・ローカル保存（一時保存）が無ければ作る。.env の LOCAL_ARCHIVE で変えられる）。
      SSD が無くても、公開（DistroKid への登録・SNS）に要るものはここにそろう。
      元のファイル（out/ や debut_kit/）と同じ実体を指す「ハードリンク」で置くので、Mac の容量は増えない
-  2. SSD … つながっていれば、ローカル保管庫から同じ並びのまま写す（archive_sync.py）。
+  2. SSD … つながっていれば、ローカル保存の <アーティスト名>/ を SSD の 02_アーティスト/<アーティスト名>/ へ同じ並びで写す（archive_sync.py）。
      つながっていなければ写すのは後回しにし、次につないだときにまとめて追いつく
 
 SSD の場所（上から順に探す）：
@@ -33,7 +35,9 @@ import filecmp, os, shutil, time, unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-LOCAL_NAME = "ローカル保管庫"
+LOCAL_PARENT = "SUNO楽曲"                 # ダウンロードの中のフォルダ
+LOCAL_NAME = "ローカル保存（一時保存）"
+_OLD_LOCAL = ROOT / "ローカル保管庫"        # 前の置き場所（見つけたら中身を新しい場所へ移す）
 
 VOLUMES = Path("/Volumes")
 VOLUME_HINT = "DS72"
@@ -74,14 +78,14 @@ def _mkdir(p: Path) -> Path:
 def _move_into(src: Path, dst: Path) -> None:
     """src を dst という名前にする。dst が既にあれば、中身を 1 つずつ移す（同じ名前のファイルは dst 側を残す）"""
     if not dst.exists():
-        src.rename(dst)
+        shutil.move(str(src), str(dst))   # 同じドライブなら名前の付け替えだけ。別のドライブなら写してから消す
         return
     for c in list(src.iterdir()):
         target = dst / c.name
         if c.is_dir():
             _move_into(c, target)
         elif not target.exists():
-            c.rename(target)
+            shutil.move(str(c), str(target))
     try:
         src.rmdir()
     except OSError:
@@ -138,20 +142,43 @@ def _root() -> tuple[Path | None, str]:
 
 
 def local_root() -> Path:
-    """ローカル保管庫（いつでも使える）"""
+    """ローカル保存（一時保存）の場所（いつでも使える）。中にアーティスト名のフォルダが並ぶ"""
     env = os.environ.get("LOCAL_ARCHIVE", "").strip()
-    return _mkdir(Path(env).expanduser() if env else ROOT / LOCAL_NAME)
+    if env:
+        base = _mkdir(Path(env).expanduser())
+    else:
+        downloads = Path.home() / "Downloads"   # Finder では「ダウンロード」と表示される
+        base = child(child(_mkdir(downloads), LOCAL_PARENT), LOCAL_NAME)
+    _migrate_local(base)
+    return base
+
+
+def _migrate_local(base: Path) -> None:
+    """前の置き場所（music-label/ローカル保管庫/02_アーティスト/<名前>）の中身を、新しい場所の <名前>/ へ移す（1 回だけ）"""
+    old = _OLD_LOCAL / ARTIST_DIR
+    if str(base) in _migrated or not old.is_dir():
+        return
+    _migrated.add(str(base))
+    for a in [a for a in old.iterdir() if a.is_dir()]:
+        _move_into(a, child(base, a.name))
+    for d in (old, _OLD_LOCAL):
+        try:
+            for f in d.glob(".*"):
+                f.unlink()
+            d.rmdir()
+        except OSError:
+            pass
 
 
 def _artist_path(base: Path, artist_name: str, kind: str | None, week: str | None) -> Path:
-    folder = child(child(base, ARTIST_DIR), artist_name)
+    folder = child(base, artist_name)
     if kind:
         folder = child(folder, SUBS[kind])
     return child(folder, week) if week else folder
 
 
 def local_folder(artist_name: str, kind: str | None = None, week: str | None = None) -> Path:
-    """ローカル保管庫の 02_アーティスト/<アーティスト名>/（kind で 01_情報〜04_楽曲、week で 04_楽曲/<週>）"""
+    """ローカル保存の <アーティスト名>/（kind で 01_情報〜04_楽曲、week で 04_楽曲/<週>）"""
     return _artist_path(local_root(), artist_name, kind, week)
 
 
@@ -160,11 +187,11 @@ def artist_folder(artist_name: str, kind: str | None = None, week: str | None = 
     base, how = root()
     if base is None:
         return None, how
-    return _artist_path(base, artist_name, kind, week), how
+    return _artist_path(child(base, ARTIST_DIR), artist_name, kind, week), how
 
 
 def store(src: Path, artist_name: str, kind: str, fname: str, week: str | None = None) -> list[str]:
-    """ローカル保管庫に入れ、SSD がつながっていれば SSD にも写す。表示用の行を返す"""
+    """ローカル保存に入れ、SSD がつながっていれば SSD にも写す。表示用の行を返す"""
     lf = local_folder(artist_name, kind, week)
     lines = [f"ローカル：{local_label(lf)}/{fname} を{save(src, lf, fname, link=True)}"]
     sf, how = artist_folder(artist_name, kind, week)
@@ -176,12 +203,14 @@ def store(src: Path, artist_name: str, kind: str, fname: str, week: str | None =
 
 
 def local_files() -> list[Path]:
-    """ローカル保管庫の中の、SSD へ写す対象のファイル（_old の古い版・隠しファイルは除く）"""
-    base = local_root() / ARTIST_DIR
-    if not base.is_dir():
-        return []
-    return sorted(f for f in base.rglob("*") if f.is_file() and not f.name.startswith((".", "~$"))
-                  and not f.stem.endswith("_old"))
+    """ローカル保存の中の、SSD へ写す対象のファイル（<アーティスト名>/01_情報〜04_楽曲 の中だけ。_old の古い版・隠しファイルは除く）"""
+    base = local_root()
+    out = []
+    for a in (a for a in base.iterdir() if a.is_dir()):
+        for sub in (d for d in a.iterdir() if d.is_dir() and any(same_name(d.name, x) for x in SUBS.values())):
+            out += [f for f in sub.rglob("*") if f.is_file() and not f.name.startswith((".", "~$"))
+                    and not f.stem.endswith("_old")]
+    return sorted(out)
 
 
 def _stamp() -> Path:
@@ -189,21 +218,21 @@ def _stamp() -> Path:
 
 
 def pending() -> list[Path]:
-    """最後に SSD へ写したあとで、ローカル保管庫に入った・変わったファイル"""
+    """最後に SSD へ写したあとで、ローカル保存に入った・変わったファイル"""
     st = _stamp()
     since = st.stat().st_mtime if st.exists() else 0
     return [f for f in local_files() if f.stat().st_mtime > since or f.stat().st_ctime > since]
 
 
 def push(check: bool = False) -> tuple[int, list[str]]:
-    """ローカル保管庫の 02_アーティスト を、同じ並びのまま SSD へ写す。(写した数, 表示用の行)"""
+    """ローカル保存の <アーティスト名>/ を、SSD の 02_アーティスト/<アーティスト名>/ へ同じ並びで写す。(写した数, 表示用の行)"""
     base, how = root()
     if base is None:
         return 0, [f"SSD：{how}"]
     lroot = local_root()
     n, lines = 0, []
     for f in local_files():
-        relp = f.relative_to(lroot)
+        relp = Path(ARTIST_DIR) / f.relative_to(lroot)
         folder = base
         for part in relp.parts[:-1]:
             folder = child(folder, part)
@@ -245,7 +274,7 @@ def save(src: Path, folder: Path, name: str, link: bool = False) -> str:
 
 
 def local_label(folder: Path) -> str:
-    """表示用：ローカル保管庫の中での位置"""
+    """表示用：ローカル保存の中での位置"""
     try:
         return f"{LOCAL_NAME}/{folder.relative_to(local_root())}"
     except ValueError:
