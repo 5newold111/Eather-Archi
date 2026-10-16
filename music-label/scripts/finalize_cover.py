@@ -99,7 +99,7 @@ def main() -> None:
     ap.add_argument("--input")
     ap.add_argument("--out")
     ap.add_argument("--demo", action="store_true")
-    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="SSD には保管しない")
+    ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="保管庫（ローカル・SSD）には入れない")
     args = ap.parse_args()
 
     if args.input:
@@ -130,19 +130,16 @@ def main() -> None:
 
 
 def to_archive(b: dict, dst: Path) -> None:
-    """SSD の 02_アーティスト/<アーティスト名>/03_ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管（試験用の週は保管しない）"""
+    """ローカル保管庫と SSD の 02_アーティスト/<アーティスト名>/03_ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管
+    （SSD が無ければローカルにだけ入れ、SSD へは後で写す。試験用の週は保管しない）"""
     if str(b.get("week_start", "")).startswith("2000-"):
         return
     import _archive as archive
     from _common import load_artist
     name = load_artist(b["artist_slug"], b.get("label_slug")).get("name") or b["artist_slug"]
-    folder, how = archive.artist_folder(name, "cover")
-    if not folder:
-        print(f"   － SSD には保管しませんでした：{how}")
-        return
     day = str(b.get("release_at") or b["week_start"])[:10]
-    fname = f"{name}_{day}_cover.jpg"
-    print(f"   ○ SSD：{archive.label(folder)}/{fname} を{archive.save(dst, folder, fname)}")
+    for line in archive.store(dst, name, "cover", f"{name}_{day}_cover.jpg"):
+        print(f"   ○ {line}")
 
 if __name__ == "__main__":
     main()

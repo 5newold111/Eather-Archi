@@ -1,7 +1,14 @@
 """
-外付け SSD（Silicon Power DS72）にアーティストの情報・写真・ジャケット・楽曲を保管する部品
+アーティストの情報・写真・ジャケット・楽曲を、まず Mac の「ローカル保管庫」に、つぎに外付け SSD（Silicon Power DS72）に保管する部品
 
-保管庫の場所（上から順に探す）：
+2 段構え：
+  1. ローカル保管庫（music-label/ローカル保管庫/。.env の LOCAL_ARCHIVE で変えられる）… いつでも必ず入れる。
+     SSD が無くても、公開（DistroKid への登録・SNS）に要るものはここにそろう。
+     元のファイル（out/ や debut_kit/）と同じ実体を指す「ハードリンク」で置くので、Mac の容量は増えない
+  2. SSD … つながっていれば、ローカル保管庫から同じ並びのまま写す（archive_sync.py）。
+     つながっていなければ写すのは後回しにし、次につないだときにまとめて追いつく
+
+SSD の場所（上から順に探す）：
   1. .env の ARCHIVE_ROOT（例 ARCHIVE_ROOT=/Volumes/DS72/Postdog Records）
   2. Mac につながっているドライブ（/Volumes/ の下）のうち、名前に「DS72」を含むもの → その中の「Postdog Records」フォルダ
 SSD がつながっていないときは何もせず、その旨だけ表示する（次に動いたときにまとめて保管される）。
@@ -22,8 +29,11 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
 同じ名前のフォルダがすでにあればそこを使い、無ければ作る。
 """
 from __future__ import annotations
-import filecmp, os, shutil, unicodedata
+import filecmp, os, shutil, time, unicodedata
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+LOCAL_NAME = "ローカル保管庫"
 
 VOLUMES = Path("/Volumes")
 VOLUME_HINT = "DS72"
@@ -127,33 +137,123 @@ def _root() -> tuple[Path | None, str]:
                   "つないでから実行するか、.env の ARCHIVE_ROOT で場所を指定してください")
 
 
-def artist_folder(artist_name: str, kind: str | None = None) -> tuple[Path | None, str]:
-    """02_アーティスト/<アーティスト名>/（kind を渡すとその下の 01_情報・02_写真・03_ジャケット・04_楽曲）"""
+def local_root() -> Path:
+    """ローカル保管庫（いつでも使える）"""
+    env = os.environ.get("LOCAL_ARCHIVE", "").strip()
+    return _mkdir(Path(env).expanduser() if env else ROOT / LOCAL_NAME)
+
+
+def _artist_path(base: Path, artist_name: str, kind: str | None, week: str | None) -> Path:
+    folder = child(child(base, ARTIST_DIR), artist_name)
+    if kind:
+        folder = child(folder, SUBS[kind])
+    return child(folder, week) if week else folder
+
+
+def local_folder(artist_name: str, kind: str | None = None, week: str | None = None) -> Path:
+    """ローカル保管庫の 02_アーティスト/<アーティスト名>/（kind で 01_情報〜04_楽曲、week で 04_楽曲/<週>）"""
+    return _artist_path(local_root(), artist_name, kind, week)
+
+
+def artist_folder(artist_name: str, kind: str | None = None, week: str | None = None) -> tuple[Path | None, str]:
+    """SSD の 02_アーティスト/<アーティスト名>/…（SSD がなければ (None, 理由)）"""
     base, how = root()
     if base is None:
         return None, how
-    folder = child(child(base, ARTIST_DIR), artist_name)
-    return (child(folder, SUBS[kind]) if kind else folder), how
+    return _artist_path(base, artist_name, kind, week), how
 
 
-def save(src: Path, folder: Path, name: str) -> str:
-    """folder/name に保存する。同じ中身なら何もしない。中身が変わっていれば前の版を _old を付けて残す"""
+def store(src: Path, artist_name: str, kind: str, fname: str, week: str | None = None) -> list[str]:
+    """ローカル保管庫に入れ、SSD がつながっていれば SSD にも写す。表示用の行を返す"""
+    lf = local_folder(artist_name, kind, week)
+    lines = [f"ローカル：{local_label(lf)}/{fname} を{save(src, lf, fname, link=True)}"]
+    sf, how = artist_folder(artist_name, kind, week)
+    if sf is None:
+        lines.append(f"SSD：あとで写します（{how}）")
+    else:
+        lines.append(f"SSD：{label(sf)}/{fname} を{save(lf / fname, sf, fname)}")
+    return lines
+
+
+def local_files() -> list[Path]:
+    """ローカル保管庫の中の、SSD へ写す対象のファイル（_old の古い版・隠しファイルは除く）"""
+    base = local_root() / ARTIST_DIR
+    if not base.is_dir():
+        return []
+    return sorted(f for f in base.rglob("*") if f.is_file() and not f.name.startswith((".", "~$"))
+                  and not f.stem.endswith("_old"))
+
+
+def _stamp() -> Path:
+    return local_root() / ".SSD に写した時刻"
+
+
+def pending() -> list[Path]:
+    """最後に SSD へ写したあとで、ローカル保管庫に入った・変わったファイル"""
+    st = _stamp()
+    since = st.stat().st_mtime if st.exists() else 0
+    return [f for f in local_files() if f.stat().st_mtime > since or f.stat().st_ctime > since]
+
+
+def push(check: bool = False) -> tuple[int, list[str]]:
+    """ローカル保管庫の 02_アーティスト を、同じ並びのまま SSD へ写す。(写した数, 表示用の行)"""
+    base, how = root()
+    if base is None:
+        return 0, [f"SSD：{how}"]
+    lroot = local_root()
+    n, lines = 0, []
+    for f in local_files():
+        relp = f.relative_to(lroot)
+        folder = base
+        for part in relp.parts[:-1]:
+            folder = child(folder, part)
+        if check:
+            if not (folder / f.name).exists():
+                n += 1
+                lines.append(f"・未保管：{relp}")
+            continue
+        res = save(f, folder, f.name)
+        if not res.startswith("保管済み"):
+            n += 1
+            lines.append(f"○ {relp} を{res}")
+    if not check:
+        _stamp().write_text(time.strftime("%Y-%m-%d %H:%M:%S") + "\n", encoding="utf-8")
+    return n, lines
+
+
+def save(src: Path, folder: Path, name: str, link: bool = False) -> str:
+    """folder/name に保存する。同じ中身なら何もしない。中身が変わっていれば前の版を _old を付けて残す。
+    link=True はハードリンク（同じ実体を指す。容量を使わない。できないときは普通に写す）"""
     dst = folder / name
+    verb = "保管"
     if dst.exists():
-        if filecmp.cmp(src, dst, shallow=False):
+        if dst.samefile(src) or filecmp.cmp(src, dst, shallow=False):
             return "保管済み（変わりなし）"
         old = dst.with_name(f"{dst.stem}_old{dst.suffix}")
         if old.exists():
             old.unlink()
         dst.rename(old)
-        shutil.copy2(src, dst)
-        return "上書き保管（前の版は _old で残しました）"
+        verb = "上書き保管（前の版は _old で残しました）"
+    if link:
+        try:
+            os.link(src, dst)
+            return verb
+        except OSError:
+            pass
     shutil.copy2(src, dst)
-    return "保管"
+    return verb
+
+
+def local_label(folder: Path) -> str:
+    """表示用：ローカル保管庫の中での位置"""
+    try:
+        return f"{LOCAL_NAME}/{folder.relative_to(local_root())}"
+    except ValueError:
+        return str(folder)
 
 
 def label(folder: Path) -> str:
-    """表示用：保管庫の中での位置"""
+    """表示用：SSD の保管庫の中での位置"""
     base, _ = root()
     try:
         return str(folder.relative_to(base)) if base else str(folder)

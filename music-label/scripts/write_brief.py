@@ -201,7 +201,23 @@ def public_safe_artist(artist: dict) -> dict:
     return a
 
 
+DB_DIGEST = ROOT / "out" / "reference_db" / "digest.json"   # reference_db.py：SSD の参考データベースの傾向
+
+
+def db_digest() -> dict:
+    """オーナーの参考データベースの傾向（実名は伏せてある。real_names は Claude に渡さない）"""
+    if not DB_DIGEST.exists():
+        return {}
+    d = load_json(DB_DIGEST)
+    return {k: v for k, v in d.items() if k not in ("real_names", "updated")} if d.get("songs") else {}
+
+
 def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
+    db = db_digest()
+    db_part = ("\n\n## Owner's reference database (overall tendencies the owner collected; real names removed)\n"
+               "Use it as taste guidance (mood, tempo range, themes, owner's notes) on top of the per-slot references. "
+               "Never imitate a specific song, and stay inside the artist's fixed constraints.\n"
+               + json.dumps(db, ensure_ascii=False, indent=1)) if db else ""
     return (
         "## Artist profile (fixed constraints; names of real artists already removed)\n"
         + json.dumps(public_safe_artist(artist), ensure_ascii=False, indent=1)
@@ -209,6 +225,7 @@ def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
         + json.dumps({k: v for k, v in brief.items() if k not in ("slots",)}, ensure_ascii=False, indent=1)
         + "\n\n## Per-slot reference excerpts (only the borrowed dimension of each reference)\n"
         + json.dumps(excerpts, ensure_ascii=False, indent=1)
+        + db_part
         + "\n\nWrite the brief now."
     )
 
@@ -217,6 +234,8 @@ def banned_terms(artist: dict) -> list[str]:
     terms = list(artist.get("profile", {}).get("favorite_artists_real", []))
     terms += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
     terms += real_names(artist)   # 管理表の『影響』『参考曲の候補』の実名
+    if DB_DIGEST.exists():        # 参考データベースのアーティスト名・曲名（3 文字以上。短い語は普通の言葉と重なるため）
+        terms += [n for n in load_json(DB_DIGEST).get("real_names", []) if len(n) >= 3]
     return [t for t in terms if t and t not in ("（bio のみ）",)]
 
 

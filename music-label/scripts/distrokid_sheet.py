@@ -147,6 +147,8 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             f"- Explicit lyrics：{r['explicit']}",
             f"- AI の申告：{r['ai_disclosure']}。アップロード画面の AI の質問で、歌詞・ボーカル・演奏・作曲のうち使ったものをすべて選ぶ",
             f"- Songwriter：{r['songwriter']}",
+            f"- 公開セット（音源・ジャケット・このシートが 1 か所に）：`ローカル保管庫/02_アーティスト/{r['artist']}/04_楽曲/{r['week_start']}/`"
+            "（archive_sync.py のあとに。SSD にも同じ並びで入る）",
             f"- 音源：`{r['audio']}`",
             f"- ジャケット：`{r['cover'] or '未作成'}`",
             f"- 歌詞（Lyrics を提出する場合）：`{r['lyrics_file'] or '—'}`",
@@ -158,7 +160,7 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             "- [ ] タイトルに feat. / ft. が入っていない",
             "- [ ] ジャケットの文字が曲名・アーティスト名と一致（他の文字・URL・SNS 名なし）",
             "- [ ] 配信日が上の日付と同じ（Postdog Records は 2 週間後の水曜、子レーベルは設定書の曜日）",
-            "- [ ] 登録後、DistroKid の画面で ISRC と UPC を控え、`" + f"out/distrokid/{week}/{r['artist_slug']}.metadata.json" + "` の isrc / upc に書く",
+            "- [ ] 登録後、DistroKid の画面で ISRC と UPC を控え、楽曲管理シート（SSD の 01_管理表/楽曲管理.xlsx）のフェーズを 7 にして ISRC・UPC を書く。あわせて `" + f"out/distrokid/{week}/{r['artist_slug']}.metadata.json" + "` の isrc / upc に書く",
         ]
     out += ["", "---", "登録が終わったら：`python scripts/supabase_sync.py releases --week " + week + "`（鍵を入れた後）"]
     return "\n".join(out) + "\n"

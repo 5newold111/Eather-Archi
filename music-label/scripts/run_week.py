@@ -2,7 +2,7 @@
 """
 1 週間ぶんの処理を、段階ごとに全組まとめて流す。人の作業（Suno・テイクを聴く・DistroKid 登録）の間をつなぐ。
 
-  brief   話題曲の取得 → 参考曲の割り当て（Postdog Records＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
+  brief   話題曲の取得 → SSD の参考データベースの取り込み → 参考曲の割り当て（Postdog Records＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
   lyrics  Suno が書いた節（<ブリーフ名>.verses.txt）があれば核と合体して最終歌詞に
   takes   Suno のテイク（out/takes/<ブリーフ名>/）があれば計測して選ぶ（Tier A/B/C）
   finish  音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備 → 外付け SSD に保管
@@ -76,6 +76,9 @@ def stage_brief(week: date, a) -> None:
     if (S / "fetch_trends.py").exists() and not (OUT / "trends" / f"{week}.json").exists():
         step("話題曲とトレンド言語を調べています（fetch_trends.py）")
         run([S / "fetch_trends.py", "--week", week.isoformat()])
+    if (S / "reference_db.py").exists() and not a.demo:
+        step("SSD の参考データベースを読んでいます（reference_db.py。SSD が無ければ前回の取り込みを使う）")
+        run([S / "reference_db.py", "--quiet"])
     ref_dir = Path(a.references)
     n = references_ok(ref_dir)
     common = ["--week", week.isoformat()]
