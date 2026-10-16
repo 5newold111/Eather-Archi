@@ -21,8 +21,8 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
     02_アーティスト/<アーティスト名>/
         01_情報/      設定書（json）・プロフィール（md）
         02_写真/      <アーティスト名>_photo.jpg・_photo2.jpg
-        03_ジャケット/ <アーティスト名>_cover.jpg（デビュー曲）・<アーティスト名>_<配信日>_cover.jpg（毎週）
-        04_楽曲/<週>/ 配信用の音源（master.wav）・選んだテイク・歌詞
+        03_ジャケット/ <アーティスト名>_<曲名>_1.jpg（作り直すと _2・_3 …）
+        04_楽曲/<曲名>/ 公開セット：配信用の音源・ジャケット・DistroKid の下書き・選んだテイク・歌詞
     03_作業書/      デビュー_<日付>/ 作業書（PDF）・曲の情報・画像の依頼文
     09_移行前/      Google から移したもの（オーナーが入れる。機械は触らない）
   前の並び（アーティスト情報・管理表・写真 など）で保管したものは、見つけしだい新しい名前へ移す。
@@ -31,7 +31,7 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
 同じ名前のフォルダがすでにあればそこを使い、無ければ作る。
 """
 from __future__ import annotations
-import filecmp, os, shutil, time, unicodedata
+import filecmp, os, re, shutil, time, unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -190,11 +190,15 @@ def artist_folder(artist_name: str, kind: str | None = None, week: str | None = 
     return _artist_path(child(base, ARTIST_DIR), artist_name, kind, week), how
 
 
-def store(src: Path, artist_name: str, kind: str, fname: str, week: str | None = None) -> list[str]:
-    """ローカル保存に入れ、SSD がつながっていれば SSD にも写す。表示用の行を返す"""
-    lf = local_folder(artist_name, kind, week)
+def store(src: Path, artist_name: str, kind: str, fname: str | None = None, sub: str | None = None,
+          stem: str | None = None, ext: str = ".jpg") -> list[str]:
+    """ローカル保存に入れ、SSD がつながっていれば SSD にも写す。表示用の行を返す。
+    fname を渡さず stem を渡すと、<stem>_<番号><ext> の名前にする（ジャケット：<アーティスト名>_<曲名>_1.jpg）"""
+    lf = local_folder(artist_name, kind, sub)
+    if fname is None:
+        fname = numbered(lf, stem, src, ext)
     lines = [f"ローカル：{local_label(lf)}/{fname} を{save(src, lf, fname, link=True)}"]
-    sf, how = artist_folder(artist_name, kind, week)
+    sf, how = artist_folder(artist_name, kind, sub)
     if sf is None:
         lines.append(f"SSD：あとで写します（{how}）")
     else:
@@ -250,9 +254,27 @@ def push(check: bool = False) -> tuple[int, list[str]]:
     return n, lines
 
 
+AUDIO_EXT = {".wav", ".mp3", ".m4a", ".flac", ".aif", ".aiff"}
+
+
+def numbered(folder: Path, stem: str, src: Path, ext: str = ".jpg") -> str:
+    """<stem>_<番号><ext> の名前を決める。同じ中身のものがすでにあればその番号、無ければ次の番号（1, 2, 3 …）"""
+    nums = []
+    if folder.is_dir():
+        pat = re.compile(re.escape(stem) + r"_(\d+)" + re.escape(ext) + "$")
+        for f in folder.iterdir():
+            m = pat.match(f.name)
+            if m:
+                if f.samefile(src) or filecmp.cmp(src, f, shallow=False):
+                    return f.name
+                nums.append(int(m.group(1)))
+    return f"{stem}_{max(nums, default=0) + 1}{ext}"
+
+
 def save(src: Path, folder: Path, name: str, link: bool = False) -> str:
     """folder/name に保存する。同じ中身なら何もしない。中身が変わっていれば前の版を _old を付けて残す。
-    link=True はハードリンク（同じ実体を指す。容量を使わない。できないときは普通に写す）"""
+    link=True は音源だけハードリンク（同じ実体を指す。容量を使わない。できないときは普通に写す）。
+    画像などの小さいファイルは、元が上書きされても保管した版が変わらないように普通に写す"""
     dst = folder / name
     verb = "保管"
     if dst.exists():
@@ -263,7 +285,7 @@ def save(src: Path, folder: Path, name: str, link: bool = False) -> str:
             old.unlink()
         dst.rename(old)
         verb = "上書き保管（前の版は _old で残しました）"
-    if link:
+    if link and src.suffix.lower() in AUDIO_EXT:
         try:
             os.link(src, dst)
             return verb

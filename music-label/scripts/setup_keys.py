@@ -201,10 +201,37 @@ def check_tiktok():
     return "ok", f"接続できました（{(d.get('data') or {}).get('user', {}).get('display_name', '名前不明')}）"
 
 
+def check_spotify():
+    if not (os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET")):
+        return "none", "鍵がありません"
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import publish
+        publish.spotify_token()
+    except Exception as e:  # noqa: BLE001
+        return "ng", f"接続できません：{str(e)[:120]}"
+    return "ok", "接続できました（配信の確認と ISRC の記録に使います）"
+
+
+def check_owner():
+    return ("ok", "設定済み（DistroKid の作詞作曲者の欄に入ります）") if os.environ.get("OWNER_LEGAL_NAME") else ("none", "まだありません")
+
+
 # ---------------------------------------------------------------------------
 # サービスごとの手順
 # ---------------------------------------------------------------------------
 SERVICES = {
+    "spotify": {
+        "title": "Spotify（配信が始まったかの確認と ISRC・UPC・配信 URL の自動記録）",
+        "url": "https://developer.spotify.com/dashboard",
+        "steps": ["Spotify のアカウントでログイン → Create app（名前 etherarchi-label、Redirect URI は http://127.0.0.1:8765/callback で可）",
+                  "使う API に Web API を選んで保存 → Settings で Client ID と Client secret（View client secret）をコピー"],
+        "keys": [("SPOTIFY_CLIENT_ID", False), ("SPOTIFY_CLIENT_SECRET", True)], "check": check_spotify},
+    "owner": {
+        "title": "オーナーの本名（DistroKid の作詞作曲者の欄。手元の .env だけに入り、GitHub には入らない）",
+        "url": "",
+        "steps": ["DistroKid の Songwriter 欄に入れる本名（例 山田 太郎）をそのまま入力"],
+        "keys": [("OWNER_LEGAL_NAME", False)], "check": check_owner},
     "anthropic": {
         "title": "Claude（ブリーフ・話題曲・画像の採点・新人の下書き）",
         "url": "https://console.anthropic.com/settings/keys",
@@ -311,7 +338,7 @@ def run_service(key: str, redo: bool) -> tuple[str, str]:
         return state, msg
     for i, st in enumerate(s["steps"], 1):
         print(f"   {i}. {st}")
-    if input(f"   ブラウザで {s['url']} を開きますか？ [Y/n]: ").strip().lower() != "n":
+    if s["url"] and input(f"   ブラウザで {s['url']} を開きますか？ [Y/n]: ").strip().lower() != "n":
         webbrowser.open(s["url"])
     if key == "supabase":
         supabase_sql_step()
@@ -364,7 +391,7 @@ def write_status(results: dict) -> Path:
 def main() -> None:
     ap = argparse.ArgumentParser(description="鍵の一括設定ウィザード")
     ap.add_argument("--check", action="store_true", help="接続の確認だけ")
-    ap.add_argument("--only", help="カンマ区切り（anthropic,openai,supabase,r2,youtube,instagram,tiktok）")
+    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,youtube,instagram,tiktok）")
     ap.add_argument("--redo", default="", help="設定済みでもやり直すサービス（カンマ区切り）")
     a = ap.parse_args()
     keys = [k for k in (a.only.split(",") if a.only else SERVICES) if k in SERVICES]

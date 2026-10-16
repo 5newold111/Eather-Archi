@@ -207,12 +207,17 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
       debut_week はデビュー曲が配信される週の月曜。制作はその 2 週間前から始まる
       cadence=biweekly の組は、デビュー週から数えて偶数週だけ作る
       cadence=paused の組は作らない
+      デビュー曲（debut_kit の Suno の曲）がある組は、それを DistroKid に登録するまで毎週の曲を作らない。
+      登録すると publish.py が debut_week をその配信週に書き換え、そこから数えて毎週の制作が始まる（決定 17）
     戻り値：(作るか, 理由)
     """
     from datetime import timedelta
     debut = as_date(artist.get("debut_week"))
     if artist.get("cadence") == "paused":
         return False, "休止中（cadence=paused）"
+    import _songs
+    if _songs.debut_registered(artist.get("slug", "")) is False:
+        return False, "デビュー曲の登録待ち（Suno の曲を DistroKid に登録すると、その配信週から毎週の制作が始まる）"
     if debut is None:
         return False, "デビュー週が未設定（debut.py で設定すると制作が始まる。試すだけなら --force）"
     first_production = monday_of(debut) - timedelta(weeks=LEAD_WEEKS)

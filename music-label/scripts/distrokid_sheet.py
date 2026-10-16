@@ -119,6 +119,12 @@ def build_row(brief_path: Path, titles: dict[str, str]) -> dict:
     }
 
 
+def _folder(r: dict) -> str:
+    """公開セットのフォルダ名（曲名。未定なら制作週）。_songs.folder_name と同じ決まり"""
+    import _songs
+    return _songs.safe(r["title"]) if r.get("title_status") != "未定" and r.get("title") else r["week_start"]
+
+
 def sheet_md(week: str, rows: list[dict]) -> str:
     out = [f"# DistroKid 登録シート（制作週 {week}）", "",
            "上から順に、DistroKid の Upload 画面の欄へコピーして貼ります。1 曲 約 5 分。",
@@ -147,7 +153,7 @@ def sheet_md(week: str, rows: list[dict]) -> str:
             f"- Explicit lyrics：{r['explicit']}",
             f"- AI の申告：{r['ai_disclosure']}。アップロード画面の AI の質問で、歌詞・ボーカル・演奏・作曲のうち使ったものをすべて選ぶ",
             f"- Songwriter：{r['songwriter']}",
-            f"- 公開セット（音源・ジャケット・このシートが 1 か所に）：`ダウンロード/SUNO楽曲/ローカル保存（一時保存）/{r['artist']}/04_楽曲/{r['week_start']}/`"
+            f"- 公開セット（音源・ジャケット・このシートが 1 か所に）：`ダウンロード/SUNO楽曲/ローカル保存（一時保存）/{r['artist']}/04_楽曲/{_folder(r)}/`"
             "（archive_sync.py のあとに。SSD にも同じ並びで入る）",
             f"- 音源：`{r['audio']}`",
             f"- ジャケット：`{r['cover'] or '未作成'}`",

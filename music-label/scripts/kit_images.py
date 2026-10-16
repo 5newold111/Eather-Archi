@@ -11,7 +11,7 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
   5. ローカル保存（ダウンロード/SUNO楽曲/ローカル保存（一時保存）/<アーティスト名>/）と外付け SSD（DS72）の 02_写真・03_ジャケット に保管する
      （同じ名前のフォルダがあればそこへ。無ければ作る。SSD がつながっていなければローカルにだけ入れ、SSD へは後で写す。_archive.py）
-     保管庫での名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
+     保管庫での名前は <アーティスト名>_<曲名>_1.jpg（ジャケット。作り直すと _2・_3 …）・<アーティスト名>_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
 
 ChatGPT の画面で手作りした画像も、images/ に <組の ID>_cover.png のような名前で置いて --fit-only で整えられる。
 
@@ -33,7 +33,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _life import real_names  # noqa: E402  管理表の実名（指示文に混ぜない）
 import generate_visuals as gv  # noqa: E402  画像 API の呼び出し（モデルの自動選択つき）
 from _common import rel  # noqa: E402
-import _archive as archive  # noqa: E402  外付け SSD への保管
+import _archive as archive  # noqa: E402  ローカル保存と外付け SSD への保管
+import _songs  # noqa: E402  曲名（ジャケットの名前に使う）
 
 ROOT = Path(__file__).resolve().parent.parent
 KIT_ROOT = ROOT / "debut_kit"
@@ -128,7 +129,12 @@ def main() -> None:
         if args.no_archive:
             return
         name = act["artist"]
-        lines = archive.store(out, name, "cover" if kind == "cover" else "photo", f"{name}_{kind}.jpg")
+        if kind == "cover":   # ジャケットは <アーティスト名>_<曲名>_<番号>.jpg（作り直すたびに 1, 2, 3 …）
+            song = next((x for x in _songs.debut_songs() if x["slug"] == act["slug"] and x["kit"] == kit), None)
+            stem = _songs.cover_stem(song) if song else _songs.safe(f"{name}_cover")
+            lines = archive.store(out, name, "cover", stem=stem)
+        else:
+            lines = archive.store(out, name, "photo", f"{name}_{kind}.jpg")
         if lines[1].startswith("SSD：あとで") and warned:
             lines = lines[:1]
         elif lines[1].startswith("SSD：あとで"):

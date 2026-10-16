@@ -126,19 +126,23 @@ def main() -> None:
     rel = dst.resolve().relative_to(ROOT) if dst.resolve().is_relative_to(ROOT) else dst
     step(("仕上がりました" if rep["ok"] else "仕上げましたが ✕ があります") + f": {rel}")
     if args.brief and not args.demo and rep["ok"] and not args.no_archive:
-        to_archive(read_json(Path(args.brief)), dst)
+        to_archive(read_json(Path(args.brief)), dst, Path(args.brief))
 
 
-def to_archive(b: dict, dst: Path) -> None:
-    """ローカル保存（一時保存）の <アーティスト名>/03_ジャケット/ と SSD の 02_アーティスト/<アーティスト名>/03_ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管
-    （SSD が無ければローカルにだけ入れ、SSD へは後で写す。試験用の週は保管しない）"""
+def to_archive(b: dict, dst: Path, brief_path: Path | None = None) -> None:
+    """ローカル保存（一時保存）の <アーティスト名>/03_ジャケット/ と SSD の 02_アーティスト/<アーティスト名>/03_ジャケット/ に
+    <アーティスト名>_<曲名>_<番号>.jpg で保管（作り直すたびに 1, 2, 3 …。SSD が無ければローカルにだけ入れ、SSD へは後で写す。試験用の週は保管しない）"""
     if str(b.get("week_start", "")).startswith("2000-"):
         return
     import _archive as archive
-    from _common import load_artist
-    name = load_artist(b["artist_slug"], b.get("label_slug")).get("name") or b["artist_slug"]
-    day = str(b.get("release_at") or b["week_start"])[:10]
-    for line in archive.store(dst, name, "cover", f"{name}_{day}_cover.jpg"):
+    import _songs
+    song = _songs.by_key(brief_path.stem) if brief_path else None
+    if song is None:
+        from _common import load_artist
+        name = load_artist(b["artist_slug"], b.get("label_slug")).get("name") or b["artist_slug"]
+        title = (b.get("title_candidates") or [str(b.get("release_at") or b["week_start"])[:10]])[0]
+        song = {"artist": name, "title": title, "week": b["week_start"]}
+    for line in archive.store(dst, song["artist"], "cover", stem=_songs.cover_stem(song)):
         print(f"   ○ {line}")
 
 if __name__ == "__main__":

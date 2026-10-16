@@ -14,7 +14,10 @@
     auto     火〜木 8〜23 時の毎時   歌詞の合体・テイクの計測・音量・ジャケット・登録シート・DB・SNS 準備（変化が無ければ何もしない）
     growth   木 10:00       成績を集めて成長分析（重み・ヒント・方針転換の提案）→ 転換の適用
     backup   毎日 03:30     情報・写真・ジャケット・楽曲を外付け SSD（DS72）に保管・楽曲管理シートを書き直し、SSD の中身ごと Cloudflare R2 にも予備保管
-    monthly  毎月 1 日 09:00  月 1 組の追加と週の曲数の確認、Instagram の鍵の延長、四半期の EP 計画（1・4・7・10 月）
+    monthly  毎月 1 日 09:00  月 1 組の追加と週の曲数の確認、Instagram の鍵の延長、四半期の EP 計画（1・4・7・10 月）、
+                            デビューから 6 か月ごとのアーティスト写真の刷新（refresh_photos.py）
+    intake   「SUNO楽曲」に曲が入ったとき＋10 分ごと  いいねしてダウンロードした曲を取り込み、音量・ジャケット・DistroKid の下書き・公開セットまで進める（publish.py scan）
+    release  毎日 10:15     DistroKid に登録した曲が Spotify に出たかを確かめ、ISRC・UPC・配信 URL を楽曲管理シートに記録（publish.py track）
 
 使い方
   python scripts/schedule.py list                 # 仕事の一覧と次の実行時刻
@@ -55,7 +58,9 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "monthly": ("新しい組と来月の近況の提案（管理表へ）・曲数の確認・Instagram の鍵の延長・四半期の EP 計画",
                 [["artist_book.py", "pull", "--if-exists"], ["expand_label.py", "check", "--apply"],
                  ["artist_book.py", "propose-update", "--all", "--if-exists"],
-                 ["post_social.py", "refresh-ig"], ["plan_quarterly.py", "--if-quarter-start"]]),
+                 ["post_social.py", "refresh-ig"], ["plan_quarterly.py", "--if-quarter-start"], ["refresh_photos.py", "--due"]]),
+    "intake":  ("Suno の曲の取り込み → 音量・ジャケット・DistroKid の下書き・公開セット", [["publish.py", "scan", "--quiet"]]),
+    "release": ("配信の確認と ISRC・UPC・配信 URL の記録", [["publish.py", "track", "--quiet"]]),
 }
 
 
@@ -75,11 +80,18 @@ def calendar(job: str) -> dict:
         return {"StartCalendarInterval": [{"Hour": 3, "Minute": 30}]}
     if job == "monthly":
         return {"StartCalendarInterval": [{"Day": 1, "Hour": 9, "Minute": 0}]}
+    if job == "intake":   # フォルダに何か入ったらすぐ。念のため 10 分ごとにも見る
+        sys.path.insert(0, str(S))
+        import publish
+        return {"WatchPaths": [str(publish.inbox())], "StartInterval": 600}
+    if job == "release":
+        return {"StartCalendarInterval": [{"Hour": 10, "Minute": 15}]}
     raise KeyError(job)
 
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
-        "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *"}
+        "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
+        "release": "15 10 * * *"}
 
 
 def plist_for(job: str) -> dict:

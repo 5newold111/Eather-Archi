@@ -31,18 +31,19 @@ from _common import OUT, ROOT, load_artist, load_dotenv, read_json  # noqa: E402
 
 load_dotenv()
 import _archive as archive  # noqa: E402
+import _songs  # noqa: E402  曲の一覧と公開の進み具合（publish.py）
 
 BOOK_NAME = "楽曲管理.xlsx"
 SHEET = "楽曲"
 PHASES = ["1 企画", "2 Suno で作曲", "3 テイク選び", "4 音量調整", "5 ジャケット", "6 登録の準備", "7 DistroKid 登録済み", "8 配信中"]
 NEXT = {
     "1 企画": "Claude がブリーフを仕上げる（自動）",
-    "2 Suno で作曲": "オーナー：Suno で 2〜4 テイク作り、out/takes/<曲 ID>/ に置く",
-    "3 テイク選び": "オーナー：聴いて 1 本選ぶ（最初の 5 回）",
+    "2 Suno で作曲": "オーナー：publish.py suno のページから Suno に貼って Create → いいねした 1 本をダウンロードして「SUNO楽曲」へ",
+    "3 テイク選び": "自動（いいねしてダウンロードした 1 本を取り込む）",
     "4 音量調整": "自動（-14 LUFS / -1 dBTP）",
     "5 ジャケット": "自動で候補 → 最初の 5 回はオーナーが選ぶ",
-    "6 登録の準備": "オーナー：DistroKid に登録（登録シートどおり）→ フェーズを 7 に変える",
-    "7 DistroKid 登録済み": "オーナー：配信が始まったら ISRC・配信 URL を書いて 8 に変える",
+    "6 登録の準備": "Claude が DistroKid に下書きを入れる → オーナーが登録ボタンを押す → publish.py registered <曲 ID>",
+    "7 DistroKid 登録済み": "自動（毎日 Spotify を確かめ、配信が始まったら ISRC・UPC・配信 URL を入れて 8 にする）",
     "8 配信中": "—",
 }
 PHASE_COLOR = {"1": "EDEDED", "2": "FCE4D6", "3": "FFF2CC", "4": "FFF2CC", "5": "FFF2CC", "6": "DDEBF7", "7": "E2EFDA", "8": "C6E0B4"}
@@ -61,17 +62,38 @@ def _join(v) -> str:
     return " / ".join(map(str, v)) if isinstance(v, (list, tuple)) else ("" if v is None else str(v))
 
 
+STATUS_PHASE = {"": PHASES[1], "imported": PHASES[3], "waiting_ffmpeg": PHASES[3], "waiting_cover": PHASES[4],
+                "ready": PHASES[5], "registered": PHASES[6], "live": PHASES[7]}
+
+
+def release_info(song: dict) -> dict:
+    """publish.py の記録（取り込み・登録・配信）から、シートに入れる値"""
+    st = _songs.state(song)
+    out = {}
+    if st.get("take"):
+        out["選んだテイク"] = st["take"]
+    if st.get("release_date") or st.get("released"):
+        out["配信予定日"] = st.get("released") or st["release_date"]
+    for k, h in (("isrc", "ISRC"), ("upc", "UPC"), ("url", "配信 URL")):
+        if st.get(k):
+            out[h] = st[k]
+    if (OUT / "masters" / song["key"] / "master.wav").exists():
+        out["保管場所（SSD）"] = f"{archive.ARTIST_DIR}/{song['artist']}/{archive.SUBS['music']}/{_songs.folder_name(song)}/"
+    return out
+
+
 def debut_rows() -> list[dict]:
     rows = []
-    for kit_json in sorted((ROOT / "debut_kit").glob("*/kit.json")):
-        kit = read_json(kit_json)
-        for i, s in enumerate(kit.get("songs", []), 1):
-            rows.append({
-                "曲 ID": f"PDR-{i:03d}", "アーティスト": s.get("artist", ""), "曲名": s.get("title", ""),
-                "曲名の別案": _join(s.get("title_alt")), "フェーズ": "2 Suno で作曲", "制作週": kit_json.parent.name,
-                "BPM": s.get("bpm", ""), "ジャンル": _join(s.get("genre")), "言語": s.get("language", ""),
-                "Suno の指示（スタイル）": s.get("style", ""), "歌詞": s.get("lyrics", ""),
-            })
+    for song in _songs.debut_songs():
+        st = _songs.state(song)
+        rows.append({
+            "曲 ID": song["id"], "アーティスト": song["artist"], "曲名": song["title"],
+            "曲名の別案": _join(song["alts"]), "フェーズ": STATUS_PHASE.get(st.get("status", ""), PHASES[1]),
+            "制作週": song["week"], "BPM": next((x.get("bpm", "") for x in read_json(song["kit"] / "kit.json").get("songs", [])
+                                              if x.get("slug") == song["slug"]), ""),
+            "ジャンル": _join(song["genre"]), "言語": song["language"],
+            "Suno の指示（スタイル）": song["style"], "歌詞": song["lyrics"], **release_info(song),
+        })
     return rows
 
 
@@ -110,14 +132,19 @@ def weekly_rows() -> list[dict]:
         lyrics = lyr.read_text(encoding="utf-8") if lyr.exists() else _join(b.get("suno_lyrics"))
         name = a.get("name") or b["artist_slug"]
         titles = b.get("title_candidates") or []
-        stored = f"{archive.ARTIST_DIR}/{name}/{archive.SUBS['music']}/{week}/" if (OUT / "masters" / p.stem / "master.wav").exists() else ""
+        song = _songs.by_key(p.stem)
+        st = _songs.state(song) if song else {}
+        if st.get("status") in ("registered", "live"):
+            phase = STATUS_PHASE[st["status"]]
+        stored = (f"{archive.ARTIST_DIR}/{name}/{archive.SUBS['music']}/{_songs.folder_name(song)}/"
+                  if song and (OUT / "masters" / p.stem / "master.wav").exists() else "")
         rows.append({
             "曲 ID": p.stem, "アーティスト": name, "曲名": meta.get("title") or (titles[0] if titles else ""),
             "曲名の別案": _join(titles[1:]), "フェーズ": phase, "制作週": week,
             "配信予定日": str(b.get("release_at") or "")[:10],
             "BPM": meta.get("bpm", ""), "ジャンル": _join(meta.get("genre") or [meta.get("primary_genre"), meta.get("secondary_genre")] if meta else ""),
             "言語": meta.get("language", ""), "Suno の指示（スタイル）": b.get("suno_style_prompt", ""), "歌詞": lyrics,
-            "選んだテイク": chosen, "保管場所（SSD）": stored,
+            "選んだテイク": chosen, "保管場所（SSD）": stored, **(release_info(song) if song else {}),
         })
     return rows
 
