@@ -9,7 +9,7 @@ ChatGPT と同じ OpenAI の画像生成を、正式な窓口（画像 API）か
   2. 管理表の実在の名前（影響・好きなアーティスト）が依頼文に混ざっていないか確かめる（混ざっていたら止める）
   3. 画像 API で 1 枚ずつ作り、images/<組の ID>_<cover|photo>_raw.png に保存する（鍵が無ければ依頼文だけ書き出す）
   4. 配信の基準（3000×3000・RGB・10MB 未満の JPG）に整えて images/<組の ID>_<cover|photo>.jpg に書き出す
-  5. 外付け SSD（DS72）の「Postdog Records/アーティスト情報/<アーティスト名>/写真・ジャケット」に保管する
+  5. 外付け SSD（DS72）の「Postdog Records/02_アーティスト/<アーティスト名>/02_写真・03_ジャケット」に保管する
      （同じ名前のフォルダがあればそこへ。無ければ作る。SSD がつながっていなければ保管だけ飛ばす。_archive.py）
      保管庫での名前は <アーティスト名>_cover.jpg（ジャケット）・_photo.jpg（アーティスト写真）・_photo2.jpg（2 枚目）
 
@@ -124,7 +124,7 @@ def main() -> None:
     warned: list[str] = []
 
     def to_archive(act: dict, kind: str, out: Path) -> None:
-        """整えた画像を SSD の アーティスト情報/<アーティスト名>/写真・ジャケット へ"""
+        """整えた画像を SSD の 02_アーティスト/<アーティスト名>/02_写真・03_ジャケット へ"""
         if args.no_archive:
             return
         name = act["artist"]
@@ -176,7 +176,7 @@ def main() -> None:
     if dry_lines:
         (images / "prompts.txt").write_text("\n".join(dry_lines), encoding="utf-8")
         print(f"  依頼文：{rel(images / 'prompts.txt')}（{len(dry_lines)} 件）")
-    print("  次：SSD の アーティスト情報/<アーティスト名>/写真・ジャケット で、顔・文字・透かしが無いか確かめる")
+    print("  次：SSD の 02_アーティスト/<アーティスト名>/02_写真・03_ジャケット で、顔・文字・透かしが無いか確かめる")
 
 
 if __name__ == "__main__":

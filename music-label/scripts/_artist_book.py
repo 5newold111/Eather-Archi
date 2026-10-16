@@ -2,9 +2,9 @@
 アーティスト管理表（スプレッドシート）の読み書き部品。
 
 管理表はアーティストの情報の「正本」。オーナーが書き足し、機械は読むだけ（提案は「状態＝提案」として足す）。
-  ・外付け SSD の Excel（Postdog Records/管理表/アーティスト情報.xlsx）… 正本（2026-10-14 から。docs/12 の決定 14）
-        SSD に無ければ、手元の music-label/artists.xlsx を写して作る
-  ・手元の Excel（music-label/artists.xlsx）… SSD がつながっていないときに読む写し（archive_sync.py が新しいほうにそろえる）
+  ・外付け SSD の Excel（Postdog Records/01_管理表/アーティスト情報.xlsx）… 唯一の正本（docs/12 の決定 14・15）
+        SSD に無いときだけ、見本の music-label/artists.xlsx を写して作る。SSD がつながっていなければ読み書きしない
+  ・music-label/artists.xlsx … 最初の 1 回だけ使う見本（2026-10-14 時点の中身）。これを書き換えても正本には入らない
   ・Google スプレッドシート … 移行前の正本。.env に ARTIST_BOOK_SOURCE=gsheet と ARTIST_BOOK_GSHEET_ID があるときだけ読む
   ・.env の ARTIST_BOOK_XLSX で Excel の場所を直接指定することもできる
 
@@ -831,34 +831,49 @@ class GSheetBook:
             self._api("POST", "/values:batchUpdate", {"valueInputOption": "RAW", "data": data[i:i + 500]})
 
 
+class OfflineBook:
+    """SSD がつながっていないときの代わり。path が存在しないので、呼び出し側は「管理表なし」として扱う"""
+    offline = True
+
+    def __init__(self, why: str):
+        self.path = Path("/Volumes/DS72（未接続）") / "Postdog Records" / "01_管理表" / BOOK_NAME
+        self.why = why
+
+    def describe(self) -> str:
+        return f"SSD の管理表（{self.why}）"
+
+    def read(self):
+        raise RuntimeError(f"SSD がつながっていないので管理表を読めません（{self.why}）")
+
+
 def open_book():
-    """管理表を開く。ARTIST_BOOK_XLSX → SSD の正本 → 手元の写しの順。Google は ARTIST_BOOK_SOURCE=gsheet のときだけ"""
+    """管理表を開く。ARTIST_BOOK_XLSX → SSD の正本。Google は ARTIST_BOOK_SOURCE=gsheet のときだけ"""
     sid, sa = os.environ.get("ARTIST_BOOK_GSHEET_ID"), os.environ.get("GOOGLE_SERVICE_ACCOUNT_FILE")
     if os.environ.get("ARTIST_BOOK_SOURCE", "").lower() == "gsheet" and sid:
         return GSheetBook(sheet_id_of(sid), Path(sa) if sa else None)
     if os.environ.get("ARTIST_BOOK_XLSX"):
         return XlsxBook(Path(os.environ["ARTIST_BOOK_XLSX"]).expanduser())
-    ssd = ssd_book_path(seed=True)
-    if ssd:
-        return XlsxBook(ssd)
-    print("   （SSD がつながっていないので、手元の写し music-label/artists.xlsx を使います）")
-    return XlsxBook(ROOT / "artists.xlsx")
+    import _archive as archive
+    base, why = archive.root()
+    if base is None:
+        return OfflineBook(why)
+    return XlsxBook(ssd_book_path(seed=True) or archive.child(base, archive.BOOK_DIR) / BOOK_NAME)
 
 
 BOOK_NAME = "アーティスト情報.xlsx"
 
 
 def ssd_book_path(seed: bool = False) -> Path | None:
-    """SSD の管理表の場所（Postdog Records/管理表/アーティスト情報.xlsx）。seed なら、無いときに手元の写しを置く"""
+    """SSD の管理表の場所（Postdog Records/01_管理表/アーティスト情報.xlsx）。seed なら、無いときに見本を写して作る"""
     import shutil
     import _archive as archive
     base, _ = archive.root()
     if base is None:
         return None
-    p = archive.child(base, "管理表") / BOOK_NAME
+    p = archive.child(base, archive.BOOK_DIR) / BOOK_NAME
     if not p.exists() and seed and (ROOT / "artists.xlsx").exists():
         shutil.copy2(ROOT / "artists.xlsx", p)
-        print(f"   （SSD に管理表を作りました：{p}）")
+        print(f"   （SSD に管理表を作りました（見本の artists.xlsx から）：{p}）")
     return p if p.exists() else None
 
 

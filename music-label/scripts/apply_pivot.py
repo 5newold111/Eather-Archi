@@ -95,7 +95,11 @@ def propose_in_book(a: dict, changes: dict, reason: str) -> int:
         rows.append({"act_id": a["slug"], "status": "提案", "date": date.today().isoformat(), "tab": tab, "field": field,
                      "current": txt(old), "proposed": txt(new), "reason": reason})
     if rows:
-        append_rows(open_book(), "changes", rows)
+        b = open_book()
+        if getattr(b, "offline", False):
+            print(f"   （{b.describe()}：変更の提案 {len(rows)} 件は管理表に入れられませんでした。SSD をつないでやり直してください）")
+            return 0
+        append_rows(b, "changes", rows)
     return len(rows)
 
 

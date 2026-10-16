@@ -9,9 +9,11 @@
     ・ブリーフ・最終歌詞・登録データ・成績・傾向レポート・成長分析
     ・設定書（templates/）… アーティストやレーベルの設定そのもの
     ・アーティスト管理表（artists.xlsx）と提案（proposals/）、管理表の読み込みの記録
+    ・外付け SSD（DS72）の保管庫の中身すべて … 管理表（アーティスト情報.xlsx・楽曲管理.xlsx）・写真・ジャケット・楽曲・作業書
+      （SSD がつながっているときだけ。09_移行前 と _old の写しは上げない）
   上げないもの：鍵（.env）、没テイクの音源、ログ
 
-  R2 側の置き場所：<バケット>/label/<music-label からの相対パス>
+  R2 側の置き場所：<バケット>/label/<music-label からの相対パス>、SSD の中身は <バケット>/label/ssd/<保管庫からの相対パス>
 
 使い方
   python scripts/backup_r2.py              # 定期実行（毎日 03:30）
@@ -98,6 +100,22 @@ def put_object(account: str, bucket: str, key: str, body: bytes, ctype: str, ak:
 
 
 # ---------------------------------------------------------------------------
+def ssd_targets() -> list[tuple[Path, str]]:
+    """SSD の保管庫の中身（つながっていなければ空）。R2 では ssd/ の下に置く"""
+    import _archive as archive
+    base, _ = archive.root()
+    if base is None:
+        return []
+    out = []
+    for f in sorted(base.rglob("*")):
+        rel = f.relative_to(base)
+        if (not f.is_file() or rel.parts[0] == archive.OLD_DIR or f.name.startswith(".")
+                or "_old" in f.stem or f.name.startswith("~$")):
+            continue
+        out.append((f, "ssd/" + rel.as_posix()))
+    return out
+
+
 def targets() -> list[Path]:
     files: set[Path] = set()
     for pat in PATTERNS:
@@ -125,10 +143,9 @@ def main() -> None:
     account, bucket = os.environ.get("R2_ACCOUNT_ID"), os.environ.get("R2_BUCKET", "label-backup")
     ak, sk = os.environ.get("R2_ACCESS_KEY_ID"), os.environ.get("R2_SECRET_ACCESS_KEY")
     manifest = {} if a.all or not MANIFEST.exists() else read_json(MANIFEST)
-    files = targets()
+    files = [(f, f.relative_to(ROOT).as_posix()) for f in targets()] + ssd_targets()
     todo = []
-    for f in files:
-        rel = f.relative_to(ROOT).as_posix()
+    for f, rel in files:
         st = f.stat()
         sig = [st.st_size, int(st.st_mtime)]
         if manifest.get(rel) != sig:

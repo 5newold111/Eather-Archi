@@ -17,12 +17,13 @@
 
 | もの | 場所 |
 |---|---|
-| アーティストの管理表（正本） | 外付け SSD「DS72」の「Postdog Records／管理表／アーティスト情報.xlsx」。SSD が無いときは手元の写し `music-label/artists.xlsx` を読む（`archive_sync.py` が新しいほうにそろえる）。Google スプレッドシートは移行前の版（オーナーが移行・もう使わない） |
-| 詰まっているところの一覧（進み具合） | 同じ Excel の「詰まっているところ」タブ |
-| アーティストの情報・写真・ジャケット・楽曲 | 外付け SSD「DS72」の「Postdog Records／アーティスト情報／<アーティスト名>／写真・ジャケット・楽曲・情報」（自動で保管。`python3 scripts/archive_sync.py`）。Google ドライブの分はオーナーが SSD に移す |
-| デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／管理表／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
+| アーティストの管理表（唯一の正本） | 外付け SSD「DS72」の「Postdog Records／01_管理表／アーティスト情報.xlsx」。SSD をつないでいないときは読み書きしない。`music-label/artists.xlsx` は最初の 1 回だけ使う見本。Google スプレッドシートは移行前の版 |
+| 楽曲管理シート | 同じ「01_管理表／楽曲管理.xlsx」。曲名・アーティスト・フェーズ・歌詞・Suno の指示・ISRC など 1 曲 1 行（`song_book.py` が自動で書き直す。ISRC・UPC・配信 URL・メモ・配信予定日はオーナーが書く） |
+| 詰まっているところの一覧（進み具合） | アーティスト情報.xlsx の「詰まっているところ」タブ |
+| アーティストの情報・写真・ジャケット・楽曲 | SSD の「Postdog Records／02_アーティスト／<アーティスト名>／01_情報・02_写真・03_ジャケット・04_楽曲」（自動で保管。`python3 scripts/archive_sync.py`）。Google から移すものは「09_移行前」へ |
+| デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜14） |
+| 決めたこと | `docs/12_decisions.md`（1〜15） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 
@@ -53,7 +54,7 @@
 cd music-label
 python3 -m pip install -r requirements.txt
 python3 scripts/setup_keys.py --only openai    # 鍵を貼って Enter（画面には出ない）→ 実際に接続して確かめる
-python3 scripts/kit_images.py                  # 5 組 × 3 種類を自動で作り、3000×3000 に整え、SSD の アーティスト情報/<アーティスト名>/ に保管
+python3 scripts/kit_images.py                  # 5 組 × 3 種類を自動で作り、3000×3000 に整え、SSD の 02_アーティスト/<アーティスト名>/ に保管
 python3 scripts/kit_images.py --kind photo2    # 2 枚目のアーティスト写真だけ（全身・サングラス・被り物・イラスト）
 python3 scripts/kit_images.py --redo           # 作り直す（前の画像は手元にも SSD にも _old を付けて残る）
 ```

@@ -130,7 +130,7 @@ def main() -> None:
 
 
 def to_archive(b: dict, dst: Path) -> None:
-    """SSD の アーティスト情報/<アーティスト名>/ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管（試験用の週は保管しない）"""
+    """SSD の 02_アーティスト/<アーティスト名>/03_ジャケット/ に <アーティスト名>_<配信日>_cover.jpg で保管（試験用の週は保管しない）"""
     if str(b.get("week_start", "")).startswith("2000-"):
         return
     import _archive as archive

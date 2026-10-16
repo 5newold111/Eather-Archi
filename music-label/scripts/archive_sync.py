@@ -2,13 +2,15 @@
 """
 アーティストの情報・写真・ジャケット・楽曲を、外付け SSD（DS72）の保管庫にまとめて保管する
 
-保管するもの（Postdog Records の全組と子レーベルの組。試験用の週 2000-xx-xx は除く）：
-  管理表/      アーティスト情報.xlsx（管理表の正本。手元の music-label/artists.xlsx と新しいほうにそろえる）
-              デビュー_<日付>/ 作業書（PDF）・曲の情報（kit.json）・画像の依頼文（chatgpt_prompts.json）
-  情報/        設定書（templates/artists/<組>.json）とプロフィール（out/profiles/<組>.md・.json）
-  写真/        デビュー用の作業セットの写真（<アーティスト名>_photo.jpg・_photo2.jpg）と、選ばれたデビュー写真・ロゴ
-  ジャケット/   デビュー曲のジャケットと、毎週仕上げたジャケット（<アーティスト名>_<配信日>_cover.jpg）
-  楽曲/<週>/   配信用の音源（master.wav）と選んだテイク
+保管するもの（Postdog Records の全組と子レーベルの組。試験用の週 2000-xx-xx は除く。並びは _archive.py）：
+  01_管理表/       アーティスト情報.xlsx（SSD に無いときだけ見本を置く。以後は SSD の正本を触らない）
+                   楽曲管理.xlsx（song_book.py が曲の一覧と進み具合を書き直す）
+  03_作業書/       デビュー_<日付>/ 作業書（PDF）・曲の情報（kit.json）・画像の依頼文（chatgpt_prompts.json）
+  02_アーティスト/<アーティスト名>/
+     01_情報/      設定書（templates/artists/<組>.json）とプロフィール（out/profiles/<組>.md・.json）
+     02_写真/      デビュー用の作業セットの写真（<アーティスト名>_photo.jpg・_photo2.jpg）と、選ばれたデビュー写真・ロゴ
+     03_ジャケット/ デビュー曲のジャケットと、毎週仕上げたジャケット（<アーティスト名>_<配信日>_cover.jpg）
+     04_楽曲/<週>/ 配信用の音源（master.wav）・選んだテイク・最終の歌詞
 
 同じ中身のファイルは写し直さない。中身が変わったファイルは前の版を _old で残す。
 SSD がつながっていなければ何もしない（次につないで実行すれば、まとめて追いつく）。
@@ -74,6 +76,9 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
             continue
         if (mdir / "master.wav").exists():
             out.append(("music", week, mdir / "master.wav", f"{name}_{week}_master.wav"))
+        lyr = OUT / "briefs" / f"{mdir.name}.lyrics_final.txt"
+        if lyr.exists():
+            out.append(("music", week, lyr, f"{name}_{week}_歌詞.txt"))
         sel = OUT / "takes" / mdir.name / "selection.json"
         if sel.exists():
             chosen = read_json(sel).get("decision", {}).get("selected")
@@ -91,39 +96,23 @@ def _release_day(slug: str, week: str) -> str | None:
     return None
 
 
-def sync_book(base: Path, check: bool) -> None:
-    """SSD の管理表と手元の写し（artists.xlsx）を、新しいほうにそろえる。古いほうは _old で残す"""
-    import shutil
-    from _artist_book import BOOK_NAME
-    ssd = archive.child(base, "管理表") / BOOK_NAME
-    local = ROOT / "artists.xlsx"
-    if not local.exists() and not ssd.exists():
-        return
-    if not ssd.exists():
-        print(f"  ■ 管理表：SSD に {BOOK_NAME} を作ります（手元の artists.xlsx から）")
+def seed_book(base: Path, check: bool) -> None:
+    """SSD に管理表が無いときだけ、見本（music-label/artists.xlsx）を置く。SSD の正本はそれ以外では触らない"""
+    from _artist_book import ssd_book_path
+    if ssd_book_path(seed=False) is None:
+        print("  ■ 管理表：SSD に アーティスト情報.xlsx を作ります（見本の artists.xlsx から）")
         if not check:
-            shutil.copy2(local, ssd)
-        return
-    if local.exists() and archive.filecmp.cmp(ssd, local, shallow=False):
-        return
-    newer, older = (ssd, local) if not local.exists() or ssd.stat().st_mtime >= local.stat().st_mtime else (local, ssd)
-    side = "SSD → 手元" if newer == ssd else "手元 → SSD"
-    print(f"  ■ 管理表：{side} にそろえます（古いほうは {older.stem}_old{older.suffix} で残します）")
-    if check:
-        return
-    if older.exists():
-        shutil.copy2(older, older.with_name(f"{older.stem}_old{older.suffix}"))
-    shutil.copy2(newer, older)
+            ssd_book_path(seed=True)
 
 
 def sync_kits(base: Path, check: bool) -> int:
-    """デビュー用の作業セットの書類（作業書の PDF・曲の情報・依頼文）を 管理表/デビュー_<日付>/ へ"""
+    """デビュー用の作業セットの書類（作業書の PDF・曲の情報・依頼文）を 03_作業書/デビュー_<日付>/ へ"""
     n = 0
     for kit in sorted(p for p in KIT_ROOT.iterdir() if p.is_dir()):
         files = [f for f in kit.iterdir() if f.suffix.lower() in (".pdf", ".json", ".md")]
         if not files:
             continue
-        folder = archive.child(archive.child(base, "管理表"), f"デビュー_{kit.name}")
+        folder = archive.child(archive.child(base, archive.KIT_DIR), f"デビュー_{kit.name}")
         for f in files:
             dst = folder / f.name
             if check:
@@ -131,7 +120,7 @@ def sync_kits(base: Path, check: bool) -> int:
                 continue
             if not archive.save(f, folder, f.name).startswith("保管済み"):
                 n += 1
-                print(f"    ○ 管理表/デビュー_{kit.name}/{f.name} を保管")
+                print(f"    ○ {archive.KIT_DIR}/デビュー_{kit.name}/{f.name} を保管")
     return n
 
 
@@ -162,7 +151,7 @@ def main() -> None:
         print(f"－ SSD には保管しませんでした：{how}")
         return
     print(f"▶ 保管庫：{base}")
-    sync_book(base, args.check)
+    seed_book(base, args.check)
     kit_changed = sync_kits(base, args.check)
     acts = [a for a in all_artists() if a.get("slug") and (not args.only or a["slug"] == args.only)]
     total, changed = 0, kit_changed
@@ -189,6 +178,9 @@ def main() -> None:
                 print(f"    ○ {archive.label(folder)}/{fname} を{res}")
     verb = "まだ保管していない" if args.check else "新しく保管・更新した"
     print(f"▶ 対象 {total} 件のうち、{verb}もの {changed} 件")
+    if not args.check and not args.only:
+        import song_book
+        song_book.update(quiet=True)
 
 
 if __name__ == "__main__":

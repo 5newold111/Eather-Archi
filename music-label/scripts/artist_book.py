@@ -26,8 +26,9 @@
   python3 scripts/artist_book.py status
 
 状態の列：提案（機械の案）／採用（使う）／保留／却下。空欄は採用として扱う（オーナーが自分で書いた行）。
-管理表の場所：外付け SSD の Postdog Records/管理表/アーティスト情報.xlsx（正本）。SSD がつながっていなければ
-手元の写し music-label/artists.xlsx。Google スプレッドシートは移行前の正本で、ARTIST_BOOK_SOURCE=gsheet のときだけ読む。
+管理表の場所：外付け SSD の Postdog Records/01_管理表/アーティスト情報.xlsx（唯一の正本）。SSD がつながっていなければ
+読み書きしない（設定書は前回のまま）。music-label/artists.xlsx は最初の 1 回だけ使う見本。
+Google スプレッドシートは移行前の正本で、ARTIST_BOOK_SOURCE=gsheet のときだけ読む。
 """
 from __future__ import annotations
 
@@ -54,6 +55,11 @@ PROPOSALS = ROOT / "proposals"
 
 def book_or_die(if_exists: bool = False):
     b = open_book()
+    if getattr(b, "offline", False):
+        if if_exists:   # 定期実行から呼ばれたとき：SSD が無ければ何もしない（今の設定書のまま動く）
+            print(f"   {b.describe()}：飛ばします")
+            sys.exit(0)
+        sys.exit(f"[案内] 管理表は SSD にだけあります。SSD（DS72）をつないでからもう一度実行してください（{b.why}）")
     if hasattr(b, "path") and not b.path.exists():
         if if_exists:   # 定期実行から呼ばれたとき：管理表がまだ無ければ何もしない
             print(f"   管理表がまだ無いので飛ばします（{b.path.name}）")
