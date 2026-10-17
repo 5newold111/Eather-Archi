@@ -1,0 +1,82 @@
+{
+  "label": "Postdog Records",
+  "made": "2026-10-11",
+  "note": "Postdog Records の 5 組のデビュー曲。歌詞の核（サビ）は管理表『歌詞の試作』をそのまま使い、前後を年表に合わせて書き足した。style と lyrics に実在のアーティスト名・機種名は入れていない。",
+  "songs": [
+    {
+      "slug": "declan_fay",
+      "artist": "DECLAN FAY",
+      "title": "Side B",
+      "title_alt": ["Hold On Now, Lad", "2:40 Through the Hiss"],
+      "bpm": 96,
+      "language": "English",
+      "instrumental": false,
+      "genre": ["Electronic", "Pop"],
+      "seed": "dm_s02",
+      "why_ja": "父のカセットを 401 号線で初めて聴いた夜の歌。名前（Fay）と父のテープという、この人の始まりそのものなので 1 曲目に。",
+      "style": "synthwave, night pop, sophisti-pop, 96 BPM, steady tempo, warm low male baritone crooner, close-mic, breathy, sung behind the beat, faint soft Irish lilt, spoken-word intro and bridge, warm analog polysynth pads with slow attack and gentle chorus, alternating 16th-note analog arpeggio, 1980s drum machine with gated reverb snare, kick on 1 and 3, round fat synth bass, thin bell-like synth counter-melody in the chorus, faint tape hiss and wow and flutter, one distant chorused clean guitar, radio tuning noise intro, minor key with a warm resolve, nocturnal, intimate, amber streetlights, slow fade-out ending",
+      "exclude": "EDM drop, four-on-the-floor, shouting, guitar solo, saxophone, sudden silence, autotune, bright happy major",
+      "lyrics": "[Intro]\n[Radio tuning noise, a cassette clicks in]\n[Spoken]\nTwo-forty a.m. Westbound on the 401.\nTape one of forty-three.\n\n[Verse 1]\nA shoebox came in April, brown tape across the lid\nForty-three cassettes in your careful capitals\nFRIDAY, LATE — DON'T TAPE OVER\nI put the first one in on the 401\n\n[Pre-Chorus]\nMile after mile of sodium light\nHiss like the rain that isn't falling tonight\n\n[Chorus]\nFlip it over, let it run\nSide B starts where the city's done\nYour voice comes up at 2:40 through the hiss\nHold on now, lad, I'm recording this\n\n[Verse 2]\nNineteen years in Granddad's garage\nUnder a sheet with the green sedan\nEvery label dated, every hour written down\nLike you knew somebody'd need the plan\n\n[Pre-Chorus]\nExit signs counting down in green\nSomebody's late-night radio in between\n\n[Chorus]\nFlip it over, let it run\nSide B starts where the city's done\nYour voice comes up at 2:40 through the hiss\nHold on now, lad, I'm recording this\n\n[Bridge]\n[Spoken]\nYou'd be sixty-two this year.\nI left the counter where you stopped it.\nRewind. Play.\n\n[Final Chorus]\nFlip it over, let it run\nSide B starts where the city's done\nYour voice comes up at 2:40 through the hiss\nHold on now, lad, I'm recording this\n\n[Outro]\n[Low humming of the chorus melody]\n[Tape hiss, slow fade]"
+    },
+    {
+      "slug": "hollowplan",
+      "artist": "HOLLOWPLAN",
+      "title": "Services at Three",
+      "title_alt": ["Still Here", "Northbound, Still"],
+      "bpm": 112,
+      "language": "English",
+      "instrumental": false,
+      "genre": ["Dance", "Electronic"],
+      "seed": "hp_s04",
+      "why_ja": "父の入院中、隔週で乗った夜行バスの 4 時間半。歌わずに声の切れ端だけで場面を作る、この人のやり方がいちばん分かる曲。",
+      "style": "deep house, lo-fi house, downtempo, 112 BPM, hypnotic and warm, soft rounded four-on-the-floor kick, 1970s electric piano playing soft 9th and 11th chords slightly behind the beat, chopped breath and wordless vocal fragments pitched in semitones, round sub bass, gentle tape wobble and faint vinyl crackle, swung 16th shaker and quiet rimshot ghost notes, muffled clean guitar two-note highlife riff, distant ventilation hum, late-night coach ride on a motorway, patient arrangement adding one element every 16 bars, mid-section where the kick drifts away, no drop",
+      "exclude": "rap, supersaw lead, big riser, EDM drop, pitched-up chipmunk vocals, full sung verses, sudden silence",
+      "lyrics": "[Intro]\n[Soft kick, electric piano chords, distant engine hum]\n\n[Hook: whispered vocal chops]\nstill here\nstill here\nnorthbound, still\nstill here\n\n[Groove]\n[Breath chops, swung shaker, sub bass enters]\n\n[Courtyard]\n[Kick drifts away, keys and breath only]\n\n[Hook: vocal chops, one semitone higher]\nstill here\nstill here\nnorthbound, still\nstill here\n\n[Groove]\n[Muffled two-note guitar riff joins]\n\n[Outro]\n[Breath, keys and engine hum fade out]"
+    },
+    {
+      "slug": "nao_easterly",
+      "artist": "VERNALIGHT",
+      "title": "Due East",
+      "title_alt": ["Pointed the Same", "Six-Oh-Eight"],
+      "bpm": 116,
+      "language": "English",
+      "instrumental": false,
+      "genre": ["Pop", "Electronic"],
+      "seed": "nao_s08",
+      "why_ja": "春分の日の出に生まれた自分の歌。名前（VERNALIGHT＝春分の光）の由来と、朝の高速のまっすぐな高揚をいちばん素直に伝えられる。",
+      "style": "synth-pop, indie pop, electropop, 116 BPM, motorik steady pulse, clear bright high female vocal, crisp consonants, light falsetto only at the peak, bright analog-style 8th-note synth arpeggio, muted clean electric guitar 16th-note cuts, short bouncy synth bass, dry punchy snare and handclaps, high bell synth in the chorus only, filter slowly opening into each chorus, chorus by 0:30, catchy post-chorus ah-ah hook, sunrise on an open highway, optimistic, dry close production",
+      "exclude": "rap, distorted guitar, heavy autotune, sudden silence, sad ending, dark nightclub, trap hi-hats",
+      "lyrics": "[Intro]\n[Bright synth arpeggio plays the chorus melody]\n\n[Verse 1]\nDad wrote it on the whiteboard the morning I was born\nSix-oh-eight, roads clear and dry, frost on the orchard floor\nTwenty-four years later I'm still up before the plow\nCocoa in the cupholder, and the Gorge is waking now\n\n[Pre-Chorus]\nRamp to eighty-four\nLight coming under the door\n\n[Chorus]\nMarch the twentieth, the sun is on the center line\nVisor up at sixty, I'm a minute ahead of time\nTwice a year it rises right where this road is aimed\nDue east, due east, me and the day are pointed the same\n\n[Post-Chorus]\nAh-ah, ah-ah\nPointed the same\nAh-ah, ah-ah\n\n[Verse 2]\nRacks rolled out at half past three, twenty borrowed keys\nBread left warm in every porch light, nobody sees me\nNow the river's turning silver and the mile signs flicker by\nI don't need a reason, I just like to meet it eye to eye\n\n[Pre-Chorus]\nRamp to eighty-four\nLight coming under the door\nHold it, hold it\n\n[Chorus]\nMarch the twentieth, the sun is on the center line\nVisor up at sixty, I'm a minute ahead of time\nTwice a year it rises right where this road is aimed\nDue east, due east, me and the day are pointed the same\n\n[Post-Chorus]\nAh-ah, ah-ah\nPointed the same\nAh-ah, ah-ah\n\n[Bridge]\n[Phone call voice, filtered]\nSunrise six-fifty-two. Roads clear and dry.\nText me when you're there.\n\n[Chorus]\nMarch the twentieth, the sun is on the center line\nVisor up at sixty, I'm a minute ahead of time\nTwice a year it rises right where this road is aimed\nDue east, due east, me and the day are pointed the same\n\n[Post-Chorus]\nAh-ah, ah-ah\nPointed the same\nAh-ah, ah-ah\n\n[Outro]\n[Arpeggio alone, bright and steady, fades]"
+    },
+    {
+      "slug": "soft_cantilever",
+      "artist": "SOFT CANTILEVER",
+      "title": "Two Lanes Over",
+      "title_alt": ["Flash Them Back", "The Whole Road Is Your Room"],
+      "bpm": 118,
+      "language": "English",
+      "instrumental": false,
+      "genre": ["Pop", "Alternative"],
+      "seed": "sc_s01",
+      "why_ja": "工場の閉鎖のあとトラック運転手になった父と、Hume Freeway で並んで走る歌。昼の光と 3 人の演奏、明るく率直なこのバンドらしさが一番出る。",
+      "style": "city pop, sunlit indie rock, funk pop, jangle pop, 118 BPM, 16th-note groove, warm male mid-range lead sung slightly behind the beat, conversational, bright female harmony a third above in the chorus, clean single-coil electric guitar 16th-note cuts with light chorus, melodic fingerstyle electric bass with round short flatwound tone, 1970s drum kit with dry wooden snare, cross-stick in the verses, 16th hi-hats, soft bell-like electric piano, 12-string acoustic shimmering under the chorus, tambourine and shaker, two-bar guitar and bass unison riff after the second chorus, brief key change in the bridge, open highway in daylight, tight ending hit",
+      "exclude": "EDM drop, horn section, heavy distortion, autotune effect, long silence, ballad",
+      "lyrics": "[Intro]\n[Clean guitar cuts, bass and hi-hats]\n\n[Verse 1]\nYou kept your plant badge in the glovebox\nUnder the rosary and the fuel receipts\nYou call me from Wallan at a quarter past one\nJust to tell me which pie you'd eat\n\n[Pre-Chorus]\nI'm heading north with the band in the back\nYou're heading home on the same black track\n\n[Chorus]\nFlash my lights and you flash them back\nTwo lanes over on the Hume\nTwenty-two years you hung doors on cars\nNow the whole road is your room\n\n[Verse 2]\nThe day they shut the gates you didn't say much\nWrote three years on the kitchen wall\nNow you know every servo from here to Sydney\nBy the colour of the chairs in the hall\n\n[Pre-Chorus]\nI'm heading north with the band in the back\nYou're heading home on the same black track\n\n[Chorus]\nFlash my lights and you flash them back\nTwo lanes over on the Hume\nTwenty-two years you hung doors on cars\nNow the whole road is your room\n\n[Instrumental Break]\n[Two-bar guitar and bass unison riff]\n\n[Bridge]\nMarch is coming, your last run north\nI'll be beside you, I'll keep the time\nOne more pie at the Holbrook stop\nYou on your side, me on mine\n\n[Final Chorus]\nFlash my lights and you flash them back\nTwo lanes over on the Hume\nTwenty-two years you hung doors on cars\nNow the whole road is your room\n\n[Final Chorus]\nFlash my lights and you flash them back\nTwo lanes over on the Hume\nTwenty-two years you hung doors on cars\nNow the whole road is your room\n\n[Outro]\n[Band hits together, end]"
+    },
+    {
+      "slug": "tidewool",
+      "artist": "TIDEWOOL",
+      "title": "The Low Part",
+      "title_alt": ["Top for Me", "Woolshed"],
+      "bpm": 90,
+      "language": "English",
+      "instrumental": false,
+      "genre": ["Singer/Songwriter", "Folk"],
+      "seed": "tw_s02",
+      "why_ja": "12 時間の時差で暮らした 2 人が、声のファイルで 1 つのハモりを作っていた歌。男女のハモりというこの 2 人の核そのもの。",
+      "style": "acoustic pop, indie folk, folk pop, 90 BPM, gentle sway, intimate male-female duet, warm female lead with soft New Zealand vowels, low male harmony and oohs underneath, close-mic warm vocals with breath, fingerpicked steel-string acoustic guitar in open D tuning with thumb bass, small mahogany guitar soft strums, pump organ drone on the fifth, upright bass, brushed snare and floor tom, light mandolin chops in thirds, one cello holding long notes, faint rain and creaking wood field recording, chorus fragment hummed within 30 seconds, bridge with only two voices and organ, homely and tender",
+      "exclude": "synth pads, electronic drop, belting, autotune effect, stadium chant, silence break, heavy drums",
+      "lyrics": "[Intro]\n[Fingerpicked guitar and organ drone]\n[Humming the chorus melody]\n\n[Verse 1: Female]\nFrost on the gatepost, the dogs at my heel\nSeven o'clock and the paddocks are steel\nYou'd be locking the boatyard, rain on the slip\nHumming a line with a pencil at your lip\n\n[Chorus: Duet]\nYour night comes in as a file on my phone\nI play it out loud in the woolshed alone\nHalf a world of water and a cold cup of tea\nYou sing the low part and leave the top for me\n\n[Verse 2: Male]\nSeven at night and the river's gone grey\nI sing it twice and I send it away\nSomewhere it's morning, you're out with the sheep\nI leave the high line for you to keep\n\n[Chorus: Duet]\nYour night comes in as a file on my phone\nI play it out loud in the woolshed alone\nHalf a world of water and a cold cup of tea\nYou sing the low part and leave the top for me\n\n[Bridge: Voices and organ only]\nTwelve hours apart and the same little tune\nOne of us up with the sun, one with the moon\nOoh, ooh\n\n[Final Chorus: Duet]\nYour night comes in as a file on my phone\nI play it out loud in the woolshed alone\nHalf a world of water and a cold cup of tea\nYou sing the low part and leave the top for me\n\n[Final Chorus: Duet]\nHalf a world of water and a cold cup of tea\nYou sing the low part and leave the top for me\n\n[Outro]\n[Rain and creaking wood, guitar fades]"
+    }
+  ]
+}

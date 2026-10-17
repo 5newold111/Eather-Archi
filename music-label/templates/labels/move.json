@@ -1,0 +1,65 @@
+{
+  "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
+  "slug": "move",
+  "name": "PACENOTE",
+  "name_status": "checked",
+  "parent": "etherarchi",
+  "scene": "歩く・走る・体を動かす",
+  "sound_center": [
+    "テンポの速いポップ",
+    "エレクトロ"
+  ],
+  "expansion_path": [
+    "ドラムンベース",
+    "アフロビーツ",
+    "走るためのロック",
+    "ハイテンポのハウス"
+  ],
+  "scene_spec": {
+    "bpm_min": 120,
+    "bpm_max": 175,
+    "length_sec_min": 150,
+    "length_sec_max": 210,
+    "hook_within_sec": 20,
+    "no_sudden_silence": true,
+    "_説明": "歩幅・足音に合う BPM。ウォーク 120〜130、ジョグ 150〜165、ラン 170〜175。サビは 20 秒以内"
+  },
+  "automation_tier": "B",
+  "max_weekly_releases": 8,
+  "release_hour_et": 6,
+  "release_weekday": "saturday",
+  "_release": "土曜 6:00 ET（日本 土曜 19:00/20:00）。週末の朝の運動に届く",
+  "accounts": {
+    "distrokid_email": "move-label",
+    "spotify_for_artists_team": "move-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "屋外。河川敷、階段、橋の上。空が広い",
+    "palette": [
+      "白",
+      "空色",
+      "蛍光の差し色"
+    ],
+    "cover_series_rule": "地面の素材（アスファルト / 芝 / 階段）と空の比率だけ変える"
+  },
+  "artists": [],
+  "name_candidates": [
+    "PACENOTE"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 STRIDE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "ラリーで助手席が読む『ペースノート』。走る・歩くリズムの指示"
+}
