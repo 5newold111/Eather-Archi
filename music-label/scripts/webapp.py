@@ -82,7 +82,16 @@ def status_json() -> dict:
                       "isrc": st.get("isrc", ""), "url": st.get("url", ""), "folder": str(folder) if folder else "",
                       "draft": (OUT / "publish" / s["key"] / "DistroKid下書き.md").exists()})
     rows, src = _status.tracker_rows()
-    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts,
+    import _timeline
+    try:
+        from dashboard import todos
+        weekly = [{"sev": a, "what": b, "who": c, "where": d} for a, b, c, d in todos()]
+    except Exception:  # noqa: BLE001  毎週の制作のやることが読めなくても画面は出す
+        weekly = []
+    for x in songs:
+        x["flow"] = "regular" if _timeline.in_regular(x["slug"]) else "debut"
+    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": _timeline.timeline(),
+            "weekly_todos": weekly,
             "system": [{"sev": a, "what": b, "how": c} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j[k] for k in ("id", "label", "state", "started")} for j in list(JOBS.values())[-8:]]}
@@ -140,104 +149,196 @@ def start_job(cmd: list[str], label: str) -> str:
 # ---------------------------------------------------------------------------
 PAGE = r"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Label Dashboard</title><style>
-:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--line:#e2ddd2;--accent:#a07a3c;--ng:#b3412e;--ok:#4f7a4a}
-@media (prefers-color-scheme:dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--line:#34322d;--accent:#d2ad6b;--ng:#e07a66;--ok:#8fbf86}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
-header{position:sticky;top:0;z-index:2;background:var(--bg);border-bottom:1px solid var(--line)}
-.bar{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.bar h1{font-size:17px;font-weight:500;letter-spacing:.04em;margin:0 auto 0 0}.bar a{color:var(--ink);text-decoration:none;font-size:14px;padding:4px 10px;border-radius:6px}
-.bar a.on{background:var(--card);border:1px solid var(--line)}main{max-width:1180px;margin:0 auto;padding:16px 16px 64px}
-h2{font-weight:500;font-size:17px;border-bottom:1px solid var(--line);padding-bottom:6px;margin:28px 0 12px}
-.sub{color:var(--sub);font-size:12px}.chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px}
-.acts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px}
-.act{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:14px 16px}
-.act.ng{border-left-color:var(--ng)}.act.wait{border-left-color:var(--accent)}.act.ok{border-left-color:var(--ok)}
-.act h3{margin:0 0 8px;font-weight:500;font-size:16px;display:flex;justify-content:space-between;gap:8px}.act h3 small{color:var(--sub);font-weight:400;font-size:12px}
-.steps{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 8px}.st{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub)}
-.st.ok{background:var(--ok);border-color:var(--ok);color:var(--card)}.st.ng{background:var(--ng);border-color:var(--ng);color:var(--card)}
-.st.wait{border-color:var(--accent);color:var(--accent);font-weight:600}.st.run{border-style:dashed;color:var(--ink)}
-.do{font-size:13px;margin:6px 0 0;padding-top:6px;border-top:1px dashed var(--line)}.who{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:6px;color:var(--sub)}
-.days{color:var(--ng);font-size:12px;margin-left:4px}code{font-size:12px;color:var(--sub);word-break:break-all}
+:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--muted:#9a948a;--line:#e2ddd2;--grid:#efebe3;--wk:#f1ede5;--accent:#a07a3c;
+--good:#0ca30c;--warn:#fab219;--crit:#d03b3b;--good-t:rgba(12,163,12,.16);--warn-t:rgba(250,178,25,.22);--crit-t:rgba(208,59,59,.16);--plan-t:rgba(110,106,96,.07)}
+@media (prefers-color-scheme:dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--muted:#7d786f;--line:#34322d;--grid:#2a2926;--wk:#1f1e1b;--accent:#d2ad6b;
+--good-t:rgba(12,163,12,.26);--warn-t:rgba(250,178,25,.22);--crit-t:rgba(208,59,59,.30);--plan-t:rgba(236,232,223,.05)}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.bar{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.bar h1{font-size:17px;font-weight:500;letter-spacing:.04em;margin:0 auto 0 0}.bar a{color:var(--ink);text-decoration:none;font-size:14px}
+main{max-width:1280px;margin:0 auto;padding:12px 16px 64px}
+h2{font-weight:500;font-size:16px;margin:24px 0 10px}.sub{color:var(--sub);font-size:12px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 12px}
+.tab{background:none;color:var(--sub);border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;padding:8px 16px;font:inherit;cursor:pointer}
+.tab[aria-selected=true]{background:var(--card);color:var(--ink);border-color:var(--line);margin-bottom:-1px;font-weight:600}
+.tab .n{font-size:12px;color:var(--sub);margin-left:4px;font-weight:400}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:0 0 8px}.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{display:inline-block;width:22px;height:12px;border-radius:3px;border:1.5px solid}
+.gwrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:70vh}
+.g{display:grid;position:relative}.gl{position:sticky;left:0;z-index:2;background:var(--card);border-right:1px solid var(--line);padding:6px 10px;border-bottom:1px solid var(--grid);min-width:0}
+.gl b{font-weight:600;font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.gl small{color:var(--sub);font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gl.first{border-top:1px solid var(--line)}.gh{position:sticky;top:0;z-index:3;background:var(--card);border-bottom:1px solid var(--line)}
+.gt{position:relative;border-bottom:1px solid var(--grid)}.day{position:absolute;top:0;bottom:0;border-left:1px solid var(--grid)}.day.we{background:var(--wk)}
+.hd{position:absolute;top:0;font-size:11px;color:var(--sub);padding:3px 0 0 3px;white-space:nowrap}.hd.mon{color:var(--ink);font-weight:600}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:1}.todaylab{position:absolute;top:0;font-size:10px;color:#fff;background:var(--accent);padding:0 4px;border-radius:3px;transform:translateX(-50%);z-index:4}
+.b{position:absolute;height:20px;border-radius:4px;border:1.5px solid;font-size:11px;line-height:17px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--ink);z-index:2}
+.b:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.b.done{background:var(--good-t);border-color:var(--good)}.b.wait{background:var(--warn-t);border-color:var(--warn)}.b.ng{background:var(--crit-t);border-color:var(--crit);font-weight:600}
+.b.run{background:transparent;border-color:var(--ink);border-style:dashed}.b.plan{background:var(--plan-t);border-color:var(--muted);border-style:dotted;color:var(--sub)}
+.m{position:absolute;width:14px;height:14px;transform:rotate(45deg);border:2px solid;cursor:pointer;z-index:2}.m.done{background:var(--good);border-color:var(--good)}.m.plan{background:var(--card);border-color:var(--muted)}
+#tip{position:fixed;z-index:20;max-width:320px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);pointer-events:none;display:none}
+.panel{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;margin:12px 0}
+.panel.ng{border-left-color:var(--crit)}.panel.done{border-left-color:var(--good)}
+code{font-size:12px;color:var(--sub);word-break:break-all}
 button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}button:disabled{opacity:.5;cursor:default}
-.tools{display:flex;gap:8px;flex-wrap:wrap}ul.list{list-style:none;padding:0;margin:0}ul.list li{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:8px 0}
-ul.list li.ng{border-left-color:var(--ng)}.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
-table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.tools{display:flex;gap:8px;flex-wrap:wrap}ul.list{list-style:none;padding:0;margin:0}ul.list li{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:8px 12px;margin:6px 0;font-size:14px}
+ul.list li.ng{border-left-color:var(--crit)}ul.list li.run{border-left-color:var(--muted)}.who{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:6px;color:var(--sub)}
+.days{color:var(--crit);font-size:12px;margin-left:4px}.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
 th{color:var(--sub);font-weight:500;white-space:nowrap}tr:last-child td{border-bottom:none}.empty{color:var(--sub)}
-pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;max-height:320px;overflow:auto}
+details{margin:10px 0}summary{cursor:pointer;color:var(--ink)}pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;max-height:320px;overflow:auto}
 input[type=date]{font:inherit;font-size:13px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.static .act-only{display:none!important}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/" class="on">ダッシュボード</a><a href="/suno">Suno に貼る内容</a>
-<span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a><span class="sub" id="upd"></span></div></header>
 <main>
-<div class="tools">
+<div class="tools act-only">
  <button data-act="scan">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
  <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button>
 </div>
 <div id="jobs"></div>
-<h2>アーティストごとの進み具合</h2><div id="chips" class="chips"></div><div id="acts" class="acts"></div>
-<p class="sub">緑＝済み・赤＝止まっている・金の枠＝だれかの番・点線＝自動で進行中・灰＝まだ先。日数は止まっている日数</p>
-<h2>曲の一覧</h2><div id="songs"></div>
+<div class="tabs" role="tablist">
+ <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
+ <button class="tab" role="tab" id="tab-debut" aria-controls="pane-debut">デビュー<span class="n" id="n-debut"></span></button>
+</div>
+<div class="legend" aria-label="凡例">
+ <span><i class="sw" style="background:var(--good-t);border-color:var(--good)"></i>✓ 済み</span>
+ <span><i class="sw" style="background:var(--warn-t);border-color:var(--warn)"></i>● だれかの番</span>
+ <span><i class="sw" style="background:var(--crit-t);border-color:var(--crit)"></i>！ 止まっている・遅れ</span>
+ <span><i class="sw" style="border-style:dashed;border-color:var(--ink)"></i>… 自動で進行中</span>
+ <span><i class="sw" style="border-style:dotted;border-color:var(--muted)"></i>○ 予定</span>
+ <span>◆ 配信日</span><span style="color:var(--accent)">｜ 今日</span>
+</div>
+<section id="pane-regular" role="tabpanel" aria-labelledby="tab-regular">
+ <p class="sub">デビュー曲が配信された組の、毎週（隔週）の 1 曲ずつ。これから作る週は「予定」として並びます。</p>
+ <div class="gwrap"><div class="g" id="g-regular"></div></div><div id="pick-regular"></div>
+ <h2>今やること（定期配信）</h2><div id="todo-regular"></div>
+ <h2>曲の一覧</h2><div id="songs-regular"></div>
+</section>
+<section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
+ <p class="sub">デビュー前の組。デビュー曲が配信されると、自動で「定期配信」に移ります。デビュー曲は準備ができしだい、いちばん早い日に配信します。</p>
+ <div class="gwrap"><div class="g" id="g-debut"></div></div><div id="pick-debut"></div>
+ <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
+ <h2>曲の一覧</h2><div id="songs-debut"></div>
+</section>
 <h2>仕組みの詰まり</h2><div id="system"></div>
-<h2>管理表の「詰まっているところ」</h2><div id="tracker"></div>
+<details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
 </main>
+<div id="tip" role="tooltip"></div>
 <script>
-const TOKEN="__TOKEN__";
+const TOKEN="__TOKEN__";const STATIC=__STATIC__;
+if(STATIC)document.body.classList.add("static");
 const E=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const sym={ok:"済み",run:"自動で進行中",wait:"番を待っている",ng:"止まっている",off:"まだ先"};
-async function act(action,params={},btn){
-  if(btn)btn.disabled=true;
+const ICON={done:"✓",wait:"●",ng:"！",run:"…",plan:"○"},STATE={done:"済み",wait:"だれかの番",ng:"止まっている・遅れ",run:"自動で進行中",plan:"予定"};
+const DAY=86400000,D=s=>new Date(s+"T00:00:00"),md=d=>`${d.getMonth()+1}/${d.getDate()}`,WD="日月火水木金土";
+let DATA=null,TAB="regular";
+function selectTab(t){TAB=t;for(const k of["regular","debut"]){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
+  if(location.hash!=="#"+t)history.replaceState(null,"","#"+t)}
+document.getElementById("tab-regular").onclick=()=>selectTab("regular");document.getElementById("tab-debut").onclick=()=>selectTab("debut");
+selectTab(location.hash==="#debut"?"debut":"regular");
+const OPEN={};
+function gantt(key){
+  const sec=DATA.timeline[key],el=document.getElementById("g-"+key);
+  const small=window.innerWidth<640,from=D(sec.range.from),to=D(sec.range.to),n=Math.round((to-from)/DAY)+1,W=small?22:30,LW=small?150:240,today=D(DATA.timeline.today);
+  el.style.gridTemplateColumns=`${LW}px ${n*W}px`;
+  if(!sec.rows.length){el.style.gridTemplateColumns="1fr";el.innerHTML=`<div class="gl" style="position:static"><span class="empty">${key==="debut"?"デビュー前の組はありません。全組が定期配信に移りました。":"定期配信の組はまだありません。デビュー曲が配信されるとここに並びます。"}</span></div>`;return}
+  const x=d=>Math.round((D(d)-from)/DAY)*W,tx=Math.round((today-from)/DAY)*W+W/2,showToday=today>=from&&today<=to;
+  let days="";for(let i=0;i<n;i++){const d=new Date(+from+i*DAY);days+=`<div class="day ${d.getDay()%6===0?"we":""}" style="left:${i*W}px;width:${W}px"></div>`}
+  const tline=showToday?`<div class="today" style="left:${tx-1}px"></div>`:"";
+  let html=`<div class="gl gh" style="height:30px"><small>${key==="debut"?"組・デビュー曲／工程":"組・曲（制作週）／工程"}</small></div><div class="gt gh" style="height:30px">`;
+  for(let i=0;i<n;i++){const d=new Date(+from+i*DAY);if(d.getDay()===1||i===0)html+=`<span class="hd mon" style="left:${i*W}px">${md(d)}（${WD[d.getDay()]}）</span>`}
+  if(showToday)html+=`<span class="todaylab" style="left:${tx}px;top:14px">今日</span>`;
+  html+=`</div>`;
+  let prev="";
+  sec.rows.forEach((r,ri)=>{
+    const gid=key+":"+ri,steps=r.phases.filter(p=>!p.milestone),ms=r.phases.find(p=>p.milestone);
+    const open=!r.planned&&(OPEN[gid]??(!!r.blocker||key==="debut"));
+    const first=r.artist!==prev;prev=r.artist;
+    const blk=r.blocker?`<small>${ICON[r.blocker.state]||""} ${E(r.blocker.who||"")}${r.blocker.who?"：":""}${E(r.blocker.name)}</small>`:(r.planned?"":`<small>${ICON.done} 進行中の工程なし</small>`);
+    // 見出しの行（曲ごと）：全体の期間の細い線と ◆ 配信日
+    const s0=Math.max(0,x(steps.reduce((a,p)=>p.start<a?p.start:a,steps[0].start))),e0=Math.min(n*W,x((ms||steps[steps.length-1]).end)+W);
+    const hh=r.planned?32:60;
+    html+=`<div class="gl ${first&&ri?"first":""}" style="height:${hh}px;cursor:${r.planned?"default":"pointer"}" ${r.planned?"":`data-g="${gid}"`}>`
+      +`<b>${first?E(r.artist):""}${r.planned?"":` <span style="font-weight:400;color:var(--sub)">${open?"▾":"▸"}</span>`}</b><small>${E(r.sub)}</small>${blk}</div>`;
+    html+=`<div class="gt ${first&&ri?"first":""}" style="height:${hh}px">${days}${tline}`;
+    if(e0>s0)html+=`<div class="b ${r.planned?"plan":"run"}" style="left:${s0+1}px;top:${r.planned?7:20}px;width:${Math.max(8,e0-s0-2)}px;height:16px;line-height:13px;border-style:${r.planned?"dotted":"solid"};border-color:var(--muted);background:var(--plan-t);color:var(--sub)" data-p="${gid}:${r.phases.indexOf(ms||steps[0])}">${r.planned?"○ 予定：ブリーフ → 配信":""}</div>`;
+    if(ms){const mx=x(ms.start)+W/2-7;if(mx>=0&&mx<=n*W)html+=`<div class="m ${ms.state==="done"?"done":"plan"}" tabindex="0" data-p="${gid}:${r.phases.indexOf(ms)}" style="left:${mx}px;top:${r.planned?9:21}px" aria-label="${E(ms.name)} ${E(ms.start)}"></div>`}
+    html+=`</div>`;
+    if(!open)return;
+    steps.forEach(p=>{
+      const id=`${gid}:${r.phases.indexOf(p)}`,s=Math.max(0,x(p.start)),e=Math.min(n*W,x(p.end)+W),d1=D(p.start),d2=D(p.end);
+      const range=p.start===p.end?md(d1):`${md(d1)}〜${md(d2)}`;
+      html+=`<div class="gl" style="height:28px;padding:4px 10px 4px 22px"><small style="color:var(--ink);font-size:12px">${ICON[p.state]} ${E(p.name)}${p.who?` <span style="color:var(--sub)">・${E(p.who)}</span>`:""}</small></div>`;
+      html+=`<div class="gt" style="height:28px">${days}${tline}`;
+      if(e>0&&s<n*W){const w=Math.max(10,e-s-2);html+=`<div class="b ${p.state}" tabindex="0" data-p="${id}" style="left:${s+1}px;top:4px;width:${w}px" aria-label="${E(p.name)}：${E(STATE[p.state])} ${range}">${w>70?`${ICON[p.state]} ${range}`:ICON[p.state]}</div>`}
+      html+=`</div>`});
+  });
+  el.innerHTML=html;
+  el.parentElement.scrollLeft=Math.max(0,tx-W*6);
+}
+document.addEventListener("click",e=>{const g=e.target.closest("[data-g]");if(!g)return;const[k,ri]=g.dataset.g.split(":");const r=DATA.timeline[k].rows[+ri];
+  OPEN[g.dataset.g]=!(OPEN[g.dataset.g]??(!!r.blocker||k==="debut"));gantt(k)});
+function phaseOf(id){const[k,ri,pi]=id.split(":");const r=DATA.timeline[k].rows[+ri];return[k,r,r.phases[+pi]]}
+function tipHTML(r,p){const d1=D(p.start),d2=D(p.end);return `<b>${E(r.artist)}</b> ${E(r.sub)}<br><b>${ICON[p.state]} ${E(p.name)}</b>（${E(STATE[p.state])}）<br>${md(d1)}${p.start!==p.end?"〜"+md(d2):""}${p.who?`　担当：${E(p.who)}`:""}<br>${E(p.detail)}`}
+const tip=document.getElementById("tip");
+document.addEventListener("mouseover",e=>{const b=e.target.closest("[data-p]");if(!b){tip.style.display="none";return}const[,r,p]=phaseOf(b.dataset.p);tip.innerHTML=tipHTML(r,p);tip.style.display="block"});
+document.addEventListener("mousemove",e=>{if(tip.style.display==="block"){tip.style.left=Math.min(e.clientX+14,innerWidth-330)+"px";tip.style.top=(e.clientY+14)+"px"}});
+function pick(id){const[k,r,p]=phaseOf(id);const box=document.getElementById("pick-"+k);
+  box.innerHTML=`<div class="panel ${p.state}">${tipHTML(r,p)}${p.action?`<br><code>${E(p.action)}</code>`:""}${actionButtons(r,p)}</div>`}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-p]");if(b)pick(b.dataset.p)});
+document.addEventListener("keydown",e=>{const b=e.target.closest&&e.target.closest("[data-p]");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();pick(b.dataset.p)}});
+function actionButtons(r,p){if(STATIC)return"";let h="";
+  if(p.name==="写真・ジャケット"&&p.state!=="done"&&!/鍵/.test(p.detail))h+=`<button data-act="images" data-slug="${E(r.slug)}">写真とジャケットを作る</button> `;
+  if(p.name==="Suno で作曲"&&p.state!=="done"&&p.state!=="plan")h+=`<a href="/suno"><button class="ghost">Suno に貼る内容を開く</button></a> <button class="ghost" data-act="scan">曲を取り込む</button>`;
+  if(p.name==="DistroKid に登録"&&(p.state==="wait"||p.state==="ng"))h+=`<input type="date" id="d-${E(r.id)}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${E(r.id)}">DistroKid に登録した</button>`;
+  return h?`<div style="margin-top:8px" class="tools">${h}</div>`:""}
+function todoList(key){
+  const rows=DATA.timeline[key].rows.filter(r=>!r.planned);const items=[];
+  rows.forEach(r=>r.phases.forEach(p=>{if(["wait","ng","run"].includes(p.state)&&!p.milestone)items.push([r,p])}));
+  if(key==="debut")DATA.artists.filter(a=>DATA.timeline.debut.rows.some(r=>r.slug===a.slug)).forEach(a=>a.steps.filter(s=>s.name==="写真の刷新"&&["wait","ng"].includes(s.state)).forEach(s=>items.push([{artist:a.name,sub:"",slug:a.slug},{...s,start:s.since||DATA.timeline.today,end:DATA.timeline.today}])));
+  let html=items.sort((a,b)=>({ng:0,wait:1,run:2}[a[1].state]-{ng:0,wait:1,run:2}[b[1].state])).map(([r,p])=>`<li class="${p.state}"><span class="who">${E(p.who||"—")}</span><b>${E(r.artist)}</b> ${E(r.sub)}　${ICON[p.state]} <b>${E(p.name)}</b>：${E(p.detail)}${p.action?`<br><code>${E(p.action)}</code>`:""}${actionButtons(r,p)}</li>`).join("");
+  if(key==="regular")html+=DATA.weekly_todos.map(t=>`<li class="${t.sev==="ng"?"ng":""}"><b>${E(t.what)}</b>（${t.who.length}）<br>${E(t.who.join("、"))}<br><code>${E(t.where)}</code></li>`).join("");
+  document.getElementById("todo-"+key).innerHTML=html?`<ul class="list">${html}</ul>`:`<p class="empty">いまやることはありません</p>`;
+}
+function songsTable(key){const ss=DATA.songs.filter(s=>s.flow===key&&(key==="debut"?s.kind==="debut":s.kind==="weekly"));
+  document.getElementById("songs-"+key).innerHTML=ss.length?`<div class="tbl"><table><tr><th>曲 ID</th><th>アーティスト</th><th>曲名</th><th>段階</th><th>配信日</th><th>ISRC</th><th class="act-only"></th></tr>${ss.map(s=>{
+    let ops="";if(s.folder)ops+=`<button class="ghost" data-act="open_folder" data-id="${E(s.id)}">フォルダを開く</button> `;if(s.url)ops+=`<a href="${E(s.url)}" target="_blank" rel="noopener">Spotify</a>`;
+    return `<tr><td>${E(s.id)}</td><td>${E(s.artist)}</td><td>${E(s.title||"（曲名未定）")}</td><td>${E(s.status_ja)}</td><td>${E(s.release_date||"—")}</td><td>${E(s.isrc||"—")}</td><td class="act-only">${ops}</td></tr>`}).join("")}</table></div>`:`<p class="empty">曲はまだありません</p>`}
+async function act(action,params={},btn){if(STATIC)return;if(btn)btn.disabled=true;
   try{const r=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json","X-Label-Token":TOKEN},body:JSON.stringify({action,...params})});
-    const j=await r.json(); if(!r.ok){alert(j.error||"実行できませんでした");return}
-    if(j.job)watch(j.job);}finally{if(btn)setTimeout(()=>btn.disabled=false,1500)}
-}
+    const j=await r.json();if(!r.ok){alert(j.error||"実行できませんでした");return}if(j.job)watch(j.job)}finally{if(btn)setTimeout(()=>btn.disabled=false,1500)}}
 const watching={};
-async function watch(id){
-  watching[id]=true;
-  const box=document.getElementById("jobs");
-  for(;;){const r=await fetch("/api/jobs/"+id);const j=await r.json();
-    let el=document.getElementById("job-"+id);if(!el){el=document.createElement("details");el.id="job-"+id;el.open=true;box.prepend(el)}
+async function watch(id){watching[id]=true;const box=document.getElementById("jobs");
+  for(;;){const r=await fetch("/api/jobs/"+id);const j=await r.json();let el=document.getElementById("job-"+id);
+    if(!el){el=document.createElement("details");el.id="job-"+id;el.open=true;box.prepend(el)}
     el.innerHTML=`<summary>${E(j.label)}：${j.state==="running"?"実行中…":j.state==="done"?"終わりました":"エラーがありました"}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
-    if(j.state!=="running"){load();break}
-    await new Promise(r=>setTimeout(r,2000));}
-}
-function steps(a){return a.steps.map(s=>`<span class="st ${s.state}" title="${E(sym[s.state])}：${E(s.detail)}">${E(s.name)}</span>`).join("")}
-function todo(a){
-  const open=a.steps.filter(s=>s.state!=="ok"&&s.state!=="off");
-  if(!open.length)return `<div class="do">すべて順調です</div>`;
-  return open.map(s=>{
-    let btn="";
-    if(s.name==="写真・ジャケット"&&s.who==="あなた"&&!/鍵/.test(s.detail))btn=`<br><button data-act="images" data-slug="${E(a.slug)}">写真とジャケットを作る</button>`;
-    if(s.name==="デビュー曲"&&/Suno/.test(s.detail))btn=`<br><a href="/suno"><button class="ghost">Suno に貼る内容を開く</button></a>`;
-    return `<div class="do"><span class="who">${E(s.who||"—")}</span><b>${E(s.name)}</b>：${E(s.detail)}${s.days>0?`<span class="days">${s.days} 日</span>`:""}`
-      +(s.action?`<br><code>${E(s.action)}</code>`:"")+btn+`</div>`}).join("");
-}
-function songRow(s){
-  let ops="";
-  if(s.folder)ops+=`<button class="ghost" data-act="open_folder" data-id="${E(s.id)}">フォルダを開く</button> `;
-  if(s.status==="ready")ops+=`<input type="date" id="d-${E(s.id)}" value="${new Date().toISOString().slice(0,10)}"> <button data-act="registered" data-id="${E(s.id)}">DistroKid に登録した</button>`;
-  if(s.url)ops+=`<a href="${E(s.url)}" target="_blank" rel="noopener">Spotify</a>`;
-  return `<tr><td>${E(s.id)}</td><td>${E(s.artist)}</td><td>${E(s.title||"（曲名未定）")}</td><td>${E(s.status_ja)}</td><td>${E(s.release_date||"—")}</td><td>${E(s.isrc||"—")}</td><td>${ops}</td></tr>`;
-}
-async function load(){
-  const r=await fetch("/api/status");const d=await r.json();
-  document.getElementById("upd").textContent=d.generated+" 時点";
-  const cnt={};d.artists.forEach(a=>{const b=a.blocker;const k=!b?"すべて順調":b.state==="ng"?"止まっている":b.state==="wait"?b.who+"の番":"自動で進行中";cnt[k]=(cnt[k]||0)+1});
-  document.getElementById("chips").innerHTML=Object.entries(cnt).map(([k,v])=>`<span class="chip">${E(k)}：${v} 組</span>`).join("");
-  document.getElementById("acts").innerHTML=d.artists.map(a=>`<div class="act ${a.blocker?a.blocker.state:"ok"}"><h3><span>${E(a.name)}</span><small>${E(a.label)}</small></h3><div class="steps">${steps(a)}</div>${todo(a)}</div>`).join("")||`<p class="empty">組がまだありません</p>`;
-  document.getElementById("songs").innerHTML=d.songs.length?`<div class="tbl"><table><tr><th>曲 ID</th><th>アーティスト</th><th>曲名</th><th>段階</th><th>配信日</th><th>ISRC</th><th></th></tr>${d.songs.map(songRow).join("")}</table></div>`:`<p class="empty">曲はまだありません</p>`;
-  document.getElementById("system").innerHTML=d.system.length?`<ul class="list">${d.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code></li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
-  const t=d.tracker;const cols=["順番","詰まっていること","担当","次の一歩","状態"];
-  document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;
-  d.jobs.filter(j=>j.state==="running"&&!watching[j.id]).forEach(j=>watch(j.id));
-}
+    if(j.state!=="running"){load();break}await new Promise(r=>setTimeout(r,2000))}}
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
   if(b.dataset.act==="images"&&!confirm("写真とジャケットを作ります（OpenAI の画像の料金がかかります）。よいですか？"))return;
   act(b.dataset.act,p,b)});
-load();setInterval(load,30000);
+function render(){
+  document.getElementById("upd").textContent=DATA.generated+" 時点";
+  for(const k of["regular","debut"]){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
+    document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;gantt(k);todoList(k);songsTable(k)}
+  document.getElementById("system").innerHTML=DATA.system.length?`<ul class="list">${DATA.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code></li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
+  const t=DATA.tracker,cols=["順番","詰まっていること","担当","次の一歩","状態"];
+  document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;
+  if(!STATIC)DATA.jobs.filter(j=>j.state==="running"&&!watching[j.id]).forEach(j=>watch(j.id));
+}
+async function load(){if(STATIC){DATA=STATIC;render();return}const r=await fetch("/api/status");DATA=await r.json();render()}
+let rz;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>DATA&&render(),200)});
+load();if(!STATIC)setInterval(load,30000);
 </script></body></html>"""
+
+
+def render_page(static_data: dict | None = None) -> str:
+    """画面の HTML。static_data を渡すと、データを埋め込んだ読むだけの画面（ボタンなし。dashboard.py の書き出し用）"""
+    data = json.dumps(static_data, ensure_ascii=False, default=str).replace("</", "<\\/") if static_data else "null"
+    return PAGE.replace("__TOKEN__", "" if static_data else TOKEN).replace("__STATIC__", data)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -279,7 +380,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.lan_key:
             extra["Set-Cookie"] = f"label_key={self.lan_key}; Path=/; HttpOnly; SameSite=Strict; Max-Age=31536000"
         if path == "/":
-            return self._send(200, PAGE.replace("__TOKEN__", TOKEN), extra=extra)
+            return self._send(200, render_page(), extra=extra)
         if path == "/suno":
             from publish import suno_page
             page, _ = suno_page()

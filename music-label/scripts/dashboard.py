@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-管理画面（out/dashboard.html）を作る。ブラウザで開くと、レーベル全体の今の状態が 1 枚で分かる。
+管理画面（out/dashboard.html）を作る。中身はウェブアプリ（webapp.py）と同じガントチャートの画面で、データを埋め込んだ読むだけの形
+（ボタンは無い。ボタンで動かしたいときは http://localhost:8765 のウェブアプリを開く）。
+タブ「定期配信」（既定）と「デビュー」。デビュー曲が配信された組は自動で定期配信に移る（_timeline.py）。
+前の形（下の一覧）は --classic で out/dashboard_classic.html に作る。
 
   ・アーティストごとの進み具合：名前の確認 → 写真・ジャケット → デビュー曲 → 毎週の制作 → 写真の刷新 の段階と、
     いま止まっているところ・担当（あなた／Claude／自動）・何日止まっているか・次の一歩（_status.py）
@@ -100,9 +103,7 @@ def todos() -> list[tuple[str, str, list[str], str]]:
         if b.get("lyrics_mode") in ("core_fixed", "topic_only") and not bp.with_suffix(".lyrics_final.txt").exists():
             add("normal", "Suno の Write Lyrics で節を書かせて保存", who, f"out/briefs/{week}_<組>.verses.txt")
         sel = OUT / "takes" / bp.stem / "selection.json"
-        if b.get("suno_style_prompt") and not sel.exists():
-            add("normal", "Suno で作り、聴いて選んだ 1 本を置く", who, f"out/takes/{week}_<組>/take_01.mp3")
-        elif sel.exists():
+        if sel.exists():   # Suno で作る番は、ガントチャートと「今やること」に出る（publish.py の流れ）
             st = read_json(sel)
             r = next((t for t in st.get("takes", []) if t["take"] == st.get("decision", {}).get("selected")), None)
             if r and not r["passed"]:
@@ -128,7 +129,7 @@ def todos() -> list[tuple[str, str, list[str], str]]:
             add("normal", "登録後の ISRC を書く", f"{who}「{m.get('title')}」", "out/distrokid/<週>/<組>.metadata.json")
     for a in all_artists():
         d = as_date(a.get("debut_week"))
-        if d and d > date.today() and (a.get("expansion") or a.get("source")):
+        if d and d > date.today() and a.get("expansion"):
             add("normal", "新人のデビュー予約（取り消すなら今）", f"{a['name']}（{d} の週）", "expand_label.py cancel --artist <組>")
     for sev, what, who, where in book_todos(names):
         add(sev, what, who, where)
@@ -140,6 +141,8 @@ def book_todos(names: dict[str, str]) -> list[tuple[str, str, str, str]]:
     try:
         from _artist_book import PENDING, TAB_ORDER, TABS, XlsxBook, open_book
         b = open_book()
+        if getattr(b, "offline", False):   # SSD が無い：管理表は読まない（仕組みの詰まりに出す）
+            return []
         if hasattr(b, "path") and not b.path.exists():
             return [("normal", "アーティスト管理表を作る", "（まだ無い）", "artist_book.py init → import-json proposals/<日付>")]
         data = b.read()
@@ -368,6 +371,18 @@ def copies(page: str) -> list[str]:
 
 
 def build() -> Path:
+    """ウェブアプリと同じガントチャートの画面を、データを埋め込んだ読むだけの形で書き出す（ボタンなし）"""
+    from webapp import render_page, status_json
+    page = render_page(status_json())
+    p = OUT / "dashboard.html"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(page, encoding="utf-8")
+    build.copies = copies(page)
+    return p
+
+
+def build_classic() -> Path:
+    """前の形の管理画面（組の伸び・Suno のダウンロード数・定期実行・鍵のカードつき）。--classic で使う"""
     now = datetime.now(JST)
     week = monday_of(date.today())
     items = todos()
@@ -388,10 +403,9 @@ def build() -> Path:
             f"<h2>定期実行</h2>{schedule_cards()}"
             f"<h2>鍵</h2>{key_cards()}"
             f"</main></body></html>")
-    p = OUT / "dashboard.html"
+    p = OUT / "dashboard_classic.html"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(page, encoding="utf-8")
-    build.copies = copies(page)
     return p
 
 
@@ -399,10 +413,13 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="管理画面（out/dashboard.html）を作る")
     ap.add_argument("--open", action="store_true")
     ap.add_argument("--text", action="store_true", help="組ごとの詰まりをターミナルに表示（画面は作らない）")
+    ap.add_argument("--classic", action="store_true", help="前の形の管理画面（out/dashboard_classic.html）も作る")
     a = ap.parse_args()
     if a.text:
         print(text_report())
         return
+    if a.classic:
+        print(f"▶ 前の形の管理画面: {build_classic().relative_to(ROOT)}")
     p = build()
     print(f"▶ 管理画面を作りました: {p.relative_to(ROOT)}" + (f"（{'・'.join(build.copies)} にも）" if getattr(build, "copies", None) else ""))
     if a.open:
