@@ -7,7 +7,7 @@
 | 段 | やること | 担当 |
 |---|---|---|
 | 1 | 曲名・スタイル・入れないもの・歌詞を用意する | 自動（ブリーフ／デビュー曲は作業セット） |
-| 2 | Suno に貼って「Create」を押す | **オーナー**（`python3 scripts/publish.py suno --open` のページからコピーして貼る） |
+| 2 | Suno の入力欄を埋める → 内容を確かめて「Create」を押す | 入力は **Claude**（デスクトップアプリ＋Claude in Chrome。頼み文は `publish.py suno --open` のページか `publish.py suno-request`）、**Create はオーナー**（決定 19） |
 | 3 | 2 つのテイクを聴いて、気に入った方に「いいね」→ その 1 本をダウンロードして「ダウンロード → SUNO楽曲」に入れる | **オーナー** |
 | 4 | どの曲かを見分けて取り込む → 音量を整える → ジャケット → DistroKid の下書き → 公開セット → 楽曲管理シート → Mac に「登録できます」と通知 | 自動（定期実行 intake。フォルダに入ると数分以内） |
 | 5 | DistroKid の画面に下書きを入れる（項目の入力・音源とジャケットの添付・配信日は最短） | Claude（オーナーの Chrome で。オーナーが見ている前で） |
@@ -68,3 +68,12 @@ python3 scripts/refresh_photos.py --list  # 写真の次の刷新日
 | Spotify の鍵と、作詞作曲者の欄の本名を入れる | `python3 scripts/setup_keys.py --only spotify,owner` |
 | 「ダウンロード」を自動の処理から読めるようにする | システム設定 → プライバシーとセキュリティ → フルディスクアクセス に python3 を追加 |
 | 定期実行に取り込み・配信の確認・ダッシュボードを加える | `python3 scripts/schedule.py install`（そのあと http://localhost:8765 をブックマーク） |
+
+## 7. Claude に Suno の入力を頼む手順（決定 19）
+
+1. Mac の Claude デスクトップアプリで新しい会話を始め、Claude in Chrome をつなぐ。Chrome で Suno にログインしておく
+2. ダッシュボードの「Suno に貼る内容」（または `python3 scripts/publish.py suno --open`）を開き、「Claude に入力を頼む（全曲まとめて）」の文をコピーして、その会話に貼る
+3. Claude が 1 曲目の欄を埋めて止まる → 内容を確かめて **Create を押す**（押すのはオーナーだけ）→ Claude に「次」と伝える
+4. できたテイクを聴き、気に入った方に「いいね」→ その 1 本をダウンロードして「ダウンロード/SUNO楽曲」へ。ここから先は自動
+
+Suno の公式 API に通れば、3 の Create も自動にできる（申し込みは `docs/16_suno_api_application.md`）。

@@ -27,7 +27,7 @@
 | 参考データベース | SSD の「データベース」などの名前のフォルダ（Excel・CSV・SQLite・解析シート）。`python3 scripts/reference_db.py --show` で読み方を確認。毎週のブリーフ作りの最初に自動で取り込み、傾向は `out/reference_db/digest.md` |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜18） |
+| 決めたこと | `docs/12_decisions.md`（1〜19） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 
@@ -36,7 +36,7 @@
 1. Suno のプラン … **完了**（Pro）
 2. DistroKid のプラン … **完了**（Ultimate・アーティスト名 5 つ。今の 5 組でちょうど埋まる）
 3. 名前の重複確認 … **完了**（オーナーが Spotify で確認。NAO EASTERLY は「NAO」と紛れるので VERNALIGHT に改名し、Claude が Web 検索で確認）
-4. Suno で 5 曲 … 未着手（`python3 scripts/publish.py suno --open` のページから貼って Create はオーナー。いいねした 1 本を「ダウンロード/SUNO楽曲」へ。決定 17）
+4. Suno で 5 曲 … 未着手（入力は Claude（デスクトップアプリ＋Claude in Chrome）、Create はオーナー。いいねした 1 本を「ダウンロード/SUNO楽曲」へ。決定 17・19。公式 API にも申し込む：docs/16）
 5. ジャケットと写真 … 自動で作る仕組みはできた（`kit_images.py`）。OpenAI の鍵を `.env` に入れれば Mac で `python3 scripts/kit_images.py` 一発で 10 枚できる
 6. テイク選び … Suno の「いいね」で決める（ダウンロードした 1 本を自動で取り込む）
 7. DistroKid に登録 … Claude が Chrome で下書きを入れ、オーナーが登録ボタンを押す（docs/15_publish.md の 4）

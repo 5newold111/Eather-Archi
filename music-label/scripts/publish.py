@@ -3,7 +3,9 @@
 公開の流れ：Suno で「いいね」してダウンロードした曲を、DistroKid の登録ボタンを押すだけの状態まで自動で進める
 
 オーナーがやること（Suno と DistroKid は規約上、機械が勝手に操作しない。docs/12_decisions.md の 17）：
-  1. `python3 scripts/publish.py suno` で開くページから、曲名・スタイル・歌詞をコピーして Suno に貼り、「Create」を押す
+  1. Suno の入力欄（曲名・スタイル・歌詞）は Claude に頼める：`publish.py suno` のページの「Claude に入力を頼む」の文を、
+     Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る。Claude は欄を埋めて止まる（決定 19）。
+     内容を確かめて「Create」を押すのはオーナーだけ。自分で貼るときは、ページのコピーボタンから
   2. できたテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードして
      ダウンロードの「SUNO楽曲」フォルダに入れる（WAV がおすすめ。ファイル名は Suno が付けた曲名のままでよい）
   3. DistroKid の画面で、Claude が入れた下書きを確かめて、最後の登録ボタンを押す
@@ -19,6 +21,7 @@
 
 使い方：
   python3 scripts/publish.py suno [--open]          # Suno に貼る内容のページを作る（--open でブラウザで開く）
+  python3 scripts/publish.py suno-request [曲 ID]   # Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文
   python3 scripts/publish.py scan                   # 「SUNO楽曲」に入った曲を取り込んで、公開の準備まで進める（定期実行でも動く）
   python3 scripts/publish.py status                 # 曲ごとの進み具合
   python3 scripts/publish.py draft PDR-001          # DistroKid の下書きを表示（Claude がブラウザで入力するときにも使う）
@@ -436,18 +439,54 @@ def cmd_track(args) -> int:
 
 # ---------------------------------------------------------------------------
 # Suno に貼る内容のページ
+SUNO_RULES = """決まり（必ず守る）：
+- 「Create」ボタンは絶対に押さない。押すのは私（オーナー）。入力が終わったら止まって「入力しました。確認して Create を押してください」と伝える
+- Suno のほかのボタン（削除・公開・共有・設定・購入・プランの変更）も押さない。曲を聴く・いいね・ダウンロードも私がやる
+- 1 曲ずつ進める。私が「次」と言ったら次の曲へ
+- 欄が見つからない・画面が想定と違うときは、推測で進めずに止まって私に聞く"""
+
+
+def suno_request(songs: list[dict]) -> str:
+    """Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る頼み文。決定 19：入力は Claude、Create はオーナー"""
+    head = ("Claude in Chrome で、Suno の作曲画面に曲の内容を入力してください。\n\n" + SUNO_RULES + "\n\n手順：\n"
+            "1. Chrome で https://suno.com/create を開く（私はログイン済み）\n"
+            "2. 「Custom」（カスタム）に切り替える\n"
+            "3. 下の内容を、同じ名前の欄に入れる（前の内容が残っていれば消してから）。Exclude Styles は「More Options」などの中にあれば開いて入れる\n"
+            "4. 入れ終わったら止まって、私に伝える\n")
+    parts = []
+    for n, s in enumerate(songs, 1):
+        parts.append(
+            f"\n【曲 {n}／{len(songs)}】{s['artist']}「{s['title']}」（{s['id']}）\n"
+            f"- Instrumental：{'オン' if s.get('instrumental') else 'オフ'}\n"
+            f"- Title：{s['title']}\n- Style of Music：{s['style']}\n"
+            + (f"- Exclude Styles：{s['exclude']}\n" if s.get("exclude") else "")
+            + ("" if s.get("instrumental") else f"- Lyrics（ここから）\n{str(s.get('lyrics', '')).strip()}\n- Lyrics（ここまで）\n"))
+    return head + "".join(parts)
+
+
+def suno_todo() -> list[dict]:
+    """Suno で作る番の曲（曲名とスタイルがあり、まだ取り込んでいないもの）"""
+    return [s for s in _songs.all_songs() if s.get("title") and s.get("style") and not str(s["week"]).startswith("2000-")
+            and not _songs.state(s).get("status")]
+
+
 def suno_page() -> tuple[str, int]:
     """Suno に貼る内容のページ（HTML）と曲数。webapp.py も使う"""
-    todo = [s for s in _songs.all_songs() if s.get("title") and s.get("style") and not str(s["week"]).startswith("2000-")
-            and not _songs.state(s).get("status")]
+    todo = suno_todo()
     E = html.escape
     cards = []
+    if todo:
+        cards.append('<section><h2>Claude に入力を頼む（全曲まとめて）</h2>'
+                     '<p>Mac の Claude デスクトップアプリで新しい会話を始め、Claude in Chrome をつないでから、下の文をコピーして貼ります。'
+                     'Claude が Suno の欄を 1 曲ずつ埋めて止まるので、内容を確かめて「Create」を押してください（押すのはあなただけ）。</p>'
+                     f'<div class="f"><div class="h"><span>頼み文（{len(todo)} 曲）</span><button onclick="cp(\'req_all\', this)">コピー</button></div>'
+                     f'<textarea id="req_all" readonly rows="6">{E(suno_request(todo))}</textarea></div></section>')
     for i, s in enumerate(todo):
-        fields = [("曲名（Title）", s["title"]), ("スタイル（Style of Music）", s["style"]),
+        fields = [("Claude への頼み文（この曲だけ）", suno_request([s])), ("曲名（Title）", s["title"]), ("スタイル（Style of Music）", s["style"]),
                   ("入れないもの（Exclude Styles）", s.get("exclude", "")), ("歌詞（Lyrics）", "" if s.get("instrumental") else s.get("lyrics", ""))]
         rows = "".join(
             f'<div class="f"><div class="h"><span>{E(k)}</span><button onclick="cp(\'t{i}_{j}\', this)">コピー</button></div>'
-            f'<textarea id="t{i}_{j}" readonly rows="{(1, 4, 2, 14)[j]}">{E(v)}</textarea></div>'
+            f'<textarea id="t{i}_{j}" readonly rows="{(3, 1, 4, 2, 14)[j]}">{E(v)}</textarea></div>'
             for j, (k, v) in enumerate(fields) if v)
         cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}</section>')
     page = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -460,6 +499,7 @@ h2 small{{font-weight:normal;opacity:.6;margin-left:8px;font-size:.7em}} textare
 .h{{display:flex;justify-content:space-between;align-items:center;margin-top:10px}} button{{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 14px;cursor:pointer}}
 ol{{padding-left:1.2em}}</style></head><body><main>
 <h1>Suno に貼る内容（{len(todo)} 曲）</h1>
+<p><b>入力は Claude に頼めます</b>（下の「Claude に入力を頼む」）。自分で貼るときは：</p>
 <ol><li>Suno の Create 画面で「Custom」を選び、下の欄を「コピー」して同じ名前の欄に貼る</li>
 <li>「Create」を押す（押すのはオーナーだけ）</li>
 <li>できた 2 つのテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードする（WAV がおすすめ）</li>
@@ -481,6 +521,15 @@ def cmd_suno(args) -> int:
     return 0
 
 
+def cmd_suno_request(args) -> int:
+    songs = [_songs.by_id(args.id)] if args.id else suno_todo()
+    if not songs or songs[0] is None:
+        print("－ Suno で作る番の曲はありません" if not args.id else f"[エラー] 曲 {args.id} が見つかりません")
+        return 0
+    print(suno_request(songs))
+    return 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno の曲を取り込み、DistroKid の登録ボタンを押すだけの状態まで進める")
     sub = ap.add_subparsers(dest="cmd")
@@ -494,11 +543,13 @@ def main() -> None:
     p.add_argument("--date", help="配信日（YYYY-MM-DD。省くと今日）")
     p = sub.add_parser("track", help="配信が始まったかを Spotify で確かめ、ISRC などを記録")
     p.add_argument("--quiet", action="store_true")
+    p = sub.add_parser("suno-request", help="Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文を表示")
+    p.add_argument("id", nargs="?", help="この曲だけ（省くと Suno で作る番の全曲）")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
-          "track": cmd_track, "suno": cmd_suno}.get(args.cmd)
+          "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return
