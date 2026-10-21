@@ -166,6 +166,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
     if action == "browser_login" and p.get("site") in ("suno", "distrokid"):
         return [PY, str(S / "browser_fill.py"), "login", p["site"]], f"ブラウザで入力（{p['site']} にログイン）"
+    if action == "browser_reset":
+        return [PY, str(S / "browser_fill.py"), "reset"], "ブラウザで入力（専用の Chrome を作り直す）"
     if action == "terminal" and p.get("key") in TERMINAL:
         t = TERMINAL[p["key"]]
         cmd = f"cd {shlex.quote(str(ROOT))} && " + (t if isinstance(t, str) else " ".join(shlex.quote(x) for x in t))
@@ -205,7 +207,12 @@ def start_job(cmd: list[str], label: str) -> str:
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=3600,
                                env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
             job["out"] = (r.stdout + r.stderr)[-20000:]
-            job["state"] = "done" if r.returncode == 0 else "error"
+            # 0：済んだ／2：まだ終わっていない（ログインが要る・入っていない欄があるなど）／ほか：エラー
+            job["state"] = {0: "done", 2: "incomplete"}.get(r.returncode, "error")
+            # 部品が「【結果】…」と書いていれば、それを結果の一文として出す（確かめた結果だけを「済んだ」と言う）
+            res = [ln[len("【結果】"):] for ln in r.stdout.splitlines() if ln.startswith("【結果】")]
+            if res:
+                job["summary"] = res[-1]
         except Exception as e:  # noqa: BLE001
             job["out"], job["state"] = str(e), "error"
     threading.Thread(target=run, daemon=True).start()
@@ -272,7 +279,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .x{position:absolute;right:10px;top:8px;background:transparent;color:var(--sub);font-size:22px;padding:2px 10px}
 .badge{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;border:1.5px solid}.badge.done{border-color:var(--good)}.badge.wait{border-color:var(--warn)}.badge.ng{border-color:var(--crit)}.badge.run{border-style:dashed}.badge.plan{border-style:dotted;border-color:var(--muted)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
-#dlg-job{margin-top:10px;font-size:12px;color:var(--sub)}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
+#dlg-job{margin-top:10px;font-size:14px;color:var(--sub)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a><span class="sub" id="upd"></span></div></header>
 <main>
@@ -441,8 +448,11 @@ const watching={};
 async function watch(id){watching[id]=true;const box=document.getElementById("jobs");
   for(;;){const r=await fetch("/api/jobs/"+id);const j=await r.json();let el=document.getElementById("job-"+id);
     if(!el){el=document.createElement("details");el.id="job-"+id;el.open=true;box.prepend(el)}
-    el.innerHTML=`<summary>${E(j.label)}：${j.state==="running"?"実行中…":j.state==="done"?"終わりました":"エラーがありました"}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
-    const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open)dj.textContent=`${j.label}：${j.state==="running"?"実行中…":j.state==="done"?"終わりました ✓":"エラーがありました（画面上のログを確認）"}`;
+    const st={running:"実行中…",done:"終わりました ✓",incomplete:"⚠ まだ終わっていません",error:"✕ エラーがありました"}[j.state]||j.state;
+    const sm=j.summary?`：${j.summary}`:"";
+    el.className="job "+j.state;
+    el.innerHTML=`<summary>${E(j.label)}　${E(st)}${E(sm)}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
+    const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open){dj.className="job "+j.state;dj.textContent=`${j.label}　${st}${sm||(j.state==="error"?"（画面の下のログを確認）":"")}`}
     if(j.state!=="running"){load();break}await new Promise(r=>setTimeout(r,2000))}}
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;

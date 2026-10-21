@@ -81,8 +81,11 @@ def explain(row: dict, phase: dict) -> dict:
     if name == "Suno で作曲":
         acts = [{"kind": "run", "primary": True, "label": "Suno に入力する（ブラウザが開きます）", "action": "fill_suno", "id": row.get("id")},
                 {"kind": "run", "label": "曲を取り込む", "action": "scan"},
-                {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"}]
-        steps = ["「Suno に入力する」を押す → 専用のブラウザが開き、曲名・スタイル・入れないもの・歌詞が自動で入ります（初回だけ Suno へのログインを求められます）",
+                {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"},
+                {"kind": "run", "label": "専用の Chrome を作り直す（ログインが何度も断られるとき）", "action": "browser_reset",
+                 "confirm": "専用の Chrome のログインの記録を消して作り直します。Suno と DistroKid に、もう一度ログインが要ります。よいですか？"}]
+        steps = ["初回だけ：「Suno にログイン」を押し、開いた Chrome でログインする（システムはつながっていないので、Google でのログインも通ります）",
+                 "「Suno に入力する」を押す → 専用の Chrome に、曲名・スタイル・入れないもの・歌詞が自動で入ります。入ったかを読み返して確かめ、全部そろったときだけ「終わりました ✓」と出ます",
                  "ブラウザの右下の案内に従って内容を確かめ、Suno の「Create」を押す（押すのは Gon さんだけ）",
                  "できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード",
                  "数分で自動で取り込まれて、次のフェーズに進みます（すぐ進めたいときは「曲を取り込む」）"]

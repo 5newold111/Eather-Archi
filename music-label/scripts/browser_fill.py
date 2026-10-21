@@ -11,7 +11,8 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
 しくみ：
   ・専用の Chrome（ふだんの Chrome とは別の窓。ログインはここが覚える：~/.postdog-browser）を、ふつうの Chrome として開き、
     入力するときだけ外からつないで欄を埋める。自動操作モードで開かないので、Google などでのログインも断られない。
-    初回だけ「login suno」「login distrokid」でログインする（このときは自動操作を一切つながない）。入力のあともタブは開いたまま
+    初回だけ「login suno」「login distrokid」でログインする（このときは自動操作を一切つながず、つなぎ口も開けない）。
+    入力のときにログインしていなければ、システムはいったん離れてログイン用の Chrome を開き直す。入力のあともタブは開いたまま
   ・入れる欄は、欄の名前・見出し・薄い字の案内（placeholder）から探す。
     見つからない欄は、ブラウザの右下の案内に「〇〇の欄をクリックしてください」と出るので、1 回クリックして教える。
     教えた場所は out/browser/fields.json に覚え、次からは自動で入れる（クリックしても、その欄を押したことにはならない）
@@ -25,6 +26,10 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
   python3 scripts/browser_fill.py distrokid PDR-003    # DistroKid の下書き
   python3 scripts/browser_fill.py login suno           # 初回：専用ブラウザでログインしておく（distrokid も）
   python3 scripts/browser_fill.py forget suno          # 覚えた欄の場所を消す（画面が変わってうまく入らないとき）
+  python3 scripts/browser_fill.py reset                # 専用の Chrome を作り直す（ログインが何度も断られるとき）
+
+「終わりました」は、作曲画面（登録画面）で、入れた欄を読み返して全部そろっていたときだけ（終了コード 0）。
+足りない欄・ログインが要るときは「まだ終わっていません」（終了コード 2）。最後の行の【結果】がダッシュボードに出る
 
 最初に 1 回：ダッシュボードの「ブラウザ入力の部品を入れる」を押す（中身は  python3 -m pip install --user playwright  と  python3 -m playwright install chromium ）
 """
@@ -108,7 +113,9 @@ OVERLAY_JS = r"""
   for (const b of cfg.buttons || []) {
     const btn = document.createElement('button'); btn.textContent = b.label;
     btn.style.cssText = 'font:inherit;border-radius:6px;padding:6px 12px;cursor:pointer;border:1px solid #a07a3c;' + (b.primary ? 'background:#a07a3c;color:#fff' : 'background:#fff;color:#22201c');
-    btn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); window.postdog({action: b.id, date: dateInput ? dateInput.value : null}); };
+    btn.onclick = (e) => { e.preventDefault(); e.stopPropagation();
+      if (b.id === 'dismiss') { box.remove(); window.__postdogPicking = false; return; }   // 案内を消すだけ（システムとはつながっていなくてよい）
+      window.postdog({action: b.id, date: dateInput ? dateInput.value : null}); };
     row.appendChild(btn);
   }
   window.__postdogPicking = !!cfg.pick;
@@ -148,21 +155,50 @@ def _running_port() -> int | None:
     return port if _port_alive(port) else None
 
 
-def open_chrome(url: str = "about:blank") -> None:
-    """専用の Chrome を開く（開いていれば、新しいタブで url を開く）"""
+def open_chrome(url: str = "about:blank", debug: bool = True) -> None:
+    """専用の Chrome を開く（開いていれば、新しいタブで url を開く）。debug=False：つなぎ口を開けない、ログイン用"""
     PROFILE.mkdir(parents=True, exist_ok=True)
     if _running_port() is None:
         (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
     extra = os.environ.get("POSTDOG_CHROME_ARGS", "").split()   # 試験用
-    subprocess.Popen([chrome_path(), f"--user-data-dir={PROFILE}", "--remote-debugging-port=0",
+    subprocess.Popen([chrome_path(), f"--user-data-dir={PROFILE}", *(["--remote-debugging-port=0"] if debug else []),
                       "--no-first-run", "--no-default-browser-check", *extra, url],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def _chrome_pids() -> list[int]:
+    """専用の Chrome の本体のプロセス（ふだんの Chrome は含まない）"""
+    out = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True).stdout
+    key = f"--user-data-dir={PROFILE}"
+    return [int(line.split(None, 1)[0]) for line in out.splitlines() if key in line and "--type=" not in line]
+
+
+def quit_chrome() -> None:
+    """専用の Chrome をきちんと終わらせる（ログインの記録は残る）"""
+    import signal
+    for pid in _chrome_pids():
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    end = time.time() + 10
+    while _chrome_pids() and time.time() < end:
+        time.sleep(0.3)
+    for pid in _chrome_pids():
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+    (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
 
 
 def chrome_port(timeout: float = 20) -> int:
     port = _running_port()
     if port:
         return port
+    if _chrome_pids():   # ログイン用（つなぎ口なし）の Chrome が開いている：入力用に開き直す
+        print("   … ログイン用の Chrome を閉じて、入力用に開き直します（ログインは覚えています）")
+        quit_chrome()
     open_chrome()
     end = time.time() + timeout
     while time.time() < end:
@@ -175,6 +211,25 @@ def chrome_port(timeout: float = 20) -> int:
 
 class BrowserClosed(Exception):
     """専用のブラウザが閉じられた"""
+
+
+class NeedLogin(Exception):
+    """ログインしていない（ログインは、システムがつながっていない Chrome で行う）"""
+    def __init__(self, site: str):
+        super().__init__(site)
+        self.site = site
+
+
+SIGN_IN = re.compile(r"^\s*(sign in|log in|login|sign up|ログイン|サインイン|新規登録)\s*$", re.I)
+
+
+def _host(url: str) -> str:
+    from urllib.parse import urlparse
+    return (urlparse(url).hostname or "").lower()
+
+
+def _base(host: str) -> str:
+    return ".".join(host.split(".")[-2:])
 
 
 class Session:
@@ -240,6 +295,7 @@ class Session:
 
     def show(self, title: str, lines: list[str] = (), buttons: list[dict] = (), date_value: str | None = None, pick: bool = False) -> None:
         self.overlay = {"title": title, "lines": list(lines), "buttons": list(buttons), "date": date_value, "pick": pick}
+        self.overlay_host = _host(self.page.url)
         self.js(OVERLAY_JS, self.overlay)
 
     def wait(self, auto: dict | None = None) -> dict:
@@ -250,30 +306,50 @@ class Session:
         while self.msg is None:
             try:
                 self.page.wait_for_timeout(400)
-                if self.overlay and not self.page.evaluate("!!document.getElementById('postdog-overlay')"):
-                    self.js(OVERLAY_JS, self.overlay)   # ページが切り替わったら案内を出し直す
+                if self.overlay and _host(self.page.url) == getattr(self, "overlay_host", "") and \
+                        not self.page.evaluate("!!document.getElementById('postdog-overlay')"):
+                    self.js(OVERLAY_JS, self.overlay)   # 同じサイトの中でページが切り替わったら案内を出し直す
             except Exception:  # noqa: BLE001
                 if self.closed():
                     return {"action": "closed"}   # ブラウザを閉じた
                 # ページの切り替わりの最中：少し待って続ける
         return self.msg
 
-    def ensure_login(self, site: str) -> bool:
+    def logged_out(self, site: str) -> bool:
+        """ログインしていないように見えるか（ログインの画面に移った・別のサイトに移った・「Sign in」のボタンがある）"""
         url = self.page.url.lower()
-        if any(k in url for k in ("login", "signin", "sign-in", "sign_in", "auth")):
-            self.show(f"{site} にログインしてください",
-                      ["この専用のブラウザで、いつものアカウントでログインします（次からは覚えています）。",
-                       "ログインが終わったら「続ける」を押してください。"],
-                      [{"id": "continue", "label": "続ける", "primary": True}, {"id": "stop", "label": "やめる"}])
-            if self.wait().get("action") != "continue":
-                return False
-            self.goto(SITES[site])
-        return True
+        if any(k in url for k in ("login", "signin", "sign-in", "sign_in", "/auth", "accounts.")):
+            return True
+        if _base(_host(url)) != _base(_host(SITES[site])):
+            return True
+        for role in ("button", "link"):
+            try:
+                loc = self.page.get_by_role(role, name=SIGN_IN)
+                for i in range(min(loc.count(), 5)):
+                    if loc.nth(i).is_visible():
+                        return True
+            except Exception:  # noqa: BLE001
+                pass
+        return False
+
+    def ensure_login(self, site: str) -> bool:
+        if not self.logged_out(site):
+            return True
+        if self.cdp:
+            raise NeedLogin(site)   # つながったままログインすると Google に断られるので、いったん離れてログイン用の Chrome を開く
+        self.show(f"{site} にログインしてください",
+                  ["この専用のブラウザで、いつものアカウントでログインします（次からは覚えています）。",
+                   "ログインが終わったら「続ける」を押してください。"],
+                  [{"id": "continue", "label": "続ける", "primary": True}, {"id": "stop", "label": "やめる"}])
+        if self.wait().get("action") != "continue":
+            return False
+        self.goto(SITES[site])
+        return not self.logged_out(site)
 
     def close(self) -> None:
         try:
             if self.cdp:   # Chrome とタブは開いたままにする（続けて聴く・いいね・ダウンロードができるように）。案内だけ消す
-                if not self.closed():
+                if not self.closed() and not getattr(self, "keep_overlay", False):
                     self.page.evaluate("() => { const b = document.getElementById('postdog-overlay'); if (b) b.remove(); window.__postdogPicking = false; }")
             else:
                 self.ctx.close()
@@ -412,6 +488,7 @@ def put(sess: Session, loc, f: dict) -> bool:
 
 def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str], list[str]]:
     done, manual = [], []
+    sess.filled = {}
     for f in fields:
         if f.get("value") in (None, ""):
             continue
@@ -427,9 +504,56 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
             ok = False
         if ok:
             done.append(f["label"])
+            sess.filled[f["key"]] = loc
         elif not f.get("optional"):
             manual.append(f"{f['label']}：{f.get('show', f['value'])}")
     return done, manual
+
+
+def _norm(v) -> str:
+    return re.sub(r"\s+", " ", str(v)).strip().lower()
+
+
+def verify(sess: Session, fields: list[dict]) -> list[str]:
+    """入れた欄の中身を読み返して、入れたかった値と同じかを確かめる。合わない欄の一覧（空なら全部入っている）"""
+    sess.page.wait_for_timeout(700)   # サイトが値を消したり書き換えたりしないかを少し待ってから見る
+    bad = []
+    for f in fields:
+        if f.get("value") in (None, "") or f["type"] == "click":
+            continue
+        loc = getattr(sess, "filled", {}).get(f["key"])
+        if loc is None:
+            bad.append(f"{f['label']}：入っていません")
+            continue
+        try:
+            if f["type"] == "file":
+                got = loc.evaluate("e => [...(e.files || [])].map(x => x.name).join(',')")
+            else:
+                got = loc.evaluate("""e => e.tagName === 'SELECT' ? ((e.selectedOptions[0] || {}).text || e.value)
+                                      : (e.isContentEditable ? e.innerText : e.value)""")
+        except Exception:  # noqa: BLE001
+            bad.append(f"{f['label']}：画面が変わって確かめられませんでした")
+            continue
+        want, g = _norm(f["value"]), _norm(got)
+        if f["type"] == "file":
+            ok = Path(str(f["value"])).name in str(got)
+        elif f["type"] == "date":
+            ok = bool(g)
+        elif f["type"] == "select":
+            ok = g == want or want in g
+        else:
+            ok = g == want
+        if not ok:
+            bad.append(f"{f['label']}：途中までしか入っていません（文字数の上限かもしれません）" if g and want.startswith(g)
+                       else f"{f['label']}：入っていません")
+    return bad
+
+
+def on_page(sess: Session, site: str) -> bool:
+    """いまの画面が、入力するはずの画面か（Suno なら作曲画面）"""
+    from urllib.parse import urlparse
+    want, now = urlparse(SITES[site]), urlparse(sess.page.url)
+    return _base(now.hostname or "") == _base(want.hostname or "") and now.path.rstrip("/").startswith(want.path.rstrip("/"))
 
 
 # ---------------------------------------------------------------------------
@@ -466,34 +590,62 @@ def wait_for_form(sess: Session, name: str, how: str) -> bool:
 
 
 def run_suno(sess: Session, ids: list[str]) -> int:
+    """全部の曲で、作曲画面のすべての欄に入ったことを確かめられたら 0、そうでなければ 2"""
     import publish
     songs = [_songs.by_id(i) for i in ids] if ids else publish.suno_todo()
     songs = [s for s in songs if s]
     if not songs:
-        print("－ Suno で作る番の曲はありません")
+        print("【結果】Suno で作る番の曲はありません")
         return 0
+    ok_songs, problems = [], []
     for n, song in enumerate(songs, 1):
         sess.goto(SITES["suno"])
         if not sess.ensure_login("suno"):
-            return 0
+            problems.append("Suno にログインできていません")
+            break
         if not wait_for_form(sess, "Suno", "左のメニューの「Create」を開いてから"):
-            return 0
-        done, manual = fill_fields(sess, "suno", suno_fields(song))
-        print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
-        lines = [f"{song['artist']}「{song['title']}」（{n}／{len(songs)} 曲目）",
-                 "入れた：" + ("・".join(done) or "なし")]
-        if manual:
-            lines += ["手で入れてください：", *manual]
+            problems.append(f"{song['artist']}「{song['title']}」：作曲画面が開けませんでした")
+            break
+        if not sess.ensure_login("suno"):   # 画面ができてから「Sign in」が出るサイトもあるので、もう一度
+            problems.append("Suno にログインできていません")
+            break
+        fields = suno_fields(song)
+        done, manual = fill_fields(sess, "suno", fields)
+        bad = verify(sess, fields)
+        if not on_page(sess, "suno"):
+            bad.insert(0, f"Suno の作曲画面ではありません（いまの画面：{sess.page.url}）")
+        name = f"{song['artist']}「{song['title']}」"
+        if bad:
+            problems += [f"{name}の{x}" for x in bad]
+            print(f"   ✕ {name}：入っていない欄があります → " + "／".join(bad))
+        else:
+            ok_songs.append(name)
+            print(f"   ✓ {name}：作曲画面の欄を読み返して、全部入っていることを確かめました（" + "・".join(done) + "）")
+        lines = [f"{name}（{n}／{len(songs)} 曲目）"]
+        if bad:
+            lines += ["⚠ 次の欄が入っていません。手で入れてください：", *bad]
+            if manual:
+                lines += ["入れる内容：", *manual]
+        else:
+            lines += ["✓ 全部の欄に入っていることを確かめました：" + "・".join(done)]
         lines += ["① Custom（カスタム）モードになっているか確かめる",
                   "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）",
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
-        last = n == len(songs)
-        sess.show("Suno に入力しました", lines,
-                  [{"id": "next", "label": "終わる" if last else "次の曲へ", "primary": True}, {"id": "stop", "label": "ここでやめる"}])
+        if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
+            sess.keep_overlay = True
+            sess.show("Suno に入力しました" if not bad else "Suno への入力が足りません", lines, [{"id": "dismiss", "label": "この案内を消す"}])
+            break
+        sess.show("Suno に入力しました" if not bad else "Suno への入力が足りません", lines,
+                  [{"id": "next", "label": "次の曲へ", "primary": True}, {"id": "stop", "label": "ここでやめる"}])
         m = sess.wait({"action": "next"})
         if m.get("action") in ("stop", "closed"):
             break
-    return 0
+    if not problems and len(ok_songs) == len(songs):
+        print(f"【結果】Suno の作曲画面に{'、' + str(len(songs)) + ' 曲とも' if len(songs) > 1 else ''}入力し、全部の欄に入っていることを確かめました。開いている Chrome で「Create」を押してください")
+        return 0
+    msg = "／".join(problems[:4]) or f"{len(songs)} 曲のうち {len(ok_songs)} 曲で止めました"
+    print(f"【結果】まだ終わっていません：{msg}")
+    return 2
 
 
 def distrokid_fields(song: dict) -> list[dict]:
@@ -524,16 +676,21 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
     sess.goto(SITES["distrokid"])
     if not sess.ensure_login("distrokid"):
-        return 0
+        print("【結果】まだ終わっていません：DistroKid にログインできていません")
+        return 2
     if not wait_for_form(sess, "DistroKid", "登録の画面（Upload）を開いてから"):
-        return 0
+        print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
+        return 2
     fields, draft = distrokid_fields(song)
     done, manual = fill_fields(sess, "distrokid", fields)
+    bad = verify(sess, fields)
     always = [f"Explicit lyrics：{draft['Explicit lyrics']}", f"Instrumental：{draft['Instrumental']}",
               f"AI の申告：{draft['AI の申告']}", f"Featured artist：{draft['Featured artist']}", f"ストア：{draft['ストア']}"]
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     sess.show("DistroKid に下書きを入れました",
-              [f"{song['artist']}「{song['title']}」", "入れた：" + ("・".join(done) or "なし"),
+              [f"{song['artist']}「{song['title']}」",
+               ("✓ 読み返して確かめました：" if not bad else "入れた：") + ("・".join(done) or "なし"),
+               *(["⚠ 入っていない欄：", *bad] if bad else []),
                *(["手で入れてください：", *manual] if manual else []), "画面で確かめて選ぶもの：", *always,
                "内容を確かめて、最後の登録ボタンを押してください（押すのは Gon さんだけ）。",
                "押し終わったら、配信日を選んで「登録した」を押すと、記録されます。"],
@@ -547,30 +704,42 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。"],
                   [{"id": "stop", "label": "閉じる", "primary": True}])
         sess.wait({"action": "stop"})
-    return 0
+        print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
+        return 0
+    if bad:
+        print("【結果】まだ終わっていません：DistroKid の入っていない欄 → " + "／".join(bad))
+    else:
+        print("【結果】下書きは全部の欄に入りましたが、「登録した」はまだ押されていません")
+    return 2
 
 
 def open_login(site: str) -> bool:
     """ログイン：自動操作をつながない、ふつうの専用の Chrome で開く（Google でのログインも通る）"""
     if not chrome_path():
         return False
-    open_chrome(SITES[site])
-    print(f"○ 専用の Chrome で {site} を開きました。いつものアカウントでログインしてください（次からは覚えています）。")
-    print("  ログインが終わったら、その窓は開いたままでも、閉じてもかまいません。")
+    if _running_port():   # 入力用（つなぎ口あり）の Chrome が開いている：閉じてから、ログイン用に開く
+        quit_chrome()
+    open_chrome(SITES[site], debug=False)
+    print(f"○ 専用の Chrome で {site} を開きました。システムはこの Chrome にはつながっていません。")
+    print("  いつものアカウント（Google など）でログインしてください。次からは覚えています。")
+    print(f"【結果】ログイン用に Chrome を開きました。ログインが済んだら「{'Suno' if site == 'suno' else 'DistroKid'} に入力する」を押してください"
+          "（ログインできたかどうかは、ダッシュボードからは見えません）")
     return True
 
 
 def run_login(sess: Session, site: str) -> int:
+    """（Chrome が無いとき）Playwright のブラウザでログインする"""
     sess.goto(SITES[site])
     sess.show(f"{site} のログイン", ["この専用のブラウザでログインしてください（次からは覚えています）。", "終わったら「閉じる」を押してください。"],
               [{"id": "stop", "label": "閉じる", "primary": True}])
     sess.wait({"action": "stop"})
+    print("【結果】ログインの画面を閉じました（ログインできたかは、次に入力するときに確かめます）")
     return 0
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno と DistroKid の入力を、システムが専用のブラウザで行う（押すのは Gon さん）")
-    ap.add_argument("what", choices=["suno", "distrokid", "login", "forget"])
+    ap.add_argument("what", choices=["suno", "distrokid", "login", "forget", "reset"])
     ap.add_argument("args", nargs="*", help="suno：曲 ID（省くと全曲）／distrokid：曲 ID／login・forget：suno か distrokid")
     a = ap.parse_args()
     if a.what == "forget":
@@ -581,6 +750,16 @@ def main() -> None:
         LEARNED.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
         print("○ 覚えた欄の場所を消しました")
         return
+    if a.what == "reset":   # 専用の Chrome の記録（ログインなど）を作り直す。前のものは .old として残す
+        quit_chrome()
+        if PROFILE.exists():
+            old = PROFILE.with_name(PROFILE.name + ".old")
+            if old.exists():
+                import shutil
+                shutil.rmtree(old, ignore_errors=True)
+            PROFILE.rename(old)
+        print("【結果】専用の Chrome を作り直しました。もう一度「Suno にログイン（初回だけ）」からログインしてください")
+        return
     if a.what == "login" and open_login((a.args or ["suno"])[0]):
         return
     try:
@@ -589,17 +768,21 @@ def main() -> None:
         sys.exit("[案内] ブラウザで入力する部品がありません。ターミナルで  python3 -m pip install --user playwright  を 1 回実行してください")
     if a.what == "distrokid" and not a.args:
         sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003）")
+    code, need = 0, None
     with sync_playwright() as pw:
         sess = Session(pw)
         try:
             if a.what == "suno":
-                run_suno(sess, a.args)
+                code = run_suno(sess, a.args)
             elif a.what == "distrokid":
-                run_distrokid(sess, a.args[0])
+                code = run_distrokid(sess, a.args[0])
             else:
-                run_login(sess, (a.args or ["suno"])[0])
+                code = run_login(sess, (a.args or ["suno"])[0])
+        except NeedLogin as e:
+            need = e.site
         except BrowserClosed:
-            print("－ ブラウザが閉じられたので終わりました")
+            print("【結果】まだ終わっていません：ブラウザが閉じられました")
+            code = 2
         except Exception as e:  # noqa: BLE001
             import traceback
             d = OUT / "browser"
@@ -612,9 +795,17 @@ def main() -> None:
             print("[エラー] ブラウザでの入力が途中で止まりました。")
             print(f"  原因：{(str(e).strip().splitlines() or [type(e).__name__])[0][:300]}")
             print(f"  くわしい記録：{d / 'last_error.txt'}（画面の写し：last_error.png）。この 2 つを Claude に見せてください")
-            sys.exit(1)
+            print(f"【結果】エラーで止まりました：{(str(e).strip().splitlines() or [type(e).__name__])[0][:150]}")
+            code = 1
         finally:
             sess.close()
+    if need:
+        name = "Suno" if need == "suno" else "DistroKid"
+        print(f"－ {name} にログインしていません。システムがつながったままだと Google などのログインが断られるので、いったん離れます")
+        open_login(need)
+        print(f"【結果】まだ終わっていません：{name} にログインしていません。開いた Chrome でログインしてから、もう一度「{name} に入力する」を押してください")
+        code = 2
+    sys.exit(code)
 
 
 if __name__ == "__main__":
