@@ -506,8 +506,9 @@ STATE_CORE = r"""
     for (const k of ['data-selected', 'data-active', 'data-checked']) if (x.hasAttribute(k)) return x.getAttribute(k) === 'false' ? 'off' : 'on';
     const hs = x.getAttribute('data-headlessui-state'); if (hs !== null) return /checked|selected|active/.test(hs) ? 'on' : 'off';
     if (x.matches && x.matches('input[type=radio],input[type=checkbox]')) return x.checked ? 'on' : 'off';
+    if (window.__postdogNoClass) return null;
     const cls = String(x.className && x.className.baseVal !== undefined ? x.className.baseVal : x.className || '');
-    if (/(^|[\s_-])(active|selected|checked|is-on|on)([\s_-]|$)/i.test(cls)) return 'on';
+    if (/(^|\s)(active|selected|checked|is-on)(\s|$)/i.test(cls)) return 'on';
     return null; };
   const holder = e => { if (read(e)) return e;
     // 文字のボタンの中や横にスイッチがある作り（そのスイッチが状態を持つ）
@@ -518,7 +519,8 @@ STATE_CORE = r"""
     }
     return null; };"""
 STATE_JS = "e => {" + STATE_CORE + " const h = holder(e); return h ? read(h) : 'unknown'; }"
-SELF_STATE_JS = "e => {" + STATE_CORE + " return read(e) || 'unknown'; }"   # そのボタン自身の目印だけ
+SELF_STATE_JS = ("e => { window.__postdogNoClass = true; try {" + STATE_CORE +
+                 " return read(e) || 'unknown'; } finally { window.__postdogNoClass = false; } }")   # そのボタン自身の目印だけ（class 名の言葉は見ない）
 HOLDER_JS = "e => {" + STATE_CORE + " const h = holder(e); return h && h !== e ? window.__postdogSel(h) : null; }"
 NEAR_JS = r"""([hint, sel, unique]) => { const want = hint.trim().toLowerCase();
     for (const el of document.querySelectorAll('label,span,div,p,h3,h4,legend')) {
@@ -713,6 +715,15 @@ def _states(sess: Session, f: dict) -> dict:
     return got
 
 
+def _look(sess: Session, f: dict) -> str:
+    """選択肢ごとの状態を短く（記録用）。例：male=off(tertiary) female=on(standard)"""
+    out = []
+    for opt, (loc, st) in _states(sess, f).items():
+        m = re.search(r"variant-([a-z]+)", loc.get_attribute("class") or "")
+        out.append(f"{opt}={st}" + (f"({m.group(1)})" if m else ""))
+    return " ".join(out) or "（ボタンが見つからない）"
+
+
 def choice_state(sess: Session, f: dict) -> bool | None:
     """「どちらか選ぶ」が希望どおりか。True／False／None（読めない・見つからない）"""
     got = _states(sess, f)
@@ -737,8 +748,17 @@ def set_choice(sess: Session, f: dict) -> bool | None:
             if NEVER.search(text):
                 return False
             h = loc.evaluate(HOLDER_JS) if len(f["options"]) == 1 else None   # 1 つだけのスイッチ：状態を持つ横のスイッチを押す
-            (sess.page.locator(h).first if h else loc).click()
-            sess.page.wait_for_timeout(400)
+            target = sess.page.locator(h).first if h else loc
+            before = _look(sess, f)
+            cls0 = target.get_attribute("class") or ""
+            target.click()
+            sess.page.wait_for_timeout(600)
+            if (target.get_attribute("class") or "") == cls0 and _look(sess, f) == before:   # 何も変わらない：押せていない
+                box = target.bounding_box()
+                if box:
+                    sess.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+                    sess.page.wait_for_timeout(600)
+            sess.log.append(f"{f['label']}：押す前 {before} → 「{opt}」を押した → 押した後 {_look(sess, f)}")
     return choice_state(sess, f)
 
 
@@ -840,6 +860,7 @@ def _read(loc) -> str:
 def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str], list[str]]:
     done, manual = [], []
     sess.filled = {}
+    sess.log = []
     for f in fields:
         if f.get("value") in (None, ""):
             continue
@@ -1060,10 +1081,11 @@ PARTS_JS = r"""() => {
                 'data-state', 'placeholder', 'name', 'data-testid'].map(a => e.getAttribute(a) !== null ? `${a}=${cut(e.getAttribute(a), 40)}` : '').filter(Boolean);
     const raw = (t === 'input' || t === 'textarea') ? String(e.value || '') : (e.isContentEditable ? (e.innerText || '') : null);
     const val = raw === null ? '' : ` 中身=${raw.length}文字「${cut(raw, 40)}」 まわり=「${cut(e.parentElement && e.parentElement.parentElement ? e.parentElement.parentElement.innerText : '', 60)}」`;
-    out.push(`${Math.round(e.getBoundingClientRect().top)}\t${t}${role ? '[' + role + ']' : ''}${e.isContentEditable ? '[編集可]' : ''}\t「${cut(e.innerText || e.value || '', 30)}」\t${at.join(' ')}${val}\tclass=${cut(e.className && e.className.baseVal !== undefined ? '' : e.className, 50)}\t見出し=${lab(e)}`);
+    out.push(`${Math.round(e.getBoundingClientRect().top)}\t${t}${role ? '[' + role + ']' : ''}${e.isContentEditable ? '[編集可]' : ''}\t「${cut(e.innerText || e.value || '', 30)}」\t${at.join(' ')}${val}\tclass=${cut(e.className && e.className.baseVal !== undefined ? '' : e.className, 160)}\t見出し=${lab(e)}`);
     if (out.length >= 300) break;
   }
-  return out.sort((a, b) => parseInt(a) - parseInt(b)).join('\n'); }"""
+  const log = window.__postdogLog ? '押したボタンの記録：\n' + window.__postdogLog + '\n' : '';
+  return log + out.sort((a, b) => parseInt(a) - parseInt(b)).join('\n'); }"""
 
 
 def save_parts(sess: Session, site: str) -> Path | None:
@@ -1073,7 +1095,8 @@ def save_parts(sess: Session, site: str) -> Path | None:
     p = d / f"{site}_parts.txt"
     try:
         body = sess.js(PARTS_JS, None, default="")
-        p.write_text(f"画面：{sess.page.url}\n（上からの位置\t部品\t文字\t目印\tclass\t見出し）\n{body}\n", encoding="utf-8")
+        log = "\n".join(getattr(sess, "log", []) or [])
+        p.write_text(f"画面：{sess.page.url}\n押したボタンの記録：\n{log}\n（上からの位置\t部品\t文字\t目印\tclass\t見出し）\n{body}\n", encoding="utf-8")
         sess.page.screenshot(path=str(d / f"{site}_screen.png"), full_page=True)
         return p
     except Exception:  # noqa: BLE001
@@ -1152,6 +1175,10 @@ def run_suno(sess: Session, ids: list[str]) -> int:
             lines += ["✓ 全部の欄に入っていることを確かめました：" + "・".join(done)]
         if sess.unsure:
             lines += ["目で確かめてください（画面から状態が読めませんでした）：", *sess.unsure]
+        if (bad or sess.unsure) and getattr(sess, "log", None):
+            lines += ["押したボタンの記録：", *sess.log]
+        for x in getattr(sess, "log", []):
+            print(f"   記録：{x}")
             unsure_all.extend(f"{name}の{x}" for x in sess.unsure)
         try:
             import publish
@@ -1163,6 +1190,7 @@ def run_suno(sess: Session, ids: list[str]) -> int:
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
+            sess.js("(t) => { window.__postdogLog = t; }", "\n".join(getattr(sess, "log", []) or []))   # コピーのボタンにも記録を入れる
             btns = [{"id": "dismiss", "label": "この案内を消す"}]
             if bad or sess.unsure:
                 btns.insert(0, {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）", "primary": True})
