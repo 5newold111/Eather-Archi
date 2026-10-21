@@ -84,6 +84,8 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
         master = OUT / "masters" / song["key"] / "master.wav"
         if not master.exists():
             continue   # 公開セットは、配信用の音源ができてから作る
+        if _songs.state(song).get("status") == "live":
+            continue   # 配信が始まった曲は、ローカル保存（一時保存）に入れ直さない（SSD に写したあと tidy_released が片付ける）
         sub = _songs.folder_name(song)
         astem = _songs.audio_stem(song)   # 楽曲データ：<曲名>_<アーティスト名>_<生成日>
         out.append(("music", sub, master, f"{astem}.wav"))
@@ -165,6 +167,36 @@ def sync_kits(base: Path, check: bool) -> int:
     return n
 
 
+def tidy_released() -> int:
+    """配信が始まった曲（publish.py の記録が live）の公開セットを、ローカル保存（一時保存）から片付ける。
+    SSD に同じ中身のファイルがあるものだけ消す（無いもの・中身が違うものは残す）。片付けた数を返す"""
+    import filecmp
+    base, _ = archive.root()
+    if base is None:
+        return 0
+    n = 0
+    for song in _songs.all_songs():
+        if _songs.state(song).get("status") != "live":
+            continue
+        sub = _songs.folder_name(song)
+        lf = archive.local_folder(song["artist"], "music", sub)
+        sf = archive.find_child(base, archive.ARTIST_DIR)
+        for part in (song["artist"], archive.SUBS["music"], sub):
+            sf = archive.find_child(sf, part) if sf else None
+        if sf is None:
+            continue
+        for f in [f for f in lf.iterdir() if f.is_file()]:
+            twin = sf / f.name
+            if twin.exists() and filecmp.cmp(f, twin, shallow=False):
+                f.unlink()
+                n += 1
+        try:
+            lf.rmdir()   # 空になったらフォルダも片付ける
+        except OSError:
+            pass
+    return n
+
+
 def setup(path: str) -> None:
     p = Path(path).expanduser()
     if not p.exists():
@@ -206,12 +238,23 @@ def main() -> None:
     ap.add_argument("--only", help="この組だけ（組の ID）")
     ap.add_argument("--check", action="store_true", help="SSD にまだ写していないファイルを見るだけ")
     ap.add_argument("--setup", metavar="PATH", help="SSD の保管庫の場所を .env に書く（例 /Volumes/DS72）")
+    ap.add_argument("--on-mount", action="store_true", help="SSD をつないだときの自動実行用（SSD が無ければ何も言わずに終わる。終わったら Mac に知らせる）")
     args = ap.parse_args()
     if args.setup:
         setup(args.setup)
         return
 
+    if args.on_mount and archive.root()[0] is None:
+        return   # つながったのは別のドライブ
     acts = [a for a in all_artists() if a.get("slug") and (not args.only or a["slug"] == args.only)]
+    moved = []
+    if archive.root()[0] is not None and not args.check:
+        import publish
+        moved = publish.move_to_ssd()
+        if moved:
+            print(f"▶ 0. SSD が無い間に「ダウンロード/SUNO楽曲」へ入った曲を、SSD の「{archive.INBOX_DIR}」へ移しました")
+            for l in moved:
+                print("    " + l)
     print(f"▶ 1. ローカル保存（一時保存）：{archive.local_root()}")
     total, changed = to_local(acts, args.check)
     print(f"   対象 {total} 件のうち、新しく入れた・変わったもの {changed} 件")
@@ -235,9 +278,15 @@ def main() -> None:
     for l in lines:
         print("    " + l)
     print(f"   SSD に新しく写した・更新したもの {n + kit_changed} 件")
+    cleaned = tidy_released()
+    if cleaned:
+        print(f"▶ 3. 配信が始まった曲を、ローカル保存（一時保存）から片付けました（SSD に同じものがあるのを確かめてから）：{cleaned} 件")
     if not args.only:
         import song_book
         song_book.update(quiet=True)
+    if args.on_mount and (moved or n + kit_changed or cleaned):
+        from _common import notify
+        notify("SSD に移しました", f"楽曲情報へ {len(moved)} 件・保管 {n + kit_changed} 件・片付け {cleaned} 件")
 
 
 if __name__ == "__main__":

@@ -93,6 +93,62 @@ def inbox() -> Path:
     return inboxes()[0]
 
 
+def move_to_ssd() -> list[str]:
+    """SSD が外れていた間に予備のフォルダ（ダウンロード/SUNO楽曲）へ入った曲を、SSD の「楽曲情報」へ移す。
+    中のフォルダの並びはそのまま。取り込み済みの曲は、移したあとも取り込み済みとして扱う（取り込み直さない）。表示用の行を返す"""
+    if os.environ.get("SUNO_INBOX", "").strip():
+        return []   # 見張る場所を自分で決めているときは動かさない
+    base, _ = archive.root()
+    downloads = Path.home() / "Downloads"
+    src = archive.find_child(downloads, archive.LOCAL_PARENT) if downloads.is_dir() else None
+    if base is None or src is None:
+        return []
+    dst_root = archive.child(base, archive.INBOX_DIR)
+    skip = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み")}
+    reg = read_json(REGISTRY) if REGISTRY.exists() else {}
+    lines = []
+    try:
+        files = sorted(f for f in src.rglob("*") if f.is_file() and f.suffix.lower() in AUDIO and not f.name.startswith((".", "~")))
+    except PermissionError:
+        return [f"✕ 「{src}」を読む許可がありません（フルディスクアクセスに python3 を追加）"]
+    for f in files:
+        rel = f.relative_to(src)
+        if any(_songs.norm(p) in skip for p in rel.parts[:-1]) or time.time() - f.stat().st_mtime < 15:
+            continue
+        folder = dst_root
+        for part in rel.parts[:-1]:
+            folder = archive.child(folder, part)
+        target = folder / f.name
+        if target.exists():
+            import filecmp
+            if filecmp.cmp(f, target, shallow=False):
+                f.unlink()   # SSD に同じものがある：予備のほうを消すだけ
+                lines.append(f"○ {rel}（SSD に同じものがあるので、予備のほうを片付けました）")
+                continue
+            n = 2
+            while target.exists():
+                target = folder / f"{f.stem}_{n}{f.suffix}"
+                n += 1
+        info = reg.get(_sig(f))
+        size = f.stat().st_size
+        shutil.move(str(f), str(target))
+        if target.stat().st_size != size:
+            lines.append(f"✕ {rel} を移せませんでした（大きさが合わない）")
+            continue
+        if info is not None:
+            reg[_sig(target)] = {**info, "moved_from": str(f)}
+        for s in _songs.all_songs():   # 取り込み記録の元の場所も書き換える
+            st = _songs.state(s)
+            if st.get("source") == str(f):
+                st["source"] = str(target)
+                _songs.save_state(s, st)
+        lines.append(f"○ {rel} → SSD の {archive.INBOX_DIR}/{target.relative_to(dst_root)}")
+    if lines:
+        REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+        REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    return lines
+
+
 def new_files() -> list[Path]:
     """見張るフォルダの中の、まだ取り込んでいない音源（ローカル保存の中・ダウンロード途中のものは除く）"""
     seen = read_json(REGISTRY) if REGISTRY.exists() else {}
@@ -283,6 +339,10 @@ def draft_fields(song: dict) -> dict:
     from _common import load_label
     label = load_label(song.get("label_slug"))
     folder, audio, cover = publish_folder(song)
+    if not (folder / audio).exists():   # ローカル保存から片付けたあと：SSD の公開セットを指す
+        sf, _ = archive.artist_folder(song["artist"], "music", _songs.folder_name(song))
+        if sf is not None and (sf / audio).exists():
+            folder = sf
     if song["kind"] == "debut" or not song.get("release_at"):
         when = "いちばん早い日（登録する日。DistroKid の画面で選べる最短の日付）"
     else:

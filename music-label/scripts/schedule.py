@@ -18,6 +18,8 @@
                             デビューから 6 か月ごとのアーティスト写真の刷新（refresh_photos.py）
     intake   SSD の「楽曲情報」か「SUNO楽曲」に曲が入ったとき＋10 分ごと  いいねしてダウンロードした曲を取り込み、音量・ジャケット・DistroKid の下書き・公開セットまで進める（publish.py scan）
     release  毎日 10:15     DistroKid に登録した曲が Spotify に出たかを確かめ、ISRC・UPC・配信 URL を楽曲管理シートに記録（publish.py track）
+    ssd      SSD をつないだとき  SSD が無い間に「ダウンロード/SUNO楽曲」へ入った曲を SSD の「楽曲情報」へ移し、ローカル保存の中身を SSD に写し、
+                            配信が始まった曲はローカル保存から片付けて、Mac に知らせる（archive_sync.py --on-mount → publish.py scan）
     webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
 
 使い方
@@ -62,6 +64,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
                  ["post_social.py", "refresh-ig"], ["plan_quarterly.py", "--if-quarter-start"], ["refresh_photos.py", "--due"]]),
     "intake":  ("Suno の曲の取り込み → 音量・ジャケット・DistroKid の下書き・公開セット", [["publish.py", "scan", "--quiet"]]),
     "release": ("配信の確認と ISRC・UPC・配信 URL の記録", [["publish.py", "track", "--quiet"]]),
+    "ssd":     ("SSD をつないだとき：楽曲のデータを SSD へ移す・保管・取り込み", [["archive_sync.py", "--on-mount"], ["publish.py", "scan", "--quiet"]]),
 }
 
 
@@ -87,12 +90,14 @@ def calendar(job: str) -> dict:
         return {"WatchPaths": [str(p) for p in publish.inboxes()], "StartInterval": 600}
     if job == "release":
         return {"StartCalendarInterval": [{"Hour": 10, "Minute": 15}]}
+    if job == "ssd":   # ドライブがつながるたびに動く（SSD でなければすぐ終わる）
+        return {"StartOnMount": True}
     raise KeyError(job)
 
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
-        "release": "15 10 * * *"}
+        "release": "15 10 * * *", "ssd": "*/30 * * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）
