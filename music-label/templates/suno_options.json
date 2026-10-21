@@ -1,35 +1,125 @@
 {
- "_使い方": "Suno の作曲画面の「高度な」→「その他のオプション」に、組ごとに入れる設定（browser_fill.py が自動で入れる）。Gon さんが自由に書き換えてよい。vocal_gender は male（男性）・female（女性）・null（選ばない）。weirdness・style_influence は 0〜100（%）。Suno の初期値はどちらも 50",
+ "_使い方": "Suno の作曲画面に、組ごとに入れる設定（suno_design.py が曲のイメージと合わせて設計図にし、browser_fill.py が入れる）。Gon さんが自由に書き換えてよい。vocal_gender は male（男性）・female（女性）・null（選ばない）。weirdness・style_influence は 0〜100（%。Suno の初期値はどちらも 50）。vocal_tag はスタイル欄の先頭近くに入れる声の説明（英語）。exclude は「除外するスタイル」に必ず入れる言葉（英語。設定書の禁止事項から）。persona は Suno で作ったペルソナの名前（声を毎回同じにする。作るまでは null）。extra_tags は、設定書の毎曲の癖にタグが無いものの英語のタグと入れる位置（歌詞に足りなければ自動で差し込む）",
  "_weirdness": "Weirdness（意外さ）：高いほど予想外の展開・音色になる。毎回同じ声と音で通したい組は低め",
  "_style_influence": "Style Influence（スタイルの効き具合）：高いほどスタイル欄の指定どおりになる。音の決まりが細かい組は高め",
  "declan_fay": {
   "vocal_gender": "male",
   "weirdness": 35,
   "style_influence": 70,
-  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、意外さは低め・スタイルは強め"
+  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、意外さは低め・スタイルは強め",
+  "vocal_tag": "warm low male baritone crooner vocals",
+  "persona": null,
+  "exclude": [
+   "sudden silence",
+   "EDM drop",
+   "four-on-the-floor",
+   "shouting",
+   "belting",
+   "guitar solo",
+   "saxophone solo",
+   "fast vibrato",
+   "heavy autotune",
+   "rap",
+   "growl",
+   "bright happy major"
+  ]
  },
  "hollowplan": {
   "vocal_gender": null,
   "weirdness": 55,
   "style_influence": 65,
-  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、意外さは少し高め"
+  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、意外さは少し高め",
+  "vocal_tag": "wordless breathy vocal chops",
+  "persona": null,
+  "exclude": [
+   "full sung verses",
+   "sudden silence",
+   "long riser build-up",
+   "EDM drop",
+   "supersaw lead",
+   "rap",
+   "pitched-up chipmunk vocals",
+   "heavy autotune",
+   "shouting"
+  ]
  },
  "nao_easterly": {
   "vocal_gender": "female",
   "weirdness": 30,
   "style_influence": 70,
-  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、意外さは低め・スタイルは強め"
+  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、意外さは低め・スタイルは強め",
+  "vocal_tag": "bright clear high female vocals",
+  "persona": null,
+  "exclude": [
+   "rap",
+   "sudden silence",
+   "distorted guitar",
+   "heavy autotune",
+   "sad ending",
+   "dark nightclub",
+   "whispered vocals",
+   "shouting",
+   "R&B vocal runs",
+   "trap hi-hats"
+  ]
  },
  "soft_cantilever": {
   "vocal_gender": "male",
   "weirdness": 40,
   "style_influence": 65,
-  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、意外さは中くらい"
+  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、意外さは中くらい",
+  "vocal_tag": "warm male lead vocals with female harmony",
+  "persona": null,
+  "exclude": [
+   "sudden silence",
+   "EDM drop",
+   "autotune effect",
+   "heavy distorted guitar",
+   "horn section",
+   "shouting",
+   "deep vibrato",
+   "whispered vocals",
+   "ballad"
+  ],
+  "extra_tags": [
+   {
+    "tag": "Female vocal pickup, 2-3 words",
+    "where": "プリコーラスの最後の 1 小節",
+    "why": "女性ボーカルが短い言葉を先に歌い、男性リードが受けてサビに入る"
+   },
+   {
+    "tag": "Bass slides up an octave",
+    "where": "サビに入る直前の 1 拍",
+    "why": "ベースが 1 オクターブ上へスライドしてサビの 1 拍目でルートに戻る"
+   },
+   {
+    "tag": "Guitar and bass unison riff, drum hits",
+    "where": "2 回目のサビのあと・ブリッジの前",
+    "why": "ギターとベースが同じ 2 小節のリフをユニゾンで弾き、ドラムがキメで合わせる"
+   }
+  ]
  },
  "tidewool": {
   "vocal_gender": null,
   "weirdness": 35,
   "style_influence": 60,
-  "_why": "男女 2 人の 3 度のハモりが持ち味。性別を 1 つ選ぶと片方の声だけになりやすいので選ばない。生楽器の自然な響きを残したいので、スタイルの効きは少しゆるめ"
+  "_why": "男女 2 人の 3 度のハモりが持ち味。性別を 1 つ選ぶと片方の声だけになりやすいので選ばない。生楽器の自然な響きを残したいので、スタイルの効きは少しゆるめ",
+  "vocal_tag": "male and female duet vocals, close harmony",
+  "persona": null,
+  "exclude": [
+   "synth pads",
+   "electronic drop",
+   "sudden silence break",
+   "belting",
+   "autotune effect",
+   "stadium chant",
+   "gospel runs",
+   "deep vibrato",
+   "heavy drums"
+  ]
+ },
+ "default": {
+  "model": "v5",
+  "_why": "Suno のいちばん新しいモデル。画面にあれば選ぶ（無ければ今のまま）"
  }
 }

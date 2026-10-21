@@ -604,17 +604,24 @@ def suno_page() -> tuple[str, int]:
                      '<p>ダッシュボード（http://localhost:8765）の「作曲待ちの曲を Suno に入力する」を押すと、専用のブラウザが開き、'
                      '下の内容が 1 曲ずつ Suno の欄に自動で入ります。内容を確かめて「Create」を押してください（押すのは Gon さんだけ）。</p>'
                      '<p>ターミナルからなら：<code>python3 scripts/browser_fill.py suno</code></p></section>')
+    import suno_design
     for i, s in enumerate(todo):
+        d = suno_design.design(s)   # 曲のイメージを Suno の全部の軸に写した設計図
         # Suno の「高度な」の画面の上から順（歌詞 → スタイル → 除外するスタイル → 曲のタイトル）
-        fields = [("歌詞（Lyrics）", "" if s.get("instrumental") else s.get("lyrics", "")), ("スタイル（Styles）", s["style"]),
-                  ("除外するスタイル（Exclude styles・「その他のオプション」の中）", s.get("exclude", "")), ("曲のタイトル（Song Title）", s["title"])]
+        fields = [("歌詞（Lyrics）", d["lyrics"]), ("スタイル（Styles）", d["style"]),
+                  ("除外するスタイル（Exclude styles・「その他のオプション」の中）", d["exclude"]), ("曲のタイトル（Song Title）", d["title"])]
         rows = "".join(
             f'<div class="f"><div class="h"><span>{E(k)}</span><button onclick="cp(\'t{i}_{j}\', this)">コピー</button></div>'
             f'<textarea id="t{i}_{j}" readonly rows="{(14, 4, 2, 1)[j]}">{E(v)}</textarea></div>'
             for j, (k, v) in enumerate(fields) if v)
-        opt = _songs.suno_options_text(s)
-        opt_html = f'<p>「その他のオプション」の設定（組ごとに決めたもの）：<b>{E(opt)}</b></p>' if opt else ""
-        cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}{opt_html}</section>')
+        ok, n = suno_design.score(d)
+        mark = {"ok": "✓", "warn": "⚠", "info": "＋"}
+        table = "".join(f"<tr><td>{E(k)}</td><td>{E(str(v)[:80] + ('…' if len(str(v)) > 80 else ''))}</td><td>{E(src)}</td></tr>" for k, v, src in d["map"])
+        checks = "".join(f"<li>{mark[st]} {E(k)}：{E(t)}</li>" for k, st, t in d["checks"])
+        design_html = (f'<details><summary>設計図：イメージの写し具合 {ok}／{n}（押すと、どの軸に何を入れたか）</summary>'
+                       f'<table class="map"><tr><th>Suno の軸</th><th>入れる値</th><th>イメージのどこから</th></tr>{table}</table>'
+                       f'<ul class="chk">{checks}</ul></details>')
+        cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}{design_html}</section>')
     page = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Suno に貼る内容</title><style>
 :root{{--bg:#f7f5f1;--fg:#222;--card:#fff;--line:#ddd;--accent:#7a5c2e}}
@@ -623,7 +630,7 @@ body{{background:var(--bg);color:var(--fg);font-family:-apple-system,"Hiragino S
 main{{max-width:860px;margin:auto}} section{{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin:16px 0}}
 h2 small{{font-weight:normal;opacity:.6;margin-left:8px;font-size:.7em}} textarea{{width:100%;box-sizing:border-box;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:8px;font:inherit}}
 .h{{display:flex;justify-content:space-between;align-items:center;margin-top:10px}} button{{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 14px;cursor:pointer}}
-ol{{padding-left:1.2em}}</style></head><body><main>
+ol{{padding-left:1.2em}} table.map{{border-collapse:collapse;width:100%;font-size:.85em;margin:8px 0}} .map td,.map th{{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}} ul.chk{{font-size:.85em;padding-left:1.2em}} details summary{{cursor:pointer;margin-top:10px;color:var(--accent)}}</style></head><body><main>
 <h1>Suno に貼る内容（{len(todo)} 曲）</h1>
 <p><b>入力は仕組みが自動でやります</b>（下の「自動で入力する」）。自分で貼るときは：</p>
 <ol><li>Suno の作曲画面の上で「高度な」を選び、下の欄を「コピー」して同じ名前の欄に貼る（上から 歌詞 → スタイル → 除外するスタイル〔「その他のオプション」の中〕→ 曲のタイトル）</li>

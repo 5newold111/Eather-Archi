@@ -58,8 +58,8 @@ LEARNED = OUT / "browser" / "fields.json"
 PROFILE = Path(os.environ.get("POSTDOG_BROWSER_PROFILE", str(Path.home() / ".postdog-browser")))
 AUTO = os.environ.get("POSTDOG_AUTOCONTINUE") == "1"   # 試験用：案内のボタンを待たずに進む
 # システムが絶対に押さないボタン（作成・送信・公開・購入・削除など）
-NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribute|buy|purchase|pay|checkout|subscribe|delete|remove|"
-                   r"作成|生成|送信|公開|配信|購入|支払|削除", re.I)
+NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribute|buy|purchase|pay|checkout|subscribe|delete|remove|upgrade|"
+                   r"作成|生成|送信|公開|配信|購入|支払|削除|アップグレード", re.I)
 
 # ページに毎回入れる下準備：欄の場所を言葉にする関数と、「クリックで教える」の受け取り
 INIT_JS = r"""
@@ -549,6 +549,56 @@ def set_choice(sess: Session, f: dict) -> bool | None:
     return choice_state(sess, f)
 
 
+MENU_ITEM_ROLES = ("option", "menuitem", "menuitemradio", "radio", "button")
+
+
+def _menu_button(sess: Session, f: dict):
+    """選ぶ項目を開くボタン（モデルなら v4.5・v5 のような文字のボタン）"""
+    rx = re.compile(f["button"], re.I)
+    for role in ("button", "combobox"):
+        c = _pick(sess.page.get_by_role(role, name=rx), None)
+        if c is not None:
+            return c
+    return None
+
+
+def menu_state(sess: Session, f: dict) -> bool | None:
+    btn = _menu_button(sess, f)
+    if btn is None:
+        return None
+    try:
+        text = (btn.inner_text(timeout=2000) or "") + " " + (btn.get_attribute("aria-label") or "")
+    except Exception:  # noqa: BLE001
+        return None
+    return bool(re.search(f["pick"], text, re.I))
+
+
+def set_menu(sess: Session, f: dict) -> bool | None:
+    """ボタンを開いて、名前の合う項目を選ぶ（モデル・ペルソナ）。有料の案内などは押さない"""
+    if menu_state(sess, f):
+        return True
+    btn = _menu_button(sess, f)
+    if btn is None:
+        return None
+    btn.click()
+    sess.page.wait_for_timeout(600)
+    rx = re.compile(f["pick"], re.I)
+    for role in MENU_ITEM_ROLES:
+        c = _pick(sess.page.get_by_role(role, name=rx), None)
+        if c is None:
+            continue
+        text = " ".join(filter(None, [c.inner_text(timeout=2000), c.get_attribute("aria-label") or ""]))
+        if NEVER.search(text):
+            break
+        c.click()
+        sess.page.wait_for_timeout(600)
+        break
+    if menu_state(sess, f) is not True:
+        sess.page.keyboard.press("Escape")   # 開いたままの一覧を閉じる
+        sess.page.wait_for_timeout(300)
+    return menu_state(sess, f)
+
+
 def teach(sess: Session, site: str, f: dict):
     """見つからない欄を、クリックで 1 回だけ教えてもらう"""
     sess.show(f"「{f['label']}」の欄が見つかりません",
@@ -632,6 +682,18 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
                         _option(sess, sum(x["options"].values(), [])) if x["type"] == "choice" else find(sess, site, x)) is None
                        for x in targets):
                 continue   # 中の欄が全部見えている＝もう開いている（押すと閉じてしまう）
+        if f["type"] == "menu":
+            try:
+                r = set_menu(sess, f)
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001
+                r = False
+            if r:
+                done.append(f["label"])
+            elif not f.get("optional"):
+                manual.append(f"{f['label']}：{f.get('show', f['value'])}（手で選んでください）")
+            continue
         if f["type"] == "choice":
             try:
                 r = set_choice(sess, f)
@@ -641,7 +703,7 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
                 r = False
             if r:
                 done.append(f["label"])
-            else:
+            elif not (r is None and f.get("quiet_unknown")):
                 manual.append(f"{f['label']}：{f.get('show', f['value'])}" + ("（状態が読めないので、手で選んでください）" if r is None else ""))
             continue
         if f["type"] == "slider":
@@ -688,11 +750,17 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
     for f in fields:
         if f.get("value") in (None, "") or f["type"] == "click":
             continue
+        if f["type"] == "menu":
+            r = menu_state(sess, f)
+            if r is not True:
+                (bad if r is False and not f.get("optional") else sess.unsure).append(
+                    f"{f['label']}：{f.get('show', f['value'])}" + ("になっていません" if r is False else "（画面で確かめてください）"))
+            continue
         if f["type"] == "choice":
             r = choice_state(sess, f)
             if r is False:
                 bad.append(f"{f['label']}：{f.get('show', f['value'])}になっていません")
-            elif r is None:
+            elif r is None and not f.get("quiet_unknown"):
                 sess.unsure.append(f"{f['label']}：{f.get('show', f['value'])}（画面で確かめてください）")
             continue
         if f["type"] == "slider":
@@ -740,44 +808,48 @@ def on_page(sess: Session, site: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-def _option_fields(song: dict) -> list[dict]:
-    """組ごとに決めた「その他のオプション」（templates/suno_options.json）"""
-    o = _songs.suno_options(song)
-    out = []
-    if "vocal_gender" in o:
-        g = o["vocal_gender"] or "none"
-        out.append({"key": "gender", "label": "ボーカルの性別（Vocal Gender）", "type": "choice", "value": g,
-                    "show": _songs.GENDER_JA.get(o["vocal_gender"], g),
-                    "options": {"male": ["男性", "Male"], "female": ["女性", "Female"]}})
-    if o.get("weirdness") is not None:
-        out.append({"key": "weirdness", "label": "Weirdness（意外さ）", "type": "slider", "value": int(o["weirdness"]),
-                    "hints": ["Weirdness", "奇抜さ", "奇妙さ", "ウィアードネス", "意外性"]})
-    if o.get("style_influence") is not None:
-        out.append({"key": "style_influence", "label": "Style Influence（スタイルの効き具合）", "type": "slider", "value": int(o["style_influence"]),
-                    "hints": ["Style Influence", "スタイルの影響", "スタイルの影響度", "スタイル影響", "スタイルの強さ"]})
-    return out
-
-
 def suno_fields(song: dict) -> list[dict]:
-    """Suno の作曲画面の「高度な」（Advanced）モードの欄。画面の上から順に入れる"""
+    """Suno の作曲画面の「高度な」（Advanced）モードの欄。値は設計図（suno_design.py）から。画面の上から順に入れる"""
+    import suno_design
+    d = suno_design.design(song)
     tip = "欄が見えないときは、画面の上の「高度な」を選び、「その他のオプション」を開いてからクリックしてください。"
-    return [
+    fields = []
+    if d.get("model"):
+        fields.append({"key": "model", "label": f"モデル（{d['model']}）", "type": "menu", "value": d["model"], "optional": True,
+                       "button": r"^\s*v\d", "pick": r"^\s*" + re.escape(d["model"]) + r"(\b|$|\s|\+)"})
+    fields += [
         {"key": "mode", "label": "「高度な」モード", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
          "hints": ["高度な", "高度", "Advanced", "Custom", "カスタム"]},
-        {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": "" if song.get("instrumental") else song.get("lyrics", ""),
+        {"key": "instrumental", "label": "インスト（歌なし）", "type": "choice", "value": "on" if d["instrumental"] else "none",
+         "show": "オン" if d["instrumental"] else "オフ", "options": {"on": ["Instrumental", "インストゥルメンタル", "インスト"]},
+         "quiet_unknown": not d["instrumental"]},   # 歌のある曲で、スイッチの状態が読めないだけなら知らせない（初期はオフ）
+        {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": d["lyrics"],
          "hints": ["Lyrics", "歌詞", "Write some lyrics", "Write your own lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル",
          "largest_textarea": True, "tip": tip, "show": "（歌詞はダッシュボードの「Suno に貼る内容」からコピー）"},
-        {"key": "style", "label": "スタイル（Styles）", "type": "text", "value": song.get("style", ""),
+        {"key": "style", "label": "スタイル（Styles）", "type": "text", "value": d["style"],
          "hints": ["Style of Music", "Styles", "Style", "スタイル", "音楽のスタイル"], "avoid": r"exclude|除外|lyrics|歌詞", "tip": tip},
         {"key": "more", "label": "その他のオプション", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
          "only_if_missing": ["exclude", "gender", "weirdness", "style_influence"],
          "hints": ["その他のオプション", "詳細オプション", "More Options", "More options", "オプション"]},
-        {"key": "exclude", "label": "除外するスタイル（Exclude styles）", "type": "text", "value": song.get("exclude", ""),
+        {"key": "exclude", "label": "除外するスタイル（Exclude styles）", "type": "text", "value": d["exclude"],
          "hints": ["Exclude styles", "Exclude", "除外"], "tip": tip},
-        *_option_fields(song),
-        {"key": "title", "label": "曲のタイトル（Song Title）", "type": "text", "value": song["title"],
-         "hints": ["Song Title", "Title", "曲のタイトル", "タイトル", "曲名"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip},
     ]
+    if d["vocal_gender"] != "unset" and not d["instrumental"]:
+        g = d["vocal_gender"] or "none"
+        fields.append({"key": "gender", "label": "ボーカルの性別（Vocal Gender）", "type": "choice", "value": g,
+                       "show": _songs.GENDER_JA.get(d["vocal_gender"], g), "options": {"male": ["男性", "Male"], "female": ["女性", "Female"]}})
+    if d.get("weirdness") is not None:
+        fields.append({"key": "weirdness", "label": "Weirdness（意外さ）", "type": "slider", "value": int(d["weirdness"]),
+                       "hints": ["Weirdness", "奇抜さ", "奇妙さ", "ウィアードネス", "意外性"]})
+    if d.get("style_influence") is not None:
+        fields.append({"key": "style_influence", "label": "Style Influence（スタイルの効き具合）", "type": "slider", "value": int(d["style_influence"]),
+                       "hints": ["Style Influence", "スタイルの影響", "スタイルの影響度", "スタイル影響", "スタイルの強さ"]})
+    if d.get("persona"):
+        fields.append({"key": "persona", "label": f"ペルソナ（{d['persona']}）", "type": "menu", "value": d["persona"],
+                       "button": r"persona|ペルソナ", "pick": r"^\s*" + re.escape(d["persona"]) + r"\s*$"})
+    fields.append({"key": "title", "label": "曲のタイトル（Song Title）", "type": "text", "value": d["title"],
+                   "hints": ["Song Title", "Title", "曲のタイトル", "タイトル", "曲名"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip})
+    return fields
 
 
 def wait_for_form(sess: Session, name: str, how: str) -> bool:
@@ -833,7 +905,12 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         else:
             ok_songs.append(name)
             print(f"   ✓ {name}：作曲画面の欄を読み返して、全部入っていることを確かめました（" + "・".join(done) + "）")
-        lines = [f"{name}（{n}／{len(songs)} 曲目）"]
+        import suno_design
+        dz = suno_design.design(song)
+        sc_ok, sc_n = suno_design.score(dz)
+        lines = [f"{name}（{n}／{len(songs)} 曲目）",
+                 f"イメージの写し具合：{sc_ok}／{sc_n}（設定書の特徴語・禁止事項・毎曲の癖が、Suno の欄に入っているか）",
+                 *[f"⚠ {k}：{t}" for k, st, t in dz["checks"] if st == "warn"]]
         if bad:
             lines += ["⚠ 次の欄が入っていません。手で入れてください：", *bad]
             if manual:

@@ -52,7 +52,7 @@ def debut_songs() -> list[dict]:
                 "title": s.get("title", ""), "alts": list(s.get("title_alt") or []), "week": kit_json.parent.name,
                 "release_at": None, "style": s.get("style", ""), "lyrics": s.get("lyrics", ""),
                 "exclude": s.get("exclude", ""), "genre": list(s.get("genre") or []), "language": s.get("language", ""),
-                "instrumental": bool(s.get("instrumental")), "brief": None, "kit": kit_json.parent,
+                "instrumental": bool(s.get("instrumental")), "brief": None, "kit": kit_json.parent, "bpm": s.get("bpm"),
             })
     return out
 
@@ -81,7 +81,8 @@ def weekly_songs() -> list[dict]:
             "lyrics": lyr.read_text(encoding="utf-8") if lyr.exists() else str(b.get("suno_lyrics") or ""),
             "exclude": b.get("suno_exclude", "") or "", "genre": list((a.get("sound") or {}).get("genres") or [])[:2],
             "language": b.get("language") or (a.get("lyrics") or {}).get("language", ""),
-            "instrumental": b.get("language") == "none", "brief": p, "kit": None,
+            "instrumental": b.get("language") == "none", "brief": p, "kit": None, "bpm": b.get("bpm"),
+            "suno_options": b.get("suno_settings") or {},
         })
     return out
 
@@ -161,7 +162,8 @@ GENDER_JA = {"male": "男性", "female": "女性", None: "選ばない"}
 def suno_options(song: dict) -> dict:
     """{'vocal_gender': 'male'|'female'|None, 'weirdness': 0〜100, 'style_influence': 0〜100}。曲ごとの指定（song['suno_options']）が優先"""
     d = read_json(SUNO_OPTIONS) if SUNO_OPTIONS.exists() else {}
-    opt = {k: v for k, v in (d.get(song.get("slug", ""), {}) or {}).items() if not k.startswith("_")}
+    opt = {k: v for k, v in (d.get("default") or {}).items() if not k.startswith("_")}   # 全組共通（モデルなど）
+    opt.update({k: v for k, v in (d.get(song.get("slug", ""), {}) or {}).items() if not k.startswith("_")})
     opt.update(song.get("suno_options") or {})
     return opt
 
@@ -170,11 +172,13 @@ def suno_options_text(song: dict) -> str:
     o = suno_options(song)
     if not o:
         return ""
-    parts = []
+    parts = [f"モデル：{o['model']}"] if o.get("model") else []
     if "vocal_gender" in o:
         parts.append(f"ボーカルの性別：{GENDER_JA.get(o['vocal_gender'], o['vocal_gender'])}")
     if o.get("weirdness") is not None:
         parts.append(f"Weirdness：{o['weirdness']}%")
     if o.get("style_influence") is not None:
         parts.append(f"Style Influence：{o['style_influence']}%")
+    if o.get("persona"):
+        parts.append(f"ペルソナ：{o['persona']}")
     return "・".join(parts)
