@@ -619,19 +619,12 @@ def set_slider(sess: Session, loc, target: float, tol: float = 2) -> bool:
     return abs(_slider_value(loc) - target) <= tol
 
 
-def _scope(sess: Session, f: dict):
-    """f['near']（見出しの言葉）があれば、その近くのかたまりの中だけを探す"""
-    for h in f.get("near") or []:
-        sel = sess.js(BELOW_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", 90]) or \
-            sess.js(NEAR_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", False])
-        if sel:
-            box = sess.js("""(sel) => { const b = document.querySelector(sel); let up = b;
-                for (let i = 0; i < 4 && up.parentElement; i++) { up = up.parentElement;
-                  if (up.querySelectorAll('button,[role=radio],[role=tab],[role=switch],[role=checkbox]').length >= 2) break; }
-                return window.__postdogSel(up); }""", sel)
-            if box:
-                return sess.page.locator(box).first
-    return sess.page
+LABEL_POS_JS = r"""(hints) => { for (const hint of hints) { const want = hint.trim().toLowerCase();
+    for (const el of document.querySelectorAll('label,span,div,p,h2,h3,h4,legend,button')) {
+      if (el.closest('#postdog-overlay')) continue;
+      if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase() === want)) continue;
+      const r = el.getBoundingClientRect(); if (r.width > 0 && r.height > 0) return {x: r.left, y: r.top}; } }
+    return null; }"""
 
 
 def _sec(text: str) -> int | None:
@@ -681,13 +674,35 @@ def slider_ok(sess: Session, f: dict) -> bool:
 
 
 def _option(sess: Session, hints: list[str], f: dict | None = None):
-    page = _scope(sess, f) if f else sess.page
+    """名前の合うボタン。画面に 1 つしか無ければそれ（Male・Female など）。
+    同じ名前が何か所にもあるとき（Off・On）は、見出し（f['near']）にいちばん近いもの。近くに無ければ使わない（取り違えないように）"""
+    cands = []
     for h in hints:
         rx = re.compile(r"^\s*" + re.escape(h) + r"\s*$", re.I)
         for role in ("button", "radio", "tab", "checkbox", "switch", "option"):
-            c = _pick(page.get_by_role(role, name=rx), None)
-            if c is not None:
-                return c
+            loc = sess.page.get_by_role(role, name=rx)
+            try:
+                cands += [loc.nth(i) for i in range(min(loc.count(), 10)) if loc.nth(i).is_visible()
+                          and not loc.nth(i).evaluate("e => !!e.closest('#postdog-overlay')")]
+            except Exception:  # noqa: BLE001
+                continue
+        if cands:
+            break
+    if cands:
+        if len(cands) == 1 or not (f and f.get("near")):
+            return cands[0]
+        pos = sess.js(LABEL_POS_JS, f["near"])
+        best, bd = None, 1e9
+        for c in cands if pos else []:
+            b = c.bounding_box()
+            if not b:
+                continue
+            dy = b["y"] - pos["y"]
+            if -20 <= dy <= 150:
+                d = abs(dy) + 0.2 * abs(b["x"] - pos["x"])
+                if d < bd:
+                    best, bd = c, d
+        return best
     if f is not None and len(f.get("options", {})) == 1:   # オン・オフのスイッチ：名前が無くても、見出しの横のものを使う
         for h in hints:
             sel = sess.js(NEAR_JS, [h, "[role=switch],input[type=checkbox],button[aria-checked],button[aria-pressed]", True])
@@ -738,8 +753,12 @@ def choice_state(sess: Session, f: dict) -> bool | None:
 def set_choice(sess: Session, f: dict) -> bool | None:
     """希望どおりに選ぶ（ボーカルの性別など）。状態が読めないボタンは押さない"""
     got = _states(sess, f)
+    if not got:
+        sess.log.append(f"{f['label']}：ボタンが見つかりません（{'・'.join(sum(f['options'].values(), [])[:6])}）")
     if any(st == "unknown" for _, st in got.values()):
+        sess.log.append(f"{f['label']}：状態が読めないので押していません（{_look(sess, f)}）")
         return None
+    pressed = False
     # 選ぶほうを先に押す（2 つのうち 1 つを選ぶ作りなら、それだけで切り替わる）
     for opt, (loc, st) in sorted(got.items(), key=lambda kv: kv[0] != f["value"]):
         st = _states(sess, f).get(opt, [loc, st])[1]
@@ -759,6 +778,9 @@ def set_choice(sess: Session, f: dict) -> bool | None:
                     sess.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
                     sess.page.wait_for_timeout(600)
             sess.log.append(f"{f['label']}：押す前 {before} → 「{opt}」を押した → 押した後 {_look(sess, f)}")
+            pressed = True
+    if got and not pressed:
+        sess.log.append(f"{f['label']}：もう希望どおりなので押していません（{_look(sess, f)}）")
     return choice_state(sess, f)
 
 
