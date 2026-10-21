@@ -500,7 +500,9 @@ STATE_CORE = r"""
   const read = x => { if (!x || !x.getAttribute) return null;
     const a = x.getAttribute('aria-pressed') ?? x.getAttribute('aria-checked') ?? x.getAttribute('aria-selected');
     if (a === 'true') return 'on'; if (a === 'false') return 'off';
-    const ds = x.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
+    const ds = x.getAttribute('data-state');
+    if (/^(on|active|checked|selected)$/.test(ds || '')) return 'on';
+    if (/^(off|inactive|unchecked|unselected)$/.test(ds || '')) return 'off';   // "closed" "delayed-open" など（吹き出しの目印）は使わない
     for (const k of ['data-selected', 'data-active', 'data-checked']) if (x.hasAttribute(k)) return x.getAttribute(k) === 'false' ? 'off' : 'on';
     const hs = x.getAttribute('data-headlessui-state'); if (hs !== null) return /checked|selected|active/.test(hs) ? 'on' : 'off';
     if (x.matches && x.matches('input[type=radio],input[type=checkbox]')) return x.checked ? 'on' : 'off';
@@ -510,12 +512,13 @@ STATE_CORE = r"""
   const holder = e => { if (read(e)) return e;
     // 文字のボタンの中や横にスイッチがある作り（そのスイッチが状態を持つ）
     for (let up = e, i = 0; i < 3 && up; i++, up = up.parentElement) {
-      const sw = [...up.querySelectorAll('[role=switch],input[type=checkbox],input[type=radio],[aria-checked],[aria-pressed],[data-state]')].filter(x => x !== e);
+      const sw = [...up.querySelectorAll('[role=switch],input[type=checkbox],input[type=radio],[aria-checked],[aria-pressed]')].filter(x => x !== e);
       if (sw.length === 1 && read(sw[0])) return sw[0];
       if (sw.length > 1) break;
     }
     return null; };"""
 STATE_JS = "e => {" + STATE_CORE + " const h = holder(e); return h ? read(h) : 'unknown'; }"
+SELF_STATE_JS = "e => {" + STATE_CORE + " return read(e) || 'unknown'; }"   # そのボタン自身の目印だけ
 HOLDER_JS = "e => {" + STATE_CORE + " const h = holder(e); return h && h !== e ? window.__postdogSel(h) : null; }"
 NEAR_JS = r"""([hint, sel, unique]) => { const want = hint.trim().toLowerCase();
     for (const el of document.querySelectorAll('label,span,div,p,h3,h4,legend')) {
@@ -697,8 +700,9 @@ def _states(sess: Session, f: dict) -> dict:
     for opt, hints in f["options"].items():
         loc = _option(sess, hints, f)
         if loc is not None:
-            st = loc.evaluate(STATE_JS)
-            if st == "unknown" and len(f["options"]) >= 2:   # 見た目の種類で読む（選ばれている方が目立つ種類になる作り）
+            multi = len(f["options"]) >= 2
+            st = loc.evaluate(SELF_STATE_JS if multi else STATE_JS)   # 2 つから選ぶボタンは、そのボタン自身だけを見る
+            if st == "unknown" and multi:   # 見た目の種類で読む（Suno は選ばれている方が standard、選ばれていない方が tertiary）
                 cls = loc.get_attribute("class") or ""
                 st = "off" if re.search(r"variant-tertiary", cls) else ("on" if re.search(r"variant-(standard|primary|secondary)", cls) else st)
             got[opt] = [loc, st]
@@ -732,7 +736,7 @@ def set_choice(sess: Session, f: dict) -> bool | None:
             text = " ".join(filter(None, [loc.inner_text(timeout=2000), loc.get_attribute("aria-label") or ""]))
             if NEVER.search(text):
                 return False
-            h = loc.evaluate(HOLDER_JS)   # 状態を持っているのが横のスイッチなら、そちらを押す
+            h = loc.evaluate(HOLDER_JS) if len(f["options"]) == 1 else None   # 1 つだけのスイッチ：状態を持つ横のスイッチを押す
             (sess.page.locator(h).first if h else loc).click()
             sess.page.wait_for_timeout(400)
     return choice_state(sess, f)
