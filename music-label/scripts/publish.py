@@ -7,10 +7,11 @@
      Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る。Claude は欄を埋めて止まる（決定 19）。
      内容を確かめて「Create」を押すのはオーナーだけ。自分で貼るときは、ページのコピーボタンから
   2. できたテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードして
-     ダウンロードの「SUNO楽曲」フォルダに入れる（WAV がおすすめ。ファイル名は Suno が付けた曲名のままでよい）
+     SSD の「Postdog Records/楽曲情報」に入れる（Suno のアプリの保存先をここにする。SSD が無いときは「ダウンロード/SUNO楽曲」）。
+     WAV がおすすめ。ファイル名は Suno が付けた曲名のままでよい
   3. DistroKid の画面で、Claude が入れた下書きを確かめて、最後の登録ボタンを押す
 
-ここから先は自動（Mac の定期実行が「SUNO楽曲」フォルダを見張っていて、曲が入ると数分以内に動く）：
+ここから先は自動（Mac の定期実行が「楽曲情報」と「SUNO楽曲」を見張っていて、曲が入ると数分以内に動く）：
   ・ファイル名（とフォルダ名）から、どの曲かを見分ける（曲名・曲名の別案・アーティスト名）
   ・選んだテイクとして記録し、音量を配信向けに整える（-14 LUFS / -1 dBTP・44.1kHz / 24bit の WAV）
   ・ジャケットを用意する（デビュー曲で無ければ自動で作る）
@@ -22,7 +23,7 @@
 使い方：
   python3 scripts/publish.py suno [--open]          # Suno に貼る内容のページを作る（--open でブラウザで開く）
   python3 scripts/publish.py suno-request [曲 ID]   # Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文
-  python3 scripts/publish.py scan                   # 「SUNO楽曲」に入った曲を取り込んで、公開の準備まで進める（定期実行でも動く）
+  python3 scripts/publish.py scan                   # 「楽曲情報」「SUNO楽曲」に入った曲を取り込んで、公開の準備まで進める（定期実行でも動く）
   python3 scripts/publish.py status                 # 曲ごとの進み具合
   python3 scripts/publish.py draft PDR-001          # DistroKid の下書きを表示（Claude がブラウザで入力するときにも使う）
   python3 scripts/publish.py registered PDR-001     # DistroKid に登録した（配信日は --date。省くと今日＝いちばん早い日）
@@ -31,7 +32,7 @@
 鍵（music-label/.env。会話には貼らない）：
   SPOTIFY_CLIENT_ID・SPOTIFY_CLIENT_SECRET … 配信の確認と ISRC の自動記録（Spotify for Developers で無料で作れる）
   OWNER_LEGAL_NAME                          … DistroKid の作詞作曲者の欄に入れる本名（手元だけ。GitHub には入らない）
-  SUNO_INBOX                                … 見張るフォルダを変えるとき（既定：ダウンロード/SUNO楽曲）
+  SUNO_INBOX                                … 見張るフォルダを変えるとき（既定：SSD の Postdog Records/楽曲情報 と ダウンロード/SUNO楽曲）
 """
 from __future__ import annotations
 
@@ -71,37 +72,51 @@ STATUS_JA = {
 
 # ---------------------------------------------------------------------------
 # 見張るフォルダ
-def inbox() -> Path:
+def inboxes() -> list[Path]:
+    """見張るフォルダ（上から順に）：
+      1. SSD の Postdog Records/楽曲情報（Suno のアプリの保存先。SSD がつながっているとき）
+      2. ダウンロード/SUNO楽曲（予備。SSD が無いときにダウンロードしたもの）
+    .env の SUNO_INBOX（; で区切って複数可）を書くと、そちらだけを見る"""
     env = os.environ.get("SUNO_INBOX", "").strip()
     if env:
-        return Path(env).expanduser()
-    return archive.child(archive._mkdir(Path.home() / "Downloads"), archive.LOCAL_PARENT)
+        return [Path(x.strip()).expanduser() for x in env.split(";") if x.strip()]
+    out = []
+    base, _ = archive.root()
+    if base is not None:
+        out.append(archive.child(base, archive.INBOX_DIR))
+    out.append(archive.child(archive._mkdir(Path.home() / "Downloads"), archive.LOCAL_PARENT))
+    return out
+
+
+def inbox() -> Path:
+    """いちばん目の見張るフォルダ（表示用）"""
+    return inboxes()[0]
 
 
 def new_files() -> list[Path]:
-    """「SUNO楽曲」の中の、まだ取り込んでいない音源（ローカル保存の中・ダウンロード途中のものは除く）"""
-    box = inbox()
-    if not box.is_dir():
-        return []
+    """見張るフォルダの中の、まだ取り込んでいない音源（ローカル保存の中・ダウンロード途中のものは除く）"""
     seen = read_json(REGISTRY) if REGISTRY.exists() else {}
     skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み")}
     out = []
-    try:
-        listing = sorted(box.rglob("*"))
-    except PermissionError:
-        print("   ✕ 「ダウンロード」フォルダを読む許可がありません。システム設定 → プライバシーとセキュリティ → フルディスクアクセス に"
-              " python3（/usr/bin/python3 など）を追加してください")
-        return []
-    for f in listing:
-        if not f.is_file() or f.suffix.lower() not in AUDIO or f.name.startswith((".", "~")):
+    for box in inboxes():
+        if not box.is_dir():
             continue
-        if any(_songs.norm(p) in skip_dirs for p in f.relative_to(box).parts[:-1]):
+        try:
+            listing = sorted(box.rglob("*"))
+        except PermissionError:
+            print(f"   ✕ 「{box}」を読む許可がありません。システム設定 → プライバシーとセキュリティ → フルディスクアクセス に"
+                  " python3（/usr/bin/python3 など）を追加してください")
             continue
-        st = f.stat()
-        if time.time() - st.st_mtime < 15:      # ダウンロードの途中かもしれない
-            continue
-        if _sig(f) not in seen:
-            out.append(f)
+        for f in listing:
+            if not f.is_file() or f.suffix.lower() not in AUDIO or f.name.startswith((".", "~")):
+                continue
+            if any(_songs.norm(p) in skip_dirs for p in f.relative_to(box).parts[:-1]):
+                continue
+            st = f.stat()
+            if time.time() - st.st_mtime < 15:      # ダウンロードの途中かもしれない
+                continue
+            if _sig(f) not in seen:
+                out.append(f)
     return out
 
 
@@ -157,7 +172,10 @@ def take_in(song: dict, f: Path) -> None:
     """いいねしたテイクを選んだテイクとして記録する（同じ曲に新しいファイルが来たら、そちらに差し替える）"""
     tdir = OUT / "takes" / song["key"]
     tdir.mkdir(parents=True, exist_ok=True)
-    dst = tdir / f"suno_{_songs.safe(f.stem)}{f.suffix.lower()}"
+    day = made_on(f)
+    stem = _songs.audio_stem(song, day)
+    f = rename_in_inbox(f, stem)
+    dst = tdir / f"{stem}{f.suffix.lower()}"
     shutil.copy2(f, dst)
     sel_p = tdir / "selection.json"
     sel = read_json(sel_p) if sel_p.exists() else {}
@@ -169,9 +187,37 @@ def take_in(song: dict, f: Path) -> None:
     sel.pop("master", None)
     sel_p.write_text(json.dumps(sel, ensure_ascii=False, indent=1), encoding="utf-8")
     st = _songs.state(song)
-    st.update({"status": "imported", "take": dst.name, "source": str(f), "imported_at": sel["decision"]["at"]})
+    st.update({"status": "imported", "take": dst.name, "source": str(f), "imported_at": sel["decision"]["at"], "generated_on": day})
     _songs.save_state(song, st)
     print(f"   ○ {song['artist']}「{song['title']}」のテイクとして取り込みました：{f.name}" + (f"（前の {prev} から差し替え）" if prev and prev != dst.name else ""))
+
+
+def made_on(f: Path) -> str:
+    """ファイルが作られた日（Suno でダウンロードした日＝生成日として使う。Mac は作成日、無ければ更新日）"""
+    st = f.stat()
+    ts = getattr(st, "st_birthtime", None) or st.st_mtime
+    return date.fromtimestamp(ts).isoformat()
+
+
+def rename_in_inbox(f: Path, stem: str) -> Path:
+    """取り込んだファイルの名前を <曲名>_<アーティスト名>_<生成日> にそろえる（同じフォルダの中で名前だけ変える）"""
+    new = f.with_name(f"{stem}{f.suffix.lower()}")
+    if new == f:
+        return f
+    n = 2
+    while new.exists():
+        new = f.with_name(f"{stem}_{n}{f.suffix.lower()}")
+        n += 1
+    try:
+        f.rename(new)
+    except OSError:
+        return f
+    reg = read_json(REGISTRY) if REGISTRY.exists() else {}
+    reg[_sig(new)] = {"renamed_from": f.name, "at": datetime.now().isoformat(timespec="seconds")}
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"   ○ 名前をそろえました：{f.name} → {new.name}")
+    return new
 
 
 def advance(song: dict) -> str:
@@ -229,7 +275,7 @@ def publish_folder(song: dict) -> tuple[Path, str, str]:
     stem = _songs.cover_stem(song)
     cover = _songs.cover_source(song)
     cover_name = archive.numbered(folder, stem, cover) if cover else ""
-    return folder, f"{stem}_master.wav", cover_name
+    return folder, f"{_songs.audio_stem(song)}.wav", cover_name
 
 
 def draft_fields(song: dict) -> dict:
@@ -294,10 +340,10 @@ def cmd_scan(args) -> int:
         if cur is None or f.stat().st_mtime > cur[1].stat().st_mtime:   # 同じ曲が 2 本あれば新しい方
             picked[song["key"]] = (song, f)
         reg[_sig(f)] = {"song": song["id"], "at": datetime.now().isoformat(timespec="seconds")}
-    for song, f in picked.values():
-        take_in(song, f)
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    for song, f in picked.values():
+        take_in(song, f)   # ファイルの名前を <曲名>_<アーティスト名>_<生成日> にそろえ、登録簿にも足す
     # 取り込んだ曲・待っている曲を進める
     ready = []
     for song in songs:
@@ -313,7 +359,7 @@ def cmd_scan(args) -> int:
     if picked or ready:
         _book()
     if not files and not args.quiet:
-        print(f"－ 「{inbox()}」に新しい曲はありませんでした")
+        print(f"－ 新しい曲はありませんでした（見ているところ：{'、'.join(str(b) for b in inboxes())}）")
     return 0
 
 
@@ -327,7 +373,7 @@ def _book() -> None:
 
 # ---------------------------------------------------------------------------
 def cmd_status(args) -> int:
-    print(f"見張っているフォルダ：{inbox()}")
+    print("見張っているフォルダ：" + "、".join(str(b) for b in inboxes()))
     for s in _songs.all_songs():
         if str(s["week"]).startswith("2000-"):
             continue
@@ -503,7 +549,7 @@ ol{{padding-left:1.2em}}</style></head><body><main>
 <ol><li>Suno の Create 画面で「Custom」を選び、下の欄を「コピー」して同じ名前の欄に貼る</li>
 <li>「Create」を押す（押すのはオーナーだけ）</li>
 <li>できた 2 つのテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードする（WAV がおすすめ）</li>
-<li>ダウンロードしたファイルを「ダウンロード → SUNO楽曲」に入れる。ここから先は自動で公開の準備まで進みます</li></ol>
+<li>ダウンロードしたファイルを SSD の「Postdog Records → 楽曲情報」に入れる（Suno のアプリの保存先をここにしておく。SSD が無いときは「ダウンロード → SUNO楽曲」）。ここから先は自動で公開の準備まで進みます</li></ol>
 {''.join(cards) or '<p>いま Suno で作る曲はありません。</p>'}
 </main><script>function cp(id,b){{const t=document.getElementById(id);const done=()=>{{b.textContent='コピーしました';setTimeout(()=>b.textContent='コピー',1500)}};
 if(navigator.clipboard&&window.isSecureContext){{navigator.clipboard.writeText(t.value).then(done)}}else{{t.removeAttribute('readonly');t.select();document.execCommand('copy');t.setAttribute('readonly','');done()}}}}</script></body></html>"""
@@ -533,7 +579,7 @@ def cmd_suno_request(args) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno の曲を取り込み、DistroKid の登録ボタンを押すだけの状態まで進める")
     sub = ap.add_subparsers(dest="cmd")
-    p = sub.add_parser("scan", help="「SUNO楽曲」の新しい曲を取り込んで公開の準備まで進める")
+    p = sub.add_parser("scan", help="「楽曲情報」「SUNO楽曲」の新しい曲を取り込んで公開の準備まで進める")
     p.add_argument("--quiet", action="store_true")
     sub.add_parser("status", help="曲ごとの進み具合")
     p = sub.add_parser("draft", help="DistroKid の下書きを表示")

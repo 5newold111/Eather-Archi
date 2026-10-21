@@ -16,7 +16,7 @@
     backup   毎日 03:30     情報・写真・ジャケット・楽曲を外付け SSD（DS72）に保管・楽曲管理シートを書き直し、SSD の中身ごと Cloudflare R2 にも予備保管
     monthly  毎月 1 日 09:00  月 1 組の追加と週の曲数の確認、Instagram の鍵の延長、四半期の EP 計画（1・4・7・10 月）、
                             デビューから 6 か月ごとのアーティスト写真の刷新（refresh_photos.py）
-    intake   「SUNO楽曲」に曲が入ったとき＋10 分ごと  いいねしてダウンロードした曲を取り込み、音量・ジャケット・DistroKid の下書き・公開セットまで進める（publish.py scan）
+    intake   SSD の「楽曲情報」か「SUNO楽曲」に曲が入ったとき＋10 分ごと  いいねしてダウンロードした曲を取り込み、音量・ジャケット・DistroKid の下書き・公開セットまで進める（publish.py scan）
     release  毎日 10:15     DistroKid に登録した曲が Spotify に出たかを確かめ、ISRC・UPC・配信 URL を楽曲管理シートに記録（publish.py track）
     webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
 
@@ -84,7 +84,7 @@ def calendar(job: str) -> dict:
     if job == "intake":   # フォルダに何か入ったらすぐ。念のため 10 分ごとにも見る
         sys.path.insert(0, str(S))
         import publish
-        return {"WatchPaths": [str(publish.inbox())], "StartInterval": 600}
+        return {"WatchPaths": [str(p) for p in publish.inboxes()], "StartInterval": 600}
     if job == "release":
         return {"StartCalendarInterval": [{"Hour": 10, "Minute": 15}]}
     raise KeyError(job)

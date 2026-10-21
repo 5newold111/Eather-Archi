@@ -13,7 +13,8 @@
      01_情報/      設定書（templates/artists/<組>.json）とプロフィール（out/profiles/<組>.md・.json）
      02_写真/      デビュー用の作業セットの写真（<アーティスト名>_photo.jpg・_photo2.jpg）と、選ばれたデビュー写真・ロゴ
      03_ジャケット/ 曲ごとのジャケット（<アーティスト名>_<曲名>_1.jpg。作り直すと _2・_3 …）
-     04_楽曲/<曲名>/ 公開セット：配信用の音源（master.wav）・ジャケット・DistroKid の下書き（登録シート）・
+     04_楽曲/<曲名>/ 公開セット：配信用の音源（<曲名>_<アーティスト名>_<生成日>.wav）・Suno の元データ（…_Suno元データ.wav）・
+                   ジャケット・DistroKid の下書き（登録シート）・
                    選んだテイク・歌詞。ここを開けば DistroKid に登録できる（曲名が未定の間は <週>）
   01_管理表・03_作業書は SSD にだけ置く（SSD が無いときは書き込みを保留）
 
@@ -84,7 +85,8 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
         if not master.exists():
             continue   # 公開セットは、配信用の音源ができてから作る
         sub = _songs.folder_name(song)
-        out.append(("music", sub, master, f"{stem}_master.wav"))
+        astem = _songs.audio_stem(song)   # 楽曲データ：<曲名>_<アーティスト名>_<生成日>
+        out.append(("music", sub, master, f"{astem}.wav"))
         if cover:
             out.append(("music", sub, cover, "#" + stem))
         lyr = OUT / "briefs" / f"{song['key']}.lyrics_final.txt"
@@ -95,7 +97,7 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
             chosen = read_json(sel).get("decision", {}).get("selected")
             src = sel.parent / chosen if chosen else None
             if src and src.exists():
-                out.append(("music", sub, src, f"{stem}_選んだテイク{src.suffix.lower()}"))   # 差し替えると前の版は _old
+                out.append(("music", sub, src, f"{astem}_Suno元データ{src.suffix.lower()}"))
         for f in sorted((OUT / "publish" / song["key"]).glob("*")):   # publish.py：DistroKid の下書き・歌詞など
             if f.is_file():
                 out.append(("music", sub, f, f"{stem}_{f.name}"))

@@ -25,6 +25,7 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
         04_楽曲/<曲名>/ 公開セット：配信用の音源・ジャケット・DistroKid の下書き・選んだテイク・歌詞
     03_作業書/      デビュー_<日付>/ 作業書（PDF）・曲の情報・画像の依頼文
     09_移行前/      Google から移したもの（オーナーが入れる。機械は触らない）
+    楽曲情報/       Suno からダウンロードした曲（Suno のアプリの保存先。publish.py が見張って取り込む）
   前の並び（アーティスト情報・管理表・写真 など）で保管したものは、見つけしだい新しい名前へ移す。
 
 フォルダ名は、大文字・小文字、全角・半角、Mac の濁点の持ち方（NFD／NFC）の違いを同じ名前として扱う。
@@ -46,6 +47,7 @@ BOOK_DIR = "01_管理表"
 ARTIST_DIR = "02_アーティスト"
 KIT_DIR = "03_作業書"
 OLD_DIR = "09_移行前"
+INBOX_DIR = "楽曲情報"   # Suno からダウンロードした曲を入れるところ（publish.py が見張る。オーナーの指定 2026-10-21）
 SUBS = {"info": "01_情報", "photo": "02_写真", "cover": "03_ジャケット", "music": "04_楽曲"}
 # 前の並びの名前 → 新しい名前
 _RENAME_TOP = {"管理表": BOOK_DIR, "アーティスト情報": ARTIST_DIR}
@@ -98,6 +100,7 @@ def migrate(base: Path) -> None:
         return
     _migrated.add(str(base))
     _mkdir(base / OLD_DIR)   # Google などから移すものを入れる場所（機械は触らない）
+    child(base, INBOX_DIR)   # Suno のダウンロード先（同じ名前があればそれを使う）
     for old, new in _RENAME_TOP.items():
         o = find_child(base, old)
         if o is not None and o.name != new:

@@ -108,6 +108,23 @@ def cover_stem(song: dict) -> str:
     return safe(f"{song['artist']}_{song['title'] or song['week']}")
 
 
+def generated_on(song: dict) -> str:
+    """曲を Suno で作った日（取り込んだファイルの作成日。publish.py が記録）。記録が無ければ配信用の音源ができた日"""
+    st = state(song)
+    if st.get("generated_on"):
+        return st["generated_on"]
+    m = OUT / "masters" / song["key"] / "master.wav"
+    if m.exists():
+        from datetime import date
+        return date.fromtimestamp(m.stat().st_mtime).isoformat()
+    return song["week"]
+
+
+def audio_stem(song: dict, day: str | None = None) -> str:
+    """楽曲データ（音声ファイル）の名前：<曲名>_<アーティスト名>_<生成日>（オーナーの指定 2026-10-21）"""
+    return safe(f"{song['title'] or song['week']}_{song['artist']}_{day or generated_on(song)}")
+
+
 def cover_source(song: dict) -> Path | None:
     """その曲の仕上がったジャケット（3000×3000）"""
     if song["kind"] == "debut":

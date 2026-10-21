@@ -48,7 +48,7 @@ def song_step(song: dict, name: str) -> dict:
     if s == "":
         if song["kind"] == "weekly" and not song.get("style"):
             return _step(name, "run", AUTO, f"{title}ブリーフを作っています", "run_week.py（火曜の朝）", song["week"])
-        return _step(name, "wait", YOU, f"{title}Suno で Create → いいねした 1 本を「ダウンロード/SUNO楽曲」へ",
+        return _step(name, "wait", YOU, f"{title}Suno で Create → いいねした 1 本を SSD の「楽曲情報」へダウンロード",
                      "python3 scripts/publish.py suno --open", song["week"])
     if s == "imported":
         return _step(name, "run", AUTO, f"{title}取り込み済み。音量を整えています", "", st.get("imported_at"))
