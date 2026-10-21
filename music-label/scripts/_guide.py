@@ -82,6 +82,7 @@ def explain(row: dict, phase: dict) -> dict:
         acts = [{"kind": "run", "primary": True, "label": "Suno に入力する（ブラウザが開きます）", "action": "fill_suno", "id": row.get("id")},
                 {"kind": "run", "label": "曲を取り込む", "action": "scan"},
                 {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"},
+                {"kind": "run", "label": "Suno の画面の部品を記録する（うまく入らない欄があるとき・Claude に見せる用）", "action": "browser_parts", "site": "suno"},
                 {"kind": "run", "label": "専用の Chrome を作り直す（ログインが何度も断られるとき）", "action": "browser_reset",
                  "confirm": "専用の Chrome のログインの記録を消して作り直します。Suno と DistroKid に、もう一度ログインが要ります。よいですか？"}]
         steps = ["初回だけ：「Suno にログイン」を押し、開いた Chrome でログインする（システムはつながっていないので、Google でのログインも通ります）",

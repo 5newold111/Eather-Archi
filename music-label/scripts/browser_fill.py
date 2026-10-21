@@ -27,6 +27,7 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
   python3 scripts/browser_fill.py login suno           # 初回：専用ブラウザでログインしておく（distrokid も）
   python3 scripts/browser_fill.py forget suno          # 覚えた欄の場所を消す（画面が変わってうまく入らないとき）
   python3 scripts/browser_fill.py reset                # 専用の Chrome を作り直す（ログインが何度も断られるとき）
+  python3 scripts/browser_fill.py parts suno           # いま開いている Suno の画面の部品の一覧を残す（out/browser/suno_parts.txt）
 
 「終わりました」は、作曲画面（登録画面）で、入れた欄を読み返して全部そろっていたときだけ（終了コード 0）。
 足りない欄・ログインが要るときは「まだ終わっていません」（終了コード 2）。最後の行の【結果】がダッシュボードに出る
@@ -64,6 +65,13 @@ NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribu
 # ページに毎回入れる下準備：欄の場所を言葉にする関数と、「クリックで教える」の受け取り
 INIT_JS = r"""
 (() => {
+  // Chrome の自動翻訳を止める（画面の文字が書き換わると、欄を探せず、入れた文字が消えることもある）
+  const noTranslate = () => { try {
+    const h = document.documentElement; h.setAttribute('translate', 'no'); h.classList.add('notranslate');
+    if (document.head && !document.querySelector('meta[name=google][content=notranslate]')) {
+      const m = document.createElement('meta'); m.name = 'google'; m.content = 'notranslate'; document.head.appendChild(m); }
+  } catch (e) {} };
+  noTranslate(); document.addEventListener('DOMContentLoaded', noTranslate);   // ページを読み込む前は html がまだ無いことがあるので、読み込み後にも
   window.__postdogSel = function (el) {
     const q = s => String(s).replace(/"/g, '\\"');
     for (const a of ['data-testid', 'id', 'name', 'aria-label', 'placeholder']) {
@@ -102,6 +110,7 @@ OVERLAY_JS = r"""
 (cfg) => {
   let box = document.getElementById('postdog-overlay');
   if (!box) { box = document.createElement('div'); box.id = 'postdog-overlay'; document.documentElement.appendChild(box); }
+  box.setAttribute('translate', 'no'); box.classList.add('notranslate');
   box.setAttribute('style', 'position:fixed;right:16px;bottom:16px;z-index:2147483647;width:min(420px,calc(100vw - 32px));max-height:70vh;overflow:auto;' +
     'background:#fffdf8;color:#22201c;border:2px solid #a07a3c;border-radius:12px;padding:14px 16px;font:14px/1.6 -apple-system,"Hiragino Sans",sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.25)');
   box.innerHTML = '';
@@ -172,6 +181,7 @@ def set_download_dir() -> Path | None:
         d = {}
     d.setdefault("download", {}).update({"default_directory": str(dest), "prompt_for_download": False, "directory_upgrade": True})
     d.setdefault("savefile", {})["default_directory"] = str(dest)
+    d.setdefault("translate", {})["enabled"] = False   # 自動翻訳を切る（ふだんの Chrome には関係ない）
     pf.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     return dest
 
@@ -185,7 +195,7 @@ def open_chrome(url: str = "about:blank", debug: bool = True) -> None:
         (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
     extra = os.environ.get("POSTDOG_CHROME_ARGS", "").split()   # 試験用
     subprocess.Popen([chrome_path(), f"--user-data-dir={PROFILE}", *(["--remote-debugging-port=0"] if debug else []),
-                      "--no-first-run", "--no-default-browser-check", *extra, url],
+                      "--no-first-run", "--no-default-browser-check", "--disable-features=Translate,TranslateUI", *extra, url],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
@@ -470,16 +480,32 @@ def find(sess: Session, site: str, f: dict):
 
 
 # ボタンが「選ばれているか」を読む（読めないときは unknown。そのときは押さない：押すと選択が外れることがある）
-STATE_JS = """e => { const a = e.getAttribute('aria-pressed') ?? e.getAttribute('aria-checked') ?? e.getAttribute('aria-selected');
+STATE_CORE = r"""
+  const read = x => { if (!x || !x.getAttribute) return null;
+    const a = x.getAttribute('aria-pressed') ?? x.getAttribute('aria-checked') ?? x.getAttribute('aria-selected');
     if (a === 'true') return 'on'; if (a === 'false') return 'off';
-    const ds = e.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
-    if (e.matches('input[type=radio],input[type=checkbox]')) return e.checked ? 'on' : 'off';
-    return 'unknown'; }"""
+    const ds = x.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
+    for (const k of ['data-selected', 'data-active', 'data-checked']) if (x.hasAttribute(k)) return x.getAttribute(k) === 'false' ? 'off' : 'on';
+    if (x.matches && x.matches('input[type=radio],input[type=checkbox]')) return x.checked ? 'on' : 'off';
+    const cls = String(x.className && x.className.baseVal !== undefined ? x.className.baseVal : x.className || '');
+    if (/(^|[\s_-])(active|selected|checked|is-on|on)([\s_-]|$)/i.test(cls)) return 'on';
+    return null; };
+  const holder = e => { if (read(e)) return e;
+    // 文字のボタンの中や横にスイッチがある作り（そのスイッチが状態を持つ）
+    for (let up = e, i = 0; i < 3 && up; i++, up = up.parentElement) {
+      const sw = [...up.querySelectorAll('[role=switch],input[type=checkbox],input[type=radio],[aria-checked],[aria-pressed],[data-state]')].filter(x => x !== e);
+      if (sw.length === 1 && read(sw[0])) return sw[0];
+      if (sw.length > 1) break;
+    }
+    return null; };"""
+STATE_JS = "e => {" + STATE_CORE + " const h = holder(e); return h ? read(h) : 'unknown'; }"
+HOLDER_JS = "e => {" + STATE_CORE + " const h = holder(e); return h && h !== e ? window.__postdogSel(h) : null; }"
 NEAR_JS = r"""([hint, sel, unique]) => { const want = hint.trim().toLowerCase();
     for (const el of document.querySelectorAll('label,span,div,p,h3,h4,legend')) {
       if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase() === want)) continue;
       let up = el;
       for (let i = 0; i < 5 && up; i++, up = up.parentElement) {
+        if (i > 1 && (up.innerText || '').length > 100) break;   // ほかの設定まで入った大きなかたまり：ここより上は探さない
         const all = [...up.querySelectorAll(sel)].filter(x => x.offsetParent !== null);
         if (!all.length) continue;
         // ほかの設定の部品まで入った大きなかたまりまで上がってしまったら、取り違えるので使わない
@@ -627,39 +653,53 @@ def _option(sess: Session, hints: list[str], f: dict | None = None):
             c = _pick(page.get_by_role(role, name=rx), None)
             if c is not None:
                 return c
+    if f is not None and len(f.get("options", {})) == 1:   # オン・オフのスイッチ：名前が無くても、見出しの横のものを使う
+        for h in hints:
+            sel = sess.js(NEAR_JS, [h, "[role=switch],input[type=checkbox],button[aria-checked],button[aria-pressed]", True])
+            if sel:
+                return sess.page.locator(sel).first
     return None
+
+
+def _states(sess: Session, f: dict) -> dict:
+    """選択肢ごとの (部品, 状態)。1 つだけ「選ばれている」と読めたら、読めないほかの選択肢は「選ばれていない」とみなす"""
+    got = {}
+    for opt, hints in f["options"].items():
+        loc = _option(sess, hints, f)
+        if loc is not None:
+            got[opt] = [loc, loc.evaluate(STATE_JS)]
+    if len(got) >= 2 and sum(v[1] == "on" for v in got.values()) == 1:
+        for v in got.values():
+            if v[1] == "unknown":
+                v[1] = "off"
+    return got
 
 
 def choice_state(sess: Session, f: dict) -> bool | None:
     """「どちらか選ぶ」が希望どおりか。True／False／None（読めない・見つからない）"""
-    seen = False
-    for opt, hints in f["options"].items():
-        loc = _option(sess, hints, f)
-        if loc is None:
-            continue
-        seen = True
-        st = loc.evaluate(STATE_JS)
+    got = _states(sess, f)
+    for opt, (loc, st) in got.items():
         if st == "unknown":
             return None
         if (st == "on") != (opt == f["value"]):
             return False
-    return True if seen or f["value"] == "none" else None
+    return True if got or f["value"] == "none" else None
 
 
 def set_choice(sess: Session, f: dict) -> bool | None:
     """希望どおりに選ぶ（ボーカルの性別など）。状態が読めないボタンは押さない"""
-    for opt, hints in f["options"].items():
-        loc = _option(sess, hints, f)
-        if loc is None:
-            continue
-        st = loc.evaluate(STATE_JS)
-        if st == "unknown":
-            return None
+    got = _states(sess, f)
+    if any(st == "unknown" for _, st in got.values()):
+        return None
+    # 選ぶほうを先に押す（2 つのうち 1 つを選ぶ作りなら、それだけで切り替わる）
+    for opt, (loc, st) in sorted(got.items(), key=lambda kv: kv[0] != f["value"]):
+        st = _states(sess, f).get(opt, [loc, st])[1]
         if (st == "on") != (opt == f["value"]):
             text = " ".join(filter(None, [loc.inner_text(timeout=2000), loc.get_attribute("aria-label") or ""]))
             if NEVER.search(text):
                 return False
-            loc.click()
+            h = loc.evaluate(HOLDER_JS)   # 状態を持っているのが横のスイッチなら、そちらを押す
+            (sess.page.locator(h).first if h else loc).click()
             sess.page.wait_for_timeout(400)
     return choice_state(sess, f)
 
@@ -722,16 +762,31 @@ def put(sess: Session, loc, f: dict) -> bool:
             loc.fill(str(v))
             return True
         if not _is_field(loc):
-            return False   # 入力欄でないもの（ボタンなど）には触らない
+            inner = loc.locator("textarea, input:not([type=hidden]):not([type=file]), [contenteditable=true], [contenteditable='']").first
+            if inner.count() and inner.is_visible() and _is_field(inner):
+                loc, tag = inner, inner.evaluate("e => e.tagName.toLowerCase()")   # 外側の枠：中の欄に入れる
+            else:
+                return False   # 入力欄でないもの（ボタンなど）には触らない
+        sess.last_loc = loc
         if tag in ("input", "textarea"):
             loc.fill(str(v))
-            return True
-        loc.click()   # 文字を入れられる箇所（contenteditable）
+            sess.page.wait_for_timeout(300)
+            if _norm(_read(loc)) == _norm(v):
+                return True
+        # 入れた文字が残らない作り（画面が自分で文字を管理している）：クリックして、全部選んで、キーボードで打つ
+        loc.click()
         sess.page.keyboard.press("Meta+A" if sys.platform == "darwin" else "Control+A")
+        sess.page.keyboard.press("Backspace")
         sess.page.keyboard.insert_text(str(v))
+        sess.page.wait_for_timeout(300)
         return True
     except Exception:  # noqa: BLE001
         return False
+
+
+def _read(loc) -> str:
+    return loc.evaluate("""e => e.tagName === 'SELECT' ? ((e.selectedOptions[0] || {}).text || e.value)
+                           : (e.isContentEditable ? e.innerText : (e.value ?? ''))""")
 
 
 def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str], list[str]]:
@@ -783,7 +838,8 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
             ok = False
         if ok:
             done.append(f["label"])
-            sess.filled[f["key"]] = loc
+            sess.filled[f["key"]] = getattr(sess, "last_loc", None) or loc
+            sess.last_loc = None
         elif not f.get("optional"):
             manual.append(f"{f['label']}：{f.get('show', f['value'])}")
     return done, manual
@@ -878,9 +934,9 @@ def suno_fields(song: dict) -> list[dict]:
     ]
     if d["vocal_gender"] != "unset":
         g = d["vocal_gender"] or "none"
-        fields.append({"key": "gender", "label": "声の性別", "type": "choice", "value": g, "near": ["声の性別", "ボーカルの性別", "Vocal Gender"],
+        fields.append({"key": "gender", "label": "声の性別", "type": "choice", "value": g, "near": ["声の性別", "ボーカルの性別", "Vocal Gender", "Gender", "Vocals"],
                        "show": _songs.GENDER_JA.get(d["vocal_gender"], g), "options": {"male": ["男", "男性", "Male"], "female": ["女", "女性", "Female"]}})
-    hints_len = ["間隔", "長さ", "曲の長さ", "Duration", "Length"]
+    hints_len = ["間隔", "長さ", "曲の長さ", "Duration", "Length", "Song Length", "Song length", "Interval", "Timing"]
     fields.append({"key": "length_mode", "label": "間隔（自動・カスタム）", "type": "choice", "near": hints_len,
                    "value": "custom" if d["length_sec"] else "auto", "show": "カスタム" if d["length_sec"] else "自動",
                    "options": {"custom": ["カスタム", "Custom"], "auto": ["自動", "Auto"]}})
@@ -892,19 +948,55 @@ def suno_fields(song: dict) -> list[dict]:
                        "show": onoff(d["max_mode"]), "options": {"on": ["Max mode", "Max モード", "MAX モード", "Max Mode"]}})
     if d.get("loudness") is not None:
         fields.append({"key": "loudness", "label": "音量の大きさ", "type": "slider", "scale": "percent", "value": d["loudness"],
-                       "show": f"{d['loudness']}%", "hints": ["音量の大きさ", "音量", "Volume", "Loudness"]})
+                       "show": f"{d['loudness']}%", "hints": ["音量の大きさ", "音量", "Loudness", "Volume", "Audio Loudness", "Level"]})
     if d.get("style_influence") is not None:
         fields.append({"key": "style_influence", "label": "スタイルの影響度", "type": "slider", "scale": "percent", "value": d["style_influence"],
-                       "show": f"{d['style_influence']}%", "hints": ["スタイルの影響度", "スタイルの影響", "Style Influence"]})
+                       "show": f"{d['style_influence']}%", "hints": ["スタイルの影響度", "スタイルの影響", "Style Influence", "Style influence", "Style Strength"]})
     if d.get("variety") is not None:
         fields.append({"key": "variety", "label": "バラエティ", "type": "slider", "scale": "raw", "value": d["variety"],
-                       "show": f"{d['variety']}（0〜4）", "hints": ["バラエティ", "Variety"]})
+                       "show": f"{d['variety']}（0〜4）", "hints": ["バラエティ", "Variety", "Variation", "Variations"]})
     if d.get("your_taste") is not None:
         fields.append({"key": "your_taste", "label": "あなたの好み", "type": "choice", "value": "on" if d["your_taste"] else "none",
-                       "show": onoff(d["your_taste"]), "options": {"on": ["あなたの好み", "Your taste", "Your Taste", "好み"]}})
+                       "show": onoff(d["your_taste"]), "options": {"on": ["あなたの好み", "Your taste", "Your Taste", "My Taste", "Taste", "Personalize", "Personalized", "好み"]}})
     fields.append({"key": "title", "label": "曲名", "type": "text", "value": d["title"],
                    "hints": ["曲名", "曲のタイトル", "Song Title", "Title", "タイトル"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip})
     return fields
+
+
+PARTS_JS = r"""() => {
+  const out = [], vis = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  const cut = (t, n) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const lab = e => { // 近くの見出しの文字
+    for (let up = e.parentElement, i = 0; i < 3 && up; i++, up = up.parentElement) {
+      const t = [...up.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ').trim()
+        || [...up.children].filter(c => !['SCRIPT', 'STYLE'].includes(c.tagName) && !c.querySelector('input,textarea,button,[role]') && c !== e).map(c => c.innerText || '').join(' ').trim();
+      if (t) return cut(t, 30); }
+    return ''; };
+  for (const e of document.querySelectorAll('input,textarea,select,button,[role],[contenteditable],[aria-checked],[aria-pressed],[data-state]')) {
+    if (!vis(e) || e.closest('#postdog-overlay')) continue;
+    const role = e.getAttribute('role') || '', t = e.tagName.toLowerCase();
+    if (!['input', 'textarea', 'select', 'button'].includes(t) && !/button|switch|slider|radio|tab|checkbox|textbox|combobox|option|menuitem/.test(role) && !e.isContentEditable) continue;
+    const at = ['type', 'aria-label', 'aria-checked', 'aria-pressed', 'aria-selected', 'aria-valuenow', 'aria-valuemin', 'aria-valuemax',
+                'data-state', 'placeholder', 'name', 'data-testid'].map(a => e.getAttribute(a) !== null ? `${a}=${cut(e.getAttribute(a), 40)}` : '').filter(Boolean);
+    const val = (t === 'input' || t === 'textarea') ? ` 中身=${String(e.value || '').length}文字` : (e.isContentEditable ? ` 中身=${(e.innerText || '').length}文字` : '');
+    out.push(`${Math.round(e.getBoundingClientRect().top)}\t${t}${role ? '[' + role + ']' : ''}${e.isContentEditable ? '[編集可]' : ''}\t「${cut(e.innerText || e.value || '', 30)}」\t${at.join(' ')}${val}\tclass=${cut(e.className && e.className.baseVal !== undefined ? '' : e.className, 50)}\t見出し=${lab(e)}`);
+    if (out.length >= 300) break;
+  }
+  return out.sort((a, b) => parseInt(a) - parseInt(b)).join('\n'); }"""
+
+
+def save_parts(sess: Session, site: str) -> Path | None:
+    """画面の部品の一覧（欄・ボタン・スイッチ・スライダーの名前と状態。入れた歌詞などの中身は文字数だけ）と画面の写しを残す"""
+    d = OUT / "browser"
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{site}_parts.txt"
+    try:
+        body = sess.js(PARTS_JS, None, default="")
+        p.write_text(f"画面：{sess.page.url}\n（上からの位置\t部品\t文字\t目印\tclass\t見出し）\n{body}\n", encoding="utf-8")
+        sess.page.screenshot(path=str(d / f"{site}_screen.png"), full_page=True)
+        return p
+    except Exception:  # noqa: BLE001
+        return p if p.exists() else None
 
 
 def wait_for_form(sess: Session, name: str, how: str) -> bool:
@@ -954,6 +1046,11 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         if not on_page(sess, "suno"):
             bad.insert(0, f"Suno の作曲画面ではありません（いまの画面：{sess.page.url}）")
         name = f"{song['artist']}「{song['title']}」"
+        if bad or sess.unsure:
+            parts = save_parts(sess, "suno")
+            if parts:
+                print(f"   … 画面の部品の一覧を残しました：{parts}（画面の写し：{parts.with_name('suno_screen.png')}）。"
+                      "この 2 つを Claude に見せると、本物の画面に合わせて直せます")
         if bad:
             problems += [f"{name}の{x}" for x in bad]
             print(f"   ✕ {name}：入っていない欄があります → " + "／".join(bad))
@@ -1092,7 +1189,7 @@ def run_login(sess: Session, site: str) -> int:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno と DistroKid の入力を、システムが専用のブラウザで行う（押すのは Gon さん）")
-    ap.add_argument("what", choices=["suno", "distrokid", "login", "forget", "reset"])
+    ap.add_argument("what", choices=["suno", "distrokid", "login", "forget", "reset", "parts"])
     ap.add_argument("args", nargs="*", help="suno：曲 ID（省くと全曲）／distrokid：曲 ID／login・forget：suno か distrokid")
     a = ap.parse_args()
     if a.what == "forget":
@@ -1130,6 +1227,17 @@ def main() -> None:
                 code = run_suno(sess, a.args)
             elif a.what == "distrokid":
                 code = run_distrokid(sess, a.args[0])
+            elif a.what == "parts":   # いま開いている Suno（または DistroKid）の画面の部品の一覧
+                site = (a.args or ["suno"])[0]
+                pg = next((x for x in reversed(sess.ctx.pages) if _base(_host(x.url)) == _base(_host(SITES[site]))), None)
+                if pg is None:
+                    sess.goto(SITES[site])
+                else:
+                    sess.page = pg
+                p = save_parts(sess, site)
+                if p and p.exists():
+                    print(p.read_text(encoding="utf-8"))   # ダッシュボードのログからもコピーできるように
+                print(f"【結果】画面の部品の一覧を残しました：{p}（ダッシュボードのログをコピーして Claude に貼れます）")
             else:
                 code = run_login(sess, (a.args or ["suno"])[0])
         except NeedLogin as e:

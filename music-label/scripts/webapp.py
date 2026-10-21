@@ -166,6 +166,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
     if action == "browser_login" and p.get("site") in ("suno", "distrokid"):
         return [PY, str(S / "browser_fill.py"), "login", p["site"]], f"ブラウザで入力（{p['site']} にログイン）"
+    if action == "browser_parts" and p.get("site") in ("suno", "distrokid"):
+        return [PY, str(S / "browser_fill.py"), "parts", p["site"]], f"ブラウザで入力（{p['site']} の画面の部品を記録）"
     if action == "browser_reset":
         return [PY, str(S / "browser_fill.py"), "reset"], "ブラウザで入力（専用の Chrome を作り直す）"
     if action == "terminal" and p.get("key") in TERMINAL:
