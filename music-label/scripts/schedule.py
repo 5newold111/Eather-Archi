@@ -27,6 +27,7 @@
   python scripts/schedule.py write                # plist を out/schedule/ に書き出すだけ（中身を確認できる）
   python scripts/schedule.py install              # Mac に登録（~/Library/LaunchAgents/ に置いて有効化）
   python scripts/schedule.py uninstall            # 登録を外す
+  python scripts/schedule.py status               # 登録の状態（○ 登録済み／✕ 未登録）
   python scripts/schedule.py run post             # 1 つの仕事を今すぐ動かす（ログは out/logs/<仕事>.log）
   python scripts/schedule.py cron                 # Mac 以外（Linux など）向けの crontab の行を表示
 """
@@ -38,6 +39,7 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -123,6 +125,25 @@ def plist_for(job: str) -> dict:
     }
 
 
+def loaded(uid: int, label: str) -> bool:
+    """launchd に登録されているか"""
+    return subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"], capture_output=True).returncode == 0
+
+
+def status() -> None:
+    """登録の状態（○ 登録済み・動いている／✕ 未登録）"""
+    uid = os.getuid()
+    for j in [*JOBS, *SERVICES]:
+        label = f"{PREFIX}.{j}"
+        r = subprocess.run(["launchctl", "print", f"gui/{uid}/{label}"], capture_output=True, text=True)
+        if r.returncode:
+            print(f"  ✕ {j:<8} 未登録（python3 scripts/schedule.py install）")
+            continue
+        state = next((l.split("=", 1)[1].strip() for l in r.stdout.splitlines() if l.strip().startswith("state =")), "?")
+        code = next((l.split("=", 1)[1].strip() for l in r.stdout.splitlines() if "last exit code" in l), "")
+        print(f"  ○ {j:<8} 登録済み（{'動いている' if state == 'running' else '待機中'}" + (f"・前回の終了コード {code}" if code and code != "0" and code != "(never exited)" else "") + "）")
+
+
 def run_job(job: str) -> int:
     """仕事を 1 つ実行してログに残す。まだ無いスクリプトは飛ばす"""
     desc, cmds = JOBS[job]
@@ -162,12 +183,17 @@ def trim(log: Path, keep: int = 4000) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="定期実行の設定（Mac の launchd）")
-    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "cron"])
+    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "cron", "status"])
     ap.add_argument("job", nargs="?", help="run のときの仕事の名前")
     ap.add_argument("--only", help="install / write をこの仕事だけに（カンマ区切り）")
     a = ap.parse_args()
     jobs = a.only.split(",") if a.only else [*JOBS, *SERVICES]
 
+    if a.command == "status":
+        if sys.platform != "darwin":
+            sys.exit("[停止] status は Mac 専用です")
+        status()
+        return
     if a.command == "list":
         for j in JOBS:
             print(f"  {j:<8} {CRON[j]:<16} {JOBS[j][0]}")
@@ -207,17 +233,36 @@ def main() -> None:
     agents = Path.home() / "Library" / "LaunchAgents"
     agents.mkdir(parents=True, exist_ok=True)
     uid = os.getuid()
+    ng = []
     for p in files:
         dst = agents / p.name
         label = p.stem
-        subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"], capture_output=True)   # 登録済みなら一度外す
+        if loaded(uid, label):   # 登録済みなら一度外し、外し終わるまで待つ（すぐ入れ直すと失敗することがある）
+            subprocess.run(["launchctl", "bootout", f"gui/{uid}/{label}"], capture_output=True)
+            for _ in range(50):
+                if not loaded(uid, label):
+                    break
+                time.sleep(0.2)
         if a.command == "uninstall":
             dst.unlink(missing_ok=True)
             step(f"外しました: {label}")
             continue
         shutil.copy(p, dst)
-        r = subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(dst)], capture_output=True, text=True)
-        step(f"登録しました: {label}" + (f"（警告: {r.stderr.strip()}）" if r.returncode else ""))
+        err = ""
+        for attempt in range(5):   # うまくいかなければ、少し待ってやり直す
+            r = subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(dst)], capture_output=True, text=True)
+            if r.returncode == 0 or loaded(uid, label):
+                break
+            err = r.stderr.strip()
+            time.sleep(1 + attempt)
+        if loaded(uid, label):
+            step(f"登録しました: {label}")
+        else:
+            ng.append(label)
+            print(f"   ✕ 登録できませんでした: {label}（{err or '理由不明'}）")
+    if a.command == "install" and ng:
+        print(f"   ✕ {len(ng)} 個の仕事が登録できませんでした。もう一度  python3 scripts/schedule.py install  を実行し、"
+              "それでも ✕ なら Mac を再起動してから実行してください")
     if a.command == "install":
         if "webapp" in jobs:
             print("   ダッシュボード：ブラウザで http://localhost:8765 を開く（ブックマークしておくと便利）")
