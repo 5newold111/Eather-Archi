@@ -3,13 +3,13 @@
 公開の流れ：Suno で「いいね」してダウンロードした曲を、DistroKid の登録ボタンを押すだけの状態まで自動で進める
 
 オーナーがやること（Suno と DistroKid は規約上、機械が勝手に操作しない。docs/12_decisions.md の 17）：
-  1. Suno の入力欄（曲名・スタイル・歌詞）は Claude に頼める：`publish.py suno` のページの「Claude に入力を頼む」の文を、
-     Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る。Claude は欄を埋めて止まる（決定 19）。
-     内容を確かめて「Create」を押すのはオーナーだけ。自分で貼るときは、ページのコピーボタンから
+  1. Suno の入力欄（曲名・スタイル・歌詞）は仕組みが入れる：ダッシュボードの「Suno に入力する」（browser_fill.py suno）で
+     専用のブラウザが開き、欄を埋めて止まる（決定 22）。内容を確かめて「Create」を押すのはオーナーだけ。
+     自分で貼るときは、`publish.py suno` のページのコピーボタンから
   2. できたテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードして
      SSD の「Postdog Records/楽曲情報」に入れる（Suno のアプリの保存先をここにする。SSD が無いときは「ダウンロード/SUNO楽曲」）。
      WAV がおすすめ。ファイル名は Suno が付けた曲名のままでよい
-  3. DistroKid の画面で、Claude が入れた下書きを確かめて、最後の登録ボタンを押す
+  3. ダッシュボードの「DistroKid に入力する」（browser_fill.py distrokid）で下書きが入るので、確かめて最後の登録ボタンを押す
 
 ここから先は自動（Mac の定期実行が「楽曲情報」と「SUNO楽曲」を見張っていて、曲が入ると数分以内に動く）：
   ・ファイル名（とフォルダ名）から、どの曲かを見分ける（曲名・曲名の別案・アーティスト名）
@@ -22,10 +22,10 @@
 
 使い方：
   python3 scripts/publish.py suno [--open]          # Suno に貼る内容のページを作る（--open でブラウザで開く）
-  python3 scripts/publish.py suno-request [曲 ID]   # Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文
+  python3 scripts/publish.py suno-request [曲 ID]   # （予備）Claude in Chrome に Suno の入力を頼むときの文。ふだんは browser_fill.py
   python3 scripts/publish.py scan                   # 「楽曲情報」「SUNO楽曲」に入った曲を取り込んで、公開の準備まで進める（定期実行でも動く）
   python3 scripts/publish.py status                 # 曲ごとの進み具合
-  python3 scripts/publish.py draft PDR-001          # DistroKid の下書きを表示（Claude がブラウザで入力するときにも使う）
+  python3 scripts/publish.py draft PDR-001          # DistroKid の下書きを表示（browser_fill.py が入力に使う）
   python3 scripts/publish.py registered PDR-001     # DistroKid に登録した（配信日は --date。省くと今日＝いちばん早い日）
   python3 scripts/publish.py track                  # 登録済みの曲が配信されたかを Spotify で確かめ、ISRC などを記録
 
@@ -369,7 +369,7 @@ def write_draft(song: dict, st: dict) -> None:
     fields = draft_fields(song)
     (d / "DistroKid下書き.json").write_text(json.dumps(fields, ensure_ascii=False, indent=1), encoding="utf-8")
     md = [f"# DistroKid の下書き：{song['artist']}「{song['title']}」（{song['id']}）", "",
-          "Claude がブラウザでこの内容を入れます。最後の登録ボタンだけ、オーナーが内容を確かめてから押してください。", ""]
+          "ダッシュボードの「DistroKid に入力する」で、この内容がブラウザに自動で入ります。最後の登録ボタンだけ、オーナーが内容を確かめてから押してください。", ""]
     md += [f"- {k}：`{v}`" for k, v in fields.items()]
     md += ["", "## 登録したあと", "", f"- `python3 scripts/publish.py registered {song['id']}`（配信日を変えたときは --date 2026-11-04 のように）",
            "- 配信が始まると、毎日の確認で ISRC・UPC・配信 URL が楽曲管理シートに自動で入ります"]
@@ -599,17 +599,16 @@ def suno_page() -> tuple[str, int]:
     E = html.escape
     cards = []
     if todo:
-        cards.append('<section><h2>Claude に入力を頼む（全曲まとめて）</h2>'
-                     '<p>Mac の Claude デスクトップアプリで新しい会話を始め、Claude in Chrome をつないでから、下の文をコピーして貼ります。'
-                     'Claude が Suno の欄を 1 曲ずつ埋めて止まるので、内容を確かめて「Create」を押してください（押すのはあなただけ）。</p>'
-                     f'<div class="f"><div class="h"><span>頼み文（{len(todo)} 曲）</span><button onclick="cp(\'req_all\', this)">コピー</button></div>'
-                     f'<textarea id="req_all" readonly rows="6">{E(suno_request(todo))}</textarea></div></section>')
+        cards.append('<section><h2>自動で入力する（おすすめ）</h2>'
+                     '<p>ダッシュボード（http://localhost:8765）の「作曲待ちの曲を Suno に入力する」を押すと、専用のブラウザが開き、'
+                     '下の内容が 1 曲ずつ Suno の欄に自動で入ります。内容を確かめて「Create」を押してください（押すのは Gon さんだけ）。</p>'
+                     '<p>ターミナルからなら：<code>python3 scripts/browser_fill.py suno</code></p></section>')
     for i, s in enumerate(todo):
-        fields = [("Claude への頼み文（この曲だけ）", suno_request([s])), ("曲名（Title）", s["title"]), ("スタイル（Style of Music）", s["style"]),
+        fields = [("曲名（Title）", s["title"]), ("スタイル（Style of Music）", s["style"]),
                   ("入れないもの（Exclude Styles）", s.get("exclude", "")), ("歌詞（Lyrics）", "" if s.get("instrumental") else s.get("lyrics", ""))]
         rows = "".join(
             f'<div class="f"><div class="h"><span>{E(k)}</span><button onclick="cp(\'t{i}_{j}\', this)">コピー</button></div>'
-            f'<textarea id="t{i}_{j}" readonly rows="{(3, 1, 4, 2, 14)[j]}">{E(v)}</textarea></div>'
+            f'<textarea id="t{i}_{j}" readonly rows="{(1, 4, 2, 14)[j]}">{E(v)}</textarea></div>'
             for j, (k, v) in enumerate(fields) if v)
         cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}</section>')
     page = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -622,9 +621,9 @@ h2 small{{font-weight:normal;opacity:.6;margin-left:8px;font-size:.7em}} textare
 .h{{display:flex;justify-content:space-between;align-items:center;margin-top:10px}} button{{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 14px;cursor:pointer}}
 ol{{padding-left:1.2em}}</style></head><body><main>
 <h1>Suno に貼る内容（{len(todo)} 曲）</h1>
-<p><b>入力は Claude に頼めます</b>（下の「Claude に入力を頼む」）。自分で貼るときは：</p>
+<p><b>入力は仕組みが自動でやります</b>（下の「自動で入力する」）。自分で貼るときは：</p>
 <ol><li>Suno の Create 画面で「Custom」を選び、下の欄を「コピー」して同じ名前の欄に貼る</li>
-<li>「Create」を押す（押すのはオーナーだけ）</li>
+<li>「Create」を押す（押すのは Gon さんだけ）</li>
 <li>できた 2 つのテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードする（WAV がおすすめ）</li>
 <li>ダウンロードしたファイルを SSD の「Postdog Records → 楽曲情報」に入れる（Suno のアプリの保存先をここにしておく。SSD が無いときは「ダウンロード → SUNO楽曲」）。ここから先は自動で公開の準備まで進みます</li></ol>
 {''.join(cards) or '<p>いま Suno で作る曲はありません。</p>'}

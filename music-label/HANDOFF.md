@@ -23,12 +23,12 @@
 | アーティストの情報・写真・ジャケット・楽曲 | SSD の「Postdog Records／02_アーティスト／<アーティスト名>／01_情報・02_写真・03_ジャケット・04_楽曲」（自動で保管。`python3 scripts/archive_sync.py`）。Google から移すものは「09_移行前」へ |
 | ローカル保存（一時保存）・公開セット | Mac のダウンロード「SUNO楽曲／ローカル保存（一時保存）／<アーティスト名>」。中は SSD と同じ 01_情報〜04_楽曲 で、SSD が無くても先にここへ入る（容量は増えないハードリンク）。`04_楽曲／<週>／` に音源・ジャケット・登録シートがそろい、ここから DistroKid に登録できる。SSD をつなぐと `archive_sync.py` が写す |
 | SSD をつないだとき | 自動で（定期実行 ssd）：SSD が無い間に「ダウンロード/SUNO楽曲」へ入った曲を SSD の「楽曲情報」へ移す → ローカル保存の中身を SSD に写す → 配信が始まった曲はローカル保存から片付ける → Mac に通知（決定 21） |
-| 公開の流れ | Suno で Create（オーナー）→ いいねした 1 本を SSD の「Postdog Records/楽曲情報」へダウンロード（名前は自動で <曲名>_<アーティスト名>_<生成日> に）→ 自動で音量・ジャケット・DistroKid の下書き・公開セット → Claude が DistroKid に下書きを入れ、オーナーが登録ボタン → ISRC などは自動で記録（`docs/15_publish.md`・`scripts/publish.py`） |
-| ダッシュボード（ウェブアプリ） | ブラウザで http://localhost:8765（`python3 scripts/webapp.py`。`schedule.py install` で常に起動）。ガントチャート（タブ：定期配信＝既定・デビュー。デビュー曲が配信されると定期配信へ移る）で工程ごとの予定と実績・詰まり・担当、ボタンで取り込み・登録の記録など。スマホから見るときは `--lan` |
+| 公開の流れ | ダッシュボードの「Suno に入力する」でシステムが欄を埋める → Create（オーナー）→ いいねした 1 本を SSD の「Postdog Records/楽曲情報」へダウンロード（名前は自動で <曲名>_<アーティスト名>_<生成日> に）→ 自動で音量・ジャケット・DistroKid の下書き・公開セット → ダッシュボードの「DistroKid に入力する」でシステムが下書きを入れ、オーナーが登録ボタン → ISRC などは自動で記録（`docs/15_publish.md`・`scripts/publish.py`） |
+| ダッシュボード（ウェブアプリ） | ブラウザで http://localhost:8765（`python3 scripts/webapp.py`。`schedule.py install` で常に起動）。フェーズ表（タブ：定期配信＝既定・デビュー。デビュー曲が配信されると定期配信へ移る）。マスを押すと止まっている原因・Gon さんがやること・ワンクリックのボタン（Suno・DistroKid への自動入力〔`browser_fill.py`〕・取り込み・写真・登録の記録・鍵の設定など。決定 22）。スマホから見るときは `--lan` |
 | 参考データベース | SSD の「データベース」などの名前のフォルダ（Excel・CSV・SQLite・解析シート）。`python3 scripts/reference_db.py --show` で読み方を確認。毎週のブリーフ作りの最初に自動で取り込み、傾向は `out/reference_db/digest.md` |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜21） |
+| 決めたこと | `docs/12_decisions.md`（1〜22） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 
@@ -37,10 +37,10 @@
 1. Suno のプラン … **完了**（Pro）
 2. DistroKid のプラン … **完了**（Ultimate・アーティスト名 5 つ。今の 5 組でちょうど埋まる）
 3. 名前の重複確認 … **完了**（オーナーが Spotify で確認。NAO EASTERLY は「NAO」と紛れるので VERNALIGHT に改名し、Claude が Web 検索で確認）
-4. Suno で 5 曲 … 未着手（入力は Claude（デスクトップアプリ＋Claude in Chrome）、Create はオーナー。いいねした 1 本を SSD の「楽曲情報」へ。決定 17・19・20。公式 API にも申し込む：docs/16）
+4. Suno で 5 曲 … 未着手（入力はシステム〔ダッシュボードの「Suno に入力する」〕、Create はオーナー。いいねした 1 本を SSD の「楽曲情報」へ。決定 17・20・22。公式 API にも申し込む：docs/16）
 5. ジャケットと写真 … 自動で作る仕組みはできた（`kit_images.py`）。OpenAI の鍵を `.env` に入れれば Mac で `python3 scripts/kit_images.py` 一発で 10 枚できる
 6. テイク選び … Suno の「いいね」で決める（ダウンロードした 1 本を自動で取り込む）
-7. DistroKid に登録 … Claude が Chrome で下書きを入れ、オーナーが登録ボタンを押す（docs/15_publish.md の 4）
+7. DistroKid に登録 … ダッシュボードの「DistroKid に入力する」でシステムが下書きを入れ、オーナーが登録ボタンを押す（docs/15_publish.md の 4）
 8. 配信後に ISRC などを記録 … 自動（毎日 Spotify で確認。SPOTIFY の鍵が要る）
 9. 10/28 の自動配信枠の調整 … 解決（デビュー曲の登録まで毎週の制作を止め、登録した配信週をデビュー週にする）
 10. 参考曲 11 曲以上の購入と解析 … 未着手（デビューには不要）

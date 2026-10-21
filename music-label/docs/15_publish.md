@@ -7,12 +7,12 @@
 | 段 | やること | 担当 |
 |---|---|---|
 | 1 | 曲名・スタイル・入れないもの・歌詞を用意する | 自動（ブリーフ／デビュー曲は作業セット） |
-| 2 | Suno の入力欄を埋める → 内容を確かめて「Create」を押す | 入力は **Claude**（デスクトップアプリ＋Claude in Chrome。頼み文は `publish.py suno --open` のページか `publish.py suno-request`）、**Create はオーナー**（決定 19） |
+| 2 | Suno の入力欄を埋める → 内容を確かめて「Create」を押す | 入力は**システム**（ダッシュボードの「Suno に入力する」で専用のブラウザが開き、欄が埋まる。`browser_fill.py suno`）、**Create はオーナー**（決定 22） |
 | 3 | 2 つのテイクを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「Postdog Records → 楽曲情報」にダウンロードする（Suno のアプリの保存先をここに。SSD が無いときは「ダウンロード → SUNO楽曲」） | **オーナー** |
 | 4 | どの曲かを見分けて取り込む → 音量を整える → ジャケット → DistroKid の下書き → 公開セット → 楽曲管理シート → Mac に「登録できます」と通知 | 自動（定期実行 intake。フォルダに入ると数分以内） |
-| 5 | DistroKid の画面に下書きを入れる（項目の入力・音源とジャケットの添付・配信日は最短） | Claude（オーナーの Chrome で。オーナーが見ている前で） |
+| 5 | DistroKid の画面に下書きを入れる（項目の入力・音源とジャケットの添付・配信日は最短） | システム（ダッシュボードの「DistroKid に入力する」。`browser_fill.py distrokid <曲 ID>`） |
 | 6 | 内容を確かめて、最後の登録ボタンを押す | **オーナー** |
-| 7 | 登録したことを記録する（`python3 scripts/publish.py registered <曲 ID>`） | Claude かオーナー |
+| 7 | 登録したことを記録する（ブラウザの案内の「登録した」。ダッシュボードの「DistroKid に登録した」でも同じ） | オーナー（ワンクリック） |
 | 8 | 配信が始まったかを毎日確かめ、ISRC・UPC・配信 URL を楽曲管理シートに入れて「8 配信中」にする | 自動（定期実行 release。Spotify の鍵が要る） |
 | 9 | デビューから 6 か月ごとに、同じ人物のままアーティスト写真を新しくする | 自動（定期実行 monthly。`refresh_photos.py`） |
 
@@ -38,20 +38,21 @@ Suno の「Create」と DistroKid の登録ボタンを機械が押さないの�
 
 注意：Spotify の編集部のプレイリストに推薦（ピッチ）するには、配信日の 7 日以上前の登録が要る。最短の日付にすると推薦はできない。
 
-## 4. Claude が DistroKid に下書きを入れる手順（Claude in Chrome）
+## 4. DistroKid に下書きを入れる手順（システムが自動で。決定 22）
 
-1. オーナーが Mac の Chrome で DistroKid にログインし、Claude in Chrome をつなぐ
-2. Claude が `python3 scripts/publish.py draft <曲 ID>` の内容を読み、Upload 画面の項目を上から入れる。
-   音源とジャケットは公開セットのファイルを添付する。配信日は選べる最短の日付
-3. 最後の登録ボタンの手前で止まり、オーナーに「確かめて押してください」と伝える（Claude は押さない）
-4. オーナーが押したら、Claude が `publish.py registered <曲 ID> --date <配信日>` で記録する
+1. ダッシュボードで、その曲の「DistroKid に登録」のマスを押し、「DistroKid に入力する（ブラウザが開きます）」を押す
+2. 専用のブラウザが DistroKid の登録画面を開き、`publish.py draft <曲 ID>` の内容を上から入れ、音源とジャケットを添付する（初回だけログインを求められる）
+3. 右下の案内に、手で選ぶ項目（Explicit・AI の申告など）と、入れられなかった項目が値と一緒に並ぶ。確かめて、**最後の登録ボタンを押す**（押すのはオーナーだけ）
+4. 案内で配信日を選んで「登録した」を押すと記録される（`publish.py registered <曲 ID> --date <配信日>` と同じ）
 
 ## 5. 使うコマンド
 
 ふだんはダッシュボード（ブラウザで http://localhost:8765）のボタンで同じことができる。
 
 ```
-python3 scripts/publish.py suno --open    # Suno に貼る内容のページ
+python3 scripts/browser_fill.py suno     # Suno に自動で入力（作曲待ちの全曲。曲 ID を付けるとその曲だけ）
+python3 scripts/browser_fill.py distrokid PDR-001  # DistroKid に下書きを自動で入力
+python3 scripts/publish.py suno --open    # Suno に貼る内容のページ（手で貼るとき）
 python3 scripts/publish.py status         # 曲ごとの進み具合
 python3 scripts/publish.py scan           # すぐに取り込みたいとき（ふだんは自動）
 python3 scripts/publish.py draft PDR-001  # DistroKid の下書き
@@ -68,12 +69,16 @@ python3 scripts/refresh_photos.py --list  # 写真の次の刷新日
 | Spotify の鍵と、作詞作曲者の欄の本名を入れる | `python3 scripts/setup_keys.py --only spotify,owner` |
 | 「ダウンロード」を自動の処理から読めるようにする | システム設定 → プライバシーとセキュリティ → フルディスクアクセス に python3 を追加 |
 | 定期実行に取り込み・配信の確認・ダッシュボードを加える | `python3 scripts/schedule.py install`（そのあと http://localhost:8765 をブックマーク） |
+| ブラウザで自動入力する部品を入れる | ダッシュボードの「ブラウザ入力の部品を入れる」（`python3 -m pip install --user playwright` と `python3 -m playwright install chromium`） |
+| 専用のブラウザで Suno と DistroKid にログインしておく | ダッシュボードの「Suno にログイン（初回だけ）」「DistroKid にログイン（初回だけ）」（`browser_fill.py login suno`） |
 
-## 7. Claude に Suno の入力を頼む手順（決定 19）
+## 7. Suno に入力する手順（システムが自動で。決定 22）
 
-1. Mac の Claude デスクトップアプリで新しい会話を始め、Claude in Chrome をつなぐ。Chrome で Suno にログインしておく
-2. ダッシュボードの「Suno に貼る内容」（または `python3 scripts/publish.py suno --open`）を開き、「Claude に入力を頼む（全曲まとめて）」の文をコピーして、その会話に貼る
-3. Claude が 1 曲目の欄を埋めて止まる → 内容を確かめて **Create を押す**（押すのはオーナーだけ）→ Claude に「次」と伝える
+1. ダッシュボードの「作曲待ちの曲を Suno に入力する」（1 曲だけなら、その曲の「Suno で作曲」のマス →「Suno に入力する」）を押す
+2. 専用のブラウザが Suno の作曲画面を開き、1 曲目の曲名・スタイル・入れないもの・歌詞を入れて止まる（見つからない欄は、案内に従って 1 回クリックして教える。次からは自動）
+3. 内容を確かめて **Create を押す**（押すのはオーナーだけ）→ 案内の「次の曲へ」で次の曲に進む（最後は「終わる」）
 4. できたテイクを聴き、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」へダウンロード。ここから先は自動
+
+Claude に頼む方法（`publish.py suno-request` の頼み文を Claude in Chrome に貼る）は予備として残している。
 
 Suno の公式 API に通れば、3 の Create も自動にできる（申し込みは `docs/16_suno_api_application.md`）。

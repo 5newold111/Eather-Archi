@@ -82,7 +82,7 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
         add("brief", "ブリーフ", _d(planned["brief"][1]) if song.get("style") else None, None, "自動", "Suno の指示文と歌詞ができた")
     add("suno", "Suno で作曲", imported if r >= 1 else None, None, "あなた", "いいねした 1 本を取り込んだ")
     add("finish", "仕上げ（音量・ジャケット）", ready if r >= 4 else None, imported, "自動", "音量・ジャケット・下書き・公開セットができた")
-    add("register", "DistroKid に登録", registered if r >= 5 else None, ready, "あなた＋Claude", "DistroKid に登録した")
+    add("register", "DistroKid に登録", registered if r >= 5 else None, ready, "あなた", "DistroKid に登録した")
     add("wait", "配信待ち", released if r >= 6 else None, registered, "自動", "配信が始まった")
     mdate = rel or _d(out[-1]["end"])
     out.append(_ph("配信" if song["kind"] == "weekly" else "デビュー", mdate, mdate, "done" if r >= 6 else "plan", "",
@@ -175,7 +175,7 @@ def _weekly_row(a: dict, s: dict, rel: date | None, planned_only: bool = False) 
     if planned_only:
         phases = [_ph(n, plan[k][0], plan[k][1], "plan", who, "予定") for k, n, who in
                   (("brief", "ブリーフ", "自動"), ("suno", "Suno で作曲", "あなた"), ("finish", "仕上げ（音量・ジャケット）", "自動"),
-                   ("register", "DistroKid に登録", "あなた＋Claude"), ("wait", "配信待ち", "自動"))]
+                   ("register", "DistroKid に登録", "あなた"), ("wait", "配信待ち", "自動"))]
         phases.append(_ph("配信", rel, rel, "plan", detail=f"配信予定日 {rel}", milestone=True))
         blk = None
     else:

@@ -6,9 +6,10 @@
   ・アーティストごとの進み具合と詰まり（担当・何日止まっているか・次の一歩）。30 秒ごとに自動で新しくなる
   ・仕組みの詰まり（鍵・ffmpeg・SSD・定期実行）と、管理表の「詰まっているところ」
   ・曲の一覧（公開の段階・ISRC・公開セットのフォルダ）
-  ・ボタン：曲を取り込む／配信を確かめる／SSD に保管する／写真とジャケットを作る／DistroKid に登録したことを記録する／
-    公開セットのフォルダを Finder で開く／Suno に貼る内容のページ
-動きの中身は今までのコマンド（publish.py・archive_sync.py・kit_images.py）と同じ。ボタンはそれを代わりに実行するだけ。
+  ・ボタン：Suno に入力する／DistroKid に入力する（専用のブラウザが開き、欄を自動で埋める。Create と最後の登録ボタンは押さない。browser_fill.py）／
+    曲を取り込む／配信を確かめる／SSD に保管する／写真とジャケットを作る／DistroKid に登録したことを記録する／
+    公開セットのフォルダを Finder で開く／鍵や部品の設定をターミナルで始める
+動きの中身は今までのコマンド（publish.py・archive_sync.py・kit_images.py・browser_fill.py）と同じ。ボタンはそれを代わりに実行するだけ。
 
 使い方：
   python3 scripts/webapp.py                 # この Mac のブラウザだけから見る（http://localhost:8765）
@@ -102,7 +103,7 @@ def status_json() -> dict:
                     ph["guide"] = {"cause": ph.get("detail", ""), "steps": [], "actions": [], "error": str(e)}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl,
             "weekly_todos": weekly,
-            "system": [{"sev": a, "what": b, "how": c} for a, b, c in _status.system_blockers()],
+            "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j[k] for k in ("id", "label", "state", "started")} for j in list(JOBS.values())[-8:]]}
 
@@ -153,8 +154,21 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         week = str(p.get("week") or "this")
         if week == "this" or re.fullmatch(r"\d{4}-\d{2}-\d{2}", week):
             return [PY, str(S / "run_week.py"), "brief", "--week", week], f"ブリーフを作る（{week}）"
+    if action == "fill_suno":
+        song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
+        if p.get("id") and not song:
+            return None
+        return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
+            "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "fill_distrokid":
+        song = _songs.by_id(str(p.get("id", "")))
+        if song:
+            return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
+    if action == "browser_login" and p.get("site") in ("suno", "distrokid"):
+        return [PY, str(S / "browser_fill.py"), "login", p["site"]], f"ブラウザで入力（{p['site']} にログイン）"
     if action == "terminal" and p.get("key") in TERMINAL:
-        cmd = f"cd {shlex.quote(str(ROOT))} && " + " ".join(shlex.quote(x) for x in TERMINAL[p["key"]])
+        t = TERMINAL[p["key"]]
+        cmd = f"cd {shlex.quote(str(ROOT))} && " + (t if isinstance(t, str) else " ".join(shlex.quote(x) for x in t))
         esc = cmd.replace("\\", "\\\\").replace('"', '\\"')
         return ["osascript", "-e", 'tell application "Terminal" to activate', "-e", f'tell application "Terminal" to do script "{esc}"'], \
             f"ターミナルを開く（{p['key']}）"
@@ -163,7 +177,21 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
 
 # ターミナルで始める作業（鍵の入力など、Gon さんが打ち込む必要があるもの）
 TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
-            "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"]}
+            "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
+            # ブラウザで自動入力する部品（Playwright）と、Chrome が無いとき用のブラウザ
+            # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
+            "playwright": f"{{ {shlex.quote(PY)} -m pip install --user playwright || {shlex.quote(PY)} -m pip install --user --break-system-packages playwright; }}"
+                          f" && {shlex.quote(PY)} -m playwright install chromium",
+            "schedule": [PY, "scripts/schedule.py", "install"]}
+
+
+def _fix_buttons(how: str) -> list[dict]:
+    """「仕組みの詰まり」の直し方を、ワンクリックのボタンにする"""
+    for key, needle in (("openai", "--only openai"), ("spotify", "--only spotify"), ("owner", "--only owner"),
+                        ("ffmpeg", "brew install ffmpeg"), ("playwright", "playwright"), ("schedule", "schedule.py install")):
+        if needle in how:
+            return [{"kind": "terminal", "key": key, "label": "直す（ターミナルが開きます）"}]
+    return []
 
 
 def start_job(cmd: list[str], label: str) -> str:
@@ -249,7 +277,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
- <button data-act="scan">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
+ <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
  <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button>
 </div>
 <div id="jobs"></div>
@@ -259,7 +287,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 </div>
 <div class="legend" aria-label="凡例">
  <span><i class="sw" style="background:var(--good-t);border-color:var(--good)"></i>✓ 済み</span>
- <span><i class="sw" style="background:var(--warn-t);border-color:var(--warn)"></i>● Gon さん（または Claude）の番</span>
+ <span><i class="sw" style="background:var(--warn-t);border-color:var(--warn)"></i>● Gon さんの番</span>
  <span><i class="sw" style="background:var(--crit-t);border-color:var(--crit)"></i>！ 止まっている・遅れ</span>
  <span><i class="sw" style="border-style:dashed;border-color:var(--ink)"></i>… 自動で進行中</span>
  <span><i class="sw" style="border-style:dotted;border-color:var(--muted)"></i>○ 予定</span>
@@ -343,12 +371,12 @@ const tip=document.getElementById("tip");
 document.addEventListener("mouseover",e=>{const b=e.target.closest("[data-p]");if(!b){tip.style.display="none";return}const[,r,p]=phaseOf(b.dataset.p);tip.innerHTML=tipHTML(r,p);tip.style.display="block"});
 document.addEventListener("mousemove",e=>{if(tip.style.display==="block"){tip.style.left=Math.min(e.clientX+14,innerWidth-330)+"px";tip.style.top=(e.clientY+14)+"px"}});
 const WHO=w=>String(w||"").replace(/あなた/g,"Gon さん");
-const LABEL={done:"済み",wait:"Gon さん（または Claude）の番",ng:"止まっている・遅れ",run:"自動で進行中",plan:"まだ先"};
+const LABEL={done:"済み",wait:"Gon さんの番",ng:"止まっている・遅れ",run:"自動で進行中",plan:"まだ先"};
 const daysSince=s=>Math.max(0,Math.round((D(DATA.timeline.today)-D(s))/DAY));
 let ACTS=[];
 function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
   switch(a.kind){
-   case "run":return `<button class="act-only" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
+   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
    case "copy":return `<button class="ghost" data-copy="${i}">${E(a.label)}</button>`;
    case "link":return `<a class="btn" href="${E(a.url)}" target="_blank" rel="noopener">${E(a.label)} ↗</a>`;
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
@@ -419,14 +447,14 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
-  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;
+  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
 function render(){
   document.getElementById("upd").textContent=DATA.generated+" 時点";
   for(const k of["regular","debut"]){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  document.getElementById("system").innerHTML=DATA.system.length?`<ul class="list">${DATA.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code></li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
+  document.getElementById("system").innerHTML=DATA.system.length?`<ul class="list">${DATA.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code>${(x.acts||[]).map((a,i)=>" "+actHTML(a,i,{})).join("")}</li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
   const t=DATA.tracker,cols=["順番","詰まっていること","担当","次の一歩","状態"];
   document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;
   if(!STATIC)DATA.jobs.filter(j=>j.state==="running"&&!watching[j.id]).forEach(j=>watch(j.id));
@@ -516,6 +544,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "その操作はできません"})
         if any(j["state"] == "running" and j["label"] == found[1] for j in JOBS.values()):
             return self._json(409, {"error": "同じ仕事がまだ動いています"})
+        if found[1].startswith("ブラウザで入力") and any(j["state"] == "running" and j["label"].startswith("ブラウザで入力") for j in JOBS.values()):
+            return self._json(409, {"error": "ブラウザでの入力がまだ続いています。開いているブラウザの右下の案内で「終わる」か「閉じる」を押してから、もう一度押してください"})
         return self._json(200, {"job": start_job(*found)})
 
 

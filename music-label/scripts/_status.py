@@ -62,8 +62,8 @@ def song_step(song: dict, name: str) -> dict:
     if s == "ready":
         since = _d(st.get("ready_at"))
         late = since and (today - since).days >= 3
-        return _step(name, "ng" if late else "wait", f"{YOU}＋{CLAUDE}",
-                     f"{title}DistroKid に登録（Claude in Chrome で下書き → 最後のボタンはあなた）",
+        return _step(name, "ng" if late else "wait", YOU,
+                     f"{title}DistroKid に登録（ダッシュボードの「DistroKid に入力する」で下書き → 最後のボタンはあなた）",
                      f"python3 scripts/publish.py draft {song['id']}", since)
     if s == "registered":
         rel = _d(st.get("release_date"))
@@ -167,6 +167,10 @@ def system_blockers() -> list[tuple[str, str, str]]:
     if not (os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET")):
         sev = "ng" if "registered" in states else "normal"
         out.append((sev, "Spotify の鍵がないので、配信の確認と ISRC の記録が自動になりません", "python3 scripts/setup_keys.py --only spotify"))
+    from _guide import _has_playwright
+    if not _has_playwright():
+        out.append(("normal", "Suno・DistroKid に自動で入力する部品（Playwright）が入っていません（無くても、手でコピーして貼れば進められます）",
+                    "python3 -m pip install --user playwright && python3 -m playwright install chromium"))
     if not os.environ.get("OWNER_LEGAL_NAME"):
         out.append(("normal", "DistroKid の作詞作曲者の欄に入れる本名が未設定です", "python3 scripts/setup_keys.py --only owner"))
     try:
