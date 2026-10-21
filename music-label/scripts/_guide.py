@@ -1,0 +1,150 @@
+"""
+ダッシュボードのポップアップに出す「止まっている原因」「Gon さんがやること」「ワンクリックのボタン」を作る部品（webapp.py が使う）
+
+explain(row, phase) → {"cause": 文章, "steps": [やること…], "actions": [ボタン…]}
+ボタンの種類（webapp.py の画面が描く）：
+  run        仕組みを動かす（action と、slug / id / week）
+  copy       文をコピーする（text）。Claude（デスクトップアプリ＋Claude in Chrome）に貼る頼み文など
+  link       ページを開く（url）
+  terminal   ターミナルを開いて、鍵の設定などを始める（key：openai / spotify / owner / ffmpeg）
+  registered 日付を選んで「DistroKid に登録した」を記録する（id）
+  folder     公開セットのフォルダを開く（id）／ artist_folder：その組のフォルダを開く（slug）
+"""
+from __future__ import annotations
+
+from datetime import date
+
+import _songs
+
+SUNO_URL = "https://suno.com/create"
+DISTROKID_URL = "https://distrokid.com/new/"
+DISTROKID_MYMUSIC = "https://distrokid.com/mymusic/"
+OPENAI_KEYS = "https://platform.openai.com/api-keys"
+SPOTIFY_DASH = "https://developer.spotify.com/dashboard"
+
+
+def _late(phase: dict) -> str:
+    d = phase.get("detail", "")
+    return "（予定より遅れています）" if "予定は" in d else ""
+
+
+def explain(row: dict, phase: dict) -> dict:
+    name, state = phase["name"], phase["state"]
+    song = _songs.by_id(row.get("id", "")) if row.get("id") else None
+    title = f"「{row.get('title')}」" if row.get("title") else ""
+    if row.get("planned"):
+        return {"cause": f"{row.get('sub', '')}の制作は、まだ始まっていません。その週の火曜の朝に、ブリーフ（Suno への指示と歌詞）が自動で作られます。",
+                "steps": ["いまは何もしなくて大丈夫です。"], "actions": []}
+    if state == "plan":
+        return {"cause": f"まだ先の工程です（{phase['start']} ごろの予定）。前の工程が終わると、自動でこの工程に進みます。",
+                "steps": ["いまは何もしなくて大丈夫です。"], "actions": []}
+    if state == "done" and not phase.get("milestone"):
+        return {"cause": f"済みました。{phase.get('detail', '')}", "steps": [], "actions": []}
+
+    if name == "名前の確認":
+        return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",
+                "steps": ["「名前を確かめる」を押す（Spotify などを自動で調べます）",
+                          "「重なりあり」と出たら、Claude に相談して名前を変える"],
+                "actions": [{"kind": "run", "label": "名前を確かめる", "action": "check_name", "slug": row["slug"]}]}
+
+    if name == "写真・ジャケット":
+        if "鍵" in phase.get("detail", ""):
+            return {"cause": "アーティスト写真とジャケットを作るための OpenAI の鍵が、Mac に入っていません。",
+                    "steps": ["「OpenAI の鍵のページを開く」で鍵を作ってコピーする",
+                              "「鍵を入れる（ターミナルが開きます）」を押し、出てきた質問に鍵を貼って Enter",
+                              "終わったら「写真とジャケットを作る」を押す"],
+                    "actions": [{"kind": "link", "label": "OpenAI の鍵のページを開く", "url": OPENAI_KEYS},
+                                {"kind": "terminal", "label": "鍵を入れる（ターミナルが開きます）", "key": "openai"},
+                                {"kind": "run", "label": "写真とジャケットを作る", "action": "images", "slug": row["slug"], "confirm": "写真とジャケットを作ります（OpenAI の画像の料金がかかります）。よいですか？"}]}
+        return {"cause": f"{row['artist']} のアーティスト写真かジャケットが、まだできていません。",
+                "steps": ["「写真とジャケットを作る」を押す（数分かかります。OpenAI の画像の料金がかかります）",
+                          "できたら「フォルダを開く」で仕上がりを確かめる"],
+                "actions": [{"kind": "run", "label": "写真とジャケットを作る", "action": "images", "slug": row["slug"], "confirm": "写真とジャケットを作ります（OpenAI の画像の料金がかかります）。よいですか？"},
+                            {"kind": "artist_folder", "label": "フォルダを開く", "slug": row["slug"]}]}
+
+    if name == "ブリーフ":
+        return {"cause": "今週のブリーフ（Suno への指示と歌詞）を作っています。ふだんは火曜の朝に自動で作られます。",
+                "steps": ["待つだけで大丈夫です。", "すぐに作りたいときは「ブリーフを作る」を押す"],
+                "actions": [{"kind": "run", "label": "ブリーフを作る", "action": "brief", "week": row.get("week")}]}
+
+    if name == "Suno で作曲":
+        acts = []
+        if song:
+            import publish
+            acts.append({"kind": "copy", "label": "Claude への頼み文をコピー", "text": publish.suno_request([song])})
+        acts += [{"kind": "link", "label": "Suno を開く", "url": SUNO_URL},
+                 {"kind": "run", "label": "曲を取り込む", "action": "scan"}]
+        return {"cause": f"{title}の Suno での作曲を待っています。この工程は Gon さんの番です{_late(phase)}。",
+                "steps": ["Mac の Claude デスクトップアプリで新しい会話を始め、Claude in Chrome をつなぐ",
+                          "「Claude への頼み文をコピー」を押して、その会話に貼る（Claude が Suno の欄を埋めて止まります）",
+                          "内容を確かめて、Suno の「Create」を押す",
+                          "2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード",
+                          "数分で自動で取り込まれます。すぐ進めたいときは「曲を取り込む」を押す"],
+                "actions": acts}
+
+    if name.startswith("仕上げ"):
+        d = phase.get("detail", "")
+        if "ffmpeg" in d:
+            return {"cause": "曲の音量を整える道具（ffmpeg）が Mac に入っていないため、ここで止まっています。",
+                    "steps": ["「道具を入れる（ターミナルが開きます）」を押す。終わるまで数分待つ", "終わったら「もう一度進める」を押す"],
+                    "actions": [{"kind": "terminal", "label": "道具を入れる（ターミナルが開きます）", "key": "ffmpeg"},
+                                {"kind": "run", "label": "もう一度進める", "action": "scan"}]}
+        if "鍵" in d:
+            return {"cause": "ジャケットを作るための OpenAI の鍵が、Mac に入っていません。",
+                    "steps": ["「鍵を入れる（ターミナルが開きます）」を押し、鍵を貼って Enter", "終わったら「ジャケットを作る」を押す"],
+                    "actions": [{"kind": "link", "label": "OpenAI の鍵のページを開く", "url": OPENAI_KEYS},
+                                {"kind": "terminal", "label": "鍵を入れる（ターミナルが開きます）", "key": "openai"},
+                                {"kind": "run", "label": "ジャケットを作る", "action": "cover", "slug": row["slug"]}]}
+        if "ジャケット" in d:
+            return {"cause": "ジャケットを作っています（数分）。",
+                    "steps": ["待つだけで大丈夫です。進まないときは「ジャケットを作る」を押す"],
+                    "actions": [{"kind": "run", "label": "ジャケットを作る", "action": "cover", "slug": row["slug"]},
+                                {"kind": "run", "label": "もう一度進める", "action": "scan"}]}
+        return {"cause": "取り込んだ曲の音量を整え、ジャケット・歌詞・DistroKid の下書きと一緒にまとめています（数分）。",
+                "steps": ["待つだけで大丈夫です。", "止まっているように見えたら「もう一度進める」を押す"],
+                "actions": [{"kind": "run", "label": "もう一度進める", "action": "scan"}]}
+
+    if name == "DistroKid に登録":
+        acts = []
+        if song:
+            import publish
+            acts.append({"kind": "copy", "label": "DistroKid の頼み文をコピー", "text": publish.distrokid_request(song)})
+        acts += [{"kind": "link", "label": "DistroKid を開く", "url": DISTROKID_URL},
+                 {"kind": "folder", "label": "公開セットのフォルダを開く", "id": row.get("id")},
+                 {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
+        return {"cause": f"{title}の音源・ジャケット・登録の内容がそろいました。DistroKid への登録を待っています{_late(phase)}。",
+                "steps": ["Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に、「DistroKid の頼み文をコピー」で写した文を貼る",
+                          "Claude が項目を入れ、音源とジャケットを添付して止まる",
+                          "内容を確かめて、最後の登録ボタンを押す（押すのは Gon さんだけ）",
+                          "押したら、日付を配信日に合わせて「DistroKid に登録した」を押す"],
+                "actions": acts}
+
+    if name == "配信待ち":
+        d = phase.get("detail", "")
+        if "鍵" in d:
+            return {"cause": "DistroKid には登録済みです。ただ、Spotify の鍵が無いので、配信が始まったかを自動で確かめられません。",
+                    "steps": ["「Spotify の開発者ページを開く」でアプリを作り、Client ID と Client secret をコピー",
+                              "「鍵を入れる（ターミナルが開きます）」を押し、質問に貼って Enter",
+                              "終わったら「配信を確かめる」を押す"],
+                    "actions": [{"kind": "link", "label": "Spotify の開発者ページを開く", "url": SPOTIFY_DASH},
+                                {"kind": "terminal", "label": "鍵を入れる（ターミナルが開きます）", "key": "spotify"},
+                                {"kind": "run", "label": "配信を確かめる", "action": "track"}]}
+        if "1 週間" in d:
+            return {"cause": "配信日から 1 週間たっても Spotify に出ていません。DistroKid で審査中か、差し戻しになっている可能性があります。",
+                    "steps": ["「DistroKid の My Music を開く」で、この曲の状態を確かめる",
+                              "差し戻しの知らせがあれば、その文を Claude に貼って相談する"],
+                    "actions": [{"kind": "link", "label": "DistroKid の My Music を開く", "url": DISTROKID_MYMUSIC},
+                                {"kind": "run", "label": "配信を確かめる", "action": "track"}]}
+        ms = next((x for x in row.get("phases", []) if x.get("milestone")), None)
+        when = f"配信日（{ms['start']}）に" if ms else "配信日に"
+        return {"cause": f"{title}は DistroKid に登録済みです。{when}各ストアに並びます。毎朝自動で確かめ、配信が始まったら ISRC・UPC・配信 URL を記録します。",
+                "steps": ["待つだけで大丈夫です。", "すぐに確かめたいときは「配信を確かめる」を押す"],
+                "actions": [{"kind": "run", "label": "配信を確かめる", "action": "track"}]}
+
+    if phase.get("milestone"):
+        if state == "done":
+            acts = [{"kind": "link", "label": "Spotify で聴く", "url": phase["action"]}] if phase.get("action") else []
+            return {"cause": f"配信中です。{phase.get('detail', '')}", "steps": [], "actions": acts}
+        return {"cause": f"配信の予定日です（{phase['start']}）。", "steps": ["いまは何もしなくて大丈夫です。"], "actions": []}
+
+    return {"cause": phase.get("detail", ""), "steps": [phase["action"]] if phase.get("action") else [], "actions": []}

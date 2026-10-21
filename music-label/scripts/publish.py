@@ -570,6 +570,23 @@ def suno_request(songs: list[dict]) -> str:
     return head + "".join(parts)
 
 
+def distrokid_request(song: dict) -> str:
+    """Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る、DistroKid の下書きの頼み文。最後の登録ボタンはオーナー"""
+    f = draft_fields(song)
+    rules = ("決まり（必ず守る）：\n"
+             "- 最後の登録ボタン（Upload／Done／Submit など、送信して確定するボタン）は絶対に押さない。押すのは私（オーナー）。"
+             "入力と添付が終わったら止まって「入力しました。確認して登録ボタンを押してください」と伝える\n"
+             "- 支払い・プランの変更・アカウントの設定・ほかの曲の編集や削除はしない\n"
+             "- 欄が見つからない・選択肢に同じ言葉が無い・画面が想定と違うときは、推測で進めずに止まって私に聞く\n"
+             "- ファイルの添付ができないときは、止まって「どのファイルをどの欄に入れるか」を私に伝える")
+    lines = "\n".join(f"- {k}：{v}" for k, v in f.items() if k not in ("曲 ID",))
+    return ("Claude in Chrome で、DistroKid に曲の下書きを入れてください。\n\n" + rules +
+            "\n\n手順：\n1. Chrome で " + "https://distrokid.com/new/" + " を開く（私はログイン済み）\n"
+            "2. 下の内容を上から順に、同じ意味の欄に入れる。Release date は選べるいちばん早い日（デビュー曲）か、書いてある日\n"
+            "3. 音源とジャケットのファイルを添付する（場所は下のとおり）\n4. 入れ終わったら止まって、私に伝える\n\n"
+            f"【{song['artist']}「{song['title']}」（{song['id']}）】\n" + lines + "\n")
+
+
 def suno_todo() -> list[dict]:
     """Suno で作る番の曲（曲名とスタイルがあり、まだ取り込んでいないもの）"""
     return [s for s in _songs.all_songs() if s.get("title") and s.get("style") and not str(s["week"]).startswith("2000-")
