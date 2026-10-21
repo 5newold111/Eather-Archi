@@ -556,8 +556,8 @@ def suno_request(songs: list[dict]) -> str:
     """Mac の Claude デスクトップアプリ（Claude in Chrome をつないだ会話）に貼る頼み文。決定 19：入力は Claude、Create はオーナー"""
     head = ("Claude in Chrome で、Suno の作曲画面に曲の内容を入力してください。\n\n" + SUNO_RULES + "\n\n手順：\n"
             "1. Chrome で https://suno.com/create を開く（私はログイン済み）\n"
-            "2. 「Custom」（カスタム）に切り替える\n"
-            "3. 下の内容を、同じ名前の欄に入れる（前の内容が残っていれば消してから）。Exclude Styles は「More Options」などの中にあれば開いて入れる\n"
+            "2. 画面の上の「高度な」（Advanced）に切り替える\n"
+            "3. 下の内容を、同じ名前の欄に入れる（前の内容が残っていれば消してから）。画面の上から 歌詞 → スタイル → 除外するスタイル（「その他のオプション」の中）→ 曲のタイトル\n"
             "4. 入れ終わったら止まって、私に伝える\n")
     parts = []
     for n, s in enumerate(songs, 1):
@@ -566,6 +566,7 @@ def suno_request(songs: list[dict]) -> str:
             f"- Instrumental：{'オン' if s.get('instrumental') else 'オフ'}\n"
             f"- Title：{s['title']}\n- Style of Music：{s['style']}\n"
             + (f"- Exclude Styles：{s['exclude']}\n" if s.get("exclude") else "")
+            + (f"- その他のオプション：{_songs.suno_options_text(s)}\n" if _songs.suno_options_text(s) else "")
             + ("" if s.get("instrumental") else f"- Lyrics（ここから）\n{str(s.get('lyrics', '')).strip()}\n- Lyrics（ここまで）\n"))
     return head + "".join(parts)
 
@@ -604,13 +605,16 @@ def suno_page() -> tuple[str, int]:
                      '下の内容が 1 曲ずつ Suno の欄に自動で入ります。内容を確かめて「Create」を押してください（押すのは Gon さんだけ）。</p>'
                      '<p>ターミナルからなら：<code>python3 scripts/browser_fill.py suno</code></p></section>')
     for i, s in enumerate(todo):
-        fields = [("曲名（Title）", s["title"]), ("スタイル（Style of Music）", s["style"]),
-                  ("入れないもの（Exclude Styles）", s.get("exclude", "")), ("歌詞（Lyrics）", "" if s.get("instrumental") else s.get("lyrics", ""))]
+        # Suno の「高度な」の画面の上から順（歌詞 → スタイル → 除外するスタイル → 曲のタイトル）
+        fields = [("歌詞（Lyrics）", "" if s.get("instrumental") else s.get("lyrics", "")), ("スタイル（Styles）", s["style"]),
+                  ("除外するスタイル（Exclude styles・「その他のオプション」の中）", s.get("exclude", "")), ("曲のタイトル（Song Title）", s["title"])]
         rows = "".join(
             f'<div class="f"><div class="h"><span>{E(k)}</span><button onclick="cp(\'t{i}_{j}\', this)">コピー</button></div>'
-            f'<textarea id="t{i}_{j}" readonly rows="{(1, 4, 2, 14)[j]}">{E(v)}</textarea></div>'
+            f'<textarea id="t{i}_{j}" readonly rows="{(14, 4, 2, 1)[j]}">{E(v)}</textarea></div>'
             for j, (k, v) in enumerate(fields) if v)
-        cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}</section>')
+        opt = _songs.suno_options_text(s)
+        opt_html = f'<p>「その他のオプション」の設定（組ごとに決めたもの）：<b>{E(opt)}</b></p>' if opt else ""
+        cards.append(f'<section><h2>{E(s["artist"])}「{E(s["title"])}」<small>{E(s["id"])}</small></h2>{rows}{opt_html}</section>')
     page = f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Suno に貼る内容</title><style>
 :root{{--bg:#f7f5f1;--fg:#222;--card:#fff;--line:#ddd;--accent:#7a5c2e}}
@@ -622,7 +626,7 @@ h2 small{{font-weight:normal;opacity:.6;margin-left:8px;font-size:.7em}} textare
 ol{{padding-left:1.2em}}</style></head><body><main>
 <h1>Suno に貼る内容（{len(todo)} 曲）</h1>
 <p><b>入力は仕組みが自動でやります</b>（下の「自動で入力する」）。自分で貼るときは：</p>
-<ol><li>Suno の Create 画面で「Custom」を選び、下の欄を「コピー」して同じ名前の欄に貼る</li>
+<ol><li>Suno の作曲画面の上で「高度な」を選び、下の欄を「コピー」して同じ名前の欄に貼る（上から 歌詞 → スタイル → 除外するスタイル〔「その他のオプション」の中〕→ 曲のタイトル）</li>
 <li>「Create」を押す（押すのは Gon さんだけ）</li>
 <li>できた 2 つのテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードする（WAV がおすすめ）</li>
 <li>ダウンロードしたファイルを SSD の「Postdog Records → 楽曲情報」に入れる（Suno のアプリの保存先をここにしておく。SSD が無いときは「ダウンロード → SUNO楽曲」）。ここから先は自動で公開の準備まで進みます</li></ol>

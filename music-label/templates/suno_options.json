@@ -1,0 +1,35 @@
+{
+ "_使い方": "Suno の作曲画面の「高度な」→「その他のオプション」に、組ごとに入れる設定（browser_fill.py が自動で入れる）。Gon さんが自由に書き換えてよい。vocal_gender は male（男性）・female（女性）・null（選ばない）。weirdness・style_influence は 0〜100（%）。Suno の初期値はどちらも 50",
+ "_weirdness": "Weirdness（意外さ）：高いほど予想外の展開・音色になる。毎回同じ声と音で通したい組は低め",
+ "_style_influence": "Style Influence（スタイルの効き具合）：高いほどスタイル欄の指定どおりになる。音の決まりが細かい組は高め",
+ "declan_fay": {
+  "vocal_gender": "male",
+  "weirdness": 35,
+  "style_influence": 70,
+  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、意外さは低め・スタイルは強め"
+ },
+ "hollowplan": {
+  "vocal_gender": null,
+  "weirdness": 55,
+  "style_influence": 65,
+  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、意外さは少し高め"
+ },
+ "nao_easterly": {
+  "vocal_gender": "female",
+  "weirdness": 30,
+  "style_influence": 70,
+  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、意外さは低め・スタイルは強め"
+ },
+ "soft_cantilever": {
+  "vocal_gender": "male",
+  "weirdness": 40,
+  "style_influence": 65,
+  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、意外さは中くらい"
+ },
+ "tidewool": {
+  "vocal_gender": null,
+  "weirdness": 35,
+  "style_influence": 60,
+  "_why": "男女 2 人の 3 度のハモりが持ち味。性別を 1 つ選ぶと片方の声だけになりやすいので選ばない。生楽器の自然な響きを残したいので、スタイルの効きは少しゆるめ"
+ }
+}

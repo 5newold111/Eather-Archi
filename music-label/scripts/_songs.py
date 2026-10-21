@@ -150,3 +150,31 @@ def debut_registered(slug: str) -> bool | None:
     if not ds:
         return None
     return any(state(s).get("status") in ("registered", "live") for s in ds)
+
+
+# ---------------------------------------------------------------------------
+# Suno の「その他のオプション」に組ごとに入れる設定（templates/suno_options.json。Gon さんが書き換えてよい）
+SUNO_OPTIONS = ROOT / "templates" / "suno_options.json"
+GENDER_JA = {"male": "男性", "female": "女性", None: "選ばない"}
+
+
+def suno_options(song: dict) -> dict:
+    """{'vocal_gender': 'male'|'female'|None, 'weirdness': 0〜100, 'style_influence': 0〜100}。曲ごとの指定（song['suno_options']）が優先"""
+    d = read_json(SUNO_OPTIONS) if SUNO_OPTIONS.exists() else {}
+    opt = {k: v for k, v in (d.get(song.get("slug", ""), {}) or {}).items() if not k.startswith("_")}
+    opt.update(song.get("suno_options") or {})
+    return opt
+
+
+def suno_options_text(song: dict) -> str:
+    o = suno_options(song)
+    if not o:
+        return ""
+    parts = []
+    if "vocal_gender" in o:
+        parts.append(f"ボーカルの性別：{GENDER_JA.get(o['vocal_gender'], o['vocal_gender'])}")
+    if o.get("weirdness") is not None:
+        parts.append(f"Weirdness：{o['weirdness']}%")
+    if o.get("style_influence") is not None:
+        parts.append(f"Style Influence：{o['style_influence']}%")
+    return "・".join(parts)

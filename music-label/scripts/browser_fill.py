@@ -359,13 +359,17 @@ class Session:
 
 # ---------------------------------------------------------------------------
 # 欄を探して入れる
+# 覚えた欄をしまう名前。Suno は「高度な」（Advanced）の画面に合わせて覚え直す（前の画面で覚えた場所は使わない）
+LEARN_AS = {"suno": "suno_advanced"}
+
+
 def learned() -> dict:
     return read_json(LEARNED) if LEARNED.exists() else {}
 
 
 def remember(site: str, key: str, selector: str) -> None:
     d = learned()
-    d.setdefault(site, {})[key] = selector
+    d.setdefault(LEARN_AS.get(site, site), {})[key] = selector
     LEARNED.parent.mkdir(parents=True, exist_ok=True)
     LEARNED.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
 
@@ -377,9 +381,32 @@ def _visible(loc) -> bool:
         return False
 
 
+DESC_JS = """e => [e.getAttribute('placeholder'), e.getAttribute('aria-label'), e.getAttribute('name'), e.id,
+                   e.labels ? [...e.labels].map(l => l.innerText).join(' ') : ''].join(' ')"""
+
+
+def _pick(loc, avoid):
+    """候補のうち、見えていて、避けたい欄（例：スタイルを探すときの「除外するスタイル」）ではない最初のもの"""
+    try:
+        n = min(loc.count(), 8)
+    except Exception:  # noqa: BLE001
+        return None
+    for i in range(n):
+        c = loc.nth(i)
+        try:
+            if not c.is_visible():
+                continue
+            if avoid and re.search(avoid, c.evaluate(DESC_JS) or "", re.I):
+                continue
+            return c
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
 def find(sess: Session, site: str, f: dict):
     page = sess.page
-    sel = learned().get(site, {}).get(f["key"])
+    sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
     if sel and _visible(page.locator(sel)):
         return page.locator(sel).first
     if f["type"] == "file":
@@ -398,13 +425,15 @@ def find(sess: Session, site: str, f: dict):
         elif f["type"] == "click":
             makers = [lambda: page.get_by_role("button", name=rx), lambda: page.get_by_role("tab", name=rx),
                       lambda: page.get_by_role("radio", name=rx), lambda: page.get_by_role("switch", name=rx)]
+            if f.get("text_ok"):   # 見出しの文字そのもの（「高度な」など）。別のページに移ったら put が元に戻す
+                makers.append(lambda: page.get_by_text(re.compile(r"^\s*" + re.escape(h) + r"\s*$", re.I)))
         else:
             makers.append(lambda: page.get_by_role("textbox", name=rx))
         for make in makers:
             try:
-                loc = make()
-                if _visible(loc):
-                    return loc.first
+                c = _pick(make(), f.get("avoid"))
+                if c is not None:
+                    return c
             except Exception:  # noqa: BLE001
                 continue
     if f.get("largest_textarea"):
@@ -417,10 +446,114 @@ def find(sess: Session, site: str, f: dict):
     return None
 
 
+# ボタンが「選ばれているか」を読む（読めないときは unknown。そのときは押さない：押すと選択が外れることがある）
+STATE_JS = """e => { const a = e.getAttribute('aria-pressed') ?? e.getAttribute('aria-checked') ?? e.getAttribute('aria-selected');
+    if (a === 'true') return 'on'; if (a === 'false') return 'off';
+    const ds = e.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
+    if (e.matches('input[type=radio],input[type=checkbox]')) return e.checked ? 'on' : 'off';
+    return 'unknown'; }"""
+SLIDER_NEAR_JS = r"""(hint) => { const want = hint.trim().toLowerCase();
+    for (const el of document.querySelectorAll('label,span,div,p,h3,h4')) {
+      if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase() === want)) continue;
+      let up = el;
+      for (let i = 0; i < 5 && up; i++, up = up.parentElement) {
+        const s = up.querySelector('[role=slider],input[type=range]');
+        if (s) return window.__postdogSel(s);
+      } }
+    return null; }"""
+
+
+def find_slider(sess: Session, site: str, f: dict):
+    page = sess.page
+    sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
+    if sel and _visible(page.locator(sel)):
+        return page.locator(sel).first
+    for h in f.get("hints", []):
+        rx = re.compile(re.escape(h), re.I)
+        for make in (lambda: page.get_by_role("slider", name=rx), lambda: page.get_by_label(rx)):
+            try:
+                c = _pick(make(), None)
+                if c is not None and c.evaluate("e => e.getAttribute('role') === 'slider' || (e.tagName === 'INPUT' && e.type === 'range')"):
+                    return c
+            except Exception:  # noqa: BLE001
+                continue
+        sel = sess.js(SLIDER_NEAR_JS, h)   # 見出しの文字の近くにあるスライダー
+        if sel and _visible(page.locator(sel)):
+            return page.locator(sel).first
+    return None
+
+
+def _slider_value(loc) -> float:
+    return float(loc.evaluate("e => e.getAttribute('aria-valuenow') ?? e.value"))
+
+
+def set_slider(sess: Session, loc, target: int) -> bool:
+    """スライダーを target（%）に合わせる。矢印キーで 1 目盛りずつ動かし、合ったか読み返す"""
+    if loc.evaluate("e => e.tagName === 'INPUT'"):
+        loc.evaluate("""(e, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            set.call(e, String(v)); e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); }""", target)
+    else:
+        loc.focus()
+        for _ in range(250):
+            cur = _slider_value(loc)
+            if abs(cur - target) < 1:
+                break
+            sess.page.keyboard.press("ArrowRight" if cur < target else "ArrowLeft")
+            if _slider_value(loc) == cur:
+                break   # 動かない
+    return abs(_slider_value(loc) - target) <= 2
+
+
+def _option(sess: Session, hints: list[str]):
+    page = sess.page
+    for h in hints:
+        rx = re.compile(r"^\s*" + re.escape(h) + r"\s*$", re.I)
+        for role in ("button", "radio", "tab", "checkbox", "switch", "option"):
+            c = _pick(page.get_by_role(role, name=rx), None)
+            if c is not None:
+                return c
+    return None
+
+
+def choice_state(sess: Session, f: dict) -> bool | None:
+    """「どちらか選ぶ」が希望どおりか。True／False／None（読めない・見つからない）"""
+    seen = False
+    for opt, hints in f["options"].items():
+        loc = _option(sess, hints)
+        if loc is None:
+            continue
+        seen = True
+        st = loc.evaluate(STATE_JS)
+        if st == "unknown":
+            return None
+        if (st == "on") != (opt == f["value"]):
+            return False
+    return True if seen or f["value"] == "none" else None
+
+
+def set_choice(sess: Session, f: dict) -> bool | None:
+    """希望どおりに選ぶ（ボーカルの性別など）。状態が読めないボタンは押さない"""
+    for opt, hints in f["options"].items():
+        loc = _option(sess, hints)
+        if loc is None:
+            continue
+        st = loc.evaluate(STATE_JS)
+        if st == "unknown":
+            return None
+        if (st == "on") != (opt == f["value"]):
+            text = " ".join(filter(None, [loc.inner_text(timeout=2000), loc.get_attribute("aria-label") or ""]))
+            if NEVER.search(text):
+                return False
+            loc.click()
+            sess.page.wait_for_timeout(400)
+    return choice_state(sess, f)
+
+
 def teach(sess: Session, site: str, f: dict):
     """見つからない欄を、クリックで 1 回だけ教えてもらう"""
     sess.show(f"「{f['label']}」の欄が見つかりません",
               [f"「{f['label']}」の入力欄を 1 回クリックしてください。場所を覚えて、次からは自動で入れます。",
+               *([f["tip"]] if f.get("tip") else []),
                "（このクリックでボタンが押されることはありません）"],
               [{"id": "skip", "label": "この欄はとばす（手で入れる）"}], pick=True)
     for _ in range(3):
@@ -492,6 +625,39 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
     for f in fields:
         if f.get("value") in (None, ""):
             continue
+        if f.get("only_if_missing"):
+            keys = f["only_if_missing"] if isinstance(f["only_if_missing"], list) else [f["only_if_missing"]]
+            targets = [x for x in fields if x["key"] in keys and x.get("value") not in (None, "")]
+            if not any((find_slider(sess, site, x) if x["type"] == "slider" else
+                        _option(sess, sum(x["options"].values(), [])) if x["type"] == "choice" else find(sess, site, x)) is None
+                       for x in targets):
+                continue   # 中の欄が全部見えている＝もう開いている（押すと閉じてしまう）
+        if f["type"] == "choice":
+            try:
+                r = set_choice(sess, f)
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001
+                r = False
+            if r:
+                done.append(f["label"])
+            else:
+                manual.append(f"{f['label']}：{f.get('show', f['value'])}" + ("（状態が読めないので、手で選んでください）" if r is None else ""))
+            continue
+        if f["type"] == "slider":
+            try:
+                loc = find_slider(sess, site, f)
+                ok = loc is not None and set_slider(sess, loc, int(f["value"]))
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001
+                loc, ok = None, False
+            if ok:
+                done.append(f["label"])
+                sess.filled[f["key"]] = loc
+            else:
+                manual.append(f"{f['label']}：{f['value']}%（手で合わせてください）")
+            continue
         try:
             loc = find(sess, site, f)
             if loc is None and f.get("teach", True) and f["type"] != "file":
@@ -518,8 +684,25 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
     """入れた欄の中身を読み返して、入れたかった値と同じかを確かめる。合わない欄の一覧（空なら全部入っている）"""
     sess.page.wait_for_timeout(700)   # サイトが値を消したり書き換えたりしないかを少し待ってから見る
     bad = []
+    sess.unsure = []
     for f in fields:
         if f.get("value") in (None, "") or f["type"] == "click":
+            continue
+        if f["type"] == "choice":
+            r = choice_state(sess, f)
+            if r is False:
+                bad.append(f"{f['label']}：{f.get('show', f['value'])}になっていません")
+            elif r is None:
+                sess.unsure.append(f"{f['label']}：{f.get('show', f['value'])}（画面で確かめてください）")
+            continue
+        if f["type"] == "slider":
+            loc = getattr(sess, "filled", {}).get(f["key"])
+            try:
+                v = _slider_value(loc) if loc is not None else None
+            except Exception:  # noqa: BLE001
+                v = None
+            if v is None or abs(v - float(f["value"])) > 2:
+                bad.append(f"{f['label']}：{f['value']}% になっていません" + (f"（いま {v:g}%）" if v is not None else ""))
             continue
         loc = getattr(sess, "filled", {}).get(f["key"])
         if loc is None:
@@ -557,14 +740,43 @@ def on_page(sess: Session, site: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+def _option_fields(song: dict) -> list[dict]:
+    """組ごとに決めた「その他のオプション」（templates/suno_options.json）"""
+    o = _songs.suno_options(song)
+    out = []
+    if "vocal_gender" in o:
+        g = o["vocal_gender"] or "none"
+        out.append({"key": "gender", "label": "ボーカルの性別（Vocal Gender）", "type": "choice", "value": g,
+                    "show": _songs.GENDER_JA.get(o["vocal_gender"], g),
+                    "options": {"male": ["男性", "Male"], "female": ["女性", "Female"]}})
+    if o.get("weirdness") is not None:
+        out.append({"key": "weirdness", "label": "Weirdness（意外さ）", "type": "slider", "value": int(o["weirdness"]),
+                    "hints": ["Weirdness", "奇抜さ", "奇妙さ", "ウィアードネス", "意外性"]})
+    if o.get("style_influence") is not None:
+        out.append({"key": "style_influence", "label": "Style Influence（スタイルの効き具合）", "type": "slider", "value": int(o["style_influence"]),
+                    "hints": ["Style Influence", "スタイルの影響", "スタイルの影響度", "スタイル影響", "スタイルの強さ"]})
+    return out
+
+
 def suno_fields(song: dict) -> list[dict]:
+    """Suno の作曲画面の「高度な」（Advanced）モードの欄。画面の上から順に入れる"""
+    tip = "欄が見えないときは、画面の上の「高度な」を選び、「その他のオプション」を開いてからクリックしてください。"
     return [
-        {"key": "custom", "label": "Custom（カスタム）", "type": "click", "value": "on", "hints": ["Custom"], "optional": True, "teach": False},
-        {"key": "title", "label": "曲名（Title）", "type": "text", "value": song["title"], "hints": ["Song Title", "Title", "曲名"]},
-        {"key": "style", "label": "スタイル（Style of Music）", "type": "text", "value": song.get("style", ""), "hints": ["Style of Music", "Styles", "Style", "スタイル"]},
-        {"key": "exclude", "label": "入れないもの（Exclude Styles）", "type": "text", "value": song.get("exclude", ""), "hints": ["Exclude"]},
+        {"key": "mode", "label": "「高度な」モード", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
+         "hints": ["高度な", "高度", "Advanced", "Custom", "カスタム"]},
         {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": "" if song.get("instrumental") else song.get("lyrics", ""),
-         "hints": ["Lyrics", "歌詞"], "largest_textarea": True, "show": "（歌詞はダッシュボードの「Suno に貼る内容」からコピー）"},
+         "hints": ["Lyrics", "歌詞", "Write some lyrics", "Write your own lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル",
+         "largest_textarea": True, "tip": tip, "show": "（歌詞はダッシュボードの「Suno に貼る内容」からコピー）"},
+        {"key": "style", "label": "スタイル（Styles）", "type": "text", "value": song.get("style", ""),
+         "hints": ["Style of Music", "Styles", "Style", "スタイル", "音楽のスタイル"], "avoid": r"exclude|除外|lyrics|歌詞", "tip": tip},
+        {"key": "more", "label": "その他のオプション", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
+         "only_if_missing": ["exclude", "gender", "weirdness", "style_influence"],
+         "hints": ["その他のオプション", "詳細オプション", "More Options", "More options", "オプション"]},
+        {"key": "exclude", "label": "除外するスタイル（Exclude styles）", "type": "text", "value": song.get("exclude", ""),
+         "hints": ["Exclude styles", "Exclude", "除外"], "tip": tip},
+        *_option_fields(song),
+        {"key": "title", "label": "曲のタイトル（Song Title）", "type": "text", "value": song["title"],
+         "hints": ["Song Title", "Title", "曲のタイトル", "タイトル", "曲名"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip},
     ]
 
 
@@ -597,7 +809,7 @@ def run_suno(sess: Session, ids: list[str]) -> int:
     if not songs:
         print("【結果】Suno で作る番の曲はありません")
         return 0
-    ok_songs, problems = [], []
+    ok_songs, problems, unsure_all = [], [], []
     for n, song in enumerate(songs, 1):
         sess.goto(SITES["suno"])
         if not sess.ensure_login("suno"):
@@ -628,7 +840,10 @@ def run_suno(sess: Session, ids: list[str]) -> int:
                 lines += ["入れる内容：", *manual]
         else:
             lines += ["✓ 全部の欄に入っていることを確かめました：" + "・".join(done)]
-        lines += ["① Custom（カスタム）モードになっているか確かめる",
+        if sess.unsure:
+            lines += ["目で確かめてください（画面から状態が読めませんでした）：", *sess.unsure]
+            unsure_all.extend(f"{name}の{x}" for x in sess.unsure)
+        lines += ["① 画面の上が「高度な」（Advanced）になっているか確かめる",
                   "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）",
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
@@ -641,7 +856,8 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         if m.get("action") in ("stop", "closed"):
             break
     if not problems and len(ok_songs) == len(songs):
-        print(f"【結果】Suno の作曲画面に{'、' + str(len(songs)) + ' 曲とも' if len(songs) > 1 else ''}入力し、全部の欄に入っていることを確かめました。開いている Chrome で「Create」を押してください")
+        extra = f"（ただし {'／'.join(unsure_all)}）" if unsure_all else ""
+        print(f"【結果】Suno の作曲画面に{'、' + str(len(songs)) + ' 曲とも' if len(songs) > 1 else ''}入力し、全部の欄に入っていることを確かめました{extra}。開いている Chrome で「作成」（Create）を押してください")
         return 0
     msg = "／".join(problems[:4]) or f"{len(songs)} 曲のうち {len(ok_songs)} 曲で止めました"
     print(f"【結果】まだ終わっていません：{msg}")
@@ -746,6 +962,7 @@ def main() -> None:
         d = learned()
         for site in a.args or ["suno", "distrokid"]:
             d.pop(site, None)
+            d.pop(LEARN_AS.get(site, site), None)
         LEARNED.parent.mkdir(parents=True, exist_ok=True)
         LEARNED.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
         print("○ 覚えた欄の場所を消しました")
