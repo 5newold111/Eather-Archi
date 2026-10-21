@@ -480,7 +480,7 @@ def find(sess: Session, site: str, f: dict):
                 return inputs.nth(i)
         return None
     for h in f.get("below", []):   # 名前の無い欄：見出しのすぐ下のもの
-        sel = sess.js(BELOW_JS, [h, FIELD_SEL, 160])
+        sel = sess.js(BELOW_JS, [h, "select,[role=combobox]" if f["type"] == "select" else FIELD_SEL, 160])
         if sel and _visible(page.locator(sel)):
             return page.locator(sel).first
     for h in f.get("hints", []):
@@ -853,7 +853,14 @@ def put(sess: Session, loc, f: dict) -> bool:
             return True
         tag = loc.evaluate("e => e.tagName.toLowerCase()")
         if f["type"] == "select" and tag == "select":
-            loc.select_option(label=str(v))
+            try:
+                loc.select_option(label=str(v))
+            except Exception:  # noqa: BLE001  名前が少し違う（「Electronic / Dance」など）：含むものを選ぶ
+                opts = loc.evaluate("e => [...e.options].map(o => o.text.trim())")
+                hit = next((o for o in opts if _norm(v) in _norm(o)), None)
+                if hit is None:
+                    return False
+                loc.select_option(label=hit)
             return True
         if f["type"] == "date" and (loc.get_attribute("type") or "") == "date":
             loc.fill(str(v))
@@ -1267,9 +1274,11 @@ def distrokid_fields(song: dict) -> list[dict]:
         {"key": "title", "label": "Song title", "type": "text", "value": f["Song title"], "hints": ["Song title", "Track title", "Title"]},
         {"key": "release", "label": "Release date", "type": "date", "value": rel, "hints": ["Release date"], "teach": False,
          "show": f["Release date"]},
-        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "hints": ["Language"]},
-        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "hints": ["Primary genre", "Genre"]},
-        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": f["Secondary genre"], "hints": ["Secondary genre"], "teach": False},
+        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "hints": ["Language"], "below": ["Language"]},
+        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "hints": ["Primary genre", "Genre"],
+         "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
+        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": f["Secondary genre"], "hints": ["Secondary genre"],
+         "below": ["Secondary genre"], "teach": False},
         {"key": "songwriter", "label": "Songwriter（本名）", "type": "text", "value": owner, "hints": ["Songwriter", "Real name"], "teach": False},
         {"key": "audio", "label": "音源ファイル", "type": "file", "value": str(audio_path) if audio_path.exists() else "", "show": str(audio_path)},
         {"key": "cover", "label": "ジャケット", "type": "file", "value": str(cover_path) if cover_path and cover_path.exists() else "", "show": str(cover_path)},
