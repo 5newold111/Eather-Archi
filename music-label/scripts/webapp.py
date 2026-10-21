@@ -283,7 +283,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin-top:10px;font-size:14px;color:var(--sub)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a><span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
@@ -531,6 +531,22 @@ class Handler(BaseHTTPRequestHandler):
             page, _ = suno_page()
             back = '<p style="max-width:860px;margin:16px auto 0;padding:0 16px"><a href="/">← ダッシュボードへ</a></p>'
             return self._send(200, page.replace("<main>", back + "<main>", 1), extra=extra)
+        if path == "/check":
+            import song_check
+            return self._send(200, song_check.index_page(TOKEN), extra=extra)
+        m = re.fullmatch(r"/song/([\w.\-]+)", path)
+        if m:
+            import song_check
+            page = song_check.song_page(m.group(1), TOKEN)
+            return self._send(200, page, extra=extra) if page else self._send(404, "<p>その曲は見つかりません</p>")
+        if path == "/file":   # 公開の準備の確認ページで見せる画像・音（決めた置き場所の中だけ）
+            import song_check
+            f = Path((parse_qs(urlparse(self.path).query).get("p") or [""])[0])
+            if not song_check.file_ok(f):
+                return self._send(404, "<p>見つかりません</p>")
+            import mimetypes
+            ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+            return self._send(200, f.read_bytes(), ctype, extra=extra)
         if path == "/api/status":
             try:
                 return self._json(200, status_json())

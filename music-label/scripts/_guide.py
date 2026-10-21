@@ -114,15 +114,19 @@ def explain(row: dict, phase: dict) -> dict:
                     "actions": [{"kind": "run", "label": "ジャケットを作る", "action": "cover", "slug": row["slug"], "primary": True},
                                 {"kind": "run", "label": "もう一度進める", "action": "scan"}]}
         return {"cause": "取り込んだ曲の音量を整え、ジャケット・歌詞・DistroKid の下書きと一緒にまとめています（数分）。",
-                "steps": ["待つだけで大丈夫です。", "止まっているように見えたら「もう一度進める」を押す"],
-                "actions": [{"kind": "run", "label": "もう一度進める", "action": "scan", "primary": True}]}
+                "steps": ["待つだけで大丈夫です。「公開の準備を見る」で、進み具合と中身（ジャケット・音・下書き）を確かめられます",
+                          "止まっているように見えたら「もう一度進める」を押す"],
+                "actions": [{"kind": "link", "label": "公開の準備を見る（ジャケット・下書き・公開セット）", "url": f"/song/{row.get('id')}"},
+                            {"kind": "run", "label": "もう一度進める", "action": "scan", "primary": True}]}
 
     if name == "DistroKid に登録":
-        acts = [{"kind": "run", "primary": True, "label": "DistroKid に入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": row.get("id")},
+        acts = [{"kind": "link", "label": "公開の準備を見る（ジャケット・下書き・公開セット）", "url": f"/song/{row.get('id')}"},
+                {"kind": "run", "primary": True, "label": "DistroKid に入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": row.get("id")},
                 {"kind": "folder", "label": "公開セットのフォルダを開く", "id": row.get("id")},
                 {"kind": "run", "label": "DistroKid にログイン（初回だけ）", "action": "browser_login", "site": "distrokid"},
                 {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
-        steps = ["「DistroKid に入力する」を押す → 専用のブラウザが開き、項目と音源・ジャケットが自動で入ります（初回だけ DistroKid へのログインを求められます）",
+        steps = ["「公開の準備を見る」で、ジャケット・音・下書き・公開セットを目で確かめる",
+                 "「DistroKid に入力する」を押す → 専用のブラウザが開き、項目と音源・ジャケットが自動で入ります（初回だけ DistroKid へのログインを求められます）",
                  "ブラウザの右下の案内で、手で選ぶ項目（Explicit・AI の申告など）を確かめる",
                  "内容を確かめて、最後の登録ボタンを押す（押すのは Gon さんだけ）",
                  "案内の「登録した」を押すと、配信日と一緒に記録されます（ここの「DistroKid に登録した」でも同じ）"]

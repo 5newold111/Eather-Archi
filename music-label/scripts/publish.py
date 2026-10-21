@@ -404,6 +404,13 @@ def cmd_scan(args) -> int:
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     for song, f in picked.values():
         take_in(song, f)   # ファイルの名前を <曲名>_<アーティスト名>_<生成日> にそろえ、登録簿にも足す
+    if picked and not getattr(args, "no_open", False):
+        try:
+            import song_check
+            for song, _f in picked.values():
+                song_check.open_window(song)   # 公開の準備の確認ページを開く（進み具合が目で見える）
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 確認ページを開けませんでした：{e}")
     # 取り込んだ曲・待っている曲を進める
     ready = []
     for song in songs:
