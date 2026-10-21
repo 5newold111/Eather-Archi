@@ -9,7 +9,9 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
 システムはこれらのボタン（作成・送信・公開・購入・削除など）を絶対に押さない（押そうとしても止める）。
 
 しくみ：
-  ・専用のブラウザ（Chrome。ログインはこのブラウザが覚える：~/.postdog-browser）を開く。初回だけ Suno と DistroKid にログインする
+  ・専用の Chrome（ふだんの Chrome とは別の窓。ログインはここが覚える：~/.postdog-browser）を、ふつうの Chrome として開き、
+    入力するときだけ外からつないで欄を埋める。自動操作モードで開かないので、Google などでのログインも断られない。
+    初回だけ「login suno」「login distrokid」でログインする（このときは自動操作を一切つながない）。入力のあともタブは開いたまま
   ・入れる欄は、欄の名前・見出し・薄い字の案内（placeholder）から探す。
     見つからない欄は、ブラウザの右下の案内に「〇〇の欄をクリックしてください」と出るので、1 回クリックして教える。
     教えた場所は out/browser/fields.json に覚え、次からは自動で入れる（クリックしても、その欄を押したことにはならない）
@@ -115,33 +117,130 @@ OVERLAY_JS = r"""
 
 
 # ---------------------------------------------------------------------------
+# ふつうの Chrome を専用のプロフィールで開く。
+# Playwright が開く「自動操作モード」の Chrome では、Google などのログインが「安全でないブラウザ」と断られるため、
+# Chrome は自分で（ふつうに）起動し、入力するときだけ「つなぎ口」（リモートデバッグのポート）から外から操作する
+CHROME_PATHS = [os.environ.get("POSTDOG_CHROME", ""),
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                str(Path.home() / "Applications" / "Google Chrome.app" / "Contents" / "MacOS" / "Google Chrome")]
+
+
+def chrome_path() -> str | None:
+    return next((p for p in CHROME_PATHS if p and Path(p).exists()), None)
+
+
+def _port_alive(port: int) -> bool:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2):
+            return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _running_port() -> int | None:
+    """専用の Chrome がもう開いていれば、そのつなぎ口の番号"""
+    f = PROFILE / "DevToolsActivePort"
+    try:
+        port = int(f.read_text().split()[0])
+    except Exception:  # noqa: BLE001
+        return None
+    return port if _port_alive(port) else None
+
+
+def open_chrome(url: str = "about:blank") -> None:
+    """専用の Chrome を開く（開いていれば、新しいタブで url を開く）"""
+    PROFILE.mkdir(parents=True, exist_ok=True)
+    if _running_port() is None:
+        (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
+    extra = os.environ.get("POSTDOG_CHROME_ARGS", "").split()   # 試験用
+    subprocess.Popen([chrome_path(), f"--user-data-dir={PROFILE}", "--remote-debugging-port=0",
+                      "--no-first-run", "--no-default-browser-check", *extra, url],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def chrome_port(timeout: float = 20) -> int:
+    port = _running_port()
+    if port:
+        return port
+    open_chrome()
+    end = time.time() + timeout
+    while time.time() < end:
+        time.sleep(0.5)
+        port = _running_port()
+        if port:
+            return port
+    sys.exit("[案内] 専用の Chrome につなげませんでした。開いている専用の Chrome の窓をすべて閉じて（Chrome を選んで ⌘Q）、もう一度押してください")
+
+
+class BrowserClosed(Exception):
+    """専用のブラウザが閉じられた"""
+
+
 class Session:
     """専用のブラウザと、右下の案内でのやりとり"""
 
     def __init__(self, pw):
         PROFILE.mkdir(parents=True, exist_ok=True)
-        opts = dict(user_data_dir=str(PROFILE), headless=AUTO, viewport=None, args=["--start-maximized"])
         exe = os.environ.get("POSTDOG_BROWSER_EXECUTABLE")
-        if exe:
-            self.ctx = pw.chromium.launch_persistent_context(executable_path=exe, **opts)
-        else:
-            try:   # Mac に入っている Chrome を使う（ログインの画面がふつうに出る）
-                self.ctx = pw.chromium.launch_persistent_context(channel="chrome", **opts)
-            except Exception:  # noqa: BLE001  Chrome が無い：Playwright のブラウザ
-                self.ctx = pw.chromium.launch_persistent_context(**opts)
+        self.cdp = bool(chrome_path()) and not exe
+        if self.cdp:   # ふつうに開いた専用の Chrome に、つなぎ口から入る（ログインが断られない）
+            self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
+            self.ctx = self.browser.contexts[0] if self.browser.contexts else self.browser.new_context()
+        else:          # Chrome が無い：Playwright のブラウザ（Google でのログインは断られることがある）
+            opts = dict(user_data_dir=str(PROFILE), headless=AUTO, viewport=None, args=["--start-maximized"])
+            self.ctx = pw.chromium.launch_persistent_context(executable_path=exe, **opts) if exe else \
+                pw.chromium.launch_persistent_context(**opts)
         self.msg: dict | None = None
         self.ctx.expose_binding("postdog", lambda source, payload: setattr(self, "msg", payload))
         self.ctx.add_init_script(INIT_JS)
-        self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
+        self.page = self.ctx.new_page() if self.cdp or not self.ctx.pages else self.ctx.pages[0]
+        if self.cdp:
+            self.page.bring_to_front()
         self.overlay: dict | None = None
 
     def goto(self, url: str) -> None:
         self.page.goto(url, wait_until="domcontentloaded")
-        self.page.wait_for_timeout(1500)
+        self.settle()
+
+    def settle(self, ms: int = 1500) -> None:
+        """ページの読み込み（あとから中身を作るサイトも）が落ち着くまで待つ"""
+        try:
+            self.page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:  # noqa: BLE001  ずっと通信しているサイトもあるので、待ちすぎない
+            pass
+        self.page.wait_for_timeout(ms)
+
+    def closed(self) -> bool:
+        try:
+            return self.page.is_closed() or not self.ctx.pages
+        except Exception:  # noqa: BLE001
+            return True
+
+    def js(self, expr: str, arg=None, default=None):
+        """ページで JavaScript を動かす。途中でページが切り替わったら、落ち着くのを待ってやり直す"""
+        for _ in range(6):
+            if self.closed():
+                raise BrowserClosed()
+            try:
+                if not self.page.evaluate("typeof window.__postdogSel === 'function'"):
+                    self.page.evaluate(INIT_JS)   # 下準備が入っていないページ（開いたままのタブなど）に入れ直す
+                return self.page.evaluate(expr, arg)
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001  ページの切り替わりの最中
+                if self.closed():
+                    raise BrowserClosed()
+                try:
+                    self.page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except Exception:  # noqa: BLE001
+                    pass
+                self.page.wait_for_timeout(800)
+        return default
 
     def show(self, title: str, lines: list[str] = (), buttons: list[dict] = (), date_value: str | None = None, pick: bool = False) -> None:
         self.overlay = {"title": title, "lines": list(lines), "buttons": list(buttons), "date": date_value, "pick": pick}
-        self.page.evaluate(OVERLAY_JS, self.overlay)
+        self.js(OVERLAY_JS, self.overlay)
 
     def wait(self, auto: dict | None = None) -> dict:
         """右下の案内のボタン（またはクリックで教える）を待つ。ブラウザを閉じられたら {'action': 'closed'}"""
@@ -152,9 +251,11 @@ class Session:
             try:
                 self.page.wait_for_timeout(400)
                 if self.overlay and not self.page.evaluate("!!document.getElementById('postdog-overlay')"):
-                    self.page.evaluate(OVERLAY_JS, self.overlay)   # ページが切り替わったら案内を出し直す
-            except Exception:  # noqa: BLE001  ブラウザを閉じた
-                return {"action": "closed"}
+                    self.js(OVERLAY_JS, self.overlay)   # ページが切り替わったら案内を出し直す
+            except Exception:  # noqa: BLE001
+                if self.closed():
+                    return {"action": "closed"}   # ブラウザを閉じた
+                # ページの切り替わりの最中：少し待って続ける
         return self.msg
 
     def ensure_login(self, site: str) -> bool:
@@ -171,7 +272,11 @@ class Session:
 
     def close(self) -> None:
         try:
-            self.ctx.close()
+            if self.cdp:   # Chrome とタブは開いたままにする（続けて聴く・いいね・ダウンロードができるように）。案内だけ消す
+                if not self.closed():
+                    self.page.evaluate("() => { const b = document.getElementById('postdog-overlay'); if (b) b.remove(); window.__postdogPicking = false; }")
+            else:
+                self.ctx.close()
         except Exception:  # noqa: BLE001
             pass
 
@@ -216,7 +321,7 @@ def find(sess: Session, site: str, f: dict):
             makers.append(lambda: page.get_by_role("combobox", name=rx))
         elif f["type"] == "click":
             makers = [lambda: page.get_by_role("button", name=rx), lambda: page.get_by_role("tab", name=rx),
-                      lambda: page.get_by_role("radio", name=rx), lambda: page.get_by_text(rx, exact=False)]
+                      lambda: page.get_by_role("radio", name=rx), lambda: page.get_by_role("switch", name=rx)]
         else:
             makers.append(lambda: page.get_by_role("textbox", name=rx))
         for make in makers:
@@ -227,7 +332,7 @@ def find(sess: Session, site: str, f: dict):
             except Exception:  # noqa: BLE001
                 continue
     if f.get("largest_textarea"):
-        sel = page.evaluate("""() => { let best = null, size = 0;
+        sel = sess.js("""() => { let best = null, size = 0;
             for (const t of document.querySelectorAll('textarea')) { const r = t.getBoundingClientRect();
               if (r.width * r.height > size && r.width > 0) { size = r.width * r.height; best = t; } }
             return best ? window.__postdogSel(best) : null; }""")
@@ -278,7 +383,12 @@ def put(sess: Session, loc, f: dict) -> bool:
             text = " ".join(filter(None, [loc.inner_text(timeout=2000), loc.get_attribute("aria-label") or ""]))
             if NEVER.search(text):
                 return False   # 作成・送信などのボタンは押さない
+            before = sess.page.url
             loc.click()
+            sess.page.wait_for_timeout(800)
+            if sess.page.url.split("?")[0] != before.split("?")[0]:
+                sess.goto(before)   # 別のページに移ってしまった：元の画面に戻す
+                return False
             return True
         tag = loc.evaluate("e => e.tagName.toLowerCase()")
         if f["type"] == "select" and tag == "select":
@@ -305,10 +415,17 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
     for f in fields:
         if f.get("value") in (None, ""):
             continue
-        loc = find(sess, site, f)
-        if loc is None and f.get("teach", True) and f["type"] != "file":
-            loc = teach(sess, site, f)
-        if loc is not None and put(sess, loc, f):
+        try:
+            loc = find(sess, site, f)
+            if loc is None and f.get("teach", True) and f["type"] != "file":
+                loc = teach(sess, site, f)
+            ok = loc is not None and put(sess, loc, f)
+        except BrowserClosed:
+            raise
+        except Exception as e:  # noqa: BLE001  この欄だけ手で入れてもらう
+            print(f"   － 「{f['label']}」を入れられませんでした（{str(e).splitlines()[0][:120]}）")
+            ok = False
+        if ok:
             done.append(f["label"])
         elif not f.get("optional"):
             manual.append(f"{f['label']}：{f.get('show', f['value'])}")
@@ -327,6 +444,27 @@ def suno_fields(song: dict) -> list[dict]:
     ]
 
 
+def wait_for_form(sess: Session, name: str, how: str) -> bool:
+    """入力欄のある画面が出るまで待つ。出なければ（ログインの画面・別の画面）、Gon さんに整えてもらう"""
+    for _ in range(3):
+        try:
+            sess.page.wait_for_selector("textarea, input[type=text], [contenteditable=true]", state="visible", timeout=15000)
+            sess.settle(500)
+            return True
+        except BrowserClosed:
+            raise
+        except Exception:  # noqa: BLE001
+            if sess.closed():
+                raise BrowserClosed()
+        sess.show(f"{name} の入力画面が見つかりません",
+                  [f"ログインしていなければログインし、{how}「続ける」を押してください。",
+                   "（ログインはこの専用のブラウザが覚えるので、次からは要りません）"],
+                  [{"id": "continue", "label": "続ける", "primary": True}, {"id": "stop", "label": "やめる"}])
+        if sess.wait({"action": "continue"}).get("action") != "continue":
+            return False
+    return True
+
+
 def run_suno(sess: Session, ids: list[str]) -> int:
     import publish
     songs = [_songs.by_id(i) for i in ids] if ids else publish.suno_todo()
@@ -337,6 +475,8 @@ def run_suno(sess: Session, ids: list[str]) -> int:
     for n, song in enumerate(songs, 1):
         sess.goto(SITES["suno"])
         if not sess.ensure_login("suno"):
+            return 0
+        if not wait_for_form(sess, "Suno", "左のメニューの「Create」を開いてから"):
             return 0
         done, manual = fill_fields(sess, "suno", suno_fields(song))
         print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
@@ -385,6 +525,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     sess.goto(SITES["distrokid"])
     if not sess.ensure_login("distrokid"):
         return 0
+    if not wait_for_form(sess, "DistroKid", "登録の画面（Upload）を開いてから"):
+        return 0
     fields, draft = distrokid_fields(song)
     done, manual = fill_fields(sess, "distrokid", fields)
     always = [f"Explicit lyrics：{draft['Explicit lyrics']}", f"Instrumental：{draft['Instrumental']}",
@@ -408,6 +550,16 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     return 0
 
 
+def open_login(site: str) -> bool:
+    """ログイン：自動操作をつながない、ふつうの専用の Chrome で開く（Google でのログインも通る）"""
+    if not chrome_path():
+        return False
+    open_chrome(SITES[site])
+    print(f"○ 専用の Chrome で {site} を開きました。いつものアカウントでログインしてください（次からは覚えています）。")
+    print("  ログインが終わったら、その窓は開いたままでも、閉じてもかまいません。")
+    return True
+
+
 def run_login(sess: Session, site: str) -> int:
     sess.goto(SITES[site])
     sess.show(f"{site} のログイン", ["この専用のブラウザでログインしてください（次からは覚えています）。", "終わったら「閉じる」を押してください。"],
@@ -429,6 +581,8 @@ def main() -> None:
         LEARNED.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
         print("○ 覚えた欄の場所を消しました")
         return
+    if a.what == "login" and open_login((a.args or ["suno"])[0]):
+        return
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -444,6 +598,21 @@ def main() -> None:
                 run_distrokid(sess, a.args[0])
             else:
                 run_login(sess, (a.args or ["suno"])[0])
+        except BrowserClosed:
+            print("－ ブラウザが閉じられたので終わりました")
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            d = OUT / "browser"
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "last_error.txt").write_text(f"{sess.page.url if not sess.closed() else ''}\n{traceback.format_exc()}", encoding="utf-8")
+            try:
+                sess.page.screenshot(path=str(d / "last_error.png"))
+            except Exception:  # noqa: BLE001
+                pass
+            print("[エラー] ブラウザでの入力が途中で止まりました。")
+            print(f"  原因：{(str(e).strip().splitlines() or [type(e).__name__])[0][:300]}")
+            print(f"  くわしい記録：{d / 'last_error.txt'}（画面の写し：last_error.png）。この 2 つを Claude に見せてください")
+            sys.exit(1)
         finally:
             sess.close()
 
