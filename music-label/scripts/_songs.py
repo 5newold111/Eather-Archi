@@ -154,31 +154,49 @@ def debut_registered(slug: str) -> bool | None:
 
 
 # ---------------------------------------------------------------------------
-# Suno の「その他のオプション」に組ごとに入れる設定（templates/suno_options.json。Gon さんが書き換えてよい）
+# Suno の作曲の軸のうち、組ごとに決めておくもの（templates/suno_options.json。Gon さんが書き換えてよい）
 SUNO_OPTIONS = ROOT / "templates" / "suno_options.json"
-GENDER_JA = {"male": "男性", "female": "女性", None: "選ばない"}
+# 「あなたの好み」を組ごとにオンにするかの知識（再生数が伸びた曲から、あとで作る）：{"<組>": {"on": true, "why": "…"}}
+YOUR_TASTE = OUT / "knowledge" / "your_taste.json"
+GENDER_JA = {"male": "男", "female": "女", None: "選ばない"}
 
 
 def suno_options(song: dict) -> dict:
-    """{'vocal_gender': 'male'|'female'|None, 'weirdness': 0〜100, 'style_influence': 0〜100}。曲ごとの指定（song['suno_options']）が優先"""
+    """{'vocal_gender', 'variety'(0〜4), 'style_influence'(%), 'loudness'(%), 'length_sec'(秒 or None＝自動), 'max_mode', 'your_taste', …}
+    共通（default）→ 組ごと → 知識（あなたの好み）→ 曲ごとの指定（song['suno_options']）の順に上書き"""
     d = read_json(SUNO_OPTIONS) if SUNO_OPTIONS.exists() else {}
-    opt = {k: v for k, v in (d.get("default") or {}).items() if not k.startswith("_")}   # 全組共通（モデルなど）
+    opt = {k: v for k, v in (d.get("default") or {}).items() if not k.startswith("_")}
     opt.update({k: v for k, v in (d.get(song.get("slug", ""), {}) or {}).items() if not k.startswith("_")})
+    taste = read_json(YOUR_TASTE) if YOUR_TASTE.exists() else {}
+    t = taste.get(song.get("slug", ""))
+    if t is not None:
+        opt["your_taste"] = bool(t.get("on") if isinstance(t, dict) else t)
     opt.update(song.get("suno_options") or {})
     return opt
+
+
+def fmt_len(sec) -> str:
+    return "自動" if not sec else f"カスタム {int(sec) // 60}:{int(sec) % 60:02d}"
 
 
 def suno_options_text(song: dict) -> str:
     o = suno_options(song)
     if not o:
         return ""
-    parts = [f"モデル：{o['model']}"] if o.get("model") else []
+    onoff = lambda v: "オン" if v else "オフ"  # noqa: E731
+    parts = []
     if "vocal_gender" in o:
-        parts.append(f"ボーカルの性別：{GENDER_JA.get(o['vocal_gender'], o['vocal_gender'])}")
-    if o.get("weirdness") is not None:
-        parts.append(f"Weirdness：{o['weirdness']}%")
+        parts.append(f"声の性別：{GENDER_JA.get(o['vocal_gender'], o['vocal_gender'])}")
+    if "length_sec" in o:
+        parts.append(f"間隔：{fmt_len(o['length_sec'])}")
+    if "max_mode" in o:
+        parts.append(f"Max mode：{onoff(o['max_mode'])}")
+    if o.get("loudness") is not None:
+        parts.append(f"音量の大きさ：{o['loudness']}%")
     if o.get("style_influence") is not None:
-        parts.append(f"Style Influence：{o['style_influence']}%")
-    if o.get("persona"):
-        parts.append(f"ペルソナ：{o['persona']}")
+        parts.append(f"スタイルの影響度：{o['style_influence']}%")
+    if o.get("variety") is not None:
+        parts.append(f"バラエティ：{o['variety']}")
+    if "your_taste" in o:
+        parts.append(f"あなたの好み：{onoff(o['your_taste'])}")
     return "・".join(parts)

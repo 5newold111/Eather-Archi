@@ -2,18 +2,20 @@
 """
 Suno 設計図：作曲のイメージ（アーティストの設定書・ブリーフ／作業セット）を、Suno の作曲画面で入れられる全部の軸に写す
 
-Suno の作曲画面（「高度な」）で入れられる軸と、イメージのどこから決めるか：
-   1 歌詞              … 曲の歌詞。セクション（[Verse] など）と、毎曲の癖（語り・ハミングなど）のタグが入っているかを確かめる
-   2 スタイル          … 前に書いた言葉ほど強く効くので、ジャンル → テンポ（BPM）→ 声 → 楽器・音色 → 質感・場面 の順。
+Suno の作曲画面（「高度な」）で入れられる軸（Gon さんの一覧。2026-10-21）と、イメージのどこから決めるか：
+   1 歌詞              … 曲の歌詞。セクション（[Verse] など）と、毎曲の癖（語り・ハミングなど）のタグを、足りなければ設定書の位置に足す
+   2 スタイル          … 基本は文字で書く（カスタム）。前に書いた言葉ほど強く効くので、ジャンル → テンポ（BPM）→ 声 → 楽器・音色 → 質感・場面 の順。
                          設定書の英語の特徴語（dna_tags）で入っていないものを足す（1000 文字まで）
    3 除外するスタイル  … 曲ごとの指定＋設定書の禁止事項（templates/suno_options.json の exclude）。スタイルと食い違う言葉は外す
-   4 ボーカルの性別    … 組ごとの設定（suno_options.json）
-   5 Weirdness         … 同上（意外さ）
-   6 Style Influence   … 同上（スタイルの効き具合）
-   7 インスト          … 歌の無い曲だけオン
-   8 モデル            … Suno のバージョン（全組共通：suno_options.json の default）
-   9 ペルソナ          … 声を毎回同じにする（Suno で作ったペルソナの名前。作るまでは空）
-  10 曲のタイトル
+   4 声の性別（男・女）… 組ごとの設定（suno_options.json）。男女の組・声の切れ端だけの組は選ばない
+   5 間隔（曲の長さ）  … 自動／カスタム（10 秒〜6 分）。設定書の曲の長さのまん中をカスタムで
+   6 Max mode          … オン・オフ（共通の設定）
+   7 音量の大きさ      … 組ごと（配信前に -14 LUFS にそろえるので、つぶれない程度に）
+   8 スタイルの影響度  … 組ごと
+   9 バラエティ（0〜4）… 組ごと
+  10 あなたの好み      … オン・オフ。今はオフ。再生数が伸びた曲の知識（out/knowledge/your_taste.json）がたまったら組ごとにオン
+  11 曲名
+  12 保存先            … 決めてある保存先（SSD の「楽曲情報」。無いときは ダウンロード/SUNO楽曲）に、専用の Chrome のダウンロードが入る
 
 使い方：
   python3 scripts/suno_design.py              # 作曲待ちの全曲の設計図と、イメージの写し具合（再現度）
@@ -233,21 +235,35 @@ def design(song: dict) -> dict:
             checks.append(("歌詞", "warn", "Suno に書かせる部分（{{SUNO_…}}）が残っています。歌詞の差し込みを先に済ませてください"))
     mapping.append(("歌詞", f"{len(lyrics.splitlines())} 行" if lyrics else "（なし：インスト）", "ブリーフ／作業セットの歌詞と、設定書の毎曲の癖"))
 
-    # --- 4〜9 その他のオプション
-    if "vocal_gender" in opt:
-        mapping.append(("ボーカルの性別", _songs.GENDER_JA.get(want_gender, str(want_gender)), "設定書の声（性別・編成）"))
-    for k, ja in (("weirdness", "Weirdness"), ("style_influence", "Style Influence")):
-        if opt.get(k) is not None:
-            mapping.append((ja, f"{opt[k]}%", "組ごとの設定（suno_options.json の理由を参照）"))
-    mapping.append(("インスト", "オン" if song.get("instrumental") else "オフ", "曲の言語（歌の有無）"))
-    if opt.get("model"):
-        mapping.append(("モデル", opt["model"], "全組共通（suno_options.json の default）"))
-    if opt.get("persona"):
-        mapping.append(("ペルソナ", opt["persona"], "声を毎回同じにする"))
-    elif (artist.get("vocal") or {}).get("fixed_timbre") and not song.get("instrumental"):
-        checks.append(("ペルソナ", "info", "声を毎回同じにするなら、気に入ったテイクから Suno でペルソナを作り、"
-                                            "suno_options.json の persona に名前を書いてください"))
-    mapping.append(("曲のタイトル", song.get("title", ""), "作業セット／ブリーフの曲名"))
+    # --- 4〜12 その他のオプション・曲名・保存先
+    onoff = lambda v: "オン" if v else "オフ"  # noqa: E731
+    if "vocal_gender" in opt and not song.get("instrumental"):
+        mapping.append(("声の性別", _songs.GENDER_JA.get(want_gender, str(want_gender)), "設定書の声（性別・編成）"))
+    length = opt.get("length_sec")
+    if length is not None:
+        length = max(10, min(360, int(length)))
+    mapping.append(("間隔（曲の長さ）", _songs.fmt_len(length), "設定書の曲の長さ（構成と、運転向けの 150〜210 秒）のまん中"))
+    lines_n = len([x for x in lyrics.splitlines() if x.strip() and not x.strip().startswith("[")])
+    if length and lines_n and lines_n * 4.5 > length:
+        checks.append(("間隔", "warn", f"歌う行が {lines_n} 行あり、{_songs.fmt_len(length)} では歌い切れないかもしれません"))
+    if "max_mode" in opt:
+        mapping.append(("Max mode", onoff(opt["max_mode"]), "共通の設定（音の質を優先）"))
+    if opt.get("loudness") is not None:
+        mapping.append(("音量の大きさ", f"{opt['loudness']}%", "組ごとの設定（編成の静かさ）"))
+    if opt.get("style_influence") is not None:
+        mapping.append(("スタイルの影響度", f"{opt['style_influence']}%", "組ごとの設定（音の決まりの細かさ）"))
+    if opt.get("variety") is not None:
+        mapping.append(("バラエティ", f"{opt['variety']}（0〜4）", "組ごとの設定（毎回の声と音の固さ）"))
+    if "your_taste" in opt:
+        mapping.append(("あなたの好み", onoff(opt["your_taste"]),
+                        "再生数が伸びた曲の知識（out/knowledge/your_taste.json）" if _songs.YOUR_TASTE.exists() else "知識がたまるまでオフ"))
+    mapping.append(("曲名", song.get("title", ""), "作業セット／ブリーフの曲名"))
+    try:
+        import publish
+        dest = str(publish.inboxes()[0])
+    except Exception:  # noqa: BLE001
+        dest = "SSD の Postdog Records/楽曲情報"
+    mapping.append(("保存先", dest, "決めてある保存先（専用の Chrome のダウンロード先）"))
 
     # --- 実在の名前が入っていないか（Suno に実名は入れない）
     blob = " ".join([style, exclude, lyrics]).lower()
@@ -256,10 +272,10 @@ def design(song: dict) -> dict:
         checks.append(("全体", "warn", "実在の名前が入っています：" + "・".join(hits[:5])))
 
     return {"title": song.get("title", ""), "lyrics": lyrics, "style": style, "exclude": exclude,
-            "vocal_gender": want_gender if "vocal_gender" in opt else "unset",
-            "weirdness": opt.get("weirdness"), "style_influence": opt.get("style_influence"),
-            "instrumental": bool(song.get("instrumental")), "model": opt.get("model"), "persona": opt.get("persona"),
-            "checks": checks, "map": mapping}
+            "vocal_gender": want_gender if "vocal_gender" in opt and not song.get("instrumental") else "unset",
+            "length_sec": length, "max_mode": opt.get("max_mode"), "loudness": opt.get("loudness"),
+            "style_influence": opt.get("style_influence"), "variety": opt.get("variety"), "your_taste": opt.get("your_taste"),
+            "instrumental": bool(song.get("instrumental")), "checks": checks, "map": mapping}
 
 
 def score(d: dict) -> tuple[int, int]:

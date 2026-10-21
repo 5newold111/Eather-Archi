@@ -155,9 +155,32 @@ def _running_port() -> int | None:
     return port if _port_alive(port) else None
 
 
+def set_download_dir() -> Path | None:
+    """専用の Chrome のダウンロード先を、決めてある保存先（SSD の「楽曲情報」。無いときは ダウンロード/SUNO楽曲）にする。
+    Chrome を閉じているときだけ書ける（開いていると、閉じるときに上書きされる）"""
+    try:
+        import publish
+        dest = publish.inboxes()[0]
+        dest.mkdir(parents=True, exist_ok=True)
+    except Exception:  # noqa: BLE001
+        return None
+    pf = PROFILE / "Default" / "Preferences"
+    pf.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        d = json.loads(pf.read_text(encoding="utf-8")) if pf.exists() else {}
+    except Exception:  # noqa: BLE001
+        d = {}
+    d.setdefault("download", {}).update({"default_directory": str(dest), "prompt_for_download": False, "directory_upgrade": True})
+    d.setdefault("savefile", {})["default_directory"] = str(dest)
+    pf.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    return dest
+
+
 def open_chrome(url: str = "about:blank", debug: bool = True) -> None:
     """専用の Chrome を開く（開いていれば、新しいタブで url を開く）。debug=False：つなぎ口を開けない、ログイン用"""
     PROFILE.mkdir(parents=True, exist_ok=True)
+    if not _chrome_pids():
+        set_download_dir()   # 保存先は、Chrome を開く前にだけ設定できる
     if _running_port() is None:
         (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
     extra = os.environ.get("POSTDOG_CHROME_ARGS", "").split()   # 試験用
@@ -452,15 +475,20 @@ STATE_JS = """e => { const a = e.getAttribute('aria-pressed') ?? e.getAttribute(
     const ds = e.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
     if (e.matches('input[type=radio],input[type=checkbox]')) return e.checked ? 'on' : 'off';
     return 'unknown'; }"""
-SLIDER_NEAR_JS = r"""(hint) => { const want = hint.trim().toLowerCase();
-    for (const el of document.querySelectorAll('label,span,div,p,h3,h4')) {
+NEAR_JS = r"""([hint, sel, unique]) => { const want = hint.trim().toLowerCase();
+    for (const el of document.querySelectorAll('label,span,div,p,h3,h4,legend')) {
       if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase() === want)) continue;
       let up = el;
       for (let i = 0; i < 5 && up; i++, up = up.parentElement) {
-        const s = up.querySelector('[role=slider],input[type=range]');
-        if (s) return window.__postdogSel(s);
+        const all = [...up.querySelectorAll(sel)].filter(x => x.offsetParent !== null);
+        if (!all.length) continue;
+        // ほかの設定の部品まで入った大きなかたまりまで上がってしまったら、取り違えるので使わない
+        if (unique && all.length > 1) break;
+        return window.__postdogSel(all[0]);
       } }
     return null; }"""
+SLIDER_SEL = "[role=slider],input[type=range]"
+TIME_SEL = "input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file])"
 
 
 def find_slider(sess: Session, site: str, f: dict):
@@ -477,7 +505,7 @@ def find_slider(sess: Session, site: str, f: dict):
                     return c
             except Exception:  # noqa: BLE001
                 continue
-        sel = sess.js(SLIDER_NEAR_JS, h)   # 見出しの文字の近くにあるスライダー
+        sel = sess.js(NEAR_JS, [h, SLIDER_SEL, True])   # 見出しの文字の近くにあるスライダー
         if sel and _visible(page.locator(sel)):
             return page.locator(sel).first
     return None
@@ -487,25 +515,112 @@ def _slider_value(loc) -> float:
     return float(loc.evaluate("e => e.getAttribute('aria-valuenow') ?? e.value"))
 
 
-def set_slider(sess: Session, loc, target: int) -> bool:
-    """スライダーを target（%）に合わせる。矢印キーで 1 目盛りずつ動かし、合ったか読み返す"""
+def _slider_range(loc) -> tuple[float, float]:
+    return tuple(loc.evaluate("""e => { const g = (a, b, d) => { const v = e.getAttribute(a) ?? e[b];
+        return (v === null || v === undefined || v === '') ? d : Number(v); };
+        return [g('aria-valuemin', 'min', 0), g('aria-valuemax', 'max', 100)]; }"""))
+
+
+def slider_target(loc, f: dict) -> tuple[float, float]:
+    """設定の値（% ・段階・秒）を、そのスライダーの目盛りに直す。(目標, 許す誤差)"""
+    mn, mx = _slider_range(loc)
+    v, span = float(f["value"]), (mx - mn) or 1
+    if f.get("scale") == "raw":
+        return v, 0.5
+    if f.get("scale") == "seconds":
+        if mx >= 300:
+            return v, 5                     # 目盛りが秒
+        if mx <= 6.5:
+            return v / 60, 5 / 60           # 目盛りが分
+        return mn + span * (v - 10) / 350, span * 5 / 350
+    return mn + span * v / 100, max(span * 0.02, 0.5)   # %
+
+
+def set_slider(sess: Session, loc, target: float, tol: float = 2) -> bool:
+    """スライダーを target（目盛り）に合わせる。矢印キーで 1 目盛りずつ動かし、合ったか読み返す"""
     if loc.evaluate("e => e.tagName === 'INPUT'"):
         loc.evaluate("""(e, v) => { const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
             set.call(e, String(v)); e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); }""", target)
     else:
         loc.focus()
-        for _ in range(250):
+        for _ in range(400):
             cur = _slider_value(loc)
-            if abs(cur - target) < 1:
+            if abs(cur - target) <= min(tol, 0.5):   # ぴったりをねらう（確かめるときは誤差 tol まで許す）
                 break
-            sess.page.keyboard.press("ArrowRight" if cur < target else "ArrowLeft")
-            if _slider_value(loc) == cur:
+            key = "ArrowRight" if cur < target else "ArrowLeft"
+            sess.page.keyboard.press(key)
+            new = _slider_value(loc)
+            if new == cur:
                 break   # 動かない
-    return abs(_slider_value(loc) - target) <= 2
+            if (cur < target) != (new < target):   # 行き過ぎた：近いほうで止める
+                if abs(new - target) > abs(cur - target):
+                    sess.page.keyboard.press("ArrowLeft" if key == "ArrowRight" else "ArrowRight")
+                break
+    return abs(_slider_value(loc) - target) <= tol
 
 
-def _option(sess: Session, hints: list[str]):
-    page = sess.page
+def _scope(sess: Session, f: dict):
+    """f['near']（見出しの言葉）があれば、その近くのかたまりの中だけを探す"""
+    for h in f.get("near") or []:
+        sel = sess.js(NEAR_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", False])
+        if sel:
+            box = sess.js("""(sel) => { const b = document.querySelector(sel); let up = b;
+                for (let i = 0; i < 4 && up.parentElement; i++) { up = up.parentElement;
+                  if (up.querySelectorAll('button,[role=radio],[role=tab],[role=switch],[role=checkbox]').length >= 2) break; }
+                return window.__postdogSel(up); }""", sel)
+            if box:
+                return sess.page.locator(box).first
+    return sess.page
+
+
+def _sec(text: str) -> int | None:
+    m = re.match(r"^\s*(\d+):(\d{2})\s*$", str(text or ""))
+    return int(m.group(1)) * 60 + int(m.group(2)) if m else (int(text) if str(text or "").strip().isdigit() else None)
+
+
+def put_slider(sess: Session, site: str, f: dict) -> bool:
+    """スライダーの欄に入れる。スライダーが無ければ：段階のボタン（バラエティ 0〜4）／ mm:ss の欄（間隔）"""
+    loc = find_slider(sess, site, f)
+    if loc is not None:
+        target, tol = slider_target(loc, f)
+        sess.filled[f["key"]] = ("slider", loc)
+        return set_slider(sess, loc, target, tol)
+    if f.get("scale") == "raw":   # 0〜4 のボタン
+        b = _option(sess, [str(int(f["value"]))], {"near": f["hints"]})
+        if b is not None:
+            if b.evaluate(STATE_JS) != "on":
+                b.click()
+                sess.page.wait_for_timeout(300)
+            sess.filled[f["key"]] = ("button", b)
+            return b.evaluate(STATE_JS) in ("on", "unknown")
+    if f.get("scale") == "seconds":   # 「3:10」と書く欄
+        for h in f["hints"]:
+            sel = sess.js(NEAR_JS, [h, TIME_SEL, True])
+            if sel:
+                box = sess.page.locator(sel).first
+                v = int(f["value"])
+                box.fill(f"{v // 60}:{v % 60:02d}" if ":" in (box.get_attribute("placeholder") or box.input_value() or ":") else str(v))
+                box.press("Tab")
+                sess.filled[f["key"]] = ("time", box)
+                return slider_ok(sess, f)
+    return False
+
+
+def slider_ok(sess: Session, f: dict) -> bool:
+    kind, loc = getattr(sess, "filled", {}).get(f["key"], (None, None))
+    if loc is None:
+        return False
+    if kind == "slider":
+        target, tol = slider_target(loc, f)
+        return abs(_slider_value(loc) - target) <= tol
+    if kind == "button":
+        return loc.evaluate(STATE_JS) in ("on", "unknown")
+    got = _sec(loc.input_value())
+    return got is not None and abs(got - int(f["value"])) <= 5
+
+
+def _option(sess: Session, hints: list[str], f: dict | None = None):
+    page = _scope(sess, f) if f else sess.page
     for h in hints:
         rx = re.compile(r"^\s*" + re.escape(h) + r"\s*$", re.I)
         for role in ("button", "radio", "tab", "checkbox", "switch", "option"):
@@ -519,7 +634,7 @@ def choice_state(sess: Session, f: dict) -> bool | None:
     """「どちらか選ぶ」が希望どおりか。True／False／None（読めない・見つからない）"""
     seen = False
     for opt, hints in f["options"].items():
-        loc = _option(sess, hints)
+        loc = _option(sess, hints, f)
         if loc is None:
             continue
         seen = True
@@ -534,7 +649,7 @@ def choice_state(sess: Session, f: dict) -> bool | None:
 def set_choice(sess: Session, f: dict) -> bool | None:
     """希望どおりに選ぶ（ボーカルの性別など）。状態が読めないボタンは押さない"""
     for opt, hints in f["options"].items():
-        loc = _option(sess, hints)
+        loc = _option(sess, hints, f)
         if loc is None:
             continue
         st = loc.evaluate(STATE_JS)
@@ -547,56 +662,6 @@ def set_choice(sess: Session, f: dict) -> bool | None:
             loc.click()
             sess.page.wait_for_timeout(400)
     return choice_state(sess, f)
-
-
-MENU_ITEM_ROLES = ("option", "menuitem", "menuitemradio", "radio", "button")
-
-
-def _menu_button(sess: Session, f: dict):
-    """選ぶ項目を開くボタン（モデルなら v4.5・v5 のような文字のボタン）"""
-    rx = re.compile(f["button"], re.I)
-    for role in ("button", "combobox"):
-        c = _pick(sess.page.get_by_role(role, name=rx), None)
-        if c is not None:
-            return c
-    return None
-
-
-def menu_state(sess: Session, f: dict) -> bool | None:
-    btn = _menu_button(sess, f)
-    if btn is None:
-        return None
-    try:
-        text = (btn.inner_text(timeout=2000) or "") + " " + (btn.get_attribute("aria-label") or "")
-    except Exception:  # noqa: BLE001
-        return None
-    return bool(re.search(f["pick"], text, re.I))
-
-
-def set_menu(sess: Session, f: dict) -> bool | None:
-    """ボタンを開いて、名前の合う項目を選ぶ（モデル・ペルソナ）。有料の案内などは押さない"""
-    if menu_state(sess, f):
-        return True
-    btn = _menu_button(sess, f)
-    if btn is None:
-        return None
-    btn.click()
-    sess.page.wait_for_timeout(600)
-    rx = re.compile(f["pick"], re.I)
-    for role in MENU_ITEM_ROLES:
-        c = _pick(sess.page.get_by_role(role, name=rx), None)
-        if c is None:
-            continue
-        text = " ".join(filter(None, [c.inner_text(timeout=2000), c.get_attribute("aria-label") or ""]))
-        if NEVER.search(text):
-            break
-        c.click()
-        sess.page.wait_for_timeout(600)
-        break
-    if menu_state(sess, f) is not True:
-        sess.page.keyboard.press("Escape")   # 開いたままの一覧を閉じる
-        sess.page.wait_for_timeout(300)
-    return menu_state(sess, f)
 
 
 def teach(sess: Session, site: str, f: dict):
@@ -679,21 +744,9 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
             keys = f["only_if_missing"] if isinstance(f["only_if_missing"], list) else [f["only_if_missing"]]
             targets = [x for x in fields if x["key"] in keys and x.get("value") not in (None, "")]
             if not any((find_slider(sess, site, x) if x["type"] == "slider" else
-                        _option(sess, sum(x["options"].values(), [])) if x["type"] == "choice" else find(sess, site, x)) is None
+                        _option(sess, sum(x["options"].values(), []), x) if x["type"] == "choice" else find(sess, site, x)) is None
                        for x in targets):
                 continue   # 中の欄が全部見えている＝もう開いている（押すと閉じてしまう）
-        if f["type"] == "menu":
-            try:
-                r = set_menu(sess, f)
-            except BrowserClosed:
-                raise
-            except Exception:  # noqa: BLE001
-                r = False
-            if r:
-                done.append(f["label"])
-            elif not f.get("optional"):
-                manual.append(f"{f['label']}：{f.get('show', f['value'])}（手で選んでください）")
-            continue
         if f["type"] == "choice":
             try:
                 r = set_choice(sess, f)
@@ -708,17 +761,15 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
             continue
         if f["type"] == "slider":
             try:
-                loc = find_slider(sess, site, f)
-                ok = loc is not None and set_slider(sess, loc, int(f["value"]))
+                ok = put_slider(sess, site, f)
             except BrowserClosed:
                 raise
             except Exception:  # noqa: BLE001
-                loc, ok = None, False
+                ok = False
             if ok:
                 done.append(f["label"])
-                sess.filled[f["key"]] = loc
             else:
-                manual.append(f"{f['label']}：{f['value']}%（手で合わせてください）")
+                manual.append(f"{f['label']}：{f['show']}（手で合わせてください）")
             continue
         try:
             loc = find(sess, site, f)
@@ -750,12 +801,6 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
     for f in fields:
         if f.get("value") in (None, "") or f["type"] == "click":
             continue
-        if f["type"] == "menu":
-            r = menu_state(sess, f)
-            if r is not True:
-                (bad if r is False and not f.get("optional") else sess.unsure).append(
-                    f"{f['label']}：{f.get('show', f['value'])}" + ("になっていません" if r is False else "（画面で確かめてください）"))
-            continue
         if f["type"] == "choice":
             r = choice_state(sess, f)
             if r is False:
@@ -764,13 +809,12 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
                 sess.unsure.append(f"{f['label']}：{f.get('show', f['value'])}（画面で確かめてください）")
             continue
         if f["type"] == "slider":
-            loc = getattr(sess, "filled", {}).get(f["key"])
             try:
-                v = _slider_value(loc) if loc is not None else None
+                ok = slider_ok(sess, f)
             except Exception:  # noqa: BLE001
-                v = None
-            if v is None or abs(v - float(f["value"])) > 2:
-                bad.append(f"{f['label']}：{f['value']}% になっていません" + (f"（いま {v:g}%）" if v is not None else ""))
+                ok = False
+            if not ok:
+                bad.append(f"{f['label']}：{f['show']} になっていません")
             continue
         loc = getattr(sess, "filled", {}).get(f["key"])
         if loc is None:
@@ -809,46 +853,57 @@ def on_page(sess: Session, site: str) -> bool:
 
 # ---------------------------------------------------------------------------
 def suno_fields(song: dict) -> list[dict]:
-    """Suno の作曲画面の「高度な」（Advanced）モードの欄。値は設計図（suno_design.py）から。画面の上から順に入れる"""
+    """Suno の作曲画面の「高度な」の欄。値は設計図（suno_design.py）から。Gon さんの一覧の順
+    （歌詞・スタイル・除外するスタイル・声の性別・間隔・Max mode・音量の大きさ・スタイルの影響度・バラエティ・あなたの好み・曲名）"""
     import suno_design
     d = suno_design.design(song)
     tip = "欄が見えないときは、画面の上の「高度な」を選び、「その他のオプション」を開いてからクリックしてください。"
-    fields = []
-    if d.get("model"):
-        fields.append({"key": "model", "label": f"モデル（{d['model']}）", "type": "menu", "value": d["model"], "optional": True,
-                       "button": r"^\s*v\d", "pick": r"^\s*" + re.escape(d["model"]) + r"(\b|$|\s|\+)"})
-    fields += [
+    onoff = lambda v: "オン" if v else "オフ"  # noqa: E731
+    fields = [
         {"key": "mode", "label": "「高度な」モード", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
-         "hints": ["高度な", "高度", "Advanced", "Custom", "カスタム"]},
-        {"key": "instrumental", "label": "インスト（歌なし）", "type": "choice", "value": "on" if d["instrumental"] else "none",
-         "show": "オン" if d["instrumental"] else "オフ", "options": {"on": ["Instrumental", "インストゥルメンタル", "インスト"]},
-         "quiet_unknown": not d["instrumental"]},   # 歌のある曲で、スイッチの状態が読めないだけなら知らせない（初期はオフ）
-        {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": d["lyrics"],
-         "hints": ["Lyrics", "歌詞", "Write some lyrics", "Write your own lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル",
+         "hints": ["高度な", "高度", "Advanced"]},
+        {"key": "lyrics", "label": "歌詞", "type": "text", "value": d["lyrics"],
+         "hints": ["Lyrics", "歌詞", "Write some lyrics", "Write your own lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル|曲名",
          "largest_textarea": True, "tip": tip, "show": "（歌詞はダッシュボードの「Suno に貼る内容」からコピー）"},
-        {"key": "style", "label": "スタイル（Styles）", "type": "text", "value": d["style"],
+        # スタイルは「カスタム」（文字で書く）。選べる候補は、文字に同じ言葉が入っているので押さない
+        {"key": "style_mode", "label": "スタイルを「カスタム」に", "type": "choice", "value": "custom", "show": "カスタム", "quiet_unknown": True,
+         "near": ["スタイル", "Styles", "Style"], "options": {"custom": ["カスタム", "Custom"], "select": ["選択", "Select"]}},
+        {"key": "style", "label": "スタイル", "type": "text", "value": d["style"],
          "hints": ["Style of Music", "Styles", "Style", "スタイル", "音楽のスタイル"], "avoid": r"exclude|除外|lyrics|歌詞", "tip": tip},
         {"key": "more", "label": "その他のオプション", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
-         "only_if_missing": ["exclude", "gender", "weirdness", "style_influence"],
+         "only_if_missing": ["exclude", "gender", "length", "max_mode", "loudness", "style_influence", "variety", "your_taste"],
          "hints": ["その他のオプション", "詳細オプション", "More Options", "More options", "オプション"]},
-        {"key": "exclude", "label": "除外するスタイル（Exclude styles）", "type": "text", "value": d["exclude"],
-         "hints": ["Exclude styles", "Exclude", "除外"], "tip": tip},
+        {"key": "exclude", "label": "除外するスタイル", "type": "text", "value": d["exclude"],
+         "hints": ["除外するスタイル", "Exclude styles", "Exclude", "除外"], "tip": tip},
     ]
-    if d["vocal_gender"] != "unset" and not d["instrumental"]:
+    if d["vocal_gender"] != "unset":
         g = d["vocal_gender"] or "none"
-        fields.append({"key": "gender", "label": "ボーカルの性別（Vocal Gender）", "type": "choice", "value": g,
-                       "show": _songs.GENDER_JA.get(d["vocal_gender"], g), "options": {"male": ["男性", "Male"], "female": ["女性", "Female"]}})
-    if d.get("weirdness") is not None:
-        fields.append({"key": "weirdness", "label": "Weirdness（意外さ）", "type": "slider", "value": int(d["weirdness"]),
-                       "hints": ["Weirdness", "奇抜さ", "奇妙さ", "ウィアードネス", "意外性"]})
+        fields.append({"key": "gender", "label": "声の性別", "type": "choice", "value": g, "near": ["声の性別", "ボーカルの性別", "Vocal Gender"],
+                       "show": _songs.GENDER_JA.get(d["vocal_gender"], g), "options": {"male": ["男", "男性", "Male"], "female": ["女", "女性", "Female"]}})
+    hints_len = ["間隔", "長さ", "曲の長さ", "Duration", "Length"]
+    fields.append({"key": "length_mode", "label": "間隔（自動・カスタム）", "type": "choice", "near": hints_len,
+                   "value": "custom" if d["length_sec"] else "auto", "show": "カスタム" if d["length_sec"] else "自動",
+                   "options": {"custom": ["カスタム", "Custom"], "auto": ["自動", "Auto"]}})
+    if d["length_sec"]:
+        fields.append({"key": "length", "label": "間隔（曲の長さ）", "type": "slider", "scale": "seconds", "value": d["length_sec"],
+                       "show": _songs.fmt_len(d["length_sec"]).replace("カスタム ", ""), "hints": hints_len})
+    if d.get("max_mode") is not None:
+        fields.append({"key": "max_mode", "label": "Max mode", "type": "choice", "value": "on" if d["max_mode"] else "none",
+                       "show": onoff(d["max_mode"]), "options": {"on": ["Max mode", "Max モード", "MAX モード", "Max Mode"]}})
+    if d.get("loudness") is not None:
+        fields.append({"key": "loudness", "label": "音量の大きさ", "type": "slider", "scale": "percent", "value": d["loudness"],
+                       "show": f"{d['loudness']}%", "hints": ["音量の大きさ", "音量", "Volume", "Loudness"]})
     if d.get("style_influence") is not None:
-        fields.append({"key": "style_influence", "label": "Style Influence（スタイルの効き具合）", "type": "slider", "value": int(d["style_influence"]),
-                       "hints": ["Style Influence", "スタイルの影響", "スタイルの影響度", "スタイル影響", "スタイルの強さ"]})
-    if d.get("persona"):
-        fields.append({"key": "persona", "label": f"ペルソナ（{d['persona']}）", "type": "menu", "value": d["persona"],
-                       "button": r"persona|ペルソナ", "pick": r"^\s*" + re.escape(d["persona"]) + r"\s*$"})
-    fields.append({"key": "title", "label": "曲のタイトル（Song Title）", "type": "text", "value": d["title"],
-                   "hints": ["Song Title", "Title", "曲のタイトル", "タイトル", "曲名"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip})
+        fields.append({"key": "style_influence", "label": "スタイルの影響度", "type": "slider", "scale": "percent", "value": d["style_influence"],
+                       "show": f"{d['style_influence']}%", "hints": ["スタイルの影響度", "スタイルの影響", "Style Influence"]})
+    if d.get("variety") is not None:
+        fields.append({"key": "variety", "label": "バラエティ", "type": "slider", "scale": "raw", "value": d["variety"],
+                       "show": f"{d['variety']}（0〜4）", "hints": ["バラエティ", "Variety"]})
+    if d.get("your_taste") is not None:
+        fields.append({"key": "your_taste", "label": "あなたの好み", "type": "choice", "value": "on" if d["your_taste"] else "none",
+                       "show": onoff(d["your_taste"]), "options": {"on": ["あなたの好み", "Your taste", "Your Taste", "好み"]}})
+    fields.append({"key": "title", "label": "曲名", "type": "text", "value": d["title"],
+                   "hints": ["曲名", "曲のタイトル", "Song Title", "Title", "タイトル"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip})
     return fields
 
 
@@ -920,6 +975,11 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         if sess.unsure:
             lines += ["目で確かめてください（画面から状態が読めませんでした）：", *sess.unsure]
             unsure_all.extend(f"{name}の{x}" for x in sess.unsure)
+        try:
+            import publish
+            lines += [f"保存先：{publish.inboxes()[0]}（この Chrome でダウンロードすると、ここに入ります）"]
+        except Exception:  # noqa: BLE001
+            pass
         lines += ["① 画面の上が「高度な」（Advanced）になっているか確かめる",
                   "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）",
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]

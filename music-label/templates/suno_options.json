@@ -1,14 +1,23 @@
 {
- "_使い方": "Suno の作曲画面に、組ごとに入れる設定（suno_design.py が曲のイメージと合わせて設計図にし、browser_fill.py が入れる）。Gon さんが自由に書き換えてよい。vocal_gender は male（男性）・female（女性）・null（選ばない）。weirdness・style_influence は 0〜100（%。Suno の初期値はどちらも 50）。vocal_tag はスタイル欄の先頭近くに入れる声の説明（英語）。exclude は「除外するスタイル」に必ず入れる言葉（英語。設定書の禁止事項から）。persona は Suno で作ったペルソナの名前（声を毎回同じにする。作るまでは null）。extra_tags は、設定書の毎曲の癖にタグが無いものの英語のタグと入れる位置（歌詞に足りなければ自動で差し込む）",
- "_weirdness": "Weirdness（意外さ）：高いほど予想外の展開・音色になる。毎回同じ声と音で通したい組は低め",
- "_style_influence": "Style Influence（スタイルの効き具合）：高いほどスタイル欄の指定どおりになる。音の決まりが細かい組は高め",
+ "_使い方": "Suno の作曲画面（「高度な」→「その他のオプション」）に、組ごとに入れる設定。suno_design.py が曲のイメージと合わせて設計図にし、browser_fill.py が入れる。Gon さんが自由に書き換えてよい。vocal_gender：male（男）・female（女）・null（選ばない）。variety：バラエティ 0〜4（高いほど予想外）。style_influence：スタイルの影響度（%）。loudness：音量の大きさ（%。配信前に -14 LUFS にそろえるので、Suno では音がつぶれない程度に）。length_sec：間隔（曲の長さ）を「カスタム」にして秒で指定（10〜360。null なら「自動」）。max_mode：Max mode のオン・オフ。your_taste：あなたの好み（今は全部オフ。再生数が伸びた曲の知識がたまったら、out/knowledge/your_taste.json で組ごとにオンにする）。vocal_tag：スタイル欄の先頭近くに入れる声の説明（英語）。exclude：除外するスタイルに必ず入れる言葉（英語。設定書の禁止事項から）。extra_tags：設定書の毎曲の癖にタグが無いものの英語のタグと入れる位置",
+ "_variety": "バラエティ（0〜4）：高いほど予想外の展開・音色になる。毎回同じ声と音で通したい組は低め",
+ "_style_influence": "スタイルの影響度：高いほどスタイル欄の指定どおりになる。音の決まりが細かい組は高め",
+ "_loudness": "音量の大きさ：静かな編成ほど低めにして、息や余韻を残す（大きさは配信前の音量調整でそろう）",
+ "_length_sec": "間隔：設定書の曲の長さ（作曲の癖の『構成』と運転向けの長さ 150〜210 秒）のまん中",
+ "default": {
+  "max_mode": true,
+  "your_taste": false,
+  "_why": "Max mode：音の質を最優先にするのでオン（Suno の使う量が増える場合は false に）。あなたの好み：知識がたまるまでオフ"
+ },
  "declan_fay": {
   "vocal_gender": "male",
-  "weirdness": 35,
+  "variety": 1,
   "style_influence": 70,
-  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、意外さは低め・スタイルは強め",
+  "loudness": 45,
+  "length_sec": 190,
+  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、バラエティは低め・スタイルは強め",
+  "_why_more": "静かな夜の語り。音量は控えめ、長さは 3 分〜3 分 20 秒のまん中",
   "vocal_tag": "warm low male baritone crooner vocals",
-  "persona": null,
   "exclude": [
    "sudden silence",
    "EDM drop",
@@ -26,11 +35,13 @@
  },
  "hollowplan": {
   "vocal_gender": null,
-  "weirdness": 55,
+  "variety": 2,
   "style_influence": 65,
-  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、意外さは少し高め",
+  "loudness": 55,
+  "length_sec": 180,
+  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、バラエティは少し高め",
+  "_why_more": "質感の遊びが持ち味なのでバラエティは 2。四つ打ちなので音量は中くらい",
   "vocal_tag": "wordless breathy vocal chops",
-  "persona": null,
   "exclude": [
    "full sung verses",
    "sudden silence",
@@ -45,11 +56,13 @@
  },
  "nao_easterly": {
   "vocal_gender": "female",
-  "weirdness": 30,
+  "variety": 1,
   "style_influence": 70,
-  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、意外さは低め・スタイルは強め",
+  "loudness": 60,
+  "length_sec": 190,
+  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、バラエティは低め・スタイルは強め",
+  "_why_more": "朝の明るい音。音量はやや大きめ",
   "vocal_tag": "bright clear high female vocals",
-  "persona": null,
   "exclude": [
    "rap",
    "sudden silence",
@@ -65,11 +78,13 @@
  },
  "soft_cantilever": {
   "vocal_gender": "male",
-  "weirdness": 40,
+  "variety": 2,
   "style_influence": 65,
-  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、意外さは中くらい",
+  "loudness": 55,
+  "length_sec": 175,
+  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、バラエティは中くらい",
+  "_why_more": "バンドの揺らぎがほしいのでバラエティは 2。長さは 150〜200 秒のまん中",
   "vocal_tag": "warm male lead vocals with female harmony",
-  "persona": null,
   "exclude": [
    "sudden silence",
    "EDM drop",
@@ -101,11 +116,13 @@
  },
  "tidewool": {
   "vocal_gender": null,
-  "weirdness": 35,
+  "variety": 1,
   "style_influence": 60,
+  "loudness": 40,
+  "length_sec": 180,
   "_why": "男女 2 人の 3 度のハモりが持ち味。性別を 1 つ選ぶと片方の声だけになりやすいので選ばない。生楽器の自然な響きを残したいので、スタイルの効きは少しゆるめ",
+  "_why_more": "生楽器と小さな声。音量はいちばん控えめにして余韻を残す",
   "vocal_tag": "male and female duet vocals, close harmony",
-  "persona": null,
   "exclude": [
    "synth pads",
    "electronic drop",
@@ -117,9 +134,5 @@
    "deep vibrato",
    "heavy drums"
   ]
- },
- "default": {
-  "model": "v5",
-  "_why": "Suno のいちばん新しいモデル。画面にあれば選ぶ（無ければ今のまま）"
  }
 }
