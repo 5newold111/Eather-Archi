@@ -1300,7 +1300,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
                *(["手で入れてください：", *manual] if manual else []), "画面で確かめて選ぶもの：", *always,
                "内容を確かめて、最後の登録ボタンを押してください（押すのは Gon さんだけ）。",
                "押し終わったら、配信日を選んで「登録した」を押すと、記録されます。"],
-              [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"}],
+              [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"},
+               {"id": "copy_parts", "label": "画面の部品をコピー（入らない欄があるとき・Claude に貼る用）"}],
               date_value=date.today().isoformat())
     m = sess.wait({"action": "stop"})
     if m.get("action") == "registered":
