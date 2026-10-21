@@ -253,6 +253,23 @@ class BrowserClosed(Exception):
     """専用のブラウザが閉じられた"""
 
 
+class Challenge(Exception):
+    """サイトの「ロボットではありません」の確認（Cloudflare など）が出た。システムは絶対に触らず、止まる"""
+
+
+def challenge_shown(sess) -> bool:
+    """ロボット確認が画面に出ているか（Cloudflare Turnstile・reCAPTCHA・hCaptcha の枠）"""
+    try:
+        for fr in sess.page.frames:
+            u = (fr.url or "").lower()
+            if any(k in u for k in ("challenges.cloudflare.com", "turnstile", "recaptcha", "hcaptcha")):
+                return True
+        return bool(sess.page.evaluate("""() => /私はロボットではありません|I'?m not a robot|Verify you are human|人間であることを確認/i
+            .test(document.body ? document.body.innerText.slice(0, 20000) : '')"""))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 class NeedLogin(Exception):
     """ログインしていない（ログインは、システムがつながっていない Chrome で行う）"""
     def __init__(self, site: str):
@@ -884,6 +901,8 @@ def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str]
     sess.filled = {}
     sess.log = []
     for f in fields:
+        if challenge_shown(sess):
+            raise Challenge()   # ロボット確認が出た：これ以上は何も触らない
         if f.get("value") in (None, ""):
             continue
         if f.get("only_if_missing"):
@@ -1166,6 +1185,8 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         if not sess.ensure_login("suno"):   # 画面ができてから「Sign in」が出るサイトもあるので、もう一度
             problems.append("Suno にログインできていません")
             break
+        if challenge_shown(sess):
+            raise Challenge()
         fields = suno_fields(song)
         done, manual = fill_fields(sess, "suno", fields)
         bad = verify(sess, fields)
@@ -1208,7 +1229,7 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         except Exception:  # noqa: BLE001
             pass
         lines += ["① 画面の上が「高度な」（Advanced）になっているか確かめる",
-                  "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）",
+                  "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）。そのあと「私はロボットではありません」が出たら、Gon さんがチェックする（システムは押しません）",
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
@@ -1377,6 +1398,18 @@ def main() -> None:
                 code = run_login(sess, (a.args or ["suno"])[0])
         except NeedLogin as e:
             need = e.site
+        except Challenge:
+            try:
+                sess.keep_overlay = True
+                sess.show("ロボット確認が出たので止まりました",
+                          ["サイトの「私はロボットではありません」の確認が出ました。システムはこれ以上何も触りません。",
+                           "Gon さんがご自分でチェックしてください。続きは、確認が終わってから入力し直すか、手で入れてください。",
+                           "何度も出るときは、続けて何回も作らず、時間をあけてください。"],
+                          [{"id": "dismiss", "label": "この案内を消す"}])
+            except Exception:  # noqa: BLE001
+                pass
+            print("【結果】まだ終わっていません：サイトのロボット確認が出たので、システムは止まりました（確認は Gon さんがチェックしてください。システムは押しません）")
+            code = 2
         except BrowserClosed:
             print("【結果】まだ終わっていません：ブラウザが閉じられました")
             code = 2
