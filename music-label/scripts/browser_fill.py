@@ -124,6 +124,13 @@ OVERLAY_JS = r"""
     btn.style.cssText = 'font:inherit;border-radius:6px;padding:6px 12px;cursor:pointer;border:1px solid #a07a3c;' + (b.primary ? 'background:#a07a3c;color:#fff' : 'background:#fff;color:#22201c');
     btn.onclick = (e) => { e.preventDefault(); e.stopPropagation();
       if (b.id === 'dismiss') { box.remove(); window.__postdogPicking = false; return; }   // 案内を消すだけ（システムとはつながっていなくてよい）
+      if (b.id === 'copy_parts') {   // 画面の部品の一覧をコピー（Claude に貼って、本物の画面に合わせて直してもらう）
+        const t = window.__postdogParts ? window.__postdogParts() : '（部品の一覧を作れませんでした）';
+        const ok = () => { btn.textContent = 'コピーしました。Claude に貼ってください'; };
+        const fallback = () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+          document.execCommand('copy'); ta.remove(); ok(); };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(ok, fallback); else fallback();
+        return; }
       window.postdog({action: b.id, date: dateInput ? dateInput.value : null}); };
     row.appendChild(btn);
   }
@@ -282,6 +289,7 @@ class Session:
         self.msg: dict | None = None
         self.ctx.expose_binding("postdog", lambda source, payload: setattr(self, "msg", payload))
         self.ctx.add_init_script(INIT_JS)
+        self.ctx.add_init_script(f"window.__postdogParts = {PARTS_JS};")
         self.page = self.ctx.new_page() if self.cdp or not self.ctx.pages else self.ctx.pages[0]
         if self.cdp:
             self.page.bring_to_front()
@@ -313,6 +321,7 @@ class Session:
             try:
                 if not self.page.evaluate("typeof window.__postdogSel === 'function'"):
                     self.page.evaluate(INIT_JS)   # 下準備が入っていないページ（開いたままのタブなど）に入れ直す
+                    self.page.evaluate(f"window.__postdogParts = {PARTS_JS};")
                 return self.page.evaluate(expr, arg)
             except BrowserClosed:
                 raise
@@ -486,6 +495,7 @@ STATE_CORE = r"""
     if (a === 'true') return 'on'; if (a === 'false') return 'off';
     const ds = x.getAttribute('data-state'); if (ds) return /^(on|active|checked|selected|open)$/.test(ds) ? 'on' : 'off';
     for (const k of ['data-selected', 'data-active', 'data-checked']) if (x.hasAttribute(k)) return x.getAttribute(k) === 'false' ? 'off' : 'on';
+    const hs = x.getAttribute('data-headlessui-state'); if (hs !== null) return /checked|selected|active/.test(hs) ? 'on' : 'off';
     if (x.matches && x.matches('input[type=radio],input[type=checkbox]')) return x.checked ? 'on' : 'off';
     const cls = String(x.className && x.className.baseVal !== undefined ? x.className.baseVal : x.className || '');
     if (/(^|[\s_-])(active|selected|checked|is-on|on)([\s_-]|$)/i.test(cls)) return 'on';
@@ -770,9 +780,11 @@ def put(sess: Session, loc, f: dict) -> bool:
         sess.last_loc = loc
         if tag in ("input", "textarea"):
             loc.fill(str(v))
-            sess.page.wait_for_timeout(300)
+            sess.page.wait_for_timeout(500)
             if _norm(_read(loc)) == _norm(v):
                 return True
+            if f.get("key") in ("style", "lyrics", "exclude") and _coverage(sess, loc, f) >= 0.9:
+                return True   # 札（タグ）に変わって表示される作り：もう入っているので打ち直さない（二重になるため）
         # 入れた文字が残らない作り（画面が自分で文字を管理している）：クリックして、全部選んで、キーボードで打つ
         loc.click()
         sess.page.keyboard.press("Meta+A" if sys.platform == "darwin" else "Control+A")
@@ -894,10 +906,34 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
             ok = g == want or want in g
         else:
             ok = g == want
+        cov = None
+        if not ok and f["key"] in ("style", "lyrics", "exclude"):
+            cov = _coverage(sess, loc, f)
+            ok = cov >= 0.9
         if not ok:
-            bad.append(f"{f['label']}：途中までしか入っていません（文字数の上限かもしれません）" if g and want.startswith(g)
-                       else f"{f['label']}：入っていません")
+            if cov is not None and cov >= 0.3:
+                bad.append(f"{f['label']}：一部しか入っていません（入れた言葉の {round(cov * 100)}%）")
+            else:
+                bad.append(f"{f['label']}：途中までしか入っていません（文字数の上限かもしれません）" if g and want.startswith(g)
+                           else f"{f['label']}：入っていません")
     return bad
+
+
+def _coverage(sess: Session, loc, f: dict) -> float:
+    """入れた言葉（スタイルは , 区切り、歌詞は歌う行）のうち、欄とそのまわり（タグの札などに変わって表示される作り）に出ているものの割合"""
+    v = str(f["value"])
+    if f["key"] == "lyrics":
+        toks = [ln for ln in v.splitlines() if ln.strip() and not ln.strip().startswith("[")]
+    else:
+        toks = [t for t in re.split(r",\s*", v) if t.strip()]
+    toks = [_norm(t) for t in toks if _norm(t)]
+    if not toks:
+        return 1.0
+    texts = loc.evaluate("""e => { const out = [e.value ?? '', e.innerText ?? ''];
+        let up = e.parentElement;
+        for (let i = 0; i < 3 && up; i++, up = up.parentElement) out.push(up.innerText || '');
+        return out; }""")
+    return max(sum(t in _norm(x) for t in toks) / len(toks) for x in texts)
 
 
 def on_page(sess: Session, site: str) -> bool:
@@ -978,7 +1014,8 @@ PARTS_JS = r"""() => {
     if (!['input', 'textarea', 'select', 'button'].includes(t) && !/button|switch|slider|radio|tab|checkbox|textbox|combobox|option|menuitem/.test(role) && !e.isContentEditable) continue;
     const at = ['type', 'aria-label', 'aria-checked', 'aria-pressed', 'aria-selected', 'aria-valuenow', 'aria-valuemin', 'aria-valuemax',
                 'data-state', 'placeholder', 'name', 'data-testid'].map(a => e.getAttribute(a) !== null ? `${a}=${cut(e.getAttribute(a), 40)}` : '').filter(Boolean);
-    const val = (t === 'input' || t === 'textarea') ? ` 中身=${String(e.value || '').length}文字` : (e.isContentEditable ? ` 中身=${(e.innerText || '').length}文字` : '');
+    const raw = (t === 'input' || t === 'textarea') ? String(e.value || '') : (e.isContentEditable ? (e.innerText || '') : null);
+    const val = raw === null ? '' : ` 中身=${raw.length}文字「${cut(raw, 40)}」 まわり=「${cut(e.parentElement && e.parentElement.parentElement ? e.parentElement.parentElement.innerText : '', 60)}」`;
     out.push(`${Math.round(e.getBoundingClientRect().top)}\t${t}${role ? '[' + role + ']' : ''}${e.isContentEditable ? '[編集可]' : ''}\t「${cut(e.innerText || e.value || '', 30)}」\t${at.join(' ')}${val}\tclass=${cut(e.className && e.className.baseVal !== undefined ? '' : e.className, 50)}\t見出し=${lab(e)}`);
     if (out.length >= 300) break;
   }
@@ -1082,7 +1119,11 @@ def run_suno(sess: Session, ids: list[str]) -> int:
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
-            sess.show("Suno に入力しました" if not bad else "Suno への入力が足りません", lines, [{"id": "dismiss", "label": "この案内を消す"}])
+            btns = [{"id": "dismiss", "label": "この案内を消す"}]
+            if bad or sess.unsure:
+                btns.insert(0, {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）", "primary": True})
+                lines.append("「画面の部品をコピー」を押して Claude に貼ると、本物の画面に合わせて直せます（欄やボタンの名前と状態だけで、歌詞は頭の数文字だけ）")
+            sess.show("Suno に入力しました" if not bad else "Suno への入力が足りません", lines, btns)
             break
         sess.show("Suno に入力しました" if not bad else "Suno への入力が足りません", lines,
                   [{"id": "next", "label": "次の曲へ", "primary": True}, {"id": "stop", "label": "ここでやめる"}])
