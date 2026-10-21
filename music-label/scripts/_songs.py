@@ -162,7 +162,7 @@ GENDER_JA = {"male": "男", "female": "女", None: "選ばない"}
 
 
 def suno_options(song: dict) -> dict:
-    """{'vocal_gender', 'variety'(0〜4), 'style_influence'(%), 'loudness'(%), 'length_sec'(秒 or None＝自動), 'max_mode', 'your_taste', …}
+    """{'vocal_gender', 'variety'(0〜4), 'style_influence'(%), 'weirdness'(%), 'length_sec'(秒 or None＝自動), 'max_mode', 'your_taste', …}
     共通（default）→ 組ごと → 知識（あなたの好み）→ 曲ごとの指定（song['suno_options']）の順に上書き"""
     d = read_json(SUNO_OPTIONS) if SUNO_OPTIONS.exists() else {}
     opt = {k: v for k, v in (d.get("default") or {}).items() if not k.startswith("_")}
@@ -191,8 +191,8 @@ def suno_options_text(song: dict) -> str:
         parts.append(f"間隔：{fmt_len(o['length_sec'])}")
     if "max_mode" in o:
         parts.append(f"Max mode：{onoff(o['max_mode'])}")
-    if o.get("loudness") is not None:
-        parts.append(f"音量の大きさ：{o['loudness']}%")
+    if o.get("weirdness") is not None:
+        parts.append(f"Weirdness：{o['weirdness']}%")
     if o.get("style_influence") is not None:
         parts.append(f"スタイルの影響度：{o['style_influence']}%")
     if o.get("variety") is not None:

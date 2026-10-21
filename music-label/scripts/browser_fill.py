@@ -59,8 +59,8 @@ LEARNED = OUT / "browser" / "fields.json"
 PROFILE = Path(os.environ.get("POSTDOG_BROWSER_PROFILE", str(Path.home() / ".postdog-browser")))
 AUTO = os.environ.get("POSTDOG_AUTOCONTINUE") == "1"   # 試験用：案内のボタンを待たずに進む
 # システムが絶対に押さないボタン（作成・送信・公開・購入・削除など）
-NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribute|buy|purchase|pay|checkout|subscribe|delete|remove|upgrade|"
-                   r"作成|生成|送信|公開|配信|購入|支払|削除|アップグレード", re.I)
+NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribute|buy|purchase|pay|checkout|subscribe|delete|remove|upgrade|clear|reset|"
+                   r"作成|生成|送信|公開|配信|購入|支払|削除|アップグレード|消去|リセット", re.I)
 
 # ページに毎回入れる下準備：欄の場所を言葉にする関数と、「クリックで教える」の受け取り
 INIT_JS = r"""
@@ -402,7 +402,7 @@ class Session:
 # ---------------------------------------------------------------------------
 # 欄を探して入れる
 # 覚えた欄をしまう名前。Suno は「高度な」（Advanced）の画面に合わせて覚え直す（前の画面で覚えた場所は使わない）
-LEARN_AS = {"suno": "suno_advanced"}
+LEARN_AS = {"suno": "suno_2026_10_21"}   # 本物の画面の部品の一覧に合わせた日。前に覚えた場所は使わない
 
 
 def learned() -> dict:
@@ -427,8 +427,9 @@ DESC_JS = """e => [e.getAttribute('placeholder'), e.getAttribute('aria-label'), 
                    e.labels ? [...e.labels].map(l => l.innerText).join(' ') : ''].join(' ')"""
 
 
-def _pick(loc, avoid):
-    """候補のうち、見えていて、避けたい欄（例：スタイルを探すときの「除外するスタイル」）ではない最初のもの"""
+def _pick(loc, avoid, field_only: bool = False):
+    """候補のうち、見えていて、避けたい欄（例：スタイルを探すときの「除外するスタイル」）ではない最初のもの。
+    field_only：文字を書ける部品（入力欄・書き込み欄）だけ"""
     try:
         n = min(loc.count(), 8)
     except Exception:  # noqa: BLE001
@@ -439,6 +440,8 @@ def _pick(loc, avoid):
             if not c.is_visible():
                 continue
             if avoid and re.search(avoid, c.evaluate(DESC_JS) or "", re.I):
+                continue
+            if field_only and not _is_field(c):
                 continue
             return c
         except Exception:  # noqa: BLE001
@@ -459,6 +462,10 @@ def find(sess: Session, site: str, f: dict):
             if want in acc or (want == "audio" and re.search(r"wav|mp3|flac", acc)) or (want == "image" and re.search(r"jpe?g|png", acc)):
                 return inputs.nth(i)
         return None
+    for h in f.get("below", []):   # 名前の無い欄：見出しのすぐ下のもの
+        sel = sess.js(BELOW_JS, [h, FIELD_SEL, 160])
+        if sel and _visible(page.locator(sel)):
+            return page.locator(sel).first
     for h in f.get("hints", []):
         rx = re.compile(re.escape(h), re.I)
         makers = [lambda: page.get_by_label(rx), lambda: page.get_by_placeholder(rx)]
@@ -473,7 +480,7 @@ def find(sess: Session, site: str, f: dict):
             makers.append(lambda: page.get_by_role("textbox", name=rx))
         for make in makers:
             try:
-                c = _pick(make(), f.get("avoid"))
+                c = _pick(make(), f.get("avoid"), field_only=f["type"] == "text")
                 if c is not None:
                     return c
             except Exception:  # noqa: BLE001
@@ -523,6 +530,18 @@ NEAR_JS = r"""([hint, sel, unique]) => { const want = hint.trim().toLowerCase();
         return window.__postdogSel(all[0]);
       } }
     return null; }"""
+# 見出しの文字の「すぐ下（か横）」にある部品を、画面の上の位置で探す（名前の無い欄・ボタンのかたまり用）
+BELOW_JS = r"""([hint, sel, maxdy]) => { const want = hint.trim().toLowerCase(); let best = null, bd = 1e9;
+    const shown = e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !e.closest('#postdog-overlay'); };
+    const labels = [...document.querySelectorAll('label,span,div,p,h2,h3,h4,legend,button')].filter(el =>
+      shown(el) && [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase() === want));
+    const cands = [...document.querySelectorAll(sel)].filter(shown);
+    for (const L of labels) { const lr = L.getBoundingClientRect();
+      for (const c of cands) { if (c === L || L.contains(c)) continue; const r = c.getBoundingClientRect();
+        const dy = r.top - lr.top; if (dy < -15 || dy > maxdy) continue;
+        const d = Math.abs(dy) + Math.abs(r.left - lr.left) * 0.2; if (d < bd) { bd = d; best = c; } } }
+    return best ? window.__postdogSel(best) : null; }"""
+FIELD_SEL = "textarea,input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),[contenteditable=true],[contenteditable='']"
 SLIDER_SEL = "[role=slider],input[type=range]"
 TIME_SEL = "input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file])"
 
@@ -598,7 +617,8 @@ def set_slider(sess: Session, loc, target: float, tol: float = 2) -> bool:
 def _scope(sess: Session, f: dict):
     """f['near']（見出しの言葉）があれば、その近くのかたまりの中だけを探す"""
     for h in f.get("near") or []:
-        sel = sess.js(NEAR_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", False])
+        sel = sess.js(BELOW_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", 90]) or \
+            sess.js(NEAR_JS, [h, "button,[role=radio],[role=tab],[role=switch],[role=checkbox]", False])
         if sel:
             box = sess.js("""(sel) => { const b = document.querySelector(sel); let up = b;
                 for (let i = 0; i < 4 && up.parentElement; i++) { up = up.parentElement;
@@ -677,7 +697,11 @@ def _states(sess: Session, f: dict) -> dict:
     for opt, hints in f["options"].items():
         loc = _option(sess, hints, f)
         if loc is not None:
-            got[opt] = [loc, loc.evaluate(STATE_JS)]
+            st = loc.evaluate(STATE_JS)
+            if st == "unknown" and len(f["options"]) >= 2:   # 見た目の種類で読む（選ばれている方が目立つ種類になる作り）
+                cls = loc.get_attribute("class") or ""
+                st = "off" if re.search(r"variant-tertiary", cls) else ("on" if re.search(r"variant-(standard|primary|secondary)", cls) else st)
+            got[opt] = [loc, st]
     if len(got) >= 2 and sum(v[1] == "on" for v in got.values()) == 1:
         for v in got.values():
             if v[1] == "unknown":
@@ -693,7 +717,7 @@ def choice_state(sess: Session, f: dict) -> bool | None:
             return None
         if (st == "on") != (opt == f["value"]):
             return False
-    return True if got or f["value"] == "none" else None
+    return True if got or f["value"] == "none" or f.get("skip_if_missing") else None
 
 
 def set_choice(sess: Session, f: dict) -> bool | None:
@@ -789,7 +813,15 @@ def put(sess: Session, loc, f: dict) -> bool:
         loc.click()
         sess.page.keyboard.press("Meta+A" if sys.platform == "darwin" else "Control+A")
         sess.page.keyboard.press("Backspace")
-        sess.page.keyboard.insert_text(str(v))
+        lines = str(v).split("\n")
+        if tag in ("input", "textarea") or len(lines) == 1:
+            sess.page.keyboard.insert_text(str(v))
+        else:   # 書き込み欄：1 行ずつ打って Enter（改行をまとめて入れると行が消える作りがある）
+            for i, ln in enumerate(lines):
+                if ln:
+                    sess.page.keyboard.insert_text(ln)
+                if i < len(lines) - 1:
+                    sess.page.keyboard.press("Enter")
         sess.page.wait_for_timeout(300)
         return True
     except Exception:  # noqa: BLE001
@@ -871,7 +903,9 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
             continue
         if f["type"] == "choice":
             r = choice_state(sess, f)
-            if r is False:
+            if r is False and f["value"] == "none":   # どちらかが必ず選ばれる作りで「選ばない」にできない：失敗にはせず知らせる
+                sess.unsure.append(f"{f['label']}：Suno では「選ばない」にできませんでした（声はスタイル欄の言葉で出します。気になれば画面で外してください）")
+            elif r is False:
                 bad.append(f"{f['label']}：{f.get('show', f['value'])}になっていません")
             elif r is None and not f.get("quiet_unknown"):
                 sess.unsure.append(f"{f['label']}：{f.get('show', f['value'])}（画面で確かめてください）")
@@ -955,36 +989,40 @@ def suno_fields(song: dict) -> list[dict]:
         {"key": "mode", "label": "「高度な」モード", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
          "hints": ["高度な", "高度", "Advanced"]},
         {"key": "lyrics", "label": "歌詞", "type": "text", "value": d["lyrics"],
-         "hints": ["Lyrics", "歌詞", "Write some lyrics", "Write your own lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル|曲名",
+         "hints": ["Lyrics editor", "Lyrics", "歌詞", "Start writing lyrics", "Write some lyrics"], "avoid": r"style|スタイル|除外|exclude|title|タイトル|曲名|saved|cowriter|script|tone",
          "largest_textarea": True, "tip": tip, "show": "（歌詞はダッシュボードの「Suno に貼る内容」からコピー）"},
         # スタイルは「カスタム」（文字で書く）。選べる候補は、文字に同じ言葉が入っているので押さない
         {"key": "style_mode", "label": "スタイルを「カスタム」に", "type": "choice", "value": "custom", "show": "カスタム", "quiet_unknown": True,
          "near": ["スタイル", "Styles", "Style"], "options": {"custom": ["カスタム", "Custom"], "select": ["選択", "Select"]}},
-        {"key": "style", "label": "スタイル", "type": "text", "value": d["style"],
-         "hints": ["Style of Music", "Styles", "Style", "スタイル", "音楽のスタイル"], "avoid": r"exclude|除外|lyrics|歌詞", "tip": tip},
+        # Suno のスタイル欄は名前が無く、薄い字の例文が毎回変わる：見出し「Styles」のすぐ下の欄
+        {"key": "style", "label": "スタイル", "type": "text", "value": d["style"], "below": ["Styles", "スタイル"],
+         "hints": ["Style of Music", "Styles", "Style", "スタイル", "音楽のスタイル"], "avoid": r"exclude|除外|lyrics|歌詞|search|speech|tone|describe the sound", "tip": tip},
         {"key": "more", "label": "その他のオプション", "type": "click", "value": "on", "optional": True, "teach": False, "text_ok": True,
-         "only_if_missing": ["exclude", "gender", "length", "max_mode", "loudness", "style_influence", "variety", "your_taste"],
+         "only_if_missing": ["exclude", "gender", "length", "max_mode", "weirdness", "style_influence", "variety", "your_taste"],
          "hints": ["その他のオプション", "詳細オプション", "More Options", "More options", "オプション"]},
         {"key": "exclude", "label": "除外するスタイル", "type": "text", "value": d["exclude"],
          "hints": ["除外するスタイル", "Exclude styles", "Exclude", "除外"], "tip": tip},
     ]
     if d["vocal_gender"] != "unset":
         g = d["vocal_gender"] or "none"
-        fields.append({"key": "gender", "label": "声の性別", "type": "choice", "value": g, "near": ["声の性別", "ボーカルの性別", "Vocal Gender", "Gender", "Vocals"],
+        fields.append({"key": "gender", "label": "声の性別", "type": "choice", "value": g, "near": ["Vocal Gender", "声の性別", "ボーカルの性別", "Gender"],
                        "show": _songs.GENDER_JA.get(d["vocal_gender"], g), "options": {"male": ["男", "男性", "Male"], "female": ["女", "女性", "Female"]}})
     hints_len = ["間隔", "長さ", "曲の長さ", "Duration", "Length", "Song Length", "Song length", "Interval", "Timing"]
     fields.append({"key": "length_mode", "label": "間隔（自動・カスタム）", "type": "choice", "near": hints_len,
                    "value": "custom" if d["length_sec"] else "auto", "show": "カスタム" if d["length_sec"] else "自動",
+                   "skip_if_missing": True, "quiet_unknown": True,   # いまの Suno には自動・カスタムのボタンが無い（長さを入れればカスタム）
                    "options": {"custom": ["カスタム", "Custom"], "auto": ["自動", "Auto"]}})
     if d["length_sec"]:
         fields.append({"key": "length", "label": "間隔（曲の長さ）", "type": "slider", "scale": "seconds", "value": d["length_sec"],
                        "show": _songs.fmt_len(d["length_sec"]).replace("カスタム ", ""), "hints": hints_len})
     if d.get("max_mode") is not None:
-        fields.append({"key": "max_mode", "label": "Max mode", "type": "choice", "value": "on" if d["max_mode"] else "none",
-                       "show": onoff(d["max_mode"]), "options": {"on": ["Max mode", "Max モード", "MAX モード", "Max Mode"]}})
-    if d.get("loudness") is not None:
-        fields.append({"key": "loudness", "label": "音量の大きさ", "type": "slider", "scale": "percent", "value": d["loudness"],
-                       "show": f"{d['loudness']}%", "hints": ["音量の大きさ", "音量", "Loudness", "Volume", "Audio Loudness", "Level"]})
+        # Max Mode は見出しの横の Off・On の 2 つのボタン
+        fields.append({"key": "max_mode", "label": "Max mode", "type": "choice", "value": "on" if d["max_mode"] else "off",
+                       "show": onoff(d["max_mode"]), "near": ["Max Mode", "Max mode", "Max モード"],
+                       "options": {"on": ["On", "オン"], "off": ["Off", "オフ"]}})
+    if d.get("weirdness") is not None:
+        fields.append({"key": "weirdness", "label": "Weirdness（意外さ）", "type": "slider", "scale": "percent", "value": d["weirdness"],
+                       "show": f"{d['weirdness']}%", "hints": ["Weirdness", "奇抜さ", "奇妙さ"]})
     if d.get("style_influence") is not None:
         fields.append({"key": "style_influence", "label": "スタイルの影響度", "type": "slider", "scale": "percent", "value": d["style_influence"],
                        "show": f"{d['style_influence']}%", "hints": ["スタイルの影響度", "スタイルの影響", "Style Influence", "Style influence", "Style Strength"]})
@@ -992,8 +1030,10 @@ def suno_fields(song: dict) -> list[dict]:
         fields.append({"key": "variety", "label": "バラエティ", "type": "slider", "scale": "raw", "value": d["variety"],
                        "show": f"{d['variety']}（0〜4）", "hints": ["バラエティ", "Variety", "Variation", "Variations"]})
     if d.get("your_taste") is not None:
-        fields.append({"key": "your_taste", "label": "あなたの好み", "type": "choice", "value": "on" if d["your_taste"] else "none",
-                       "show": onoff(d["your_taste"]), "options": {"on": ["あなたの好み", "Your taste", "Your Taste", "My Taste", "Taste", "Personalize", "Personalized", "好み"]}})
+        # あなたの好み＝見出し「Personalize」の横の Off・On（「My Taste」のボタンは好みの設定を開くだけなので押さない）
+        fields.append({"key": "your_taste", "label": "あなたの好み（Personalize）", "type": "choice", "value": "on" if d["your_taste"] else "off",
+                       "show": onoff(d["your_taste"]), "near": ["Personalize", "あなたの好み", "Your Taste"],
+                       "options": {"on": ["On", "オン"], "off": ["Off", "オフ"]}})
     fields.append({"key": "title", "label": "曲名", "type": "text", "value": d["title"],
                    "hints": ["曲名", "曲のタイトル", "Song Title", "Title", "タイトル"], "avoid": r"lyrics|歌詞|style|スタイル", "tip": tip})
     return fields

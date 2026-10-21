@@ -10,7 +10,7 @@ Suno の作曲画面（「高度な」）で入れられる軸（Gon さんの�
    4 声の性別（男・女）… 組ごとの設定（suno_options.json）。男女の組・声の切れ端だけの組は選ばない
    5 間隔（曲の長さ）  … 自動／カスタム（10 秒〜6 分）。設定書の曲の長さのまん中をカスタムで
    6 Max mode          … オン・オフ（共通の設定）
-   7 音量の大きさ      … 組ごと（配信前に -14 LUFS にそろえるので、つぶれない程度に）
+   7 Weirdness（意外さ）… 組ごと（画面に音量の欄は無く、この欄がある）
    8 スタイルの影響度  … 組ごと
    9 バラエティ（0〜4）… 組ごと
   10 あなたの好み      … オン・オフ。今はオフ。再生数が伸びた曲の知識（out/knowledge/your_taste.json）がたまったら組ごとにオン
@@ -248,8 +248,8 @@ def design(song: dict) -> dict:
         checks.append(("間隔", "warn", f"歌う行が {lines_n} 行あり、{_songs.fmt_len(length)} では歌い切れないかもしれません"))
     if "max_mode" in opt:
         mapping.append(("Max mode", onoff(opt["max_mode"]), "共通の設定（音の質を優先）"))
-    if opt.get("loudness") is not None:
-        mapping.append(("音量の大きさ", f"{opt['loudness']}%", "組ごとの設定（編成の静かさ）"))
+    if opt.get("weirdness") is not None:
+        mapping.append(("Weirdness（意外さ）", f"{opt['weirdness']}%", "組ごとの設定（毎回の声と音の固さ）"))
     if opt.get("style_influence") is not None:
         mapping.append(("スタイルの影響度", f"{opt['style_influence']}%", "組ごとの設定（音の決まりの細かさ）"))
     if opt.get("variety") is not None:
@@ -273,7 +273,7 @@ def design(song: dict) -> dict:
 
     return {"title": song.get("title", ""), "lyrics": lyrics, "style": style, "exclude": exclude,
             "vocal_gender": want_gender if "vocal_gender" in opt and not song.get("instrumental") else "unset",
-            "length_sec": length, "max_mode": opt.get("max_mode"), "loudness": opt.get("loudness"),
+            "length_sec": length, "max_mode": opt.get("max_mode"), "weirdness": opt.get("weirdness"),
             "style_influence": opt.get("style_influence"), "variety": opt.get("variety"), "your_taste": opt.get("your_taste"),
             "instrumental": bool(song.get("instrumental")), "checks": checks, "map": mapping}
 
