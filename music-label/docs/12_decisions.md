@@ -577,3 +577,10 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 書体は `music-label/fonts/`（SIL Open Font License。商用で使える。使用許諾の文も同じフォルダ）
 - 色は文字を置く場所の明るさで白か黒、絵がにぎやかなら薄い影。端から 7% は空ける。書体に無い文字（日本語など）があれば文字なしのまま。文字なしの版（`_notext`）も残す
 - デビュー曲（作り済み）はそのまま
+
+## 37. DistroKid の登録画面は、宣誓と最後のボタン以外をシステムが選ぶ（2026-10-22）
+
+- Gon さんが貼った本物の画面の部品の一覧（2026-10-22）で、欄の名前がわかった（`bandname`・`releaseDate`・`language`・`genre1`・`genre2`・`artwork`・`trackupload_1`・`songwriter_real_name_first1 / middle1 / last1`・`songwriter_real_name_role` と、はい／いいえの丸）。自動入力はこの名前で直接欄を探す
+- システムが選ぶ丸：前に出したことがある（No）・featured artist（No）・ふつうの版・Dolby Atmos（No）・自分で書いた曲・Explicit（No）・Clean 版（No）・インスト（曲に合わせて）・AI の申告（Yes）・試聴の始まり（サービスにまかせる）・Artist already in 〜?（DistroKid が「0 件」と出す組は No。前の曲のページが見つかっている Spotify はその ID）
+- Songwriter の本名：`.env` の `OWNER_LEGAL_NAME`（ローマ字。名と姓の間に空白）を名・ミドル・姓の欄に分けて入れる（`OWNER_LEGAL_NAME_FIRST` / `_LAST` でも指定できる）。役割は Music and lyrics（インストは Music）。本名はリポジトリには書かない
+- 変えないこと：Important checkboxes（5 つの宣誓）は法的な約束なので Gon さんが読んで押す。Extras・Discovery Pack（有料）と最後の「Continue」はシステムは押さない

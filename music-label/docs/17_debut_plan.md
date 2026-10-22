@@ -29,16 +29,17 @@ Suno のロボット確認が出にくいように、**1 日 2 組まで・組�
 | 7 | 自動 | アーティスト名・曲名・配信日・言語・ジャンル・サブジャンル・音源・ジャケットが入る | 専用の Chrome |
 | 8 | Gon さん | 右下の案内の「画面で確かめて選ぶもの」を選ぶ（下の 3）→ **最後の登録ボタン** → 案内の「**登録した**」 | DistroKid |
 
-## 3. DistroKid で Gon さんが選ぶもの（4 組とも同じ）
+## 3. DistroKid で Gon さんが選ぶもの（2026-10-22 からほぼ自動。決定 37）
 
-| 欄 | 選ぶもの |
+システムが選ぶ：前に出したことがある？（No）・featured artist（No）・ふつうの版・Dolby Atmos（No）・自分で書いた曲・Explicit（No）・Clean 版（No）・インスト（歌詞あり／なし）・AI の申告（Yes）・試聴の始まり（サービスにまかせる）・Songwriter の役割（Music and lyrics）と本名（名・姓）・Artist already in 〜?（DistroKid が「0 件」と出す組は No）
+
+| Gon さんに残るもの | やること |
 |---|---|
-| Artist already in Apple Music・Spotify・YouTube Music・Instagram・Facebook? | すべて **No**（デビュー曲なので新しいページを作る） |
-| Track credits | Performer：その組の名前（役割は下の表）／Producer：Gon さんの本名（Producer） |
-| Explicit lyrics | No（Clean） |
-| AI の申告 | はい（使ったものすべて） |
-| Extras | すべてチェックしない |
-| Important checkboxes | 文を読んで、当てはまるものを自分でチェック（Suno の Pro で作った曲か、を必ず確かめる） |
+| Important checkboxes（5 つの宣誓） | 文を読んで自分でチェック（法的な約束なので本人が押す。Suno の Pro で作った曲か、を必ず確かめる） |
+| Extras・Discovery Pack | チェックしない |
+| AI の申告で Yes のあとに質問が出たら | 使ったもの（Suno で作った部分）を正直に選ぶ |
+| Track credits が出たら | Performer：組の名前（役割は下の表）／Producer：本名 |
+| 最後の「Continue」 | Gon さんが押す |
 
 | 組 | Performer の役割 | 1 つ目のジャンル | サブジャンル・2 つ目（自動で近いものを選ぶ） |
 |---|---|---|---|

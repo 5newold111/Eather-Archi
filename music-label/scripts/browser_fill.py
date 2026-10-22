@@ -478,6 +478,10 @@ def find(sess: Session, site: str, f: dict):
     sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
     if sel and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)):
         return page.locator(sel).first
+    if f.get("css"):   # 本物の画面の部品の一覧でわかった欄の名前（DistroKid。2026-10-22）
+        loc = page.locator(f["css"])
+        if loc.count() > 0 and (f["type"] in ("select", "file") or _visible(loc)):
+            return loc.first
     if f["type"] == "file":
         want = "audio" if f["key"] == "audio" else "image"
         inputs = page.locator("input[type=file]")
@@ -1317,6 +1321,11 @@ def distrokid_fields(song: dict) -> list[dict]:
     cover_path = Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None
     rel = date.today().isoformat() if "いちばん早い" in f["Release date"] else f["Release date"]
     owner = os.environ.get("OWNER_LEGAL_NAME", "")
+    # Songwriter の本名は名・ミドル・姓の 3 つの欄（ローマ字。例 OWNER_LEGAL_NAME=Taro Yamada）。本名は .env にだけ置く
+    parts = owner.split()
+    first = os.environ.get("OWNER_LEGAL_NAME_FIRST") or (parts[0] if parts else "")
+    last = os.environ.get("OWNER_LEGAL_NAME_LAST") or (parts[-1] if len(parts) > 1 else "")
+    middle = " ".join(parts[1:-1]) if len(parts) > 2 and not os.environ.get("OWNER_LEGAL_NAME_FIRST") else ""
     # 2 つ目のジャンル：DistroKid の一覧は 1 つ目のジャンルに合わせて変わるので、その組の音に近い順に候補を並べて試す
     from _common import load_artist
     sound = ((load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}).get("sound") or {})
@@ -1324,25 +1333,98 @@ def distrokid_fields(song: dict) -> list[dict]:
     genre2 = [g for i, g in enumerate(cands) if g and g.lower() != str(f["Primary genre"]).lower()
               and g.lower() not in [c.lower() for c in cands[:i]]]
     return [
-        {"key": "artist", "label": "Artist / Band name", "type": "text", "value": f["Artist / Band name"], "hints": ["Artist name", "Band name", "Artist"]},
-        {"key": "title", "label": "Song title", "type": "text", "value": f["Song title"], "hints": ["Song title", "Track title", "Title"]},
-        {"key": "release", "label": "Release date", "type": "date", "value": rel, "hints": ["Release date"], "teach": False,
-         "show": f["Release date"]},
-        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "hints": ["Language"], "below": ["Language"]},
-        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "hints": ["Primary genre", "Genre"],
+        {"key": "artist", "label": "Artist / Band name", "type": "text", "value": f["Artist / Band name"], "css": "input[name=bandname]",
+         "hints": ["Artist name", "Band name", "Artist"]},
+        {"key": "title", "label": "Song title", "type": "text", "value": f["Song title"], "css": "input.uploadFileTitle.track_1",
+         "hints": ["Song title", "Track title", "Title"]},
+        {"key": "release", "label": "Release date", "type": "date", "value": rel, "css": "input[name=releaseDate]", "hints": ["Release date"],
+         "teach": False, "show": f["Release date"]},
+        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "css": "select[name=language]",
+         "hints": ["Language"], "below": ["Language"]},
+        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "css": "select[name=genre1]", "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
         # 1 つ目のジャンルの細かい分類（Electronic を選ぶと必須）。候補は 2 つ目のジャンルと同じく、組の音に近い順
         {"key": "subgenre", "label": f"{f['Primary genre']} のサブジャンル", "type": "select", "value": genre2[0] if genre2 else "",
          "alts": genre2[1:] + ["Electronica", "Downtempo"], "teach": False, "optional": True,
          "hints": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"], "below": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"],
          "show": "・".join(genre2[:3]) + " など（近いものを選ぶ）"},
-        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:],
+        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:], "css": "select[name=genre2]",
          "hints": ["Secondary genre"], "below": ["Secondary genre"], "teach": False, "optional": True,
          "show": "・".join(genre2) + "（どれも無ければ空欄でよい）"},
-        {"key": "songwriter", "label": "Songwriter（本名）", "type": "text", "value": owner, "hints": ["Songwriter", "Real name"], "teach": False},
-        {"key": "audio", "label": "音源ファイル", "type": "file", "value": str(audio_path) if audio_path.exists() else "", "show": str(audio_path)},
-        {"key": "cover", "label": "ジャケット", "type": "file", "value": str(cover_path) if cover_path and cover_path.exists() else "", "show": str(cover_path)},
+        {"key": "songwriter_role", "label": "Songwriter の役割", "type": "select", "css": "select.songwriter_real_name_role", "teach": False,
+         "value": "Music" if song.get("instrumental") else "Music and lyrics"},
+        {"key": "songwriter_first", "label": "Songwriter の名（ローマ字）", "type": "text", "value": first, "css": "input[name=songwriter_real_name_first1]",
+         "teach": False, "show": "（.env の OWNER_LEGAL_NAME の名）"},
+        {"key": "songwriter_middle", "label": "Songwriter のミドルネーム", "type": "text", "value": middle, "css": "input[name=songwriter_real_name_middle1]",
+         "teach": False, "optional": True},
+        {"key": "songwriter_last", "label": "Songwriter の姓（ローマ字）", "type": "text", "value": last, "css": "input[name=songwriter_real_name_last1]",
+         "teach": False, "show": "（.env の OWNER_LEGAL_NAME の姓）"},
+        {"key": "audio", "label": "音源ファイル", "type": "file", "value": str(audio_path) if audio_path.exists() else "", "css": "input.trackupload_1",
+         "show": str(audio_path)},
+        {"key": "cover", "label": "ジャケット", "type": "file", "value": str(cover_path) if cover_path and cover_path.exists() else "", "css": "input[name=artwork]",
+         "show": str(cover_path)},
     ], f
+
+
+# DistroKid の「はい／いいえ」の選択（本物の画面の部品の一覧でわかった名前。2026-10-22）。
+# システムが選ぶのはここに書いたものだけ。Extras（有料の追加）・宣誓のチェック（areyousure）・最後の「Continue」は押さない
+ARTIST_ID_RADIOS = [("spotifyArtistID", "Spotify"), ("appleArtistID", "Apple Music"), ("googleArtistID", "YouTube Music"),
+                    ("instagramProfileArtistID", "Instagram"), ("facebookProfileArtistID", "Facebook")]
+
+
+def distrokid_radios(song: dict) -> list[tuple[str, str]]:
+    """[(何を選ぶか, CSS)]"""
+    inst = "1" if song.get("instrumental") else "0"
+    return [
+        ("前に出したことがある？ → No", 'input[type=radio][name^="previouslyReleased_"][value="0"]'),
+        ("曲名に featured artist を出す？ → No", 'input[type=radio][name^="feat_"][value="0"]'),
+        ("バージョン → ふつうの版", 'input[type=radio][name^="version_"][value=""]'),
+        ("Dolby Atmos → No", 'input[type=radio][name="dolby_1"][value="0"]'),
+        ("自分で書いた曲（カバーではない）", 'input[type=radio][name^="coversong_"][value="0"]'),
+        ("Explicit（不適切な言葉）→ No", 'input[type=radio][name^="explicit_"][value="0"]'),
+        ("Clean 版の別にある？ → No（もともと Clean）", 'input[type=radio][name^="cleaned_"][value="0"]'),
+        ("インスト？ → " + ("歌詞なし" if inst == "1" else "歌詞あり"), f'input[type=radio][name^="instrumental_"][value="{inst}"]'),
+        ("AI を使った？ → Yes（正直に申告）", 'input[type=radio][name^="ai_gate_"][value="1"]'),
+        ("試聴の始まり → サービスにまかせる", 'input[type=radio][name="previewStart_1"][value="no"]'),
+    ]
+
+
+def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
+    """Artist already in 〜?：前の曲がまだ配信されていない（DistroKid が『0 件』と出す）組は「No（新しいページ）」。
+    前の曲のページが見つかっている組は、そのページを選ぶ（Spotify は配信の確認で記録した ID）。わからなければ Gon さんに"""
+    try:
+        import publish
+        sp = (publish.artist_links(song["slug"]).get("spotify") or {}).get("id")
+    except Exception:  # noqa: BLE001
+        sp = None
+    pick, ask = [], []
+    for name, svc in ARTIST_ID_RADIOS:
+        pick.append((f"Artist already in {svc}? → No（新しいページ）", f'input[type=radio][name="{name}"][value="new"][class*="ZeroMatches"]'))
+        if name == "spotifyArtistID" and sp:
+            pick.append((f"Artist already in Spotify? → Yes（前の曲のページ {sp}）", f'input[type=radio][name="{name}"][value="{sp}"]'))
+        ask.append(name)
+    return pick, ask
+
+
+def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
+    """選ぶ（見えない作りのボタンは、要素そのものを押す）。選べたもの／画面に無かったもの"""
+    done, missing = [], []
+    for label, css in items:
+        loc = sess.page.locator(css)
+        if loc.count() == 0:
+            missing.append(label)
+            continue
+        el = loc.first
+        try:
+            if not el.is_checked():
+                try:
+                    el.check(timeout=3000)
+                except Exception:  # noqa: BLE001  見た目だけの丸の下に隠れたボタン
+                    el.evaluate("e => { e.click(); e.dispatchEvent(new Event('change', {bubbles: true})); }")
+            (done if el.is_checked() else missing).append(label)
+        except Exception:  # noqa: BLE001
+            missing.append(label)
+    return done, missing
 
 
 def run_distrokid(sess: Session, song_id: str) -> int:
@@ -1358,13 +1440,21 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         return 2
     fields, draft = distrokid_fields(song)
     done, manual = fill_fields(sess, "distrokid", fields)
+    r_done, r_miss = set_radios(sess, distrokid_radios(song))
+    a_items, _ = artist_id_radios(song)
+    a_done, _ = set_radios(sess, a_items)
+    done += r_done + a_done
+    a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done)]
     bad = verify(sess, fields)
-    always = [f"Explicit lyrics：{draft['Explicit lyrics']}", f"Instrumental：{draft['Instrumental']}",
-              f"AI の申告：{draft['AI の申告']}", f"Featured artist：{draft['Featured artist']}", f"ストア：{draft['ストア']}",
-              f"Extras（有料の追加）：{draft.get('Extras（有料の追加）', 'すべてチェックしない')}",
-              f"Artist already in 〜?（5 つ）：{draft.get('Artist already in Apple Music / Spotify / YouTube Music / Instagram / Facebook?', 'デビュー曲はすべて No')}",
-              f"Track credits（Apple の決まり）：{draft.get('Track credits（Apple の決まり）', 'Performer：アーティスト名（Vocals）／Producer：本名（Producer）')}",
-              f"Important checkboxes（必須の宣誓）：{draft.get('Important checkboxes（必須の宣誓）', 'Gon さんが文を読んで、当てはまるものを自分でチェック（システムは押さない）')}"]
+    # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
+    always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
+              "Extras（有料の追加）・Discovery Pack：チェックしない"]
+    if a_left:
+        always.insert(0, f"Artist already in 〜?（{'・'.join(a_left)}）：同じ組の前の曲があれば、そのページ（Yes）を選ぶ。無ければ No")
+    if r_miss:
+        always.insert(0, "画面に無かった／選べなかった項目（出ていれば選ぶ）：" + "・".join(r_miss))
+    always.append("AI の申告で Yes のあとに質問が出たら：使ったもの（作曲・歌詞・声など Suno で作った部分）を正直に選ぶ")
+    always.append(f"Track credits が出たら：{draft.get('Track credits（Apple の決まり）', 'Performer：アーティスト名／Producer：本名')}")
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     sess.show("DistroKid に下書きを入れました",
               [f"{song['artist']}「{song['title']}」",
