@@ -875,22 +875,26 @@ def put(sess: Session, loc, f: dict) -> bool:
             return True
         tag = loc.evaluate("e => e.tagName.toLowerCase()")
         if f["type"] == "select" and tag == "select" and not loc.is_visible():
-            return bool(loc.evaluate("""(e, v) => { const n = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
-                const o = [...e.options].find(o => n(o.text) === n(v)) || [...e.options].find(o => n(o.text).includes(n(v)));
+            return bool(loc.evaluate("""(e, vs) => { const n = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+                let o = null;
+                for (const v of vs) { o = [...e.options].find(o => n(o.text) === n(v)); if (o) break; }
+                if (!o) for (const v of vs) { if (n(v).length < 5) continue; o = [...e.options].find(o => n(o.text).includes(n(v))); if (o) break; }
                 if (!o) return false; e.value = o.value;
                 e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true}));
                 if (window.jQuery) { try { window.jQuery(e).val(o.value).trigger('change'); } catch (x) {} }
-                return true; }""", str(v)))
+                return true; }""", [str(v)] + [str(x) for x in (f.get("alts") or [])]))
         if f["type"] == "select" and tag == "select":
-            try:
-                loc.select_option(label=str(v))
-            except Exception:  # noqa: BLE001  名前が少し違う（「Electronic / Dance」など）：含むものを選ぶ
-                opts = loc.evaluate("e => [...e.options].map(o => o.text.trim())")
-                hit = next((o for o in opts if _norm(v) in _norm(o)), None)
-                if hit is None:
-                    return False
-                loc.select_option(label=hit)
-            return True
+            opts = loc.evaluate("e => [...e.options].map(o => o.text.trim())")
+            wants = [str(x) for x in [v] + list(f.get("alts") or []) if x]
+            # 候補を順に：まず同じ名前、無ければ名前を含むもの（5 文字以上の候補だけ。「Pop」が「K-Pop」に当たらないように）
+            hits = [o for w in wants for o in opts if _norm(o) == _norm(w)] + \
+                [o for w in wants if len(_norm(w)) >= 5 for o in opts if _norm(w) in _norm(o)]
+            for hit in hits[:1]:
+                if hit:
+                    loc.select_option(label=hit)
+                    f["chosen"] = hit
+                    return True
+            return False
         if f["type"] == "date" and (loc.get_attribute("type") or "") == "date":
             loc.fill(str(v))
             return True
@@ -1039,7 +1043,7 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
         elif f["type"] == "date":
             ok = bool(g)
         elif f["type"] == "select":
-            ok = g == want or want in g
+            ok = any(_norm(x) == g or (_norm(x) and _norm(x) in g) for x in [f["value"], f.get("chosen", "")] + list(f.get("alts") or []) if x)
         else:
             ok = g == want
         cov = None
@@ -1298,6 +1302,12 @@ def distrokid_fields(song: dict) -> list[dict]:
     cover_path = Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None
     rel = date.today().isoformat() if "いちばん早い" in f["Release date"] else f["Release date"]
     owner = os.environ.get("OWNER_LEGAL_NAME", "")
+    # 2 つ目のジャンル：DistroKid の一覧は 1 つ目のジャンルに合わせて変わるので、その組の音に近い順に候補を並べて試す
+    from _common import load_artist
+    sound = ((load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}).get("sound") or {})
+    cands = [g.title() for g in sound.get("genres", [])] + [f["Secondary genre"]]
+    genre2 = [g for i, g in enumerate(cands) if g and g.lower() != str(f["Primary genre"]).lower()
+              and g.lower() not in [c.lower() for c in cands[:i]]]
     return [
         {"key": "artist", "label": "Artist / Band name", "type": "text", "value": f["Artist / Band name"], "hints": ["Artist name", "Band name", "Artist"]},
         {"key": "title", "label": "Song title", "type": "text", "value": f["Song title"], "hints": ["Song title", "Track title", "Title"]},
@@ -1306,8 +1316,9 @@ def distrokid_fields(song: dict) -> list[dict]:
         {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "hints": ["Language"], "below": ["Language"]},
         {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
-        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": f["Secondary genre"], "hints": ["Secondary genre"],
-         "below": ["Secondary genre"], "teach": False},
+        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:],
+         "hints": ["Secondary genre"], "below": ["Secondary genre"], "teach": False, "optional": True,
+         "show": "・".join(genre2) + "（どれも無ければ空欄でよい）"},
         {"key": "songwriter", "label": "Songwriter（本名）", "type": "text", "value": owner, "hints": ["Songwriter", "Real name"], "teach": False},
         {"key": "audio", "label": "音源ファイル", "type": "file", "value": str(audio_path) if audio_path.exists() else "", "show": str(audio_path)},
         {"key": "cover", "label": "ジャケット", "type": "file", "value": str(cover_path) if cover_path and cover_path.exists() else "", "show": str(cover_path)},
