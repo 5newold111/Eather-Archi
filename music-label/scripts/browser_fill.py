@@ -519,6 +519,8 @@ def find(sess: Session, site: str, f: dict):
                 pass
         if n and f["type"] in ("select", "file"):
             return loc.first
+        if f.get("css_only"):
+            return None   # この欄の名前が無い画面（Pop にはサブジャンルの欄が無いなど）：ほかの探し方で別の箱を触らない
     if f["type"] == "file":
         want = "audio" if f["key"] == "audio" else "image"
         inputs = page.locator("input[type=file]")
@@ -1424,16 +1426,16 @@ def distrokid_fields(song: dict) -> list[dict]:
          "teach": False, "show": f["Release date"]},
         {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "css": "select[name=language]",
          "hints": ["Language"], "below": ["Language"]},
-        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "alts": genre1_alts, "css": "select[name=genre1]", "hints": ["Primary genre", "Genre"],
+        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "alts": genre1_alts, "css": "select[name=genre1]", "css_only": True, "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
         # 1 つ目のジャンルの細かい分類（Electronic を選ぶと必須）。候補は 2 つ目のジャンルと同じく、組の音に近い順
         # サブジャンルは組の音の言葉そのもの（Synthwave・House など）を先に、無ければ近い大きな分け方。画面の選択肢にあるものだけ選ぶ
         {"key": "subgenre", "label": f"{f['Primary genre']} のサブジャンル", "type": "select",
-         "value": (subs := [g.title() for g in sound.get("genres", [])] + genre2 + ["Electronica", "Downtempo"])[0],
-         "alts": subs[1:], "teach": False, "optional": True,
+         "value": (subs := [g.title() for g in sound.get("genres", [])] + ["Electronica", "Downtempo", "House", "Synth-Pop"])[0],
+         "alts": subs[1:], "teach": False, "optional": True, "css": 'select[name*="subgenre" i]', "css_only": True,
          "hints": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"], "below": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"],
          "show": "・".join(genre2[:3]) + " など（近いものを選ぶ）"},
-        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:], "css": "select[name=genre2]",
+        {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:], "css": "select[name=genre2]", "css_only": True,
          "hints": ["Secondary genre"], "below": ["Secondary genre"], "teach": False, "optional": True,
          "show": "・".join(genre2) + "（どれも無ければ空欄でよい）"},
         {"key": "songwriter_role", "label": "Songwriter の役割", "type": "select", "css": "select.songwriter_real_name_role", "teach": False,
@@ -1494,23 +1496,60 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     return pick, texts
 
 
+ROLE_CANDS = {"Vocals": ["Vocals", "Lead Vocals", "Vocalist", "Lead Vocalist", "Vocal", "Singer", "Performer"],
+              "Performer": ["Performer", "Main Performer", "Featured Performer", "Musician", "Artist"],
+              "Producer": ["Producer", "Music Producer", "Record Producer"]}
+
+
+def _visible_options(sess: Session) -> list:
+    out = []
+    for css in (".dk-searchable-select__option", "[role=option]"):
+        loc = sess.page.locator(css)
+        for i in range(min(loc.count(), 60)):
+            if loc.nth(i).is_visible():
+                out.append(loc.nth(i))
+        if out:
+            break
+    return out
+
+
 def _searchable_pick(sess: Session, inp, text: str) -> bool:
-    """DistroKid の「打って選ぶ箱」（Track credits の役割）：打ってから、同じ名前の候補を押す"""
+    """DistroKid の「打って選ぶ箱」（Track credits の役割）：候補の言葉を打って画面に出た選択肢を集め、
+    まず候補と同じ名前（Vocals → Lead Vocals → …の順）、無ければ近い名前を選ぶ。
+    コーラスや補助の役割（Background・Backing・Co-・Assistant）は、近い名前としては選ばない。出た選択肢は記録する（決定 48）"""
+    cands = ROLE_CANDS.get(text, [text])
+    side = re.compile(r"background|backing|co-|assistant|additional", re.I)
+    seen: dict[str, str] = {}   # 選択肢の名前 → 打った言葉
+    for word in dict.fromkeys(c.split()[-1][:6] for c in cands):
+        inp.click()
+        inp.fill("")
+        inp.type(word, delay=40)
+        sess.page.wait_for_timeout(700)
+        for o in _visible_options(sess):
+            n = (o.inner_text() or "").strip()
+            if n:
+                seen.setdefault(n, word)
+    names = list(seen)
+    pick = next((n for c in cands for n in names if _norm(n) == _norm(c)), None) or \
+        next((n for c in cands for n in names if not side.search(n) and _norm(n).startswith(_norm(c))), None) or \
+        next((n for c in cands for n in names if not side.search(n) and _norm(c) in _norm(n)), None)
+    if names:
+        _remember_options("roles", names)
+    if pick is None:
+        if names:
+            print("   － 役割の選択肢に「" + text + "」に近いものがありませんでした。出た選択肢：" + "・".join(names[:20]))
+        inp.fill("")
+        return False
     inp.click()
     inp.fill("")
-    inp.type(text, delay=40)
-    sess.page.wait_for_timeout(600)
-    rx = re.compile(r"^\s*" + re.escape(text) + r"\s*$", re.I)
-    for css in (".dk-searchable-select__option", "[role=option]", ".dk-searchable-select li", "li"):
-        opt = sess.page.locator(css).filter(has_text=rx)
-        for i in range(min(opt.count(), 5)):
-            if opt.nth(i).is_visible():
-                opt.nth(i).click()
-                sess.page.wait_for_timeout(300)
-                return True
-    inp.press("Enter")
-    sess.page.wait_for_timeout(300)
-    return _norm(_read(inp)) == _norm(text)
+    inp.type(seen[pick], delay=40)
+    sess.page.wait_for_timeout(700)
+    hit = next((o for o in _visible_options(sess) if (o.inner_text() or "").strip() == pick), None)
+    if hit is None:
+        return False
+    hit.click()
+    sess.page.wait_for_timeout(400)
+    return True
 
 
 def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
@@ -1580,6 +1619,33 @@ VALIDATION_JS = r"""() => {
 }"""
 
 
+# DistroKid のページの中に置く見張り：Artist already in の欄が作り直されて「No（新しいページ）」が消えたら、選び直す。
+# システムが Chrome から離れたあとも、そのページが開いている間は働く（DistroKid の検索がとても遅いことがあるため。決定 48）
+GUARD_NO_JS = r"""(names) => {
+  window.__pdNo = names;
+  const fix = () => { for (const n of window.__pdNo || []) {
+      const no = document.querySelector(`input[type=radio][name="${n}"][value="new"]`);
+      if (no && !no.checked) { no.click(); no.dispatchEvent(new Event('change', {bubbles: true})); } } };
+  if (!window.__pdObs) {
+    window.__pdObs = new MutationObserver(() => { clearTimeout(window.__pdT); window.__pdT = setTimeout(fix, 400); });
+    window.__pdObs.observe(document.body, {childList: true, subtree: true});
+  }
+  fix();
+}"""
+
+
+def guard_artist_no(sess: Session, song: dict, a_done: list[str]) -> None:
+    """「No」を選んだ Artist already in を、ページの中の見張りで守る（デビュー曲と、DistroKid が 0 件と出した組だけ）"""
+    names = [n for n, svc in ARTIST_ID_RADIOS if any(f"in {svc}?" in d and "→ No" in d for d in a_done)]
+    if song.get("kind") == "debut":
+        names = [n for n, _ in ARTIST_ID_RADIOS]
+    if names:
+        try:
+            sess.page.evaluate(GUARD_NO_JS, names)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 def apply_choices(sess: Session, song: dict) -> tuple[list[str], list[str], list[str]]:
     """丸（はい／いいえ）と Artist already in を選ぶ。(選べた丸, 選べなかった丸, Artist already in)"""
     r_done, r_miss = set_radios(sess, distrokid_radios(song))
@@ -1626,6 +1692,7 @@ def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
     off = _unchecked(sess, song)
     bad = verify(sess, fields)
     r, _, a = apply_choices(sess, song)
+    guard_artist_no(sess, song, a)
     fixed += [l for l, _ in off]
     again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
     if again:
@@ -1662,6 +1729,7 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで探し始める）
     sess.settle(3000)
     r_done, r_miss, a_done = apply_choices(sess, song)
+    guard_artist_no(sess, song, a_done)
     d2, m2 = fill_fields(sess, "distrokid", [f for f in fields if f not in first], fresh=False)
     c_done, c_manual = fill_credits(sess, song)
     done += d2 + r_done + a_done + c_done

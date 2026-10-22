@@ -663,3 +663,12 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 前のブラウザの入力（専用の Chrome の案内を閉じるまで待っている仕事）が残っていると、ダッシュボードが「まだ続いています」と断り、入り直せなかった
 - 直したこと：ブラウザの入力（Suno・DistroKid・写真）を押したとき、前の入力が残っていれば止めてから新しく始める（止めた仕事は「止めました（もう一度入力するため）」と出る）
 - 曲の行のポップアップの上に「↻ もう一度入力する」の欄：Suno で作曲の段階なら「Suno にもう一度入力する」、登録の準備ができた・登録済みなら「DistroKid にもう一度入力する」を、どのマスを開いても出す
+
+## 48. DistroKid：ジャンルの上書き・遅い検索・役割の選び方を直す（2026-10-22。画面の部品の一覧から）
+
+- SOFT CANTILEVER の画面の部品の一覧（選択中まで出るようにしたもの）でわかったこと：配信日・言語・Songwriter・Producer・Instagram・Facebook・丸は入っていた。残りは 3 つ
+  1. 1 つ目のジャンルが「Alternative」（本当は Pop）：サブジャンルの欄が無い画面（Pop）で、サブジャンルを探す処理がジャンルの箱を見つけて上書きしていた → ジャンルとサブジャンルは欄の名前（`genre1`・`genre2`・名前に subgenre を含む箱）でだけ探し、無ければほかの探し方をしない（`css_only`）
+  2. Spotify・Apple・YouTube の Artist already in が Yes も No も選ばれていない：DistroKid の検索がとても遅く、システムの入力が終わったあとで欄を作り直していた → DistroKid のページの中に見張りを置き、欄が作り直されたら「No（新しいページ）」を選び直す。システムが Chrome から離れたあとも、ページが開いている間は働く（デビュー曲と、0 件と出た組だけ）
+  3. Performer の役割が空：役割の一覧に「Vocals」と同じ名前が無かった → Performer・Producer の役割は、候補（Vocals → Lead Vocals → Vocalist …／Performer …／Producer …）の言葉を打って出た選択肢を集め、同じ名前を先に、無ければ近い名前を選ぶ。コーラス・補助の役割（Background・Backing・Co-・Assistant）は近い名前としては選ばない。出た選択肢は `out/knowledge/distrokid_genres.json` の roles に記録する
+- DistroKid のジャンルの実際の一覧（2026-10-22）：Afrobeat・Afropop・Alternative・Big Band・Blues・Children's Music・Christian/Gospel・Classical・Comedy・Contemporary Latin・Country・Dance・Electronic・Fitness & Workout・Folk・French Pop・German Folk・German Pop・Hip Hop/Rap・Holiday・J-Pop・Jazz・K-Pop・Latin・Latin House・Latin Jazz・Latin Urban・Maskandi・Metal・New Age・Pop・Pop in Spanish・Punk・R&B/Soul・Reggae・Rock・Rock en Español・Singer/Songwriter・Soundtrack・Spoken Word・Vocal・World・Xigaza
+- 宣誓のチェックに「Non-standard cApiTaliZatiOn detected」が出ることがある（アーティスト名が全部大文字のため、Apple Music で表記が変わるかもしれないという確認）。Gon さんが読んでチェックする

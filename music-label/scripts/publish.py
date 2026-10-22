@@ -354,7 +354,7 @@ def _cover_text_note(song: dict) -> str:
 GENRE_MAP = [
     (r"house|techno|disco|club|edm|garage|dance", ["Dance", "Electronic"]),
     (r"synth|electro|retrowave|synthwave|chillwave|idm|electronica", ["Electronic", "Pop"]),
-    (r"lo-?fi|downtempo|ambient|chill|drone", ["Electronic", "Ambient", "New Age"]),
+    (r"lo-?fi|downtempo|ambient|chill|drone", ["Electronic", "New Age"]),
     (r"singer|songwriter", ["Singer/Songwriter", "Folk"]),
     (r"folk|acoustic|americana|bluegrass", ["Folk", "Singer/Songwriter"]),
     (r"rock|jangle|shoegaze|grunge|punk", ["Rock", "Alternative"]),
@@ -366,6 +366,12 @@ GENRE_MAP = [
     (r"pop|sophisti|night pop|city", ["Pop"]),
 ]
 DK_GENRES = OUT / "knowledge" / "distrokid_genres.json"   # 入力のときに読んだ DistroKid の実際の選択肢（browser_fill.py が書く）
+# DistroKid の 1 つ目のジャンルの実際の一覧（2026-10-22 の画面の部品の一覧から）。画面で読み直すまでは、これを使う
+DK_GENRE_LIST = ["Afrobeat", "Afropop", "Alternative", "Big Band", "Blues", "Children's Music", "Christian/Gospel", "Classical", "Comedy",
+                 "Contemporary Latin", "Country", "Dance", "Electronic", "Fitness & Workout", "Folk", "French Pop", "German Folk", "German Pop",
+                 "Hip Hop/Rap", "Holiday", "J-Pop", "Jazz", "K-Pop", "Latin", "Latin House", "Latin Jazz", "Latin Urban", "Maskandi", "Metal",
+                 "New Age", "Pop", "Pop in Spanish", "Punk", "R&B/Soul", "Reggae", "Rock", "Rock en Español", "Singer/Songwriter", "Soundtrack",
+                 "Spoken Word", "Vocal", "World", "Xigaza"]
 
 
 def dk_options(key: str) -> list[str]:
@@ -417,7 +423,7 @@ def draft_fields(song: dict) -> dict:
     # ジャンルは DistroKid の一覧にある名前で（作業セットのジャンル → 組の音の言葉を置き換えた候補。前に読んだ選択肢があれば、その中のものだけ）
     sound_words = list((a.get("sound") or {}).get("genres") or [])
     cands = genre_prefs(list(song.get("genre") or []) + sound_words)
-    known = dk_options("genre1")
+    known = dk_options("genre1") or DK_GENRE_LIST
     genres = [g for g in cands if not known or g in known] or cands
     return {
         "曲 ID": song["id"], "アカウント": ((label or {}).get("accounts") or {}).get("distrokid_email") or "本体アカウント（EtherArchi）",
