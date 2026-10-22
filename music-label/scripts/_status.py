@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from datetime import date, datetime
 from pathlib import Path
@@ -171,8 +172,13 @@ def system_blockers() -> list[tuple[str, str, str]]:
     if not _has_playwright():
         out.append(("normal", "Suno・DistroKid に自動で入力する部品（Playwright）が入っていません（無くても、手でコピーして貼れば進められます）",
                     "python3 -m pip install --user playwright && python3 -m playwright install chromium"))
-    if not os.environ.get("OWNER_LEGAL_NAME"):
-        out.append(("normal", "DistroKid の作詞作曲者の欄に入れる本名が未設定です", "python3 scripts/setup_keys.py --only owner"))
+    owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
+    if not owner:
+        out.append(("ng", "DistroKid の Songwriter と Track credits の Producer に入れる本名が未設定です（無いと DistroKid に差し戻されます）",
+                    "python3 scripts/setup_keys.py --only owner"))
+    elif not re.fullmatch(r"[A-Za-z][A-Za-z.'\-]*( [A-Za-z][A-Za-z.'\-]*)+", owner):
+        out.append(("ng", "本名（OWNER_LEGAL_NAME）がローマ字の「名 姓」になっていません。DistroKid の名・姓の欄に分けて入れるため、ローマ字で空白を 1 つ入れてください",
+                    "python3 scripts/setup_keys.py --only owner"))
     try:
         import _archive as archive
         base, how = archive.root()

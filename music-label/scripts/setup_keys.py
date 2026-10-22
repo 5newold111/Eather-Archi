@@ -20,6 +20,7 @@ import argparse
 import getpass
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -214,7 +215,12 @@ def check_spotify():
 
 
 def check_owner():
-    return ("ok", "設定済み（DistroKid の作詞作曲者の欄に入ります）") if os.environ.get("OWNER_LEGAL_NAME") else ("none", "まだありません")
+    v = os.environ.get("OWNER_LEGAL_NAME", "").strip()
+    if not v:
+        return ("none", "まだありません")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z.'\-]*( [A-Za-z][A-Za-z.'\-]*)+", v):
+        return ("ng", "ローマ字の「名 姓」になっていません（例 Taro Yamada）。入れ直してください")
+    return ("ok", "設定済み（DistroKid の Songwriter の名・姓と Track credits の Producer に入ります）")
 
 
 # ---------------------------------------------------------------------------
@@ -230,7 +236,8 @@ SERVICES = {
     "owner": {
         "title": "オーナーの本名（DistroKid の作詞作曲者の欄。手元の .env だけに入り、GitHub には入らない）",
         "url": "",
-        "steps": ["DistroKid の Songwriter 欄に入れる本名（例 山田 太郎）をそのまま入力"],
+        "steps": ["DistroKid の Songwriter（名・姓の欄）と Track credits の Producer に入れる本名を、ローマ字で「名 姓」の順に入力（例 Taro Yamada）",
+                  "漢字では入れない（DistroKid の欄はローマ字の名と姓に分かれているため）"],
         "keys": [("OWNER_LEGAL_NAME", False)], "check": check_owner},
     "anthropic": {
         "title": "Claude（ブリーフ・話題曲・画像の採点・新人の下書き）",

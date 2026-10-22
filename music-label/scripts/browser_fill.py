@@ -1587,6 +1587,11 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
         return 2
     fields, draft = distrokid_fields(song)
+    owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
+    owner_ng = "" if re.fullmatch(r"[A-Za-z][A-Za-z.'\-]*( [A-Za-z][A-Za-z.'\-]*)+", owner) else \
+        ("本名（.env の OWNER_LEGAL_NAME）が空です" if not owner else "本名（.env の OWNER_LEGAL_NAME）がローマ字の「名 姓」になっていません")
+    if owner_ng:
+        print(f"   ⚠ {owner_ng}。Songwriter と Track credits の Producer を入れられません")
     # 入れる順番（2026-10-22 の差し戻しから）：
     #  1 アーティスト名と曲名 → DistroKid が Spotify・Apple・YouTube で同じ名前を探し終えるまで待つ（終わると、その欄を作り直して「Yes」に戻す）
     #  2 丸（はい／いいえ・Artist already in）→ 3 残りの欄 → 4 Track credits → 5 落ち着いてから読み返し、戻されたものを入れ直す
@@ -1609,9 +1614,25 @@ def run_distrokid(sess: Session, song_id: str) -> int:
             print("   … 空になった欄を入れ直します：" + "・".join(f["label"] for f in again))
             fill_fields(sess, "distrokid", again, fresh=False)
             bad = verify(sess, fields)
+    # 何が入っているかを記録に残す（ダッシュボードのログにも出る。差し戻されたとき、どこで止まったかを確かめるため）
+    try:
+        snap = sess.page.evaluate("""() => { const v = s => { const e = [...document.querySelectorAll(s)].find(x => x.offsetParent !== null);
+                return e ? (e.type === 'radio' ? null : e.value) : '（欄が無い）'; };
+            const r = n => { const e = document.querySelector(`input[type=radio][name^="${n}"]:checked`); return e ? (e.value || 'Yes') : '（未選択）'; };
+            return {release: v('input[name=releaseDate]'), genre1: v('select[name=genre1]'), first: v('input[name=songwriter_real_name_first1]'),
+                    last: v('input[name=songwriter_real_name_last1]'), performer: v('input[name=performer-name]'), producer: v('input[name=producer-name]'),
+                    spotify: r('spotifyArtistID'), apple: r('appleArtistID'), youtube: r('googleArtistID'),
+                    instagram: r('instagramProfileArtistID'), facebook: r('facebookProfileArtistID')}; }""")
+        print("   記録：入れ終わったときの画面 → " + "・".join(f"{k}={'（あり）' if k in ('first', 'last', 'producer') and v and v != '（欄が無い）' else v}"
+                                                   for k, v in snap.items()))
+    except Exception as e:  # noqa: BLE001
+        print(f"   記録：画面を読めませんでした（{e}）")
     # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
     always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
               "Extras（有料の追加）・Discovery Pack：チェックしない"]
+    if owner_ng:
+        always.insert(0, f"⚠ {owner_ng}：Songwriter（名・姓）と Track credits の Producer に本名をローマ字で入れてください。"
+                         "次からは、ダッシュボードの「仕組みの詰まり」の鍵の設定か、.env に OWNER_LEGAL_NAME=名 姓（ローマ字）を入れると自動で入ります")
     if a_left:
         always.insert(0, f"Artist already in 〜?（{'・'.join(a_left)}）：同じ組の前の曲があれば、そのページ（Yes）を選ぶ。無ければ No")
     if r_miss:
