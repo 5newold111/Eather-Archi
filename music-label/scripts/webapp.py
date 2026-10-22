@@ -107,9 +107,16 @@ def status_json() -> dict:
         for r in tl[key]["rows"]:
             if r.get("id") and not r.get("planned"):   # 間違えて進めたときに戻すボタン（ポップアップの上に出す。決定 38・41）
                 try:
-                    r["back"] = _guide.back_actions(_songs.by_id(r["id"]))
+                    song = _songs.by_id(r["id"])
+                    r["back"] = _guide.back_actions(song)
+                    # もう一度入力する（前の入力が残っていても止めて入り直す。決定 47）
+                    stt = _songs.state(song).get("status", "") if song else "live"
+                    r["redo"] = ([{"kind": "run", "label": "Suno にもう一度入力する（ブラウザが開きます）", "action": "fill_suno", "id": r["id"]}]
+                                 if stt == "" else []) + \
+                        ([{"kind": "run", "label": "DistroKid にもう一度入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": r["id"]}]
+                         if stt in ("ready", "registered") else [])
                 except Exception:  # noqa: BLE001
-                    r["back"] = []
+                    r["back"], r["redo"] = [], []
             for ph in r["phases"]:
                 try:
                     ph["guide"] = _guide.explain(r, ph)
@@ -223,6 +230,24 @@ def _fix_buttons(how: str) -> list[dict]:
     return []
 
 
+PROCS: dict[str, subprocess.Popen] = {}   # 動いている仕事（止めるため）
+
+
+def stop_job(jid: str) -> bool:
+    """動いている仕事を止める（ブラウザの入力を入り直すときなど）"""
+    p = PROCS.get(jid)
+    if p is None or p.poll() is not None:
+        return False
+    if jid in JOBS:
+        JOBS[jid]["stopped"] = True   # 止める前に印を付ける（仕事の終わりの判定がこの印を見る）
+    p.terminate()
+    try:
+        p.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        p.kill()
+    return True
+
+
 def start_job(cmd: list[str], label: str) -> str:
     jid = secrets.token_hex(4)
     job = {"id": jid, "label": label, "state": "running", "started": datetime.now().strftime("%H:%M:%S"), "out": ""}
@@ -232,9 +257,20 @@ def start_job(cmd: list[str], label: str) -> str:
     def run():
         try:
             load_dotenv(override=True)   # あとで直した .env（本名・鍵など）を、ダッシュボードを動かしたままでも使う
-            r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=3600,
-                               env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
+            p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
+            PROCS[jid] = p
+            try:
+                out, err = p.communicate(timeout=3600)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                out, err = p.communicate()
+            PROCS.pop(jid, None)
+            r = subprocess.CompletedProcess(cmd, p.returncode, out or "", err or "")
             job["out"] = (r.stdout + r.stderr)[-20000:]
+            if job.get("stopped"):   # 入り直すために止めた
+                job["state"], job["summary"] = "incomplete", "止めました（もう一度入力するため）"
+                return
             # 0：済んだ／2：まだ終わっていない（ログインが要る・入っていない欄があるなど）／ほか：エラー
             job["state"] = {0: "done", 2: "incomplete"}.get(r.returncode, "error")
             # 部品が「【結果】…」と書いていれば、それを結果の一文として出す（確かめた結果だけを「済んだ」と言う）
@@ -426,6 +462,7 @@ function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].r
   document.getElementById("dlg-body").innerHTML=`<p class="sub">${E(r.artist)}・${E(r.sub)}</p>
    <h3 id="dlg-title">${ICON[p.state]} ${E(p.name)}</h3>
    <span class="badge ${p.state}">${E(LABEL[p.state])}${cur&&p.who?`・${E(WHO(p.who))}`:""}${d?`・${d} 日`:""}</span> <span class="sub">${p.state==="plan"?"予定 ":""}${dates}</span>
+   ${(r.redo||[]).length?`<div class="backbox"><b>↻ もう一度入力する</b><span class="sub">　前の入力が残っていても、止めてから入り直します</span><div class="acts">${r.redo.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    ${(r.back||[]).length?`<div class="backbox"><b>← 戻る（間違えて進めたとき）</b><span class="sub">　前の工程に戻します。消さずに「戻したもの」に移すので、あとから取り出せます</span><div class="acts">${r.back.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    <h4>${p.state==="ng"?"止まっている原因":"いまの状態"}</h4><p>${E(WHO(g.cause))}</p>
    ${(g.steps||[]).length?`<h4>Gon さんがやること</h4><ol>${g.steps.map(x=>`<li>${E(WHO(x))}</li>`).join("")}</ol>`:""}
@@ -616,10 +653,12 @@ class Handler(BaseHTTPRequestHandler):
         found = command_for(str(p.get("action", "")), p)
         if not found:
             return self._json(400, {"error": "その操作はできません"})
-        if any(j["state"] == "running" and j["label"] == found[1] for j in JOBS.values()):
+        if not found[1].startswith("ブラウザで入力") and any(j["state"] == "running" and j["label"] == found[1] for j in JOBS.values()):
             return self._json(409, {"error": "同じ仕事がまだ動いています"})
-        if found[1].startswith("ブラウザで入力") and any(j["state"] == "running" and j["label"].startswith("ブラウザで入力") for j in JOBS.values()):
-            return self._json(409, {"error": "ブラウザでの入力がまだ続いています。開いているブラウザの右下の案内で「終わる」か「閉じる」を押してから、もう一度押してください"})
+        if found[1].startswith("ブラウザで入力"):   # 前のブラウザの入力が残っていれば止めてから始める（入り直せるように）
+            for j in list(JOBS.values()):
+                if j["state"] == "running" and j["label"].startswith("ブラウザで入力"):
+                    stop_job(j["id"])
         return self._json(200, {"job": start_job(*found)})
 
 
