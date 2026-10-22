@@ -241,6 +241,21 @@ def dna_score(ref: Reference, artist: dict) -> float:
     return len(ref.tags & dna) / len(dna)
 
 
+_DB_CLOSE: dict[str, dict] = {}
+
+
+def db_boost(artist: dict, ref_id: str) -> float:
+    """参考データベースの組ごとの近さ（out/reference_db/artists/<組>.json）から重み 1〜3 倍。無ければ 1"""
+    slug = artist.get("slug", "")
+    if slug not in _DB_CLOSE:
+        p = ROOT / "out" / "reference_db" / "artists" / f"{slug}.json"
+        try:
+            _DB_CLOSE[slug] = json.loads(p.read_text(encoding="utf-8")).get("close", {}) if p.exists() else {}
+        except (OSError, ValueError):
+            _DB_CLOSE[slug] = {}
+    return 1.0 + min(float(_DB_CLOSE[slug].get(ref_id, 0.0)), 2.0)
+
+
 def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
                   slot: str, slot_weights: dict[str, float]) -> Reference:
     """DNA の重なり・成績の重み・トレンドかどうかを掛け合わせてランダムに 1 曲選ぶ"""
@@ -250,6 +265,7 @@ def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
         # ルール 5：成績の重み（analyze_growth.py の weights.json「枠|参考曲ID」）。最大 3 倍まで
         w *= min(slot_weights.get(f"{slot}|{c.id}", c.weight), 3.0)
         w *= choice_boost(artist, c.title, c.artist_name, slot)   # その組が自分で選んだ参考曲（管理表の『参考曲の候補』）
+        w *= db_boost(artist, c.id)          # 参考データベースでこの組に近い曲（reference_db.py。オーナーが組を書いた曲は最大 3 倍）
         if c.is_trend:
             w *= 1.5                        # 今週のトレンド曲は少し優先
         weights.append(w)

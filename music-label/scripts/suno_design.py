@@ -5,7 +5,8 @@ Suno 設計図：作曲のイメージ（アーティストの設定書・ブリ
 Suno の作曲画面（「高度な」）で入れられる軸（Gon さんの一覧。2026-10-21）と、イメージのどこから決めるか：
    1 歌詞              … 曲の歌詞。セクション（[Verse] など）と、毎曲の癖（語り・ハミングなど）のタグを、足りなければ設定書の位置に足す
    2 スタイル          … 基本は文字で書く（カスタム）。前に書いた言葉ほど強く効くので、ジャンル → テンポ（BPM）→ 声 → 楽器・音色 → 質感・場面 の順。
-                         設定書の英語の特徴語（dna_tags）で入っていないものを足す（1000 文字まで）
+                         設定書の英語の特徴語（dna_tags）で入っていないものを足す（1000 文字まで）。
+                         いちばん後ろに、参考データベースでこの組に近い曲によく出る英語の言葉（reference_db.py。最大 4 つ）
    3 除外するスタイル  … 曲ごとの指定＋設定書の禁止事項（templates/suno_options.json の exclude）。スタイルと食い違う言葉は外す
    4 声の性別（男・女）… 組ごとの設定（suno_options.json）。男女の組・声の切れ端だけの組は選ばない
    5 間隔（曲の長さ）  … 自動／カスタム（10 秒〜6 分）。設定書の曲の長さのまん中をカスタムで
@@ -195,13 +196,32 @@ def design(song: dict) -> dict:
         style, added = cand, added + [t]
     if added:
         checks.append(("スタイル", "info", "設定書の特徴語を足しました：" + "・".join(added)))
+    # 参考データベースでこの組に近い曲によく出る言葉（reference_db.py。いちばん後ろ＝いちばん弱く効く。suno_options.json の use_reference_db で止められる）
+    hints = []
+    if opt.get("use_reference_db", True):
+        try:
+            import reference_db
+            near = reference_db.artist_digest(song["slug"])
+        except Exception:  # noqa: BLE001
+            near = {}
+        ng = [e.lower() for e in _split(song.get("exclude", "")) + list(opt.get("exclude") or [])]
+        for t in near.get("style_hints") or []:
+            if _has(style, t) or any(e in t.lower() or t.lower() in e for e in ng):
+                continue
+            cand = f"{style}, {t}" if style else t
+            if len(cand) <= STYLE_MAX:
+                style, hints = cand, hints + [t]
+        if near.get("close_count"):
+            checks.append(("スタイル", "info", f"参考データベースでこの組に近い曲 {near['close_count']} 曲"
+                           + (f"から足した言葉：{'・'.join(hints)}" if hints else "（足す言葉はありませんでした）")))
     if len(style) > STYLE_MAX:
         checks.append(("スタイル", "warn", f"スタイルが {len(style)} 文字で、上限 {STYLE_MAX} 文字を超えています（後ろが切れます）"))
     have = [t for t in (sound.get("dna_tags") or []) if _has(style, t)]
     if sound.get("dna_tags"):
         checks.append(("スタイル", "ok" if len(have) == len(sound["dna_tags"]) else "warn",
                        f"設定書の特徴語 {len(have)}／{len(sound['dna_tags'])} が入っています"))
-    mapping.append(("スタイル", style, "設定書の音（ジャンル・テンポ・楽器・特徴語）と声 ＋ ブリーフのスタイル"))
+    mapping.append(("スタイル", style, "設定書の音（ジャンル・テンポ・楽器・特徴語）と声 ＋ ブリーフのスタイル"
+                    + (" ＋ 参考データベースの近い曲の言葉" if hints else "")))
 
     # --- 3 除外するスタイル
     ex = _dedupe(_split(song.get("exclude", "")) + list(opt.get("exclude") or []))

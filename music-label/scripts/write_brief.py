@@ -212,12 +212,28 @@ def db_digest() -> dict:
     return {k: v for k, v in d.items() if k not in ("real_names", "updated")} if d.get("songs") else {}
 
 
+def artist_db(slug: str) -> dict:
+    """参考データベースのうち、この組に近い曲の傾向（reference_db.py の組ごとの要約。id の一覧は渡さない）"""
+    p = DB_DIGEST.parent / "artists" / f"{slug}.json"
+    if not p.exists():
+        return {}
+    d = load_json(p)
+    return {k: v for k, v in d.items() if k not in ("close", "updated", "slug", "name")} if d.get("close_count") else {}
+
+
 def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
     db = db_digest()
     db_part = ("\n\n## Owner's reference database (overall tendencies the owner collected; real names removed)\n"
                "Use it as taste guidance (mood, tempo range, themes, owner's notes) on top of the per-slot references. "
                "Never imitate a specific song, and stay inside the artist's fixed constraints.\n"
                + json.dumps(db, ensure_ascii=False, indent=1)) if db else ""
+    near = artist_db(artist.get("slug", ""))
+    if near:
+        db_part += ("\n\n## Songs in the owner's database closest to THIS artist (tendencies only; real names removed)\n"
+                    "Weigh these above the overall tendencies: they are what the owner's taste looks like inside this artist's sound. "
+                    "owner_assigned counts songs the owner explicitly tagged for this artist. "
+                    "style_hints are optional extra English style words; use them only if they fit the fixed constraints.\n"
+                    + json.dumps(near, ensure_ascii=False, indent=1))
     return (
         "## Artist profile (fixed constraints; names of real artists already removed)\n"
         + json.dumps(public_safe_artist(artist), ensure_ascii=False, indent=1)

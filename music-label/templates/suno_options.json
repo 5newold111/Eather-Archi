@@ -6,7 +6,8 @@
  "default": {
   "max_mode": true,
   "your_taste": false,
-  "_why": "Max mode：音の質を最優先にするのでオン（Suno の使う量が増える場合は false に）。あなたの好み：知識がたまるまでオフ"
+  "use_reference_db": true,
+  "_why": "Max mode：音の質を最優先にするのでオン（Suno の使う量が増える場合は false に）。あなたの好み：知識がたまるまでオフ。use_reference_db：参考データベースでこの組に近い曲によく出る言葉を、スタイル欄のいちばん後ろに足す（止めるときは false。組ごとにも書ける）"
  },
  "declan_fay": {
   "vocal_gender": "male",

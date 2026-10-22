@@ -22,11 +22,15 @@ SSD に置いた「データベース」（参考曲・資料）を読み、楽�
   ・out/reference_db/digest.json・digest.md … データベース全体の傾向（タグ・ジャンル・BPM・テーマ・メモ）。
       write_brief.py が Claude に渡す。実在のアーティスト名・曲名は入れない
   ・out/reference_db/summary.md … 何が見つかり、どう読んだかの一覧（--show でも表示）
+  ・out/reference_db/artists/<組>.json・artists.md … 組ごとの「近い参考曲」と傾向（既存の組の作曲に使う）。
+      近さ＝ジャンル・タグ・楽器の言葉の重なり・テンポ・声の性別。データベースに組の名前（例：TIDEWOOL）を書いた曲は最優先。
+      select_references.py（参考曲の割り当ての重み）・write_brief.py（Claude に渡す）・suno_design.py（スタイル欄の後ろに足す言葉）が読む
 
 使い方：
   python3 scripts/reference_db.py --show                # 見つかったデータベースの中身と読み方を表示するだけ
   python3 scripts/reference_db.py                       # 取り込む（run_week.py のブリーフ作りの前にも自動で動く）
   python3 scripts/reference_db.py --setup "/Volumes/SP DS72/データベース"   # 場所を .env に書く
+  python3 scripts/reference_db.py --artists             # 組ごとの近い参考曲だけ作り直す（SSD が無くても前回の取り込みから）
 """
 from __future__ import annotations
 
@@ -61,6 +65,7 @@ MAX_ROWS = 5000
 
 # 見出し → 欄（上から順に見る。アーティストを曲名より先に見る：「song artist」などのため）
 FIELDS = [
+    ("for_artist", ["使う組", "向いている組", "合う組", "どの組", "使うアーティスト", "向いているアーティスト", "うちの組", "for artist", "use for"]),
     ("artist", ["アーティスト", "artist", "歌手", "バンド", "band", "歌い手"]),
     ("title", ["曲名", "タイトル", "title", "song", "track", "楽曲名", "曲"]),
     ("bpm", ["bpm", "テンポ", "tempo"]),
@@ -88,9 +93,10 @@ CREDITS = ["作曲", "作詞", "編曲", "composer", "lyricist", "writer", "prod
 LABEL = {"artist": "アーティスト（実名は制作の指示に入れない）", "title": "曲名", "bpm": "BPM", "key": "キー", "genre": "ジャンル",
          "tags": "タグ・雰囲気", "theme": "テーマ", "vocal": "ボーカル", "instruments": "楽器", "structure": "構成",
          "language": "言語", "year": "年", "memo": "メモ（参考にしたい点）", "other": "その他（メモとして渡す）",
-         "skip": "使わない（URL・番号・作者名・歌詞の本文）"}
+         "skip": "使わない（URL・番号・作者名・歌詞の本文）",
+         "for_artist": "使う組（この組の作曲で最優先にする）"}
 # 部分一致で見る順（キーワード→キー、曲調→曲名 の取り違えを防ぐ）
-ORDER = ["skip", "artist", "tags", "theme", "memo", "title", "bpm", "key", "genre", "vocal", "instruments", "structure", "language", "year"]
+ORDER = ["skip", "for_artist", "artist", "tags", "theme", "memo", "title", "bpm", "key", "genre", "vocal", "instruments", "structure", "language", "year"]
 
 
 def field_of(header: str) -> str | None:
@@ -284,6 +290,8 @@ def row_to_sheet(row: dict, src: str) -> dict | None:
             slots.add("worldview")
     if bpm:
         sheet.setdefault("groove", {})["bpm"] = bpm
+    if got.get("for_artist"):
+        sheet["for_artists"] = j("for_artist")[:200]   # assigned_to が読む（組の名前）
     sheet["usable_slots"] = sorted(slots) if slots else ["worldview"]
     sheet["_memo"] = memo
     return sheet
@@ -432,6 +440,175 @@ def summary(res: dict, where: str, paths: list[Path]) -> str:
     return "\n".join(out) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# 組ごとの近い参考曲（既存の組がこれからの作曲で使う。select_references.py・write_brief.py・suno_design.py が読む）
+ARTIST_DIR = DIGEST_DIR / "artists"
+# データベースの日本語の言葉 → 設定書の英語の言葉（近さを測るためだけ。Suno には英語のタグしか入れない）
+JA_EN = {
+    "ポップ": "pop", "ロック": "rock", "フォーク": "folk", "アコースティック": "acoustic", "アコギ": "acoustic guitar",
+    "シティポップ": "city pop", "シティ・ポップ": "city pop", "ハウス": "house", "ディープハウス": "deep house", "ダンス": "dance",
+    "エレクトロ": "electro", "エレクトロニカ": "electronica", "シンセ": "synth", "シンセポップ": "synth-pop", "シンセウェイヴ": "synthwave",
+    "シンセウェーブ": "synthwave", "ローファイ": "lo-fi", "インディー": "indie", "インディ": "indie", "ファンク": "funk", "ソウル": "soul",
+    "ジャズ": "jazz", "ディスコ": "disco", "アンビエント": "ambient", "ダウンテンポ": "downtempo", "チル": "chill", "バラード": "ballad",
+    "80年代": "80s", "80's": "80s", "90年代": "90s", "レトロ": "retro", "夜": "night", "朝": "morning", "ドライブ": "drive",
+    "雨": "rain", "海": "ocean", "夏": "summer", "冬": "winter", "ギター": "guitar", "ベース": "bass", "ピアノ": "piano",
+    "ドラム": "drums", "ブラシ": "brushed", "ストリングス": "strings", "チェロ": "cello", "オルガン": "organ", "サックス": "saxophone",
+    "ハーモニー": "harmony", "ハモり": "harmony", "ハモリ": "harmony", "デュエット": "duet", "男女": "male-female",
+    "ウィスパー": "whisper", "ささやき": "whisper", "ファルセット": "falsetto", "裏声": "falsetto", "クルーナー": "crooner",
+    "ボーカルチョップ": "vocal chops", "フィールド録音": "field recording", "環境音": "field recording", "明るい": "bright",
+    "切ない": "bittersweet", "温かい": "warm", "あたたかい": "warm", "爽やか": "fresh", "メロウ": "mellow", "グルーヴ": "groove",
+}
+STOP = {"and", "with", "the", "of", "a", "in", "on", "for", "to", "style", "music", "song", "vocals", "vocal", "sound", "feel"}
+WIDE = {"pop", "rock", "dance", "indie", "night", "warm", "bright", "drive", "guitar", "bass", "drums", "synth"}  # 広すぎる言葉は半分に数える
+
+
+def words_of(*texts: object) -> set[str]:
+    """文章 → 比べるための言葉の集まり（英語は単語と 2 語のつながり、日本語は上の対応表で英語に）"""
+    out: set[str] = set()
+    for t in texts:
+        s = norm(t if isinstance(t, str) else json.dumps(t, ensure_ascii=False) if t else "")
+        for ja, en in JA_EN.items():
+            if norm(ja) in s:
+                out |= set(en.split()) | {en}
+        toks = [w for w in re.findall(r"[a-z0-9][a-z0-9'&+\-]*", s) if w not in STOP and len(w) >= 2]
+        out |= set(toks)
+        out |= {f"{a} {b}" for a, b in zip(toks, toks[1:])}
+    return out
+
+
+def artist_words(artist: dict) -> set[str]:
+    snd = artist.get("sound") or {}
+    return words_of(" , ".join(snd.get("genres") or []), " , ".join(snd.get("dna_tags") or []))
+
+
+def _sheet_text(s: dict) -> list:
+    r = s.get("reference") or {}
+    return [r.get("tags"), (s.get("groove") or {}).get("notes"), (s.get("instruments") or {}).get("notes"),
+            (s.get("vocal") or {}).get("notes"), (s.get("performance") or {}), (s.get("worldview") or {}).get("notes"),
+            (s.get("lyrics") or {}).get("theme")]
+
+
+def _bpm_fit(bpm, lo, hi) -> float | None:
+    if not isinstance(bpm, (int, float)) or not lo or not hi:
+        return None
+    best = min(abs(b - min(max(b, lo), hi)) for b in (bpm, bpm / 2, bpm * 2))   # 倍・半分のノリも同じテンポ感とみる
+    return 1.0 if best <= 5 else 0.5 if best <= 15 else 0.0
+
+
+def _vocal_fit(sex, artist: dict) -> float | None:
+    want = (artist.get("vocal") or {}).get("sex")
+    if not sex or not want:
+        return None
+    if want in ("none", "mixed") or sex == "mixed":
+        return 1.0
+    return 1.0 if sex == want else 0.0
+
+
+def assigned_to(s: dict, artist: dict) -> bool:
+    """オーナーがデータベースに組の名前を書いた曲（「使う組」の欄・メモなど）"""
+    names = {norm(artist.get("name")), norm(artist.get("slug")), norm(str(artist.get("slug", "")).replace("_", " "))} - {""}
+    blob = norm(json.dumps({k: v for k, v in s.items() if k != "id"}, ensure_ascii=False))
+    return any(len(n) >= 4 and n in blob for n in names)
+
+
+def affinity(s: dict, artist: dict, aw: set[str] | None = None) -> tuple[float, list[str]]:
+    """参考曲と組の近さ（0〜2。1 を超えるのはオーナーが組を書いた曲）と、近いと見た理由"""
+    aw = artist_words(artist) if aw is None else aw
+    common = aw & words_of(*_sheet_text(s))
+    singles = {w for w in common if " " not in w}
+    hit = sum(0.5 if w in WIDE else 1.0 for w in singles) + sum(1.0 for w in common if " " in w)
+    tag = min(1.0, hit / 3)
+    snd = artist.get("sound") or {}
+    bpm = _bpm_fit((s.get("groove") or {}).get("bpm"), snd.get("bpm_min"), snd.get("bpm_max"))
+    voc = _vocal_fit((s.get("vocal") or {}).get("sex"), artist)
+    parts = [(tag, 0.6)] + [(v, w) for v, w in ((bpm, 0.25), (voc, 0.15)) if v is not None]
+    score = sum(v * w for v, w in parts) / sum(w for _, w in parts)
+    if voc == 0.0:
+        score *= 0.5            # 声の性別が逆の曲は、声以外の参考としてだけ少し残す
+    why = []
+    if singles:
+        why.append("言葉：" + "・".join(sorted(singles)[:6]))
+    if bpm:
+        why.append("テンポが近い")
+    if assigned_to(s, artist):
+        score += 1.0
+        why.insert(0, "オーナーがこの組に指定")
+    if tag < 0.34 and not assigned_to(s, artist):
+        score = min(score, 0.3)  # 言葉が 1 つも本当に重ならない曲は、テンポと声が合っても近いとみない
+    return round(score, 3), why
+
+
+def _style_hints(close: list[tuple[float, dict]], artist: dict, names: set[str]) -> list[str]:
+    """近い参考曲に 2 曲以上出てくる英語のタグで、設定書にまだ無く、禁止にも当たらないもの（Suno のスタイル欄の後ろに足す候補）"""
+    snd = artist.get("sound") or {}
+    have = norm(" , ".join((snd.get("genres") or []) + (snd.get("dna_tags") or [])))
+    bad = norm(" , ".join(snd.get("forbidden") or []))
+    cnt: Counter = Counter()
+    for sc, s in close:
+        for t in dict.fromkeys(norm(x) for x in (s.get("reference") or {}).get("tags", [])):
+            if re.fullmatch(r"[a-z0-9][a-z0-9 '&+\-]{1,38}", t) and t not in names and t not in have and t not in bad:
+                cnt[t] += 2 if sc > 1 else 1
+    return [t for t, c in cnt.most_common() if c >= 2][:4]
+
+
+def build_artist_digests(quiet: bool = False) -> list[str]:
+    """取り込んだ参考曲（out/references/db-*.json。実名以外の文章は伏せ済み）から、組ごとの近い参考曲と傾向を作る。
+    SSD が無いときも前回の取り込みから作り直す（設定書が変わっても追いつく）"""
+    sheets = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(REF_DIR.glob(f"{PREFIX}*.json"))] if REF_DIR.exists() else []
+    dg = json.loads((DIGEST_DIR / "digest.json").read_text(encoding="utf-8")) if (DIGEST_DIR / "digest.json").exists() else {}
+    real = list(dg.get("real_names") or [])
+    names, scrub = {norm(n) for n in real}, scrubber(real)
+    if not sheets:
+        return []
+    from _common import all_artists
+    ARTIST_DIR.mkdir(parents=True, exist_ok=True)
+    md = [f"# 参考データベース：組ごとの近い参考曲（{datetime.now():%Y-%m-%d %H:%M}・データベース {len(sheets)} 曲）", "",
+          "近さ＝ジャンル・タグ・楽器の言葉の重なり（6 割）・テンポ（2.5 割）・声の性別（1.5 割）。"
+          "データベースの「使う組」の欄やメモに組の名前を書いた曲は、いちばん優先します。", ""]
+    lines = []
+    for a in all_artists():
+        aw = artist_words(a)
+        scored = sorted(((affinity(s, a, aw), s) for s in sheets), key=lambda x: -x[0][0])
+        close = [(sc, why, s) for (sc, why), s in scored if sc >= 0.4][:15]
+        uniq = lambda xs: list(dict.fromkeys(x for x in xs if x))
+        pick = [(sc, s) for sc, _, s in close if sc >= 0.6] or [(sc, s) for sc, _, s in close]   # 傾向は特に近い曲から
+        tags = Counter(norm(t) for _, s in pick for t in (s.get("reference") or {}).get("tags", []) if norm(t) not in names)
+        bpms = sorted(b for _, s in pick if isinstance(b := (s.get("groove") or {}).get("bpm"), (int, float)))
+        d = {
+            "slug": a["slug"], "name": a.get("name"), "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "close_count": len(close), "owner_assigned": sum(1 for sc, _, _ in close if sc > 1),
+            "close": {s["id"]: sc for sc, _, s in close},   # select_references.py が選ぶ重みに使う（id だけ。実名は入れない）
+            "top_tags": [t for t, _ in tags.most_common(15)],
+            "bpm": {"min": bpms[0], "median": bpms[len(bpms) // 2], "max": bpms[-1]} if bpms else None,
+            "themes": scrub(uniq((s.get("lyrics") or {}).get("theme") for _, s in pick))[:8],
+            "instruments": scrub(uniq((s.get("instruments") or {}).get("notes") for _, s in pick))[:8],
+            "vocal_notes": scrub(uniq((s.get("vocal") or {}).get("notes") for _, s in pick))[:6],
+            "owner_notes": scrub(uniq((s.get("performance") or {}).get("notes") for _, s in pick))[:10],
+            "style_hints": _style_hints(pick, a, names),
+        }
+        (ARTIST_DIR / f"{a['slug']}.json").write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        md += [f"## {a.get('name')}（{a['slug']}）：近い参考曲 {len(close)} 曲"
+               + (f"（うちオーナーの指定 {d['owner_assigned']} 曲）" if d["owner_assigned"] else ""), ""]
+        md += [f"- {s['reference'].get('title')}／{s['reference'].get('artist_name')}　近さ {sc:.2f}　{'・'.join(why)}" for sc, why, s in close] or ["- —（近い曲がありません。データベースに足すと次の制作から効きます）"]
+        if d["style_hints"]:
+            md += ["", f"Suno のスタイル欄の後ろに足す言葉：{'、'.join(d['style_hints'])}"]
+        md.append("")
+        lines.append(f"{a.get('name')} {len(close)} 曲")
+    (DIGEST_DIR / "artists.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    if not quiet:
+        print("   組ごとの近い参考曲：" + "・".join(lines) + "（out/reference_db/artists.md）")
+    return lines
+
+
+def artist_digest(slug: str) -> dict:
+    """組ごとの近い参考曲の傾向（無ければ空）"""
+    p = ARTIST_DIR / f"{slug}.json"
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def setup(path: str) -> None:
     p = Path(path).expanduser()
     if not p.exists():
@@ -448,7 +625,12 @@ def main() -> None:
     ap.add_argument("--show", action="store_true", help="見つかったデータベースの中身と読み方を表示するだけ（取り込まない）")
     ap.add_argument("--setup", metavar="PATH", help="データベースの場所を .env に書く")
     ap.add_argument("--quiet", action="store_true", help="SSD が無いときは何も言わない（自動実行用）")
+    ap.add_argument("--artists", action="store_true", help="組ごとの近い参考曲だけ作り直す")
     args = ap.parse_args()
+    if args.artists:
+        if not build_artist_digests():
+            print("－ まだ参考曲を取り込んでいません。SSD をつないで python3 scripts/reference_db.py を実行してください")
+        return
     if args.setup:
         setup(args.setup)
         return
@@ -462,6 +644,7 @@ def main() -> None:
             elif "SSD" not in where:
                 print("   SSD の一番上か Postdog Records の中に「データベース」という名前のフォルダを置くか、"
                       "--setup で場所を指定してください")
+        build_artist_digests(quiet=args.quiet)
         return
     print(f"▶ 参考データベース：{where}")
     for p in paths:
@@ -476,6 +659,7 @@ def main() -> None:
         print(f"   よく出るタグ：{'、'.join(d['top_tags'][:10])}")
     if res["skipped"]:
         print(f"   読まなかったもの {len(res['skipped'])} 件（out/reference_db/summary.md）")
+    build_artist_digests()
 
 
 if __name__ == "__main__":
