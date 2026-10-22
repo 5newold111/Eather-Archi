@@ -1340,7 +1340,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     done, manual = fill_fields(sess, "distrokid", fields)
     bad = verify(sess, fields)
     always = [f"Explicit lyrics：{draft['Explicit lyrics']}", f"Instrumental：{draft['Instrumental']}",
-              f"AI の申告：{draft['AI の申告']}", f"Featured artist：{draft['Featured artist']}", f"ストア：{draft['ストア']}"]
+              f"AI の申告：{draft['AI の申告']}", f"Featured artist：{draft['Featured artist']}", f"ストア：{draft['ストア']}",
+              f"Extras（有料の追加）：{draft.get('Extras（有料の追加）', 'すべてチェックしない')}"]
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     sess.show("DistroKid に下書きを入れました",
               [f"{song['artist']}「{song['title']}」",
