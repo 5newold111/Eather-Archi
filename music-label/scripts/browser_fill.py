@@ -160,20 +160,34 @@ def chrome_path() -> str | None:
 
 
 def _port_alive(port: int) -> bool:
+    """その番号の窓口が、ふつうの Chrome のものか（ほかのアプリ（Electron など）の窓口にはつながない）"""
     import urllib.request
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2):
-            return True
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/json/version", timeout=2) as r:
+            v = json.loads(r.read() or b"{}")
     except Exception:  # noqa: BLE001
         return False
+    return str(v.get("Browser", "")).startswith(("Chrome/", "HeadlessChrome/")) and "Electron" not in str(v.get("User-Agent", ""))
+
+
+def _debug_chrome_running() -> bool:
+    """専用の Chrome が、つなぎ口つき（入力用）で動いているか"""
+    out = subprocess.run(["ps", "-axww", "-o", "command="], capture_output=True, text=True).stdout
+    key = f"--user-data-dir={PROFILE}"
+    return any(key in line and "--remote-debugging-port" in line and "--type=" not in line for line in out.splitlines())
 
 
 def _running_port() -> int | None:
-    """専用の Chrome がもう開いていれば、そのつなぎ口の番号"""
+    """専用の Chrome がもう開いていれば、そのつなぎ口の番号。
+    Mac の再起動などで記録（DevToolsActivePort）だけが残り、同じ番号を別のアプリが使っていることがあるので、
+    専用の Chrome がつなぎ口つきで動いていて、その番号がふつうの Chrome の窓口のときだけ使う（2026-10-22）"""
     f = PROFILE / "DevToolsActivePort"
     try:
         port = int(f.read_text().split()[0])
     except Exception:  # noqa: BLE001
+        return None
+    if not _debug_chrome_running():
+        f.unlink(missing_ok=True)   # 古い記録
         return None
     return port if _port_alive(port) else None
 
@@ -304,7 +318,18 @@ class Session:
         exe = os.environ.get("POSTDOG_BROWSER_EXECUTABLE")
         self.cdp = bool(chrome_path()) and not exe
         if self.cdp:   # ふつうに開いた専用の Chrome に、つなぎ口から入る（ログインが断られない）
-            self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
+            try:
+                self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
+            except Exception as e:  # noqa: BLE001  つなげない：専用の Chrome を閉じて、開き直してから 1 回だけやり直す
+                print(f"   … 専用の Chrome につなげませんでした（{str(e).splitlines()[0][:120]}）。閉じて開き直します")
+                quit_chrome()
+                (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
+                try:
+                    self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
+                except Exception as e2:  # noqa: BLE001
+                    sys.exit("[案内] 専用の Chrome につなげませんでした。① 開いている Chrome をすべて ⌘Q で閉じる "
+                             "② ターミナルで  python3 -m pip install --user -U playwright  を実行する ③ もう一度押す。"
+                             f"それでもだめなら、この文を Claude に貼ってください：{str(e2).splitlines()[0][:200]}")
             self.ctx = self.browser.contexts[0] if self.browser.contexts else self.browser.new_context()
         else:          # Chrome が無い：Playwright のブラウザ（Google でのログインは断られることがある）
             opts = dict(user_data_dir=str(PROFILE), headless=AUTO, viewport=None, args=["--start-maximized"])
@@ -910,7 +935,7 @@ def put(sess: Session, loc, f: dict) -> bool:
             return True
         tag = loc.evaluate("e => e.tagName.toLowerCase()")
         if f["type"] == "select" and tag == "select" and not loc.is_visible():
-            return bool(loc.evaluate("""(e, vs) => { const n = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+            return bool(loc.evaluate(r"""(e, vs) => { const n = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
                 let o = null;
                 for (const v of vs) { o = [...e.options].find(o => n(o.text) === n(v)); if (o) break; }
                 if (!o) for (const v of vs) { if (n(v).length < 5) continue; o = [...e.options].find(o => n(o.text).includes(n(v))); if (o) break; }
