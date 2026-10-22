@@ -350,6 +350,8 @@ def main() -> None:
     artist = load_artist(brief["artist_slug"], brief.get("label_slug"))
     label = load_label(brief.get("label_slug"))
     spec = length_spec(artist, label)
+    spec.update({k: v for k, v in (brief.get("scene") or {}).items()   # その曲の聴かれる場面の決まり（決定 30）
+                 if k in ("length_sec_min", "length_sec_max", "hook_within_sec", "no_sudden_silence")})
     tier = args.tier or label.get("automation_tier", "B")
     instrumental = (artist.get("lyrics") or {}).get("mode") == "instrumental"
 

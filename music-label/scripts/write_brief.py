@@ -100,6 +100,11 @@ Hard rules (never break):
    scene (persona.drive_scene / persona.scene and sound.scene_spec.notes): a live-house act needs a chorus a crowd can
    sing and a band arrangement; a party act needs a steady danceable groove and DJ-friendly intro/outro; a personal-
    listening act can use intimate detail, quiet dynamics and space; a driving act stays clear over road noise.
+   If the brief has a "scene" object, it is THIS song's listening scene and it wins over the act's usual scene and
+   over drive_spec for length, hook timing and breaks. The act's identity never changes with the scene: the same voice,
+   timbre, palette, tics, landscape words and themes - only the arrangement, energy and form adapt to the place.
+   Forbidden items that exist only for driving (sudden silence, big volume jumps) are relaxed when
+   scene.no_sudden_silence is false; every other forbidden item still applies.
 4. Vocal: convert note names to descriptions ("the chorus peak sits just below where the voice would flip to
    falsetto, sung in full voice"). Blend the three vocal references 6:2:2 for EXPRESSION only (breath, ad-libs,
    layering, phrasing) - the timbre is fixed by the artist's Suno Persona.

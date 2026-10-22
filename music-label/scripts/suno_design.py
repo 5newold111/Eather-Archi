@@ -225,6 +225,14 @@ def design(song: dict) -> dict:
 
     # --- 3 除外するスタイル
     ex = _dedupe(_split(song.get("exclude", "")) + list(opt.get("exclude") or []))
+    scene = song.get("scene") or {}
+    if scene and scene.get("no_sudden_silence") is False:   # この曲の場面ではブレイクを使ってよい（ドライブのための除外を外す）
+        lifted = [e for e in ex if "silence" in e.lower()]
+        ex = [e for e in ex if e not in lifted]
+        if lifted:
+            checks.append(("除外", "info", f"この曲の場面（{scene.get('name')}）ではブレイクを使ってよいので外しました：" + "・".join(lifted)))
+    if scene:
+        mapping.append(("聴かれる場面", scene.get("name", ""), "定期配信の曲ごとの場面（templates/scene_plan.json の割合。決定 30）"))
     clash = [e for e in ex if _has(style, e)]
     if clash:
         ex = [e for e in ex if e not in clash]

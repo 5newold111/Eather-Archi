@@ -99,6 +99,7 @@ def suno_section(song: dict) -> str:
     warn = [t for k, s, t in d["checks"] if s == "warn"]
     return ('<section><h2>1. Suno で作る</h2>'
             f'<p class="note">イメージの写し具合 {sc}／{total}。上から順に、Suno の作曲画面（「高度な」）の欄と同じ並びです。</p>'
+            + (f'<p class="note">この曲の聴かれる場面：<b>{E(song["scene"].get("name", ""))}</b></p>' if song.get("scene") else "")
             + "".join(f'<p class="note">！ {E(w)}</p>' for w in warn)
             + '<a class="big" href="https://suno.com/create" target="_blank" rel="noopener">Suno の作曲画面を開く ↗</a>'
             + "".join(rows)

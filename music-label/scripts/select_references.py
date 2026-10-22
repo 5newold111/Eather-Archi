@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import production_status, rel  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
+from _common import pick_scene, production_status, rel  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
 from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # Postdog Records（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
@@ -268,6 +268,8 @@ def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
         w *= db_boost(artist, c.id)          # 参考データベースでこの組に近い曲（reference_db.py。オーナーが組を書いた曲は最大 3 倍）
         if c.is_trend:
             w *= 1.5                        # 今週のトレンド曲は少し優先
+        if artist.get("_scene") and artist["_scene"] in c.tags:
+            w *= 1.5                        # 今週の曲の場面（ライブハウス・パーティなど）で伸びている曲（fetch_trends.py の場面のタグ）
         weights.append(w)
     return rng.choices(candidates, weights=weights, k=1)[0]
 
@@ -511,6 +513,16 @@ def main() -> None:
             if old.get("suno_style_prompt") or old.get("title_candidates"):
                 print(f"  既に Claude が書き足したブリーフがあるので守ります（作り直すときは --overwrite）: {rel(out_path)}")
                 continue
+        # 今週の曲の聴かれる場面（Postdog Records の組。templates/scene_plan.json の割合でくじ。決定 30）
+        prev_p = args.out / f"{week_monday - timedelta(days=7)}_{slug}.json"
+        try:
+            last = (json.loads(prev_p.read_text(encoding="utf-8")).get("scene") or {}).get("type") if prev_p.exists() else None
+        except (OSError, ValueError):
+            last = None
+        scene = pick_scene(artist, week_monday, last) if slug != "demo" else None
+        artist["_scene"] = scene["type"] if scene else None
+        if scene:
+            print(f"    今週の場面：{scene['name']}（曲の長さ {scene['length_sec_min']}〜{scene['length_sec_max']} 秒）")
         try:
             # 成長分析のヒント：横ばい（flat）や方針転換レベル 1 の組は、トレンド曲の枠を 2 → 3 に増やす
             h = hints_all.get(slug) or {}
@@ -522,6 +534,10 @@ def main() -> None:
             continue
         brief = build_brief_skeleton(artist, slots, week_monday, args.trend_language, hints_all.get(slug))
         brief["references_dir"] = str(args.references.resolve()) if args.references else None   # write_brief.py が解析シートを探す場所
+        if scene:
+            brief["scene"] = scene   # write_brief.py（曲づくり）・suno_design.py（長さ・除外）・select_takes.py（長さの確かめ）が読む
+            brief["suno_settings"] = {**(brief.get("suno_settings") or {}),
+                                      "length_sec": (scene["length_sec_min"] + scene["length_sec_max"]) // 2}
         moment = pick_moment(artist, week_monday, args.out)   # 今週の歌のもとになる瞬間（近況 → 歌の種）
         if moment:
             brief["life_moment"] = moment

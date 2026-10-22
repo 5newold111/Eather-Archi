@@ -103,6 +103,37 @@ def scene_type_of(text: str, default: str = "personal") -> str:
     return best
 
 
+SCENE_PLAN = ROOT / "templates" / "scene_plan.json"
+
+
+def scene_weights(artist: dict) -> dict[str, float]:
+    """定期配信で、この組の曲がどの場面で聴かれるかの割合（Postdog Records の組だけ。子レーベルは空）。決定 30"""
+    if label_slug_of(artist.get("label_slug")) not in (MAIN_LABEL, ""):
+        return {}
+    plan = read_json(SCENE_PLAN) if SCENE_PLAN.exists() else {}
+    w = {k: float(v) for k, v in (plan.get(artist.get("slug", "")) or {}).items() if k in SCENE_TYPES and float(v) > 0}
+    if w:
+        return w
+    main = (artist.get("persona") or {}).get("scene_type") or ("drive" if (artist.get("sound") or {}).get("drive_spec") else
+                                                               scene_type_of((artist.get("persona") or {}).get("scene", "")))
+    rest = [k for k in SCENE_TYPES if k != main]
+    return {main: 0.55, **{k: 0.45 / len(rest) for k in rest}}
+
+
+def pick_scene(artist: dict, week_monday, last: str | None = None) -> dict | None:
+    """今週の曲の聴かれる場面を、割合のくじで選ぶ（週と組で決まるので、やり直しても同じ）。前の週と同じ場面は 3 分の 1 に下げる"""
+    import random
+    w = scene_weights(artist)
+    if not w:
+        return None
+    if last in w and len(w) > 1:
+        w = {**w, last: w[last] / 3}
+    rng = random.Random(f"{week_monday}|{artist.get('slug')}|scene")
+    k = rng.choices(list(w), weights=list(w.values()), k=1)[0]
+    t = SCENE_TYPES[k]
+    return {"type": k, "name": t["name"], "en": t["en"], **t["spec"]}
+
+
 def load_label(slug: str | None) -> dict:
     """子レーベルの設定書。Postdog Records（drive）は設定書ファイルが無いので既定値を返す"""
     if not slug or slug == MAIN_LABEL:
