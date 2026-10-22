@@ -466,3 +466,19 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 曲を取り込むと、このページがブラウザで自動で開く（publish.py の scan。ダッシュボードが動いているとき）
 - ダッシュボードの上の「公開の準備」、ポップアップ（仕上げ・DistroKid に登録）の「公開の準備を見る」からも開ける
 - ページで見せるファイルは、決めた置き場所（out・debut_kit・ローカル保存・SSD の Postdog Records）の中の画像と音だけ
+
+
+## 26. 最初の 1 曲（DECLAN FAY「Side B」）を DistroKid に登録できた。登録の画面でわかったことを仕組みに入れる（2026-10-22）
+
+- Suno の作曲 → いいね・ダウンロード → 取り込み・音量・ジャケット・下書き・公開セット → DistroKid の登録まで、通しで動いた
+- DistroKid の登録画面でわかった決まりと、システムの扱い：
+  | 欄 | 決まり | システム |
+  |---|---|---|
+  | Primary genre のサブジャンル | Electronic などを選ぶと必須 | 組の音に近い候補から自動で選ぶ |
+  | Secondary genre | 一覧は 1 つ目に合わせて変わる。任意 | 近い候補から自動。無ければ空欄 |
+  | Artist already in Apple Music・Spotify・YouTube Music・Instagram・Facebook? | どれも答えが必須 | デビュー曲はすべて No。2 曲目からは、配信が始まって記録したページの ID で Yes（下書き・案内に出す。押すのは Gon さん） |
+  | Track credits | Apple は Performer と Producer を 1 人ずつ以上 | Performer：アーティスト名（Vocals）／Producer：本名（下書き・案内に出す）。Producer の名前は公開される |
+  | Extras | 有料の追加 | すべてチェックしない（Content ID は AI の曲だと申し立てのトラブルになりやすい） |
+  | Important checkboxes | 必須の宣誓 | Gon さんが文を読んで自分でチェック（システムは押さない） |
+- 配信が始まったら、Spotify で見つけた曲から、DistroKid が作ったアーティストのページの ID も記録する（out/knowledge/artist_links.json）。
+  同じ組の次の曲では、下書きの「Artist already in Spotify?」が「Yes（その ID）」になり、ページが 2 つに分かれない

@@ -351,7 +351,9 @@ def draft_fields(song: dict) -> dict:
     genres = song.get("genre") or []
     return {
         "曲 ID": song["id"], "アカウント": ((label or {}).get("accounts") or {}).get("distrokid_email") or "本体アカウント（EtherArchi）",
-        "Artist / Band name": song["artist"], "Spotify のアーティスト": ((a.get("distribution") or {}).get("spotify_uri") or "初回は「新しいアーティスト」"),
+        "Artist / Band name": song["artist"],
+        "Spotify のアーティスト": ((a.get("distribution") or {}).get("spotify_uri") or (artist_links(song["slug"]).get("spotify") or {}).get("id")
+                                  or "初回は「新しいアーティスト」"),
         "Featured artist": "なし", "Song title": song["title"], "Release date": when,
         "Language": lang, "Instrumental": "はい" if song.get("instrumental") else "いいえ",
         "Primary genre": genres[0] if genres else "", "Secondary genre": genres[1] if len(genres) > 1 else "",
@@ -363,8 +365,9 @@ def draft_fields(song: dict) -> dict:
         "サブジャンル（1 つ目のジャンルの細かい分類）": "その組の音に近いものを自動で選ぶ（候補：" + " → ".join(g.title() for g in ((a.get("sound") or {}).get("genres") or [])[:4]) + "。無ければ近いもの）",
         "Artist already in Apple Music / Spotify / YouTube Music / Instagram / Facebook?": (
             "すべて No（デビュー曲：新しいアーティストのページを作る。同じ名前の別人のページに混ざらないように）"
-            if not (a.get("distribution") or {}).get("spotify_uri") else
-            f"Spotify：Yes（{(a.get('distribution') or {}).get('spotify_uri')}）。ほかはページができていれば Yes とその URL、無ければ No"),
+            if not ((a.get("distribution") or {}).get("spotify_uri") or artist_links(song["slug"]).get("spotify")) else
+            f"Spotify：Yes（Artist ID {(a.get('distribution') or {}).get('spotify_uri') or artist_links(song['slug'])['spotify']['id']}）。"
+            "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
         "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 Vocals）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
@@ -506,6 +509,24 @@ def spotify_get(token: str, path: str) -> dict:
         return json.loads(r.read())
 
 
+ARTIST_LINKS = OUT / "knowledge" / "artist_links.json"
+
+
+def artist_links(slug: str) -> dict:
+    """配信が始まってわかった、その組の配信先のページ（{"spotify": {"id": …, "url": …}}）"""
+    return (read_json(ARTIST_LINKS) if ARTIST_LINKS.exists() else {}).get(slug, {})
+
+
+def save_artist_link(slug: str, service: str, ident: str, url: str = "") -> None:
+    d = read_json(ARTIST_LINKS) if ARTIST_LINKS.exists() else {}
+    cur = d.setdefault(slug, {}).get(service) or {}
+    if cur.get("id") != ident:
+        d[slug][service] = {"id": ident, "url": url, "found_at": datetime.now().isoformat(timespec="seconds")}
+        ARTIST_LINKS.parent.mkdir(parents=True, exist_ok=True)
+        ARTIST_LINKS.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"   ○ {service} のアーティストのページを記録しました：{ident}（次の曲から DistroKid で Yes とこの ID を使う）")
+
+
 def find_on_spotify(token: str, song: dict) -> dict | None:
     q = urllib.parse.quote(f'track:"{song["title"]}" artist:"{song["artist"]}"')
     items = spotify_get(token, f"search?q={q}&type=track&limit=20").get("tracks", {}).get("items", [])
@@ -514,6 +535,9 @@ def find_on_spotify(token: str, song: dict) -> dict | None:
                 any(_songs.norm(x.get("name")) == _songs.norm(song["artist"]) for x in t.get("artists", [])):
             found = {"isrc": (t.get("external_ids") or {}).get("isrc", ""), "url": (t.get("external_urls") or {}).get("spotify", ""),
                      "released": (t.get("album") or {}).get("release_date", ""), "spotify_track_id": t.get("id")}
+            ar = next((x for x in t.get("artists", []) if _songs.norm(x.get("name")) == _songs.norm(song["artist"])), {})
+            if ar.get("id"):   # DistroKid が作ったアーティストのページ。2 曲目からは「Artist already in Spotify? → Yes」でこの ID を使う
+                save_artist_link(song["slug"], "spotify", ar["id"], (ar.get("external_urls") or {}).get("spotify", ""))
             try:
                 alb = spotify_get(token, f"albums/{t['album']['id']}")
                 found["upc"] = (alb.get("external_ids") or {}).get("upc", "")
