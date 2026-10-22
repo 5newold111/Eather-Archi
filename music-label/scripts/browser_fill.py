@@ -907,8 +907,15 @@ def put(sess: Session, loc, f: dict) -> bool:
                     return True
             return False
         if f["type"] == "date" and (loc.get_attribute("type") or "") == "date":
+            lo = loc.get_attribute("min") or ""
+            if lo and str(v) < lo:   # 選べるいちばん早い日より前：その日にする（DistroKid は早すぎる日を受け付けず空にする）
+                v = lo
+                f["chosen"] = lo
             loc.fill(str(v))
-            return True
+            if (loc.input_value() or "") != str(v):   # 入らなかった：値を直接入れて、サイトに知らせる
+                loc.evaluate("(e, v) => { e.value = v; e.dispatchEvent(new Event('input', {bubbles: true}));"
+                             " e.dispatchEvent(new Event('change', {bubbles: true})); if (window.jQuery) window.jQuery(e).trigger('change'); }", str(v))
+            return (loc.input_value() or "") == str(v)
         if not _is_field(loc):
             inner = loc.locator("textarea, input:not([type=hidden]):not([type=file]), [contenteditable=true], [contenteditable='']").first
             if inner.count() and inner.is_visible() and _is_field(inner):
@@ -1397,13 +1404,64 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
         sp = (publish.artist_links(song["slug"]).get("spotify") or {}).get("id")
     except Exception:  # noqa: BLE001
         sp = None
-    pick, ask = [], []
+    pick, texts = [], []
     for name, svc in ARTIST_ID_RADIOS:
+        if name == "spotifyArtistID" and sp:   # 前の曲が Spotify に出ている：Yes を選び、下の欄にアーティストの URI を入れる
+            pick.append((f"Artist already in Spotify? → Yes（前の曲のページ）", f'input[type=radio][name="{name}"][value=""]'))
+            texts.append((f"Spotify のアーティスト URI（spotify:artist:{sp}）", "input.myCustomSpotifyUri", f"spotify:artist:{sp}"))
+            continue
         pick.append((f"Artist already in {svc}? → No（新しいページ）", f'input[type=radio][name="{name}"][value="new"][class*="ZeroMatches"]'))
-        if name == "spotifyArtistID" and sp:
-            pick.append((f"Artist already in Spotify? → Yes（前の曲のページ {sp}）", f'input[type=radio][name="{name}"][value="{sp}"]'))
-        ask.append(name)
-    return pick, ask
+    return pick, texts
+
+
+def _searchable_pick(sess: Session, inp, text: str) -> bool:
+    """DistroKid の「打って選ぶ箱」（Track credits の役割）：打ってから、同じ名前の候補を押す"""
+    inp.click()
+    inp.fill("")
+    inp.type(text, delay=40)
+    sess.page.wait_for_timeout(600)
+    rx = re.compile(r"^\s*" + re.escape(text) + r"\s*$", re.I)
+    for css in (".dk-searchable-select__option", "[role=option]", ".dk-searchable-select li", "li"):
+        opt = sess.page.locator(css).filter(has_text=rx)
+        for i in range(min(opt.count(), 5)):
+            if opt.nth(i).is_visible():
+                opt.nth(i).click()
+                sess.page.wait_for_timeout(300)
+                return True
+    inp.press("Enter")
+    sess.page.wait_for_timeout(300)
+    return _norm(_read(inp)) == _norm(text)
+
+
+def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
+    """Track credits（Apple の決まり：Performer と Producer を 1 人ずつ以上）。Performer＝組の名前、Producer＝本名"""
+    import publish
+    from _common import load_artist
+    art = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
+    owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
+    rows = [("Performer", publish._credit_role(art), "input[name=performer-name]", song["artist"]),
+            ("Producer", "Producer", "input[name=producer-name]", owner)]
+    roles = sess.page.locator("input.dk-searchable-select__input")
+    done, manual = [], []
+    for i, (who, role, name_css, name) in enumerate(rows):
+        name_loc = sess.page.locator(name_css)
+        if not name_loc.count():
+            continue   # この画面には Track credits の欄が無い
+        ok = True
+        try:
+            if roles.count() > i and not _searchable_pick(sess, roles.nth(i), role):
+                ok = False
+            if name:
+                name_loc.first.fill(name)
+            else:
+                ok = False
+        except Exception:  # noqa: BLE001
+            ok = False
+        if ok and _norm(_read(name_loc.first)) == _norm(name):
+            done.append(f"Track credits の {who}（{role}）")
+        else:
+            manual.append(f"Track credits の {who}：役割 {role}／名前 {name or '（.env の OWNER_LEGAL_NAME が空）'}")
+    return done, manual
 
 
 def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
@@ -1439,13 +1497,27 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
         return 2
     fields, draft = distrokid_fields(song)
-    done, manual = fill_fields(sess, "distrokid", fields)
+    # 丸（はい／いいえ）を先に選ぶ：DistroKid は丸を選ぶと画面の一部を作り直し、先に入れた配信日などが消えることがある（2026-10-22）
     r_done, r_miss = set_radios(sess, distrokid_radios(song))
-    a_items, _ = artist_id_radios(song)
+    a_items, a_texts = artist_id_radios(song)
     a_done, _ = set_radios(sess, a_items)
-    done += r_done + a_done
+    for label, css, val in a_texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
+        loc = sess.page.locator(css)
+        if loc.count() and loc.first.is_visible():
+            loc.first.fill(val)
+            a_done.append(label)
+    done, manual = fill_fields(sess, "distrokid", fields)
+    c_done, c_manual = fill_credits(sess, song)
+    done += r_done + a_done + c_done
+    manual += c_manual
     a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done)]
     bad = verify(sess, fields)
+    if bad:   # 空になった欄（ほかの欄を入れたときに消えたものなど）を、もう一度だけ入れ直す
+        again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
+        if again:
+            print("   … 空になった欄を入れ直します：" + "・".join(f["label"] for f in again))
+            fill_fields(sess, "distrokid", again)
+            bad = verify(sess, fields)
     # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
     always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
               "Extras（有料の追加）・Discovery Pack：チェックしない"]
@@ -1454,7 +1526,7 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     if r_miss:
         always.insert(0, "画面に無かった／選べなかった項目（出ていれば選ぶ）：" + "・".join(r_miss))
     always.append("AI の申告で Yes のあとに質問が出たら：使ったもの（作曲・歌詞・声など Suno で作った部分）を正直に選ぶ")
-    always.append(f"Track credits が出たら：{draft.get('Track credits（Apple の決まり）', 'Performer：アーティスト名／Producer：本名')}")
+    always.append("Release date・Primary genre が空のときは入れる（DistroKid が赤い枠を出す欄）")
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     sess.show("DistroKid に下書きを入れました",
               [f"{song['artist']}「{song['title']}」",

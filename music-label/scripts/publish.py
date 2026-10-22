@@ -355,7 +355,7 @@ def _credit_role(artist: dict) -> str:
     form = str(artist.get("formation") or "")
     sex = str((artist.get("vocal") or {}).get("sex") or "")
     if form == "producer" or sex == "none":
-        return "Performer（声の切れ端・演奏）"
+        return "Performer"   # 声の切れ端・演奏（DistroKid の役割の一覧の名前のまま）
     return "Vocals"
 
 
