@@ -643,3 +643,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 組の音の言葉（city pop・house など）を、DistroKid のジャンル名の候補（Pop・Dance・Electronic・Singer/Songwriter など）に置き換える対応表（`publish.py` の `GENRE_MAP`）
   - 入力のとき、画面の選択肢を読み、候補を上から順に、選択肢にあるものだけを選ぶ（無い名前は選ばない）。サブジャンルは組の音の言葉そのもの（Synthwave・House など）を先に試す
   - 読んだ選択肢は `out/knowledge/distrokid_genres.json` に記録し、次からの下書きのジャンルも、この一覧にある名前だけで作る
+
+## 45. 動かしたままのダッシュボードでも、直した .env を使う／待っている間も戻された項目を入れ直す（2026-10-22）
+
+- 4 回目の差し戻し：primary genre・Apple Music の Artist already in・Songwriter の名前・Track credits（配信日・Spotify・YouTube・Instagram・Facebook は直った）
+- Songwriter と Track credits：`.env` の読み込みが「すでに入っている値は上書きしない」作りで、ダッシュボードは起動したときの値（空か漢字）を持ち続け、入力にもその古い値を渡していた。→ ダッシュボードは仕事を始めるたび・表を作るたびに、いまの `.env` を読み直す（`load_dotenv(override=True)`）
+- Apple Music：DistroKid の検索が遅れて、入れ終わったあとに「Yes」に戻されたと見られる。→ Gon さんが案内を閉じる・Continue を押すまでの待ち時間も 2 秒ごとに見張り、戻された丸・空になったジャンル・配信日を黙って入れ直す（ログに残す）
+- ジャンル：同じ名前の選ぶ箱が複数あれば全部に同じジャンルを入れてサイトに知らせる。読み返しは、いま画面に見えている箱で確かめる
+- 「画面の部品をコピー」に、選ぶ箱の「選択中」「値」「選択肢の数」（ジャンルは全部の選択肢）、丸とチェックの「●選ばれている」、「［画面に見えない］」を出す

@@ -18,16 +18,28 @@ MAIN_LABEL = "drive"
 MAIN_LABEL_NAME = "Postdog Records"   # メインのレーベル（slug は drive）の公開名。配信のレーベル欄・プロフィールに出る
 
 
-def load_dotenv(path: Path = ROOT / ".env") -> None:
-    """music-label/.env があれば読み込んで環境変数にする（既に設定済みのものは上書きしない）"""
+def dotenv_values(path: Path = ROOT / ".env") -> dict[str, str]:
+    """music-label/.env の中身（いまのファイルの値）"""
+    out = {}
     if not path.exists():
-        return
+        return out
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+def load_dotenv(path: Path = ROOT / ".env", override: bool = False) -> None:
+    """music-label/.env があれば読み込んで環境変数にする（ふだんは既に設定済みのものは上書きしない。
+    override=True：ファイルの今の値で上書きする。動かしたままのダッシュボードが、あとで直した .env を使うため）"""
+    for k, v in dotenv_values(path).items():
+        if override:
+            os.environ[k] = v
+        else:
+            os.environ.setdefault(k, v)
 
 
 def ssl_context():

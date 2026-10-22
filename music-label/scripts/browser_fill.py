@@ -929,6 +929,12 @@ def put(sess: Session, loc, f: dict) -> bool:
             for hit in hits[:1]:
                 if hit:
                     loc.select_option(label=hit)
+                    if f.get("css"):   # 同じ名前の箱が裏にもあるときは、全部に同じものを入れてサイトに知らせる（DistroKid のジャンル）
+                        sess.page.evaluate("""([css, text]) => { for (const e of document.querySelectorAll(css)) {
+                            const o = [...e.options].find(o => o.text.trim() === text); if (!o) continue;
+                            if (e.value !== o.value) { e.value = o.value; }
+                            e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true}));
+                            if (window.jQuery) { try { window.jQuery(e).val(o.value).trigger('change'); } catch (x) {} } } }""", [f["css"], hit])
                     f["chosen"] = hit
                     if f.get("key") == "genre1":
                         sess.filled_genre1 = hit
@@ -1073,9 +1079,9 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
                 bad.append(f"{f['label']}：{f['show']} になっていません")
             continue
         loc = getattr(sess, "filled", {}).get(f["key"])
-        if loc is None and f.get("css"):   # 欄の名前がわかっているもの：画面に見えている欄を読む
+        if f.get("css"):   # 欄の名前がわかっているもの：入れたときの箱ではなく、いま画面に見えている箱を読む（作り直されても気づけるように）
             cand = sess.page.locator(f["css"])
-            loc = next((cand.nth(i) for i in range(cand.count()) if cand.nth(i).is_visible()), None)
+            loc = next((cand.nth(i) for i in range(cand.count()) if cand.nth(i).is_visible()), None) or loc
         if loc is None:
             if not f.get("optional"):
                 bad.append(f"{f['label']}：入っていません")
@@ -1213,7 +1219,15 @@ PARTS_JS = r"""() => {
     const at = ['type', 'aria-label', 'aria-checked', 'aria-pressed', 'aria-selected', 'aria-valuenow', 'aria-valuemin', 'aria-valuemax',
                 'data-state', 'placeholder', 'name', 'data-testid'].map(a => e.getAttribute(a) !== null ? `${a}=${cut(e.getAttribute(a), 40)}` : '').filter(Boolean);
     const raw = (t === 'input' || t === 'textarea') ? String(e.value || '') : (e.isContentEditable ? (e.innerText || '') : null);
-    const val = raw === null ? '' : ` 中身=${raw.length}文字「${cut(raw, 40)}」 まわり=「${cut(e.parentElement && e.parentElement.parentElement ? e.parentElement.parentElement.innerText : '', 60)}」`;
+    let val = raw === null ? '' : ` 中身=${raw.length}文字「${cut(raw, 40)}」 まわり=「${cut(e.parentElement && e.parentElement.parentElement ? e.parentElement.parentElement.innerText : '', 60)}」`;
+    if (t === 'select') {   // 選ぶ箱：いま選ばれているもの・選択肢の数（ジャンルは全部の選択肢）
+      const sel = e.selectedOptions && e.selectedOptions[0];
+      val = ` 選択中=「${cut(sel ? sel.text : '', 40)}」 値=「${cut(e.value, 20)}」 選択肢=${e.options.length}`
+        + (/genre/i.test(e.name || '') ? ` 一覧=「${cut([...e.options].map(o => o.text.trim()).join('|'), 900)}」` : '');
+    }
+    if (t === 'input' && /radio|checkbox/.test(e.type)) val += e.checked ? ' ●選ばれている' : '';
+    const hidden = !(e.offsetParent !== null || getComputedStyle(e).position === 'fixed') || getComputedStyle(e).visibility === 'hidden' || getComputedStyle(e).opacity === '0';
+    if (hidden) val += ' ［画面に見えない］';
     out.push(`${Math.round(e.getBoundingClientRect().top)}\t${t}${role ? '[' + role + ']' : ''}${e.isContentEditable ? '[編集可]' : ''}\t「${cut(e.innerText || e.value || '', 30)}」\t${at.join(' ')}${val}\tclass=${cut(e.className && e.className.baseVal !== undefined ? '' : e.className, 160)}\t見出し=${lab(e)}`);
     if (out.length >= 300) break;
   }
@@ -1642,7 +1656,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         snap = sess.page.evaluate("""() => { const v = s => { const e = [...document.querySelectorAll(s)].find(x => x.offsetParent !== null);
                 return e ? (e.type === 'radio' ? null : e.value) : '（欄が無い）'; };
             const r = n => { const e = document.querySelector(`input[type=radio][name^="${n}"]:checked`); return e ? (e.value || 'Yes') : '（未選択）'; };
-            return {release: v('input[name=releaseDate]'), genre1: v('select[name=genre1]'), first: v('input[name=songwriter_real_name_first1]'),
+            const g = [...document.querySelectorAll('select[name=genre1]')].map(x => `${x.offsetParent !== null ? '見える' : '隠れ'}:${(x.selectedOptions[0] || {}).text || ''}/${x.options.length}件`).join(' ');
+            return {release: v('input[name=releaseDate]'), genre1: v('select[name=genre1]'), genre1_boxes: g, first: v('input[name=songwriter_real_name_first1]'),
                     last: v('input[name=songwriter_real_name_last1]'), performer: v('input[name=performer-name]'), producer: v('input[name=producer-name]'),
                     spotify: r('spotifyArtistID'), apple: r('appleArtistID'), youtube: r('googleArtistID'),
                     instagram: r('instagramProfileArtistID'), facebook: r('facebookProfileArtistID')}; }""")
@@ -1674,9 +1689,20 @@ def run_distrokid(sess: Session, song_id: str) -> int:
                {"id": "copy_parts", "label": "画面の部品をコピー（入らない欄があるとき・Claude に貼る用）"}],
               date_value=date.today().isoformat())
 
+    keep = [f for f in fields if f["key"] in ("genre1", "release")]
+
     def watch_errors():   # Gon さんが Continue を押して差し戻されたら、エラーの文を読んで入れ直す
         txt = sess.js(VALIDATION_JS, default="")
         if not txt:
+            # 待っている間も、DistroKid があとから戻した丸（Artist already in など）・ジャンル・配信日を、黙って入れ直す
+            off = _unchecked(sess, song)
+            if off:
+                set_radios(sess, off)
+                print("   … あとから戻された丸を入れ直しました：" + "・".join(l for l, _ in off))
+            lost = [f for f in keep if any(b.startswith(f["label"]) for b in verify(sess, keep))]
+            if lost:
+                fill_fields(sess, "distrokid", lost, fresh=False)
+                print("   … あとから空になった欄を入れ直しました：" + "・".join(f["label"] for f in lost))
             return
         print("   … DistroKid に差し戻されました：" + " ／ ".join(x.strip() for x in txt.splitlines()[1:6] if x.strip()))
         fixed = distrokid_fix(sess, song, fields)

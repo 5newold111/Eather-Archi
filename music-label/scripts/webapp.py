@@ -67,6 +67,7 @@ def _iso(x):
 
 
 def status_json() -> dict:
+    load_dotenv(override=True)   # 「仕組みの詰まり」も、いまの .env で判定する
     arts = []
     for r in _status.artists_overview():
         steps = [{**s, "since": _iso(s["since"]),
@@ -230,6 +231,7 @@ def start_job(cmd: list[str], label: str) -> str:
 
     def run():
         try:
+            load_dotenv(override=True)   # あとで直した .env（本名・鍵など）を、ダッシュボードを動かしたままでも使う
             r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=3600,
                                env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
             job["out"] = (r.stdout + r.stderr)[-20000:]
