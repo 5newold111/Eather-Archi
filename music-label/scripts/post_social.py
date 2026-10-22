@@ -174,10 +174,10 @@ def hashtags(artist: dict) -> list[str]:
     return [f"#{t}" for t in dict.fromkeys(tags) if t]
 
 
-def captions(artist: dict, title: str, feat: str | None) -> dict:
+def captions(artist: dict, title: str, feat: str | None, story: str = "") -> dict:
     name = artist["name"] + (f" feat. {feat}" if feat else "")    # 説明文では feat. 表記で可（タイトル欄ではない）
     bio = ((artist.get("distribution") or {}).get("bio_en") or "").split(". ")
-    line = bio[1] if len(bio) > 1 else (bio[0] if bio else "")
+    line = story or (bio[1] if len(bio) > 1 else (bio[0] if bio else ""))   # 曲のエピソード（決定 33）があればそれを
     tags = " ".join(hashtags(artist))
     disclosure = "Made with AI at EtherArchi — a label where AI-generated music meets spatial design."
     base = f"{title} — {name}\nOut now on all platforms.\n\n{line.strip()}\n\n{disclosure}"
@@ -321,7 +321,9 @@ def cmd_plan(week: str) -> None:
                 print(f"     （背景に Blender のルームツアーを使います：{loop.relative_to(ROOT)}）")
             make_clip(master, cover, start, m["title"], artist["name"], video, loop)
         feat = load_artist(m["featured_artist_slug"])["name"] if m.get("featured_artist_slug") else None
-        cap = captions(artist, m["title"], feat)
+        bp = OUT / "briefs" / f"{week}_{slug}.json"
+        story = ((read_json(bp).get("episode") or {}).get("story_en") or "") if bp.exists() else ""
+        cap = captions(artist, m["title"], feat, story)
         for v in cap.values():
             scrub_check(v, artist)
         old = read_json(folder / "plan.json") if (folder / "plan.json").exists() else {}

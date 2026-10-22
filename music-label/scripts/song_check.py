@@ -192,6 +192,19 @@ def _btn(a: dict, primary: bool = False) -> str:
     return f'<button class="{"primary" if primary else ""}" data-p="{E(json.dumps(p, ensure_ascii=False))}">{E(a["label"])}</button>'
 
 
+def episode_html(ep: dict | None) -> str:
+    """この曲のエピソード（決定 33）：テーマ・いつどこで・見た・聞いた・考えた・感じた・思った"""
+    if not ep:
+        return ""
+    li = lambda xs: "、".join(xs) if isinstance(xs, list) else str(xs or "")  # noqa: E731
+    rows = [("テーマ", ep.get("theme")), ("いつ・どこで", ep.get("when_where")), ("見たもの", li(ep.get("saw"))),
+            ("聞いたもの", li(ep.get("heard"))), ("考えたこと", ep.get("thought")), ("感じたこと", ep.get("felt")),
+            ("そして思ったこと", ep.get("realized")), ("生まれたもと", ep.get("source"))]
+    tbl = "".join(f"<tr><th>{E(k)}</th><td>{E(str(v))}</td></tr>" for k, v in rows if v)
+    return (f'<section><h2>この曲のエピソード</h2><p>{E(ep.get("story_ja", ""))}</p><table class="kv">{tbl}</table>'
+            + (f'<p class="sub">英語の紹介：{E(ep["story_en"])}</p>' if ep.get("story_en") else "") + "</section>")
+
+
 def song_page(song_id: str, token: str) -> str | None:
     song = _songs.by_id(song_id)
     if song is None:
@@ -209,7 +222,7 @@ def song_page(song_id: str, token: str) -> str | None:
     if all_done:
         head += "<section><h2>次にやること</h2><p>中身を確かめたら、DistroKid の登録画面に自動で入れます（最後の登録ボタンは Gon さんが押します）。</p>" + \
             _btn({"action": "fill_distrokid", "id": song["id"], "label": "DistroKid に入力する（ブラウザが開きます）"}, True) + "</section>"
-    body = head + "".join(secs)
+    body = head + episode_html(song.get("episode")) + "".join(secs)
     return PAGE.replace("__BODY__", body).replace("__TOKEN__", token).replace("__AUTO__", "false" if all_done else "true")
 
 

@@ -397,6 +397,17 @@ def write_draft(song: dict, st: dict) -> None:
     (d / "DistroKid下書き.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     if song.get("lyrics"):
         (d / "歌詞.txt").write_text(song["lyrics"].strip() + "\n", encoding="utf-8")
+    ep = song.get("episode") or {}
+    if ep:   # この曲のエピソード（決定 33）。曲の紹介・SNS・インタビューの元に
+        li = lambda xs: "、".join(xs) if isinstance(xs, list) else str(xs or "")  # noqa: E731
+        lines = [f"# {song['artist']}「{song['title']}」のエピソード", "", ep.get("story_ja", ""), ""]
+        lines += [f"- {k}：{v}" for k, v in (("テーマ", ep.get("theme")), ("いつ・どこで", ep.get("when_where")),
+                                              ("見たもの", li(ep.get("saw"))), ("聞いたもの", li(ep.get("heard"))),
+                                              ("考えたこと", ep.get("thought")), ("感じたこと", ep.get("felt")),
+                                              ("そして思ったこと", ep.get("realized")), ("生まれたもと", ep.get("source"))) if v]
+        if ep.get("story_en"):
+            lines += ["", "## English", "", ep["story_en"]]
+        (d / "エピソード.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def store_set(song: dict) -> None:

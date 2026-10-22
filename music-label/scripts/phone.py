@@ -177,7 +177,7 @@ def phone_page(song_id: str, token: str) -> str | None:
     if st and st not in DONE:
         secs += [distrokid_section(song), record_section(song, token)]
     secs.append(mac_section(song))
-    body = EXTRA + head + "".join(secs)
+    body = EXTRA + head + song_check.episode_html(song.get("episode")) + "".join(secs)
     return song_check.PAGE.replace("<title>公開の準備</title>", "<title>スマホで進める</title>").replace(
         "__BODY__", body).replace("__TOKEN__", token).replace("__AUTO__", "false")
 

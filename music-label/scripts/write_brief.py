@@ -48,7 +48,7 @@ OUTPUT_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "required": ["title_candidates", "suno_style_prompt", "suno_lyrics", "vocal_instruction",
-                 "phrase_transform_options", "cover_prompt_seed", "notes_ja", "self_check", "core", "suno_lyric_prompt"],
+                 "phrase_transform_options", "cover_prompt_seed", "notes_ja", "self_check", "core", "suno_lyric_prompt", "episode"],
     "properties": {
         "title_candidates": {"type": "array", "minItems": 3, "maxItems": 5, "items": {"type": "string"}},
         "suno_style_prompt": {"type": "string", "description": "Suno の Style 欄。英語。ジャンル・テンポ・楽器・声の質感・場面。実在アーティスト名を含めない。900 文字以内"},
@@ -64,6 +64,23 @@ OUTPUT_SCHEMA = {
                           "contour_interval_changed": {"type": "boolean"},
                           "description": {"type": "string"}}}},
         "cover_prompt_seed": {"type": "string", "description": "ジャケット生成の種（英語 3〜5 行）。色調・光・構図・質感・モチーフ。人の顔・文字・ロゴなし"},
+        "episode": {
+            "type": "object", "additionalProperties": False,
+            "description": "この曲のエピソード（決定 33）。アーティストがどんな場面で、何を見て・聞いて・考えて・感じて、何を思ったか。歌詞はここから書く。日本語（story_en だけ英語）。実在の名前なし",
+            "required": ["theme", "when_where", "saw", "heard", "thought", "felt", "realized", "story_ja", "story_en", "source"],
+            "properties": {
+                "theme": {"type": "string", "description": "何のテーマの曲か（1 行）"},
+                "when_where": {"type": "string", "description": "いつ・どこで（季節・時刻・場所。具体的に）"},
+                "saw": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "string"}, "description": "見たもの（具体的な物・光・人の動き）"},
+                "heard": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string"}, "description": "聞いたもの（音・声・言葉）"},
+                "thought": {"type": "string", "description": "考えたこと（頭の中の言葉）"},
+                "felt": {"type": "string", "description": "感じたこと（体と気持ち）"},
+                "realized": {"type": "string", "description": "そして何を思ったか（たどり着いた思い。サビの芯になる）"},
+                "story_ja": {"type": "string", "description": "エピソードの文章（日本語 200〜400 字。アーティスト本人の目線で、控えめに具体的に）"},
+                "story_en": {"type": "string", "description": "同じエピソードの英語の短い紹介（2〜3 文。SNS・曲紹介に使う。三人称）"},
+                "source": {"type": "string", "description": "どの近況・歌の種・ベースの曲から生まれたか（日本語 1 行）"}
+            }
+        },
         "notes_ja": {"type": "string", "description": "オーナー向けの日本語メモ：この曲で何を狙ったか、どの枠から何を借りたか、迷った点"},
         "core": {
             "type": "object", "additionalProperties": False,
@@ -140,6 +157,14 @@ Hard rules (never break):
    (places, objects, people's roles, their way of speaking). Keep it understated and specific, never melodramatic.
    If life_moment.owner_sketch exists, the owner adopted that sketch: keep its title idea and build the chorus from
    its lines (you may tighten wording and meter). Explain in notes_ja which moment you used and how.
+13. Episode first (every song): before writing lyrics, decide the song's episode - its theme, and the concrete
+   scene the act lived through: when and where, what they SAW, what they HEARD, what they THOUGHT, what they FELT,
+   and what they finally came to think (realized). Ground it in artist.life_context, the life_moment if any, and the
+   song's listening scene (brief.scene) - e.g. a live-house song can come from a night at a small venue, a party song
+   from a party, a personal song from a room at 2 a.m. Then write the lyrics FROM the episode: verses use the seen and
+   heard details (changed into the act's own words), the chorus carries "realized". Keep it quiet and specific, never
+   melodramatic; no real names, brands or places that identify real people. Fill "episode" (Japanese, story_en in
+   English) - the owner reads it, and it is used for song introductions and social posts.
 
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
@@ -414,6 +439,7 @@ def main() -> None:
         brief["phrase_transform"]["description"] = "options から 1 つ選び、kept / changed / contour_interval_changed を上に写す"
         brief["cover_prompt_seed"] = result["cover_prompt_seed"]
         brief["notes_ja"] = result["notes_ja"]
+        brief["episode"] = result.get("episode") or {}   # この曲のエピソード（決定 33）
         brief["lyrics_mode"] = artist.get("lyrics", {}).get("mode", "core_fixed")
         brief["core"] = result.get("core", {})
         brief["suno_lyric_prompt"] = result.get("suno_lyric_prompt", "")

@@ -94,6 +94,10 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
         lyr = OUT / "briefs" / f"{song['key']}.lyrics_final.txt"
         if lyr.exists():
             out.append(("music", sub, lyr, f"{stem}_歌詞.txt"))
+        import publish as _pub
+        epi = _pub.PUB / song["key"] / "エピソード.md"   # この曲のエピソード（決定 33）
+        if epi.exists():
+            out.append(("music", sub, epi, f"{stem}_エピソード.md"))
         sel = OUT / "takes" / song["key"] / "selection.json"
         if sel.exists():
             chosen = read_json(sel).get("decision", {}).get("selected")

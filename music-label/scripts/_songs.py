@@ -83,6 +83,7 @@ def weekly_songs() -> list[dict]:
             "language": b.get("language") or (a.get("lyrics") or {}).get("language", ""),
             "instrumental": b.get("language") == "none", "brief": p, "kit": None, "bpm": b.get("bpm"),
             "suno_options": b.get("suno_settings") or {}, "scene": b.get("scene"), "scene_base": b.get("scene_base"),
+            "episode": b.get("episode") or {},
         })
     return out
 
