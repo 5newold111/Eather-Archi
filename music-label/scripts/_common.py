@@ -120,18 +120,36 @@ def scene_weights(artist: dict) -> dict[str, float]:
     return {main: 0.55, **{k: 0.45 / len(rest) for k in rest}}
 
 
+SCENE_GROWTH = OUT / "growth" / "scene_weights.json"   # analyze_growth.py：場面ごとの伸び（決定 31）
+
+
+def scene_growth(slug: str) -> dict:
+    """この組の場面ごとの伸び {weights: {場面: 倍率}, hits: {場面: [よく伸びた曲]}, stats}。まだ無ければ空"""
+    try:
+        return (read_json(SCENE_GROWTH) if SCENE_GROWTH.exists() else {}).get(slug) or {}
+    except (OSError, ValueError):
+        return {}
+
+
 def pick_scene(artist: dict, week_monday, last: str | None = None) -> dict | None:
-    """今週の曲の聴かれる場面を、割合のくじで選ぶ（週と組で決まるので、やり直しても同じ）。前の週と同じ場面は 3 分の 1 に下げる"""
+    """今週の曲の聴かれる場面を、割合のくじで選ぶ（週と組で決まるので、やり直しても同じ）。
+    割合＝scene_plan.json × 場面ごとの伸びの倍率（よく伸びた場面ほど厚く。決定 31）。
+    前の週と同じ場面は 3 分の 1 に下げる（よく伸びている場面＝倍率 1.5 以上は 3 分の 2 まで。続けて厚くしてよい）"""
     import random
     w = scene_weights(artist)
     if not w:
         return None
+    g = scene_growth(artist.get("slug", "")).get("weights") or {}
+    w = {k: v * float(g.get(k, 1.0)) for k, v in w.items()}
     if last in w and len(w) > 1:
-        w = {**w, last: w[last] / 3}
+        w = {**w, last: w[last] * (2 / 3 if float(g.get(last, 1.0)) >= 1.5 else 1 / 3)}
     rng = random.Random(f"{week_monday}|{artist.get('slug')}|scene")
     k = rng.choices(list(w), weights=list(w.values()), k=1)[0]
     t = SCENE_TYPES[k]
-    return {"type": k, "name": t["name"], "en": t["en"], **t["spec"]}
+    out = {"type": k, "name": t["name"], "en": t["en"], **t["spec"]}
+    if k in g:
+        out["growth_multiplier"] = g[k]
+    return out
 
 
 def load_label(slug: str | None) -> dict:

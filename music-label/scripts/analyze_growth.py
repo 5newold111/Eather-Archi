@@ -7,14 +7,19 @@
   out/growth/report.md     ← 人が読む週次レポート（日本語）
   out/growth/weights.json  ← select_references.py が読む「参考曲 × 枠」の重み（1.0〜3.0）
   out/growth/hints.json    ← ブリーフに入れる組ごとのヒント（trend / top_slots / notes）
+  out/growth/scene_weights.json ← 組ごと・聴かれる場面ごとの伸び（決定 31）。
+      weights：場面のくじの倍率（0.5〜3.0。よく伸びた場面ほど厚く）／hits：場面ごとによく伸びた曲（次の曲のベース）
+      _common.pick_scene と select_references.py が読む
 
 使い方：
   python3 scripts/analyze_growth.py --demo
   python3 scripts/analyze_growth.py --metrics out/metrics.csv --sources out/brief_sources.csv
+      （同じフォルダに release_scenes.csv があれば、場面ごとの伸びも出す。--scenes で場所を指定してもよい）
 
 CSV の列：
   metrics.csv       : release_id, artist_slug, title, release_date, date, platform, streams, saves, skips
   brief_sources.csv : release_id, slot, reference_id
+  release_scenes.csv: release_id, artist_slug, scene（collect_metrics.py が書く。Postdog Records の組だけ）
 
 標準ライブラリだけで動く。
 """
@@ -165,6 +170,56 @@ def slot_weights(tracks: dict[str, dict], sources: list[dict]) -> tuple[dict[str
 
 
 # ---------------------------------------------------------------------------
+# 聴かれる場面ごとの伸び（決定 31）：よく伸びた場面を厚くし、その場面でよく伸びた曲を次の曲のベースにする
+SCENE_CAP, SCENE_FLOOR = 3.0, 0.5
+HIT_RATIO = 1.2          # 組の平均の勢いのこれ倍以上を「よく伸びた曲」とする
+
+
+def power(t: dict, today: date) -> float:
+    """曲の勢い＝配信開始からの 1 日あたりの再生数（出した時期が違う曲を比べるため。最初の 1 週は 7 日として数える）"""
+    try:
+        days = (today - date.fromisoformat(str(t["release_date"])[:10])).days
+    except ValueError:
+        days = 7
+    return t["streams"] / max(7, days)
+
+
+def scene_growth(tracks: dict[str, dict], scenes: list[dict], today: date) -> dict[str, dict]:
+    """組ごと・場面ごとの勢い・保存率・曲数と、くじの倍率・よく伸びた曲"""
+    scene_of = {r["release_id"]: r["scene"] for r in scenes if r.get("scene")}
+    by: dict[str, list[tuple[str, dict]]] = defaultdict(list)
+    for rid, t in tracks.items():
+        if rid in scene_of:
+            by[t["artist"]].append((rid, t))
+    out: dict[str, dict] = {}
+    for artist, items in by.items():
+        pw = {rid: power(t, today) for rid, t in items}
+        avg = sum(pw.values()) / len(pw) if pw else 0.0
+        st = sum(t["streams"] for _, t in items)
+        save_all = (sum(t["saves"] for _, t in items) / st) if st else 0.0
+        weights, stats, hits = {}, {}, {}
+        for sc in sorted({scene_of[rid] for rid, _ in items}):
+            mine = [(rid, t) for rid, t in items if scene_of[rid] == sc]
+            p = sum(pw[rid] for rid, _ in mine) / len(mine)
+            s_st = sum(t["streams"] for _, t in mine)
+            save = (sum(t["saves"] for _, t in mine) / s_st) if s_st else 0.0
+            ratio = (p / avg) if avg else 1.0
+            if save_all and save:
+                ratio *= (save / save_all) ** 0.5     # 保存（また聴きたい）も少し効かせる
+            n = len(mine)
+            lo, hi = (SCENE_FLOOR, SCENE_CAP) if n >= 2 else (0.8, 1.5)   # 1 曲だけの場面は大きく動かさない
+            weights[sc] = round(min(hi, max(lo, ratio)), 2)
+            stats[sc] = {"songs": n, "power": round(p, 1), "save_rate": round(save, 4), "ratio": round(ratio, 2)}
+            good = sorted(((rid, t) for rid, t in mine if avg and pw[rid] >= avg * HIT_RATIO), key=lambda x: -pw[x[0]])[:3]
+            if good:
+                hits[sc] = [{"release_id": rid, "title": t["title"], "power": round(pw[rid], 1),
+                             "save_rate": round(t["save_rate"], 4), "growth": round(t["growth"], 2) if t["growth"] else None,
+                             "streams": t["streams"]} for rid, t in good]
+        out[artist] = {"weights": weights, "stats": stats, "hits": hits, "avg_power": round(avg, 1)}
+    return out
+
+
+# ---------------------------------------------------------------------------
 # 判断ルール → ヒント
 # ---------------------------------------------------------------------------
 
@@ -252,7 +307,8 @@ def make_hints(artists: dict[str, dict], top: dict[str, dict]) -> dict[str, dict
 # レポート
 # ---------------------------------------------------------------------------
 
-def write_report(path: Path, today: date, artists: dict, tracks: dict, weights: dict, hints: dict) -> None:
+def write_report(path: Path, today: date, artists: dict, tracks: dict, weights: dict, hints: dict,
+                 scene_info: dict | None = None) -> None:
     lines = [f"# 成長レポート（{today}）", ""]
     lines += ["## アーティスト", "", "| 組 | 傾向 | 直近4週 | その前4週 | 曲数 | 1,000到達率 | 保存率 |", "|---|---|---|---|---|---|---|"]
     for slug, a in sorted(artists.items(), key=lambda x: -x[1]["s4"]):
@@ -267,6 +323,14 @@ def write_report(path: Path, today: date, artists: dict, tracks: dict, weights: 
     lines += ["", f"## 参考曲 × 枠 の重み（1.0 超えのもの、上限 {WEIGHT_CAP}）", ""]
     strong = sorted(((k, w) for k, w in weights.items() if w > 1.0), key=lambda x: -x[1])[:15]
     lines += [f"- `{k}` → {w}" for k, w in strong] or ["- （まだ重みをつけられるデータがありません）"]
+    if scene_info:
+        ja = {"live": "ライブハウス", "party": "パーティ・クラブ", "personal": "ひとりで聴く", "drive": "ドライブ"}
+        lines += ["", "## 聴かれる場面ごとの伸び（くじの倍率と、次の曲のベースになる曲）", "",
+                  "| 組 | 場面 | 曲数 | 1 日あたりの再生 | 保存率 | 組の平均との比 | くじの倍率 | よく伸びた曲 |", "|---|---|---|---|---|---|---|---|"]
+        for slug, g in scene_info.items():
+            for sc, s in g["stats"].items():
+                hit = "、".join(h["title"] for h in g["hits"].get(sc, [])) or "—"
+                lines.append(f"| {slug} | {ja.get(sc, sc)} | {s['songs']} | {s['power']:,} | {s['save_rate']:.1%} | {s['ratio']:.2f} | ×{g['weights'][sc]} | {hit} |")
     lines += ["", "## 組ごとのヒント（ブリーフに入ります）", ""]
     for slug, h in hints.items():
         lines.append(f"### {slug}（{h['artist_trend']}）")
@@ -284,6 +348,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="伸びているアーティスト・曲・要素を分析し、重みとヒントを出す")
     ap.add_argument("--metrics", type=Path, help="metrics.csv")
     ap.add_argument("--sources", type=Path, help="brief_sources.csv")
+    ap.add_argument("--scenes", type=Path, help="release_scenes.csv（省略時は metrics.csv と同じフォルダにあれば読む）")
     ap.add_argument("--demo", action="store_true", help="架空の成績データで動作確認する")
     ap.add_argument("--today", help="集計基準日（YYYY-MM-DD）。省略時は今日")
     ap.add_argument("--seed", type=int, default=7)
@@ -301,6 +366,19 @@ def main() -> None:
             ap.error("--metrics と --sources の両方、または --demo を指定してください")
         metrics, sources = load_csv(args.metrics), load_csv(args.sources)
         print(f"  成績 {len(metrics)} 行、枠の割り当て {len(sources)} 行を読み込みました")
+    scenes_p = args.scenes or (args.metrics.parent / "release_scenes.csv" if args.metrics else None)
+    if args.demo:
+        rng = random.Random(args.seed)
+        favs = {"a": "party", "b": "live", "c": "personal", "d": "drive", "e": "live"}   # 組ごとに伸びる場面を仕込む
+        scenes, boost = [], {}
+        for m in metrics:
+            if m["release_id"] not in boost:
+                sc = rng.choice(["live", "party", "personal", "drive"])
+                scenes.append({"release_id": m["release_id"], "artist_slug": m["artist_slug"], "scene": sc})
+                boost[m["release_id"]] = 2.0 if favs.get(m["artist_slug"]) == sc else 1.0
+            m["streams"] = int(int(m["streams"]) * boost[m["release_id"]])
+    else:
+        scenes = load_csv(scenes_p) if scenes_p and scenes_p.exists() else []
 
     print("  曲ごとに集計しています…")
     tracks = aggregate(metrics, today)
@@ -309,6 +387,12 @@ def main() -> None:
     print("  参考曲 × 枠 の重みを計算しています…")
     weights, top = slot_weights(tracks, sources)
     hints = make_hints(artists, top)
+    scene_info = scene_growth(tracks, scenes, today) if scenes else {}
+    for slug, g in scene_info.items():
+        if slug in hints and g["weights"]:
+            best = max(g["weights"], key=g["weights"].get)
+            if g["weights"][best] > 1.0:
+                hints[slug]["notes"].append(f"場面「{best}」がよく伸びている（×{g['weights'][best]}）：この場面の曲を増やし、よく伸びた曲をベースに厚みを出す")
     hist_path = args.out / "trend_history.json"
     raw_hist = json.loads(hist_path.read_text(encoding="utf-8")) if hist_path.exists() else {}
     # 履歴は [週の月曜, 傾向] の並び（新しい順）。同じ週に何度実行しても 1 回分として数える
@@ -329,7 +413,8 @@ def main() -> None:
     (args.out / "pivots.json").write_text(json.dumps(pivots, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "weights.json").write_text(json.dumps(weights, ensure_ascii=False, indent=2), encoding="utf-8")
     (args.out / "hints.json").write_text(json.dumps(hints, ensure_ascii=False, indent=2), encoding="utf-8")
-    write_report(args.out / "report.md", today, artists, tracks, weights, hints)
+    (args.out / "scene_weights.json").write_text(json.dumps(scene_info, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_report(args.out / "report.md", today, artists, tracks, weights, hints, scene_info)
 
     for slug, a in artists.items():
         g = f"{a['growth']:.2f}" if a["growth"] else "—"

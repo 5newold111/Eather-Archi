@@ -17,6 +17,7 @@
     out/metrics/daily.csv          … 全部の記録（release_id, artist_slug, title, release_date, date, platform, kind, streams, saves, skips, listeners）
     out/metrics/metrics.csv        … 成長分析用（kind=dsp＝配信サービスの数字だけ。SNS の再生は混ぜない）
     out/metrics/brief_sources.csv  … どの曲にどの参考曲を使ったか（成長分析の「要素」の判定用）
+    out/metrics/release_scenes.csv … どの曲がどの場面で聴かれる前提で作ったか（成長分析の「場面ごとの伸び」用。決定 31）
     out/metrics/unmatched.csv      … どの曲か分からなかった行（曲名の綴り違いなど）
 
 使い方
@@ -314,6 +315,17 @@ def write_for_growth(rows: dict) -> None:
                 if s and s.get("reference_id"):
                     w.writerow({"release_id": f"{b['week_start']}_{b['artist_slug']}", "slot": slot,
                                 "reference_id": s["reference_id"]})
+    with (M / "release_scenes.csv").open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["release_id", "artist_slug", "scene"])
+        w.writeheader()
+        for bp in sorted((OUT / "briefs").glob("*.json")):
+            if "." in bp.stem:
+                continue
+            b = read_json(bp)
+            if "week_start" not in b or (b.get("label_slug") or "drive") != "drive":
+                continue   # 子レーベルはレーベルの場面のまま（分けない）
+            sc = (b.get("scene") or {}).get("type") or "drive"   # 場面を選び始める前（決定 30 より前）の曲はドライブ
+            w.writerow({"release_id": f"{b['week_start']}_{b['artist_slug']}", "artist_slug": b["artist_slug"], "scene": sc})
 
 
 def mark_live(rels: list[dict], rows: dict) -> None:

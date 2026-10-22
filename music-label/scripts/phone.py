@@ -100,6 +100,8 @@ def suno_section(song: dict) -> str:
     return ('<section><h2>1. Suno で作る</h2>'
             f'<p class="note">イメージの写し具合 {sc}／{total}。上から順に、Suno の作曲画面（「高度な」）の欄と同じ並びです。</p>'
             + (f'<p class="note">この曲の聴かれる場面：<b>{E(song["scene"].get("name", ""))}</b></p>' if song.get("scene") else "")
+            + (f'<p class="note">ベースの曲：「{E(song["scene_base"].get("title", ""))}」（この場面でよく伸びた曲。要素を引き継いで厚みを出す）</p>'
+               if song.get("scene_base") else "")
             + "".join(f'<p class="note">！ {E(w)}</p>' for w in warn)
             + '<a class="big" href="https://suno.com/create" target="_blank" rel="noopener">Suno の作曲画面を開く ↗</a>'
             + "".join(rows)

@@ -105,6 +105,11 @@ Hard rules (never break):
    timbre, palette, tics, landscape words and themes - only the arrangement, energy and form adapt to the place.
    Forbidden items that exist only for driving (sudden silence, big volume jumps) are relaxed when
    scene.no_sudden_silence is false; every other forbidden item still applies.
+   If the brief has "scene_base", it is THIS act's best-growing song in THIS scene (power = streams per day). Write a
+   sibling that thickens what made it grow: keep its strongest elements (tempo feel, groove, arrangement density, hook
+   placement and length, vocal treatment, energy curve; see its style and what it borrowed) and push one or two of them
+   further. Change the theme, title, melody and every lyric line - never reuse its lyric lines or melody, and do not
+   make a copy; listeners should hear the same act at its best, not the same song.
 4. Vocal: convert note names to descriptions ("the chorus peak sits just below where the voice would flip to
    falsetto, sung in full voice"). Blend the three vocal references 6:2:2 for EXPRESSION only (breath, ad-libs,
    layering, phrasing) - the timbre is fixed by the artist's Suno Persona.

@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import pick_scene, production_status, rel  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
+from _common import pick_scene, production_status, rel, scene_growth  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
 from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # Postdog Records（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
@@ -268,6 +268,8 @@ def weighted_pick(rng: random.Random, candidates: list[Reference], artist: dict,
         w *= db_boost(artist, c.id)          # 参考データベースでこの組に近い曲（reference_db.py。オーナーが組を書いた曲は最大 3 倍）
         if c.is_trend:
             w *= 1.5                        # 今週のトレンド曲は少し優先
+        if (slot, c.id) in artist.get("_base_slots", set()):
+            w *= 2.0                        # その場面でよく伸びた曲が同じ枠で借りた参考曲（ベースの曲の要素を引き継いで厚みを出す。決定 31）
         if artist.get("_scene") and artist["_scene"] in c.tags:
             w *= 1.5                        # 今週の曲の場面（ライブハウス・パーティなど）で伸びている曲（fetch_trends.py の場面のタグ）
         weights.append(w)
@@ -327,6 +329,33 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
 # ---------------------------------------------------------------------------
 
 WEEKDAY_OFFSET = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4, "saturday": 5, "sunday": 6}
+
+
+def scene_base(slug: str, scene: dict, briefs_dir: Path) -> dict | None:
+    """この組がこの場面でよく伸びた曲（analyze_growth.py の hits）の 1 番目を、次の曲のベースにする。
+    返すもの：曲名・勢い・保存率と、その曲のブリーフから「何を借りて・どう作ったか」（実在の名前は入れない）。
+    _slots（枠と参考曲 ID）は割り当ての重みに使い、ブリーフには入れない。同じ曲を 3 回続けてベースにはしない"""
+    hits = (scene_growth(slug).get("hits") or {}).get(scene["type"]) or []
+    used = []
+    for p in sorted(briefs_dir.glob(f"*_{slug}.json"))[-2:]:   # 直前 2 週のベース
+        try:
+            used.append((json.loads(p.read_text(encoding="utf-8")).get("scene_base") or {}).get("release_id"))
+        except (OSError, ValueError):
+            pass
+    for h in hits:
+        if used.count(h["release_id"]) >= 2:
+            continue
+        p = briefs_dir / f"{h['release_id']}.json"
+        b = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        return {
+            "release_id": h["release_id"], "title": h["title"], "power": h["power"], "save_rate": h["save_rate"],
+            "growth": h.get("growth"),
+            "style": b.get("suno_style_prompt", ""), "bpm": b.get("bpm"),
+            "borrowed": {sl: s.get("borrowed_summary", "") for sl, s in (b.get("slots") or {}).items()},
+            "theme": (b.get("life_moment") or {}).get("idea") or (b.get("life_moment") or {}).get("event") or "",
+            "_slots": [(sl, s.get("reference_id")) for sl, s in (b.get("slots") or {}).items() if s.get("reference_id")],
+        }
+    return None
 
 
 def release_at_for_production_week(week_monday: date, weekday: str = "wednesday", hour_et: int = 17) -> datetime:
@@ -521,8 +550,13 @@ def main() -> None:
             last = None
         scene = pick_scene(artist, week_monday, last) if slug != "demo" else None
         artist["_scene"] = scene["type"] if scene else None
+        base = scene_base(slug, scene, args.out) if scene else None
+        artist["_base_slots"] = {(sl, rid) for sl, rid in (base or {}).pop("_slots", [])}
         if scene:
-            print(f"    今週の場面：{scene['name']}（曲の長さ {scene['length_sec_min']}〜{scene['length_sec_max']} 秒）")
+            print(f"    今週の場面：{scene['name']}（曲の長さ {scene['length_sec_min']}〜{scene['length_sec_max']} 秒"
+                  + (f"・伸びの倍率 ×{scene['growth_multiplier']}" if scene.get("growth_multiplier") else "") + "）")
+        if base:
+            print(f"    ベースの曲：「{base['title']}」（この場面でよく伸びた曲。1 日あたり {base['power']:,} 再生）")
         try:
             # 成長分析のヒント：横ばい（flat）や方針転換レベル 1 の組は、トレンド曲の枠を 2 → 3 に増やす
             h = hints_all.get(slug) or {}
@@ -534,6 +568,8 @@ def main() -> None:
             continue
         brief = build_brief_skeleton(artist, slots, week_monday, args.trend_language, hints_all.get(slug))
         brief["references_dir"] = str(args.references.resolve()) if args.references else None   # write_brief.py が解析シートを探す場所
+        if base:
+            brief["scene_base"] = base   # write_brief.py：この曲の要素を引き継いで、兄弟の曲として厚みを出す（決定 31）
         if scene:
             brief["scene"] = scene   # write_brief.py（曲づくり）・suno_design.py（長さ・除外）・select_takes.py（長さの確かめ）が読む
             brief["suno_settings"] = {**(brief.get("suno_settings") or {}),

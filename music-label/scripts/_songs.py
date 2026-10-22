@@ -82,7 +82,7 @@ def weekly_songs() -> list[dict]:
             "exclude": b.get("suno_exclude", "") or "", "genre": list((a.get("sound") or {}).get("genres") or [])[:2],
             "language": b.get("language") or (a.get("lyrics") or {}).get("language", ""),
             "instrumental": b.get("language") == "none", "brief": p, "kit": None, "bpm": b.get("bpm"),
-            "suno_options": b.get("suno_settings") or {}, "scene": b.get("scene"),
+            "suno_options": b.get("suno_settings") or {}, "scene": b.get("scene"), "scene_base": b.get("scene_base"),
         })
     return out
 
