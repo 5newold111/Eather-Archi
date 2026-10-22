@@ -66,8 +66,12 @@ NEVER = re.compile(r"create|generate|submit|upload|done|publish|release|distribu
                    r"作成|生成|送信|公開|配信|購入|支払|削除|アップグレード|消去|リセット", re.I)
 
 # ページに毎回入れる下準備：欄の場所を言葉にする関数と、「クリックで教える」の受け取り
+# ロボット確認（Cloudflare など）の画面や、ページの中の小さな画面（iframe）には何も入れない。
+# 入れると「自動操作の気配」と見なされ、ロボット確認が何度も出て通らなくなる（2026-10-22）
+FRAME_GUARD = r"window.top !== window || /(^|\.)(challenges\.cloudflare\.com|hcaptcha\.com|recaptcha\.net)$/.test(location.hostname)"
 INIT_JS = r"""
 (() => {
+  if (window.top !== window || /(^|\.)(challenges\.cloudflare\.com|hcaptcha\.com|recaptcha\.net)$/.test(location.hostname)) return;   // 一番外の画面だけ（ロボット確認の枠の中には入れない）
   // Chrome の自動翻訳を止める（画面の文字が書き換わると、欄を探せず、入れた文字が消えることもある）
   const noTranslate = () => { try {
     const h = document.documentElement; h.setAttribute('translate', 'no'); h.classList.add('notranslate');
@@ -309,7 +313,7 @@ class Session:
         self.msg: dict | None = None
         self.ctx.expose_binding("postdog", lambda source, payload: setattr(self, "msg", payload))
         self.ctx.add_init_script(INIT_JS)
-        self.ctx.add_init_script(f"window.__postdogParts = {PARTS_JS};")
+        self.ctx.add_init_script(f"if (!({FRAME_GUARD})) window.__postdogParts = {PARTS_JS};")
         self.page = self.ctx.new_page() if self.cdp or not self.ctx.pages else self.ctx.pages[0]
         if self.cdp:
             self.page.bring_to_front()
@@ -1216,6 +1220,10 @@ def run_suno(sess: Session, ids: list[str]) -> int:
     if not songs:
         print("【結果】Suno で作る番の曲はありません")
         return 0
+    # 1 回の入力は 1 曲だけ。入れ終わったらすぐにシステムが Chrome から離れ、つながっていない状態で Gon さんが Create を押す。
+    # つながったまま Create を押すと、ロボット確認が「自動操作の気配」を見つけて、何度出しても通らなくなる（2026-10-22）
+    later = songs[1:]
+    songs = songs[:1]
     ok_songs, problems, unsure_all = [], [], []
     for n, song in enumerate(songs, 1):
         sess.goto(SITES["suno"])
@@ -1272,8 +1280,11 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         except Exception:  # noqa: BLE001
             pass
         lines += ["① 画面の上が「高度な」（Advanced）になっているか確かめる",
-                  "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）。そのあと「私はロボットではありません」が出たら、Gon さんがチェックする（システムは押しません）",
-                  "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）"]
+                  "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）。システムはもうこの Chrome から離れています。"
+                  "「私はロボットではありません」が出たら、Gon さんがチェックする",
+                  "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）",
+                  *([f"次の曲（あと {len(later)} 曲）は、Create のあと少し時間をあけて、ダッシュボードでもう一度「Suno に入力する」を押してください"] if later else []),
+                  "ロボット確認が何度も出て通らないとき：この専用の Chrome は使わず、ふだんの Chrome か Safari で http://localhost:8765/phone/{id} を開き、「写す」ボタンで Suno に貼ってください（ふだんのブラウザは確認が出にくい）".format(id=song["id"])]
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
             sess.js("(t) => { window.__postdogLog = t; }", "\n".join(getattr(sess, "log", []) or []))   # コピーのボタンにも記録を入れる
@@ -1290,7 +1301,8 @@ def run_suno(sess: Session, ids: list[str]) -> int:
             break
     if not problems and len(ok_songs) == len(songs):
         extra = f"（ただし {'／'.join(unsure_all)}）" if unsure_all else ""
-        print(f"【結果】Suno の作曲画面に{'、' + str(len(songs)) + ' 曲とも' if len(songs) > 1 else ''}入力し、全部の欄に入っていることを確かめました{extra}。開いている Chrome で「作成」（Create）を押してください")
+        rest = f"。次の曲（あと {len(later)} 曲）は、少し時間をあけてもう一度押してください" if later else ""
+        print(f"【結果】Suno の作曲画面に入力し、全部の欄に入っていることを確かめました{extra}。システムは Chrome から離れました。開いている Chrome で「作成」（Create）を押してください{rest}")
         return 0
     msg = "／".join(problems[:4]) or f"{len(songs)} 曲のうち {len(ok_songs)} 曲で止めました"
     print(f"【結果】まだ終わっていません：{msg}")
@@ -1542,7 +1554,8 @@ def main() -> None:
                 sess.show("ロボット確認が出たので止まりました",
                           ["サイトの「私はロボットではありません」の確認が出ました。システムはこれ以上何も触りません。",
                            "Gon さんがご自分でチェックしてください。続きは、確認が終わってから入力し直すか、手で入れてください。",
-                           "何度も出るときは、続けて何回も作らず、時間をあけてください。"],
+                           "何度も出て通らないときは、この専用の Chrome は使わず、ふだんの Chrome か Safari で http://localhost:8765/phone を開き、"
+                           "曲を選んで「写す」ボタンで Suno に貼ってください。続けて何回も作らず、時間もあけてください。"],
                           [{"id": "dismiss", "label": "この案内を消す"}])
             except Exception:  # noqa: BLE001
                 pass
