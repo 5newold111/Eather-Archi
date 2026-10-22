@@ -672,3 +672,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   3. Performer の役割が空：役割の一覧に「Vocals」と同じ名前が無かった → Performer・Producer の役割は、候補（Vocals → Lead Vocals → Vocalist …／Performer …／Producer …）の言葉を打って出た選択肢を集め、同じ名前を先に、無ければ近い名前を選ぶ。コーラス・補助の役割（Background・Backing・Co-・Assistant）は近い名前としては選ばない。出た選択肢は `out/knowledge/distrokid_genres.json` の roles に記録する
 - DistroKid のジャンルの実際の一覧（2026-10-22）：Afrobeat・Afropop・Alternative・Big Band・Blues・Children's Music・Christian/Gospel・Classical・Comedy・Contemporary Latin・Country・Dance・Electronic・Fitness & Workout・Folk・French Pop・German Folk・German Pop・Hip Hop/Rap・Holiday・J-Pop・Jazz・K-Pop・Latin・Latin House・Latin Jazz・Latin Urban・Maskandi・Metal・New Age・Pop・Pop in Spanish・Punk・R&B/Soul・Reggae・Rock・Rock en Español・Singer/Songwriter・Soundtrack・Spoken Word・Vocal・World・Xigaza
 - 宣誓のチェックに「Non-standard cApiTaliZatiOn detected」が出ることがある（アーティスト名が全部大文字のため、Apple Music で表記が変わるかもしれないという確認）。Gon さんが読んでチェックする
+
+## 49. DistroKid：確認の小窓に OK を押す・ジャンルを見張る（2026-10-22。画面の部品の一覧から）
+
+- SOFT CANTILEVER の画面の部品の一覧でわかったこと：Performer の役割（Singing & vocals）・Producer・Songwriter・配信日などは入っていた。残りは 2 つ
+  1. Spotify・Apple・YouTube の Artist already in が Yes も No も選ばれず、画面に「OK／Cancel」の確認の小窓（SweetAlert）が開いたままだった：「No（新しいページを作る）」を選ぶと DistroKid が確認を出し、OK を押さないと選んだ丸が取り消される → 3 つのサイトを 1 つずつ選び、そのたびに小窓の文を読む。「新しいページを作る」「まだリリースが無い」「まとめられない」などの確認のときだけ OK を押す。ほかの内容の小窓（曲を消すなど）は押さずにログに文を出す。ページの中の見張りが選び直したときも同じ
+  2. 1 つ目のジャンルが「Alternative」、2 つ目が「Holiday」：入れたあとに、ページの何か（原因はまだわからない）がジャンルを書き換えていた → 入れたジャンルを DistroKid のページの中で見張り、ほかのものに変わったら選び直す。変わったときは「ジャンルの変わり方」としてログに残す（何がいつ書き換えたかを調べるため）。Gon さんがジャンルの箱を自分でクリック・キー操作したら、その箱の見張りはやめる（Gon さんの選び直しを邪魔しない）
+- 読み返しも厳しくした：ジャンルは「実際に選んだ名前」と同じときだけ「入った」とみる（候補のどれかに当たれば良し、とはしない）
+- 宣誓のチェック（「Non-standard cApiTaliZatiOn detected」を含む）は、これまでどおり Gon さんが読んでチェックする
