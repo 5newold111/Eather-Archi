@@ -259,10 +259,15 @@ def design(song: dict) -> dict:
     onoff = lambda v: "オン" if v else "オフ"  # noqa: E731
     if "vocal_gender" in opt and not song.get("instrumental"):
         mapping.append(("声の性別", _songs.GENDER_JA.get(want_gender, str(want_gender)), "設定書の声（性別・編成）"))
-    length = opt.get("length_sec")
+    length, why_len = opt.get("length_sec"), "組ごとの設定（設定書の曲の長さのまん中）"
+    if "length_sec" not in opt and artist:   # 追加の組：聴かれる場面の仕様（ライブハウス・パーティ・ひとりで・ドライブ）の長さのまん中
+        from _common import length_spec, load_label
+        sp = length_spec(artist, load_label(song.get("label_slug")))
+        length = (int(sp["length_sec_min"]) + int(sp["length_sec_max"])) // 2
+        why_len = f"聴かれる場面の曲の長さ（{sp['length_sec_min']}〜{sp['length_sec_max']} 秒）のまん中"
     if length is not None:
         length = max(10, min(360, int(length)))
-    mapping.append(("間隔（曲の長さ）", _songs.fmt_len(length), "設定書の曲の長さ（構成と、運転向けの 150〜210 秒）のまん中"))
+    mapping.append(("間隔（曲の長さ）", _songs.fmt_len(length), why_len))
     lines_n = len([x for x in lyrics.splitlines() if x.strip() and not x.strip().startswith("[")])
     if length and lines_n and lines_n * 4.5 > length:
         checks.append(("間隔", "warn", f"歌う行が {lines_n} 行あり、{_songs.fmt_len(length)} では歌い切れないかもしれません"))

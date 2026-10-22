@@ -67,11 +67,49 @@ def label_slug_of(value) -> str:
     return v
 
 
+# Postdog Records の組が聴かれる場面（決定 29。2026-10-22〜 追加でデビューする組）。
+# 最初の 5 組はドライブ（設定書の drive_spec）のまま。新しい組は「主な場面」を 1 つ選び、その仕様（scene_spec）で作る
+SCENE_TYPES = {
+    "live": {"name": "ライブハウス", "en": "live houses and small venues (band energy, sing-along choruses)",
+             "words": ["ライブ", "live", "ステージ", "会場", "フェス", "バンドの音", "小箱"],
+             "spec": {"hook_within_sec": 45, "length_sec_min": 180, "length_sec_max": 270, "no_sudden_silence": False,
+                      "notes": "生演奏で再現できる編成。サビは観客が一緒に歌える短い言葉。キメやブレイク（一瞬の無音）を使ってよい。ライブで伸ばせるイントロ・アウトロ"}},
+    "party": {"name": "パーティ・クラブ", "en": "parties, clubs and pre-game playlists (danceable, steady groove)",
+              "words": ["パーティ", "パーティー", "party", "クラブ", "club", "dj", "踊", "ダンスフロア", "宴", "フロア"],
+              "spec": {"hook_within_sec": 30, "length_sec_min": 180, "length_sec_max": 300, "no_sudden_silence": False,
+                       "notes": "DJ がつなぎやすい 8〜16 小節のイントロ・アウトロ。テンポは一定。ブレイクからの盛り上げ（ドロップ）を使ってよい。踊れるグルーヴ"}},
+    "personal": {"name": "ひとりで聴く", "en": "personal listening (headphones, alone in a room, late nights, walks)",
+                 "words": ["ひとり", "一人", "ヘッドホン", "イヤホン", "部屋", "夜更かし", "散歩", "寝る前", "personal", "headphone"],
+                 "spec": {"hook_within_sec": 45, "length_sec_min": 150, "length_sec_max": 270, "no_sudden_silence": False,
+                          "notes": "ヘッドホンで気づく細部（息・部屋の響き・小さな音）。音量の起伏や静かな間を使ってよい。歌詞は 1 人に語りかける距離"}},
+    "drive": {"name": "ドライブ", "en": "driving (morning highway, night drive, long distance)",
+              "words": ["ドライブ", "運転", "車", "高速", "環状線", "海岸線", "drive", "highway"],
+              "spec": {"hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": True,
+                       "notes": "車内の騒音でも聴き取れる中音域。急な無音・大きな音量差を作らない"}},
+}
+MAIN_SCENE = ("Postdog Records の組は、幅広い場面で聴かれる：ライブハウス・パーティやクラブ・ひとりで聴く（ヘッドホン・部屋・散歩）・ドライブ。"
+              "新しい組は scene_types から主な場面を 1 つと、近い場面を 1〜2 つ選ぶ。最初の 5 組はドライブなので、それ以外を優先する")
+
+
+def scene_type_of(text: str, default: str = "personal") -> str:
+    """「聴かれる場面」の文から、主な場面の種類（live / party / personal / drive）。いちばん先に出てくる言葉で決める"""
+    t = str(text or "").casefold()
+    best, pos = default, None
+    for k, v in SCENE_TYPES.items():
+        for w in v["words"]:
+            i = t.find(w.casefold())
+            if i >= 0 and (pos is None or i < pos):
+                best, pos = k, i
+    return best
+
+
 def load_label(slug: str | None) -> dict:
     """子レーベルの設定書。Postdog Records（drive）は設定書ファイルが無いので既定値を返す"""
     if not slug or slug == MAIN_LABEL:
         return {"slug": MAIN_LABEL, "name": MAIN_LABEL_NAME, "automation_tier": "A",
-                "release_hour_et": 17, "release_weekday": "wednesday", "accounts": {}}
+                "release_hour_et": 17, "release_weekday": "wednesday", "accounts": {},
+                "scene": MAIN_SCENE,
+                "scene_types": {k: {"name": v["name"], "en": v["en"], **v["spec"]} for k, v in SCENE_TYPES.items()}}
     p = ROOT / "templates" / "labels" / f"{slug}.json"
     if not p.exists():
         sys.exit(f"[エラー] レーベルの設定書がありません: {p}")
@@ -119,9 +157,11 @@ def all_artists() -> list[dict]:
 
 
 def length_spec(artist: dict, label: dict) -> dict:
-    """曲の尺・サビ位置などの仕様。Postdog Records は drive_spec、子レーベルは scene_spec"""
+    """曲の尺・サビ位置などの仕様。子レーベルは scene_spec、Postdog Records の最初の 5 組は drive_spec、
+    追加の組は設定書の sound.scene_spec（主な場面の仕様。決定 29）"""
     spec = dict(label.get("scene_spec") or {})
     spec.update((artist.get("sound") or {}).get("drive_spec") or {})
+    spec.update((artist.get("sound") or {}).get("scene_spec") or {})
     spec.setdefault("length_sec_min", 150)
     spec.setdefault("length_sec_max", 210)
     spec.setdefault("hook_within_sec", 30)

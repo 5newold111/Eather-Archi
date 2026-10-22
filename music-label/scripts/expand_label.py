@@ -128,7 +128,8 @@ def switch_to_biweekly(label: str, cap: int) -> list[str]:
 # 新しい組の下書き
 # ---------------------------------------------------------------------------
 DRAFT_SYSTEM = """You design virtual music artists for EtherArchi, a label that pairs AI-generated music with spatial
-design. Every artist is defined by a scene of daily life (driving, sleep, morning coffee, focus, walking/running) and
+design. Every artist is defined by a scene of daily life (live houses, parties, personal listening, driving, sleep,
+morning coffee, focus, walking/running) and
 by space: shape, quality, light, time and the self. The tone is refined but approachable - never theatrical.
 
 Write a complete artist sheet as ONE JSON object with exactly the same keys and nesting as the template you are given
@@ -143,6 +144,15 @@ Write a complete artist sheet as ONE JSON object with exactly the same keys and 
 - collab.preferred_partners: 1-2 slugs from the existing acts (prefer ones listed as "up").
 - slug: lowercase ascii with underscores, prefixed with the label slug for sub-labels (e.g. focus_tapeloop).
 - name_status "draft", debut_week null, cadence "weekly", distribution ids null.
+- Listening scenes (Postdog Records, the main label): acts are heard far beyond the car - live houses and small
+  venues, parties and clubs, personal listening (headphones, alone in a room, late nights, walks), and driving. Pick ONE
+  main scene from label.scene_types and 1-2 neighbouring ones, and design the act for them (formation that works on a
+  small stage, danceable grooves, intimate detail, etc.). The first five acts are all driving acts, so prefer the other
+  scenes unless the owner's note says otherwise. Write persona.scene in Japanese starting with the main scene name, e.g.
+  "ライブハウス：…（近い場面：パーティ・クラブ、ひとりで聴く）". Follow that scene's spec (hook_within_sec, length,
+  whether breaks/silence are allowed).
+  For the main label, put the chosen scene's spec into sound.scene_spec (type, name, hook_within_sec, length_sec_min,
+  length_sec_max, no_sudden_silence, notes) instead of sound.drive_spec.
 Return only the JSON object."""
 
 
@@ -196,7 +206,7 @@ def draft_artist(label: str, direction: str | None) -> dict | None:
     direction = direction or (path[n_extra % len(path)] if path else "")
     trend = growth_trends()
     user = json.dumps({
-        "label": {k: lab.get(k) for k in ("slug", "name", "scene", "sound_center", "expansion_path", "scene_spec")},
+        "label": {k: lab.get(k) for k in ("slug", "name", "scene", "scene_types", "sound_center", "expansion_path", "scene_spec") if lab.get(k)},
         "next_direction": direction,
         "existing_acts": [{**e, "trend": trend.get(e["slug"], "new")} for e in existing_summary(label)],
         "template": clean(template),

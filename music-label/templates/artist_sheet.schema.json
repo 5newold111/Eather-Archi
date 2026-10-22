@@ -104,7 +104,7 @@
         },
         "drive_scene": {
           "type": "string",
-          "description": "このアーティストが担当するドライブの場面"
+          "description": "最初の 5 組（ドライブ）が担当するドライブの場面"
         },
         "origin": {
           "type": "object",
@@ -173,6 +173,20 @@
               "type": "string"
             }
           }
+        },
+        "scene": {
+          "type": "string",
+          "description": "聴かれる場面（2026-10-22 からの追加の組・子レーベル）。主な場面を先頭に：ライブハウス／パーティ・クラブ／ひとりで聴く／ドライブ"
+        },
+        "scene_type": {
+          "type": "string",
+          "enum": [
+            "live",
+            "party",
+            "personal",
+            "drive"
+          ],
+          "description": "主な場面の種類（scene から自動で決まる）"
         }
       }
     },
@@ -482,7 +496,7 @@
         },
         "drive_spec": {
           "type": "object",
-          "description": "ドライブ向けの共通仕様",
+          "description": "ドライブ向けの共通仕様（最初の 5 組）",
           "properties": {
             "hook_within_sec": {
               "type": "integer",
@@ -499,6 +513,33 @@
             "no_sudden_silence": {
               "type": "boolean",
               "default": true
+            }
+          }
+        },
+        "scene_spec": {
+          "type": "object",
+          "description": "聴かれる場面の仕様（追加の組。_common.py の SCENE_TYPES から）。長さ・サビの位置・ブレイク（一瞬の無音）を使ってよいか・曲づくりの注意",
+          "properties": {
+            "type": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "hook_within_sec": {
+              "type": "integer"
+            },
+            "length_sec_min": {
+              "type": "integer"
+            },
+            "length_sec_max": {
+              "type": "integer"
+            },
+            "no_sudden_silence": {
+              "type": "boolean"
+            },
+            "notes": {
+              "type": "string"
             }
           }
         }

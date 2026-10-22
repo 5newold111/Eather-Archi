@@ -507,3 +507,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 自動入力（Mac の専用の Chrome）を使いたいときは、画面共有で Mac を操作する道も残す（ページの下のボタン）
 - `.env` の `WEBAPP_AWAKE=1`：ダッシュボードが動いている間、Mac が勝手に眠らない（caffeinate）。`WEBAPP_LAN=1`：家の Wi-Fi から合鍵つきで開ける（`--lan` と同じ）
 - 手順は `docs/18_phone.md`。Create と最後の登録ボタンは今までどおり Gon さんが押す
+
+## 29. 追加でデビューする組は、ドライブだけでなく幅広い場面で聴かれる前提で作る（2026-10-22）
+
+- 場面：**ライブハウス**・**パーティ・クラブ**・**ひとりで聴く**（ヘッドホン・部屋・散歩・夜更かし）・**ドライブ**。新しい組は主な場面を 1 つと近い場面を 1〜2 つ持つ。最初の 5 組がドライブなので、それ以外を優先する
+- 場面ごとの仕様（曲の長さ・サビの位置・ブレイクを使ってよいか・曲づくりの注意）は `_common.py` の `SCENE_TYPES`。表は `docs/03_artists.md`
+- 管理表の「聴かれる場面」の先頭に主な場面を書く → 設定書の `persona.scene_type`・`sound.scene_spec` が自動で決まる
+- 効く場所：Claude の新しい組の提案（`artist_book.py propose`・`expand_label.py`）／ブリーフ作り（場面に合わせた曲づくりと、ブレイクの可否）／毎週の話題曲の調べ（live・party・personal を追加）／Suno の曲の長さ（場面の長さのまん中）／取り込みのときの長さの確かめ（`select_takes.py`）
+- 最初の 5 組（DECLAN FAY・HOLLOWPLAN・VERNALIGHT・SOFT CANTILEVER・TIDEWOOL）はドライブのまま変えない

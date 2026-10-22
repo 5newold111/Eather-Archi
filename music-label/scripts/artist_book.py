@@ -40,7 +40,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _artist_book import PENDING, TAB_ORDER, TABS, ReadOnlyBook, XlsxBook, adopted, append_rows, open_book  # noqa: E402
-from _common import (MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, all_artists, label_slug_of, load_dotenv,  # noqa: E402
+from _common import (MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, SCENE_TYPES, all_artists, label_slug_of, load_dotenv, scene_type_of,  # noqa: E402
                      load_label, read_json, save_artist, step, write_json)
 
 load_dotenv()
@@ -155,7 +155,7 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
                         for m in members],
             "age_feel": "、".join(f"{m.get('name', '')} {m.get('age', '')} 歳" for m in members),
             "story": act.get("current_chapter") or act.get("values", ""),
-            ("drive_scene" if label == MAIN_LABEL else "scene"): act.get("scene", ""),
+            ("drive_scene" if label == MAIN_LABEL and "drive_scene" in (old.get("persona") or {}) else "scene"): act.get("scene", ""),
             "origin": {"birthplace": main.get("birthplace", ""), "upbringing": act.get("origin", ""),
                        "landscape_words": act.get("landscape_words", [])},
             "influences": [{"name": i.get("author") or i.get("title", ""), "era": "", "genre": "",
@@ -234,8 +234,12 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
         "source": {"pulled_at": datetime.now().isoformat(timespec="seconds")},
     }
     if label == MAIN_LABEL:
-        sheet["sound"]["drive_spec"] = (old.get("sound") or {}).get("drive_spec") or {
-            "hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": True}
+        if (old.get("sound") or {}).get("drive_spec"):   # 最初の 5 組（ドライブ）はそのまま
+            sheet["sound"]["drive_spec"] = old["sound"]["drive_spec"]
+        else:   # 追加の組：「聴かれる場面」の主な場面の仕様（ライブハウス・パーティ・ひとりで・ドライブ。決定 29）
+            st = scene_type_of(act.get("scene", ""))
+            sheet["persona"]["scene_type"] = st
+            sheet["sound"]["scene_spec"] = {"type": st, "name": SCENE_TYPES[st]["name"], **SCENE_TYPES[st]["spec"]}
     for k in ("expansion",):
         if old.get(k):
             sheet[k] = old[k]
@@ -304,7 +308,14 @@ Rules:
   written in the act's own voice; never quote or imitate a real lyric.
 - music: voice spec in note names, 2-3 recurring tics writable as Suno tags, genres, BPM range, etc.
 - visual: the face is never shown (pick a concealment method); describe space, light, palette, logo idea.
-- Do not overlap the existing acts listed (voice range/sex, formation, origin, scene)."""
+- Do not overlap the existing acts listed (voice range/sex, formation, origin, scene).
+- Listening scenes (Postdog Records, the main label): acts are heard far beyond the car - live houses and small
+  venues, parties and clubs, personal listening (headphones, alone in a room, late nights, walks), and driving. Pick ONE
+  main scene from label.scene_types and 1-2 neighbouring ones, and design the act for them (formation that works on a
+  small stage, danceable grooves, intimate detail, etc.). The first five acts are all driving acts, so prefer the other
+  scenes unless the owner's note says otherwise. Write act.scene in Japanese starting with the main scene name, e.g.
+  "ライブハウス：…（近い場面：パーティ・クラブ、ひとりで聴く）". Follow that scene's spec (hook_within_sec, length,
+  whether breaks/silence are allowed)."""
 
 
 def template_for_prompt() -> dict:
@@ -325,7 +336,8 @@ def existing_summary() -> list[dict]:
         v = x.get("vocal") or {}
         out.append({"id": x["slug"], "name": x["name"], "label": x["label_slug"], "formation": x.get("formation"),
                     "voice": f"{v.get('sex')}/{v.get('range')}", "genres": (x.get("sound") or {}).get("genres"),
-                    "origin": (x.get("persona") or {}).get("origin", {}).get("birthplace")})
+                    "origin": (x.get("persona") or {}).get("origin", {}).get("birthplace"),
+                    "scene": (x.get("persona") or {}).get("drive_scene") or (x.get("persona") or {}).get("scene")})
     return out
 
 
@@ -400,7 +412,7 @@ def cmd_propose(a) -> None:
     book = book_or_die()
     label = label_slug_of(a.label)
     lab = load_label(label)
-    user = json.dumps({"label": {k: lab.get(k) for k in ("slug", "name", "scene", "sound_center", "expansion_path", "scene_spec")},
+    user = json.dumps({"label": {k: lab.get(k) for k in ("slug", "name", "scene", "scene_types", "sound_center", "expansion_path", "scene_spec") if lab.get(k)},
                        "owner_note": a.note, "existing_acts": existing_summary(),
                        "template": template_for_prompt()}, ensure_ascii=False, indent=1)
     if not available():

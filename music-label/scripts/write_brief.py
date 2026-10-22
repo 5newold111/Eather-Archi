@@ -96,13 +96,17 @@ Hard rules (never break):
 2. Never copy lyrics lines, melodies, or distinctive phrases from any reference. Never name a real artist, band, song,
    or brand anywhere in the output (Suno rejects them and it is a likeness/IP risk). Describe by attributes instead.
 3. The artist's fixed constraints (composition habits, voice spec, signature techniques, tics, landscape words,
-   forbidden list, BPM range, drive/scene spec) override anything a reference suggests.
+   forbidden list, BPM range, drive/scene spec) override anything a reference suggests. Write for the act's listening
+   scene (persona.drive_scene / persona.scene and sound.scene_spec.notes): a live-house act needs a chorus a crowd can
+   sing and a band arrangement; a party act needs a steady danceable groove and DJ-friendly intro/outro; a personal-
+   listening act can use intimate detail, quiet dynamics and space; a driving act stays clear over road noise.
 4. Vocal: convert note names to descriptions ("the chorus peak sits just below where the voice would flip to
    falsetto, sung in full voice"). Blend the three vocal references 6:2:2 for EXPRESSION only (breath, ad-libs,
    layering, phrasing) - the timbre is fixed by the artist's Suno Persona.
 5. Phrase transformation: keep at most 2 of {rhythm, contour, instrument, position}; words always change; if contour
    is kept, intervals/key must change (contour_interval_changed=true).
-6. Hook/chorus element within the hook_within_sec limit; total length inside length_sec range; no sudden silence;
+6. Hook/chorus element within the hook_within_sec limit; total length inside length_sec range; no sudden silence
+   unless the spec has no_sudden_silence=false (then deliberate breaks/stops are allowed);
    nothing from forbidden/forbidden_topics; lyrics in the primary language; if trend_language is given and the
    artist allows it, use it only for one hook line or call-out, within the max ratio.
 7. Tics with frequency every_song MUST appear in the lyrics as section/performance tags (e.g. [Humming], [Whisper],

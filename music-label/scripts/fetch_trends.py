@@ -35,7 +35,11 @@ from _claude import available, call_json, call_research, dry_run_file  # noqa: E
 from _common import OUT, ROOT, monday_of, step, write_json  # noqa: E402
 
 THRESHOLD = 0.10   # 上位 50 曲のうち英語以外の言語がこの割合以上なら、トレンド言語にする
-SCENES = {"drive": "driving (morning highway, night drive, long distance)", "sleep": "falling asleep / sleep",
+SCENES = {"drive": "driving (morning highway, night drive, long distance)",
+          "live": "live houses and small venues (band energy, sing-along choruses)",
+          "party": "parties, clubs, pre-game playlists (danceable, steady groove)",
+          "personal": "personal listening (headphones, alone in a room, late nights)",
+          "sleep": "falling asleep / sleep",
           "morning": "morning coffee / slow morning", "focus": "focus, study, work",
           "move": "walking, running, gym"}
 

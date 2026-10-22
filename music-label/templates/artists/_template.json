@@ -39,7 +39,7 @@
       }
     ],
     "_influences": "影響を受けた音楽・アーティスト。name は公開プロフィール（bio）には書いてよいが、Suno の指示文には渡さない。指示文には era / genre / what_was_taken（何を受け継いだか）だけを渡す。reference_id はその人の曲を参考曲 DB に入れたときの ID",
-    "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）",
+    "_説明": "members は編成ぶんの人物。drive_scene はこの組が担当するドライブの場面（例：朝の高速、夜の環状線、雨の海岸線）。2026-10-22 からの追加の組は drive_scene の代わりに scene（聴かれる場面。主な場面を先頭に：ライブハウス／パーティ・クラブ／ひとりで聴く／ドライブ）と scene_type（live / party / personal / drive）、sound.scene_spec（その場面の仕様。_common.py の SCENE_TYPES）を使う（決定 29）",
     "formation_story": {
       "started": "",
       "how": "",
