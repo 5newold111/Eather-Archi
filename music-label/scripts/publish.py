@@ -334,6 +334,15 @@ def publish_folder(song: dict) -> tuple[Path, str, str]:
     return folder, f"{_songs.audio_stem(song)}.wav", cover_name
 
 
+def _credit_role(artist: dict) -> str:
+    """Apple の Performer の役割：編成に合わせる（声の切れ端だけの組は Vocals ではなく Performer）"""
+    form = str(artist.get("formation") or "")
+    sex = str((artist.get("vocal") or {}).get("sex") or "")
+    if form == "producer" or sex == "none":
+        return "Performer（声の切れ端・演奏）"
+    return "Vocals"
+
+
 def draft_fields(song: dict) -> dict:
     a = load_artist(song["slug"], song.get("label_slug")) or {}
     from _common import load_label
@@ -368,7 +377,7 @@ def draft_fields(song: dict) -> dict:
             if not ((a.get("distribution") or {}).get("spotify_uri") or artist_links(song["slug"]).get("spotify")) else
             f"Spotify：Yes（Artist ID {(a.get('distribution') or {}).get('spotify_uri') or artist_links(song['slug'])['spotify']['id']}）。"
             "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
-        "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 Vocals）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
+        "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 {_credit_role(a)}）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
     }

@@ -31,6 +31,7 @@
 | 決めたこと | `docs/12_decisions.md`（1〜26） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
+| 残り 4 組のデビューの段取り | `docs/17_debut_plan.md`（順番・1 組ぶんの流れ・DistroKid で選ぶもの） |
 
 ## 詰まっているところ（2026-10-13 時点。最新は管理表の「詰まっているところ」タブ）
 
