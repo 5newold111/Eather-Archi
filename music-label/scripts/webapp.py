@@ -104,6 +104,11 @@ def status_json() -> dict:
     import _guide
     for key in ("debut", "regular"):
         for r in tl[key]["rows"]:
+            if r.get("id") and not r.get("planned"):   # 間違えて進めたときに戻すボタン（ポップアップの上に出す。決定 38・41）
+                try:
+                    r["back"] = _guide.back_actions(_songs.by_id(r["id"]))
+                except Exception:  # noqa: BLE001
+                    r["back"] = []
             for ph in r["phases"]:
                 try:
                     ph["guide"] = _guide.explain(r, ph)
@@ -292,6 +297,7 @@ input[type=date]{font:inherit;font-size:13px;padding:3px 6px;border:1px solid va
 .cell{width:100%;min-height:44px;border-radius:8px;border:1.5px solid var(--line);background:transparent;color:var(--sub);font:inherit;font-size:12px;cursor:pointer;padding:4px;line-height:1.35}
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}.cell.done{background:var(--good-t);border-color:var(--good);color:var(--ink)}
 .cell.wait{background:var(--warn-t);border-color:var(--warn);color:var(--ink);font-weight:600}.cell.ng{background:var(--crit-t);border-color:var(--crit);color:var(--ink);font-weight:700}
+.backbox{border:1.5px dashed var(--muted);border-radius:10px;padding:8px 12px;margin:10px 0}.backbox .acts{margin-top:6px}
 .cell.run{border-style:dashed;border-color:var(--ink);color:var(--ink)}.cell.plan{border-style:dotted;border-color:var(--muted)}
 .cell .d{display:block;font-weight:400;font-size:11px;color:var(--crit)}
 dialog{border:1px solid var(--line);border-radius:14px;padding:0;max-width:min(640px,calc(100vw - 32px));width:100%;background:var(--card);color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.25)}
@@ -418,6 +424,7 @@ function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].r
   document.getElementById("dlg-body").innerHTML=`<p class="sub">${E(r.artist)}・${E(r.sub)}</p>
    <h3 id="dlg-title">${ICON[p.state]} ${E(p.name)}</h3>
    <span class="badge ${p.state}">${E(LABEL[p.state])}${cur&&p.who?`・${E(WHO(p.who))}`:""}${d?`・${d} 日`:""}</span> <span class="sub">${p.state==="plan"?"予定 ":""}${dates}</span>
+   ${(r.back||[]).length?`<div class="backbox"><b>← 戻る（間違えて進めたとき）</b><span class="sub">　前の工程に戻します。消さずに「戻したもの」に移すので、あとから取り出せます</span><div class="acts">${r.back.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    <h4>${p.state==="ng"?"止まっている原因":"いまの状態"}</h4><p>${E(WHO(g.cause))}</p>
    ${(g.steps||[]).length?`<h4>Gon さんがやること</h4><ol>${g.steps.map(x=>`<li>${E(WHO(x))}</li>`).join("")}</ol>`:""}
    ${ACTS.length?`<div class="acts">${ACTS.map((a,i)=>actHTML(a,i,r)).join("")}</div>`:""}<div id="dlg-job"></div>`;
@@ -477,7 +484,7 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
     el.className="job "+j.state;
     el.innerHTML=`<summary>${E(j.label)}　${E(st)}${E(sm)}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
     const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open){dj.className="job "+j.state;dj.textContent=`${j.label}　${st}${sm||(j.state==="error"?"（画面の下のログを確認）":"")}`}
-    if(j.state!=="running"){load();break}await new Promise(r=>setTimeout(r,2000))}}
+    if(j.state!=="running"){load();if(j.state==="done"&&String(j.label).startsWith("戻す")){const dl=document.getElementById("dlg");if(dl.open)dl.close()}break}await new Promise(r=>setTimeout(r,2000))}}
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}

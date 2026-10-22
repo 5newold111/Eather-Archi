@@ -61,12 +61,8 @@ def back_actions(song: dict | None) -> list[dict]:
 
 
 def explain(row: dict, phase: dict) -> dict:
-    g = _explain(row, phase)
-    if phase["name"].startswith(SONG_PHASES) and phase["state"] != "plan" and row.get("id"):
-        g = {**g, "actions": list(g.get("actions") or []) + back_actions(_songs.by_id(row["id"]))}
-        if g["actions"] and any(a.get("action") == "back" for a in g["actions"]):
-            g["steps"] = list(g.get("steps") or []) + ["間違えて進めてしまったときは、「←」のボタンで前の工程に戻せます"]
-    return g
+    # 戻すボタンは、工程ごとではなく曲の行ごとに、ポップアップの上の「← 戻る」の欄に出す（webapp.py の rows[].back）
+    return _explain(row, phase)
 
 
 def _explain(row: dict, phase: dict) -> dict:
