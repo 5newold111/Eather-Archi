@@ -360,6 +360,12 @@ def draft_fields(song: dict) -> dict:
         "音源ファイル": str(folder / audio), "ジャケット": str(folder / cover) if cover else "（まだ）",
         "歌詞": f"{_songs.cover_stem(song)}_歌詞.txt（同じフォルダ。Lyrics を提出する場合）",
         "ストア": "すべて（DistroKid の初期設定のまま）", "ISRC": "空欄（DistroKid が自動で付ける）",
+        "サブジャンル（1 つ目のジャンルの細かい分類）": "その組の音に近いものを自動で選ぶ（候補：" + " → ".join(g.title() for g in ((a.get("sound") or {}).get("genres") or [])[:4]) + "。無ければ近いもの）",
+        "Artist already in Apple Music / Spotify / YouTube Music / Instagram / Facebook?": (
+            "すべて No（デビュー曲：新しいアーティストのページを作る。同じ名前の別人のページに混ざらないように）"
+            if not (a.get("distribution") or {}).get("spotify_uri") else
+            f"Spotify：Yes（{(a.get('distribution') or {}).get('spotify_uri')}）。ほかはページができていれば Yes とその URL、無ければ No"),
+        "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 Vocals）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
     }

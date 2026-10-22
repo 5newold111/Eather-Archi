@@ -1316,6 +1316,11 @@ def distrokid_fields(song: dict) -> list[dict]:
         {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "hints": ["Language"], "below": ["Language"]},
         {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
+        # 1 つ目のジャンルの細かい分類（Electronic を選ぶと必須）。候補は 2 つ目のジャンルと同じく、組の音に近い順
+        {"key": "subgenre", "label": f"{f['Primary genre']} のサブジャンル", "type": "select", "value": genre2[0] if genre2 else "",
+         "alts": genre2[1:] + ["Electronica", "Downtempo"], "teach": False, "optional": True,
+         "hints": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"], "below": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"],
+         "show": "・".join(genre2[:3]) + " など（近いものを選ぶ）"},
         {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:],
          "hints": ["Secondary genre"], "below": ["Secondary genre"], "teach": False, "optional": True,
          "show": "・".join(genre2) + "（どれも無ければ空欄でよい）"},
@@ -1342,6 +1347,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     always = [f"Explicit lyrics：{draft['Explicit lyrics']}", f"Instrumental：{draft['Instrumental']}",
               f"AI の申告：{draft['AI の申告']}", f"Featured artist：{draft['Featured artist']}", f"ストア：{draft['ストア']}",
               f"Extras（有料の追加）：{draft.get('Extras（有料の追加）', 'すべてチェックしない')}",
+              f"Artist already in 〜?（5 つ）：{draft.get('Artist already in Apple Music / Spotify / YouTube Music / Instagram / Facebook?', 'デビュー曲はすべて No')}",
+              f"Track credits（Apple の決まり）：{draft.get('Track credits（Apple の決まり）', 'Performer：アーティスト名（Vocals）／Producer：本名（Producer）')}",
               f"Important checkboxes（必須の宣誓）：{draft.get('Important checkboxes（必須の宣誓）', 'Gon さんが文を読んで、当てはまるものを自分でチェック（システムは押さない）')}"]
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     sess.show("DistroKid に下書きを入れました",
