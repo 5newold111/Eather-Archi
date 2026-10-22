@@ -485,7 +485,14 @@ def find(sess: Session, site: str, f: dict):
         return page.locator(sel).first
     if f.get("css"):   # 本物の画面の部品の一覧でわかった欄の名前（DistroKid。2026-10-22）
         loc = page.locator(f["css"])
-        if loc.count() > 0 and (f["type"] in ("select", "file") or _visible(loc)):
+        n = loc.count()
+        for i in range(n):   # 同じ名前の欄が裏にもあることがある：画面に見えているほうに入れる
+            try:
+                if loc.nth(i).is_visible():
+                    return loc.nth(i)
+            except Exception:  # noqa: BLE001
+                pass
+        if n and f["type"] in ("select", "file"):
             return loc.first
     if f["type"] == "file":
         want = "audio" if f["key"] == "audio" else "image"
@@ -959,10 +966,12 @@ def _read(loc) -> str:
                            : (e.isContentEditable ? e.innerText : (e.value ?? ''))""")
 
 
-def fill_fields(sess: Session, site: str, fields: list[dict]) -> tuple[list[str], list[str]]:
+def fill_fields(sess: Session, site: str, fields: list[dict], fresh: bool = True) -> tuple[list[str], list[str]]:
+    """fresh=False：前に入れた欄の記録を残したまま足す（DistroKid で欄を何回かに分けて入れるとき）"""
     done, manual = [], []
-    sess.filled = {}
-    sess.log = []
+    if fresh or not hasattr(sess, "filled"):
+        sess.filled = {}
+        sess.log = []
     for f in fields:
         if challenge_shown(sess):
             raise Challenge()   # ロボット確認が出た：これ以上は何も触らない
@@ -1048,8 +1057,12 @@ def verify(sess: Session, fields: list[dict]) -> list[str]:
                 bad.append(f"{f['label']}：{f['show']} になっていません")
             continue
         loc = getattr(sess, "filled", {}).get(f["key"])
+        if loc is None and f.get("css"):   # 欄の名前がわかっているもの：画面に見えている欄を読む
+            cand = sess.page.locator(f["css"])
+            loc = next((cand.nth(i) for i in range(cand.count()) if cand.nth(i).is_visible()), None)
         if loc is None:
-            bad.append(f"{f['label']}：入っていません")
+            if not f.get("optional"):
+                bad.append(f"{f['label']}：入っていません")
             continue
         try:
             if f["type"] == "file":
@@ -1505,25 +1518,60 @@ VALIDATION_JS = r"""() => {
 }"""
 
 
-def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
-    """差し戻されたとき：丸・Artist already in・欄・Track credits をもう一度入れる（入れ直したものの一覧）"""
-    fixed = []
-    d, _ = set_radios(sess, distrokid_radios(song))
+def apply_choices(sess: Session, song: dict) -> tuple[list[str], list[str], list[str]]:
+    """丸（はい／いいえ）と Artist already in を選ぶ。(選べた丸, 選べなかった丸, Artist already in)"""
+    r_done, r_miss = set_radios(sess, distrokid_radios(song))
     a_items, a_texts = artist_id_radios(song)
-    ad, _ = set_radios(sess, a_items)
-    for label, css, val in a_texts:
+    a_done, _ = set_radios(sess, a_items)
+    for label, css, val in a_texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
         loc = sess.page.locator(css)
         if loc.count() and loc.first.is_visible():
             loc.first.fill(val)
-            ad.append(label)
-    fixed += [x for x in ad if "Artist already" in x or "URI" in x]
+            a_done.append(label)
+    return r_done, r_miss, a_done
+
+
+def _unchecked(sess: Session, song: dict) -> list[tuple[str, str]]:
+    a_items, _ = artist_id_radios(song)
+    out = []
+    for label, css in distrokid_radios(song) + a_items:
+        loc = sess.page.locator(css)
+        if loc.count() and not loc.first.is_checked():
+            out.append((label, css))
+    return out
+
+
+def stabilize(sess: Session, song: dict, fields: list[dict], rounds: int = 3) -> list[str]:
+    """DistroKid が画面を作り直して戻した丸・欄を、落ち着くまで入れ直す（最大 rounds 回）。最後まで戻せなかった丸の一覧"""
+    for i in range(rounds):
+        sess.settle(2500)
+        off = _unchecked(sess, song)
+        bad = verify(sess, fields)
+        if not off and not bad:
+            return []
+        print(f"   … 戻された項目を入れ直します（{i + 1} 回目）：" + "・".join([l for l, _ in off] + bad)[:300])
+        set_radios(sess, off)
+        again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
+        if again:
+            fill_fields(sess, "distrokid", again, fresh=False)
+    sess.settle(1500)
+    return [l for l, _ in _unchecked(sess, song)]
+
+
+def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
+    """差し戻されたとき：丸・Artist already in・欄・Track credits をもう一度入れる（入れ直したものの一覧）"""
+    fixed = []
+    off = _unchecked(sess, song)
     bad = verify(sess, fields)
+    r, _, a = apply_choices(sess, song)
+    fixed += [l for l, _ in off]
     again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
     if again:
-        done, _ = fill_fields(sess, "distrokid", again)
+        done, _ = fill_fields(sess, "distrokid", again, fresh=False)
         fixed += done
     c, _ = fill_credits(sess, song)
     fixed += c
+    stabilize(sess, song, fields)
     return list(dict.fromkeys(fixed))
 
 
@@ -1539,26 +1587,27 @@ def run_distrokid(sess: Session, song_id: str) -> int:
         print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
         return 2
     fields, draft = distrokid_fields(song)
-    # 丸（はい／いいえ）を先に選ぶ：DistroKid は丸を選ぶと画面の一部を作り直し、先に入れた配信日などが消えることがある（2026-10-22）
-    r_done, r_miss = set_radios(sess, distrokid_radios(song))
-    a_items, a_texts = artist_id_radios(song)
-    a_done, _ = set_radios(sess, a_items)
-    for label, css, val in a_texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
-        loc = sess.page.locator(css)
-        if loc.count() and loc.first.is_visible():
-            loc.first.fill(val)
-            a_done.append(label)
-    done, manual = fill_fields(sess, "distrokid", fields)
+    # 入れる順番（2026-10-22 の差し戻しから）：
+    #  1 アーティスト名と曲名 → DistroKid が Spotify・Apple・YouTube で同じ名前を探し終えるまで待つ（終わると、その欄を作り直して「Yes」に戻す）
+    #  2 丸（はい／いいえ・Artist already in）→ 3 残りの欄 → 4 Track credits → 5 落ち着いてから読み返し、戻されたものを入れ直す
+    first = [f for f in fields if f["key"] in ("artist", "title")]
+    done, manual = fill_fields(sess, "distrokid", first)
+    sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで探し始める）
+    sess.settle(3000)
+    r_done, r_miss, a_done = apply_choices(sess, song)
+    d2, m2 = fill_fields(sess, "distrokid", [f for f in fields if f not in first], fresh=False)
     c_done, c_manual = fill_credits(sess, song)
-    done += r_done + a_done + c_done
-    manual += c_manual
-    a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done)]
+    done += d2 + r_done + a_done + c_done
+    manual += m2 + c_manual
+    r_miss = stabilize(sess, song, fields) or r_miss
+    a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done) or any(f"in {svc}?" in m for m in r_miss)]
+    r_miss = [m for m in r_miss if "Artist already" not in m]
     bad = verify(sess, fields)
     if bad:   # 空になった欄（ほかの欄を入れたときに消えたものなど）を、もう一度だけ入れ直す
         again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
         if again:
             print("   … 空になった欄を入れ直します：" + "・".join(f["label"] for f in again))
-            fill_fields(sess, "distrokid", again)
+            fill_fields(sess, "distrokid", again, fresh=False)
             bad = verify(sess, fields)
     # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
     always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
