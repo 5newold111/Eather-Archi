@@ -218,6 +218,11 @@ def prompts_cover(artist: dict, brief: dict) -> list[dict]:
     rule = v.get("cover_series_rule", "")
     theme = ", ".join(artist.get("lyrics", {}).get("themes", [])[:3])
     seed = brief.get("cover_prompt_seed") or ""
+    try:   # Gon さんが入れた参考曲のジャケットから読み取った「アートの方向」（cover_refs.py。決定 35）
+        import cover_refs
+        seed += " " + cover_refs.art_direction(artist.get("slug", ""), brief)
+    except Exception:  # noqa: BLE001
+        pass
     title = (brief.get("title_candidates") or [""])[0]
     out = []
     variants = ["no text at all", "no text at all", "title only, small, matching the typography rule", "no text at all",

@@ -79,6 +79,9 @@ def stage_brief(week: date, a) -> None:
     if (S / "reference_db.py").exists() and not a.demo:
         step("SSD の参考データベースを読んでいます（reference_db.py。SSD が無ければ前回の取り込みを使う）")
         run([S / "reference_db.py", "--quiet"])
+    if (S / "cover_refs.py").exists() and not a.demo:
+        step("参考曲のジャケットを探して、特徴を読んでいます（cover_refs.py。新しい曲だけ。ジャケットづくりに使う）")
+        run([S / "cover_refs.py", "collect", "--quiet", "--limit", "20"])
     ref_dir = Path(a.references)
     n = references_ok(ref_dir)
     common = ["--week", week.isoformat()]

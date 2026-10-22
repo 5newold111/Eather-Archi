@@ -148,6 +148,13 @@ def main() -> None:
             if key not in act:   # この作業セットに無い種類（古い作業セットの photo2 など）
                 continue
             prompt = f"{act[key]}{data.get(common_key, '')}"
+            if kind == "cover":   # Gon さんが入れた参考曲のジャケットから読み取った「アートの方向」（cover_refs.py。決定 35）
+                try:
+                    import cover_refs
+                    d = cover_refs.art_direction(slug)
+                    prompt += (" " + d) if d else ""
+                except Exception:  # noqa: BLE001
+                    pass
             check_real_names(slug, prompt)
             raw = images / f"{slug}_{kind}_raw.png"
             out = images / f"{slug}_{kind}.jpg"
