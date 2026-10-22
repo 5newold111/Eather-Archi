@@ -24,6 +24,7 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
   python3 scripts/browser_fill.py suno                 # 作曲待ちの全曲を 1 曲ずつ
   python3 scripts/browser_fill.py suno PDR-003         # この曲だけ
   python3 scripts/browser_fill.py distrokid PDR-003    # DistroKid の下書き
+  python3 scripts/browser_fill.py photo tidewool spotify   # アーティスト写真を入れる（spotify / apple / amazon。「保存」は Gon さん。決定 32）
   python3 scripts/browser_fill.py login suno           # 初回：専用ブラウザでログインしておく（distrokid も）
   python3 scripts/browser_fill.py forget suno          # 覚えた欄の場所を消す（画面が変わってうまく入らないとき）
   python3 scripts/browser_fill.py reset                # 専用の Chrome を作り直す（ログインが何度も断られるとき）
@@ -54,7 +55,9 @@ import _songs  # noqa: E402
 
 S = Path(__file__).resolve().parent
 SITES = {"suno": os.environ.get("POSTDOG_SUNO_URL", "https://suno.com/create"),
-         "distrokid": os.environ.get("POSTDOG_DISTROKID_URL", "https://distrokid.com/new/")}
+         "distrokid": os.environ.get("POSTDOG_DISTROKID_URL", "https://distrokid.com/new/"),
+         # アーティスト写真を入れるサイト（artist_photo.py。決定 32）
+         "spotify": "https://artists.spotify.com/", "apple": "https://artists.apple.com/", "amazon": "https://artists.amazonmusic.com/"}
 LEARNED = OUT / "browser" / "fields.json"
 PROFILE = Path(os.environ.get("POSTDOG_BROWSER_PROFILE", str(Path.home() / ".postdog-browser")))
 AUTO = os.environ.get("POSTDOG_AUTOCONTINUE") == "1"   # 試験用：案内のボタンを待たずに進む
@@ -1378,6 +1381,77 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     return 2
 
 
+def run_photo(sess: Session, slug: str, service: str) -> int:
+    """アーティスト写真をサイトのアーティストのページに入れる（決定 32）。
+    システムはサイトのボタンを押さない。Gon さんが「写真を変える」などを押すと、ファイルを選ぶ画面の代わりに整えた画像が選ばれる。
+    切り抜きの確認と「保存」は Gon さんが押す"""
+    import artist_photo
+    svc = artist_photo.SERVICES.get(service)
+    if svc is None:
+        sys.exit(f"[エラー] サイトは {' / '.join(artist_photo.SERVICES)} のどれか")
+    art = artist_photo.artist_of(slug)
+    if art is None:
+        sys.exit(f"[エラー] 組 {slug} が見つかりません")
+    try:
+        imgs = artist_photo.prepare(slug)
+    except FileNotFoundError as e:
+        print(f"【結果】まだ終わっていません：{e}")
+        return 2
+    kinds = list(svc["images"])
+    state = {"kind": kinds[0], "set": []}
+
+    def on_chooser(fc):   # Gon さんがサイトの「写真を変える」を押したとき：ファイルを選ぶ画面の代わりに、整えた画像を入れる
+        try:
+            fc.set_files(str(imgs[state["kind"]]))
+            state["set"].append(state["kind"])
+            print(f"   ○ {svc['images'][state['kind']]} を選びました：{imgs[state['kind']].name}")
+        except Exception as e:  # noqa: BLE001
+            print(f"   ✕ 画像を選べませんでした：{e}")
+
+    def watch(pg):
+        try:
+            pg.on("filechooser", on_chooser)
+        except Exception:  # noqa: BLE001
+            pass
+    for pg in sess.ctx.pages:
+        watch(pg)
+    sess.ctx.on("page", watch)
+    sess.goto(svc["url"])
+    sess.ensure_login(service)
+
+    def lines():
+        now = svc["images"][state["kind"]]
+        got = "・".join(svc["images"][k] for k in dict.fromkeys(state["set"])) or "まだ"
+        return ([f"{art['name']} の写真を {svc['name']} に入れます。", *svc["how"],
+                 f"サイトの写真の「編集」「アップロード」などを押すと、ファイルを選ぶ画面の代わりに「{now}」が自動で選ばれます。",
+                 "切り抜きを確かめて、「保存」は Gon さんが押してください（公開されます。システムは押しません）。",
+                 f"選んだ画像：{got}"]
+                + (["⚠ 元の写真が小さいので、サイトに断られるかもしれません"] if imgs.get("_small") else []))
+
+    def buttons():
+        bs = [{"id": f"kind_{k}", "label": f"次に選ぶ画像：{v}" + ("（いま）" if k == state["kind"] else ""), "primary": False}
+              for k, v in svc["images"].items()] if len(kinds) > 1 else []
+        return bs + [{"id": "done", "label": "保存した（記録する）", "primary": True}, {"id": "stop", "label": "閉じる（まだ）"},
+                     {"id": "copy_parts", "label": "画面の部品をコピー（うまくいかないとき・Claude に貼る用）"}]
+    while True:
+        sess.show(f"アーティスト写真：{svc['name']}", lines(), buttons())
+        m = sess.wait({"action": "stop"})
+        act = m.get("action", "")
+        if act.startswith("kind_") and act[5:] in svc["images"]:
+            state["kind"] = act[5:]
+            continue
+        break
+    if act == "done":
+        artist_photo.mark_done(slug, service, imgs.get("_source"))
+        print(f"【結果】{art['name']} の写真を {svc['name']} に入れたと記録しました")
+        return 0
+    if act == "closed":
+        raise BrowserClosed()
+    print(f"【結果】まだ終わっていません：{svc['name']} の写真は「保存した」が押されていません"
+          + (f"（選んだ画像：{'・'.join(dict.fromkeys(state['set']))}）" if state["set"] else ""))
+    return 2
+
+
 def open_login(site: str) -> bool:
     """ログイン：自動操作をつながない、ふつうの専用の Chrome で開く（Google でのログインも通る）"""
     if not chrome_path():
@@ -1387,7 +1461,8 @@ def open_login(site: str) -> bool:
     open_chrome(SITES[site], debug=False)
     print(f"○ 専用の Chrome で {site} を開きました。システムはこの Chrome にはつながっていません。")
     print("  いつものアカウント（Google など）でログインしてください。次からは覚えています。")
-    print(f"【結果】ログイン用に Chrome を開きました。ログインが済んだら「{'Suno' if site == 'suno' else 'DistroKid'} に入力する」を押してください"
+    name = {"suno": "Suno に入力する", "distrokid": "DistroKid に入力する"}.get(site, "写真を入れる")
+    print(f"【結果】ログイン用に Chrome を開きました。ログインが済んだら、もう一度「{name}」を押してください"
           "（ログインできたかどうかは、ダッシュボードからは見えません）")
     return True
 
@@ -1404,7 +1479,7 @@ def run_login(sess: Session, site: str) -> int:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno と DistroKid の入力を、システムが専用のブラウザで行う（押すのは Gon さん）")
-    ap.add_argument("what", choices=["suno", "distrokid", "login", "forget", "reset", "parts"])
+    ap.add_argument("what", choices=["suno", "distrokid", "photo", "login", "forget", "reset", "parts"])
     ap.add_argument("args", nargs="*", help="suno：曲 ID（省くと全曲）／distrokid：曲 ID／login・forget：suno か distrokid")
     a = ap.parse_args()
     if a.what == "forget":
@@ -1434,6 +1509,8 @@ def main() -> None:
         sys.exit("[案内] ブラウザで入力する部品がありません。ターミナルで  python3 -m pip install --user playwright  を 1 回実行してください")
     if a.what == "distrokid" and not a.args:
         sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003）")
+    if a.what == "photo" and len(a.args or []) < 2:
+        sys.exit("[エラー] 組とサイトを付けてください（例 photo tidewool spotify）")
     code, need = 0, None
     with sync_playwright() as pw:
         sess = Session(pw)
@@ -1442,6 +1519,8 @@ def main() -> None:
                 code = run_suno(sess, a.args)
             elif a.what == "distrokid":
                 code = run_distrokid(sess, a.args[0])
+            elif a.what == "photo":
+                code = run_photo(sess, a.args[0], a.args[1])
             elif a.what == "parts":   # いま開いている Suno（または DistroKid）の画面の部品の一覧
                 site = (a.args or ["suno"])[0]
                 pg = next((x for x in reversed(sess.ctx.pages) if _base(_host(x.url)) == _base(_host(SITES[site]))), None)

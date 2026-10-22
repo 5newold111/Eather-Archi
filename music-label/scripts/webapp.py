@@ -167,7 +167,9 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", "")))
         if song:
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
-    if action == "browser_login" and p.get("site") in ("suno", "distrokid"):
+    if action == "fill_photo" and p.get("slug") in _slugs() and p.get("service") in ("spotify", "apple", "amazon"):
+        return [PY, str(S / "browser_fill.py"), "photo", p["slug"], p["service"]], f"ブラウザで入力（写真：{p['slug']} → {p['service']}）"
+    if action == "browser_login" and p.get("site") in ("suno", "distrokid", "spotify", "apple", "amazon"):
         return [PY, str(S / "browser_fill.py"), "login", p["site"]], f"ブラウザで入力（{p['site']} にログイン）"
     if action == "browser_parts" and p.get("site") in ("suno", "distrokid"):
         return [PY, str(S / "browser_fill.py"), "parts", p["site"]], f"ブラウザで入力（{p['site']} の画面の部品を記録）"
@@ -286,7 +288,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin-top:10px;font-size:14px;color:var(--sub)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a><span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
@@ -534,6 +536,9 @@ class Handler(BaseHTTPRequestHandler):
             page, _ = suno_page()
             back = '<p style="max-width:860px;margin:16px auto 0;padding:0 16px"><a href="/">← ダッシュボードへ</a></p>'
             return self._send(200, page.replace("<main>", back + "<main>", 1), extra=extra)
+        if path == "/photos":
+            import artist_photo
+            return self._send(200, artist_photo.photos_page(TOKEN), extra=extra)
         if path == "/phone":
             import phone
             return self._send(200, phone.phone_index(TOKEN), extra=extra)

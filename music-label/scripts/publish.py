@@ -379,6 +379,7 @@ def draft_fields(song: dict) -> dict:
             "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
         "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 {_credit_role(a)}）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
+        "アーティスト写真": "DistroKid の登録画面には欄が無い。配信が始まってアーティストのページができたら、ダッシュボードの「アーティスト写真」から Spotify・Apple Music・Amazon Music に入れる（決定 32）",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
     }
 
