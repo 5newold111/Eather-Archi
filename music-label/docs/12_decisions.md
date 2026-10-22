@@ -634,3 +634,12 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 本名を入れる案内（`setup_keys.py --only owner`）が「例 山田 太郎」と漢字になっていた。DistroKid の欄はローマ字の名・姓に分かれているので、漢字だと正しく分けられず Songwriter と Producer が入らない → 案内を「ローマ字で 名 姓（例 Taro Yamada）」に直し、確かめもローマ字かどうかを見る
 - ダッシュボードの「仕組みの詰まり」に、本名が無い・ローマ字でないことを赤で出す。DistroKid の入力の案内にも出す
 - 「DistroKid に入力する」のログに、入れ終わったときの画面の状態（配信日・ジャンル・Songwriter と Producer が入っているか・Artist already in の 5 つの選択）を 1 行で残す。本名そのものはログに出さない（「あり」とだけ出す）。差し戻されたとき、入力で入らなかったのか、あとで消えたのかを見分けるため
+
+## 44. Track credits の決まりと、ジャンルは DistroKid の実際の選択肢から選ぶ（2026-10-22。オーナーの指示）
+
+- Performer：インストの組は本名（演奏した人。役割 Performer）、それ以外はアーティスト名（役割 Vocals。HOLLOWPLAN は Performer）
+- Producer：全組とも本名（`.env` の `OWNER_LEGAL_NAME`。ローマ字の「名 姓」）。本名はリポジトリには書かない
+- ジャンル：DistroKid の画面のドロップダウンの実際の選択肢の中からだけ選ぶ
+  - 組の音の言葉（city pop・house など）を、DistroKid のジャンル名の候補（Pop・Dance・Electronic・Singer/Songwriter など）に置き換える対応表（`publish.py` の `GENRE_MAP`）
+  - 入力のとき、画面の選択肢を読み、候補を上から順に、選択肢にあるものだけを選ぶ（無い名前は選ばない）。サブジャンルは組の音の言葉そのもの（Synthwave・House など）を先に試す
+  - 読んだ選択肢は `out/knowledge/distrokid_genres.json` に記録し、次からの下書きのジャンルも、この一覧にある名前だけで作る

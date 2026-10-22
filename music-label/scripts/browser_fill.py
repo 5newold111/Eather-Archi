@@ -878,6 +878,18 @@ def _is_field(loc) -> bool:
         return False
 
 
+def _remember_options(key: str, opts: list[str]) -> None:
+    import publish
+    real = [o for o in opts if o and not re.match(r"(?i)select", o)]
+    if not real:
+        return
+    d = read_json(publish.DK_GENRES) if publish.DK_GENRES.exists() else {}
+    if d.get(key) != real:
+        d[key] = real
+        publish.DK_GENRES.parent.mkdir(parents=True, exist_ok=True)
+        publish.DK_GENRES.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def put(sess: Session, loc, f: dict) -> bool:
     """欄に値を入れる。押してはいけないボタンには触らない"""
     v = f.get("value", "")
@@ -908,6 +920,8 @@ def put(sess: Session, loc, f: dict) -> bool:
                 return true; }""", [str(v)] + [str(x) for x in (f.get("alts") or [])]))
         if f["type"] == "select" and tag == "select":
             opts = loc.evaluate("e => [...e.options].map(o => o.text.trim())")
+            if f.get("key") in ("genre1", "genre2", "subgenre"):   # DistroKid の実際の選択肢を記録（下書きも、この中の名前で作る）
+                _remember_options("sub:" + str(sess.filled_genre1) if f["key"] == "subgenre" and getattr(sess, "filled_genre1", "") else f["key"], opts)
             wants = [str(x) for x in [v] + list(f.get("alts") or []) if x]
             # 候補を順に：まず同じ名前、無ければ名前を含むもの（5 文字以上の候補だけ。「Pop」が「K-Pop」に当たらないように）
             hits = [o for w in wants for o in opts if _norm(o) == _norm(w)] + \
@@ -916,6 +930,8 @@ def put(sess: Session, loc, f: dict) -> bool:
                 if hit:
                     loc.select_option(label=hit)
                     f["chosen"] = hit
+                    if f.get("key") == "genre1":
+                        sess.filled_genre1 = hit
                     return True
             return False
         if f["type"] == "date" and (loc.get_attribute("type") or "") == "date":
@@ -1354,7 +1370,10 @@ def distrokid_fields(song: dict) -> list[dict]:
     # 2 つ目のジャンル：DistroKid の一覧は 1 つ目のジャンルに合わせて変わるので、その組の音に近い順に候補を並べて試す
     from _common import load_artist
     sound = ((load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}).get("sound") or {})
-    cands = [g.title() for g in sound.get("genres", [])] + [f["Secondary genre"]]
+    # ジャンルの候補は DistroKid のジャンル名に置き換えたもの（publish.genre_prefs）。画面では、選択肢にあるものだけを選ぶ（決定 44）
+    prefs = publish.genre_prefs([f["Primary genre"], f["Secondary genre"]] + list(sound.get("genres") or []))
+    genre1_alts = [g for g in prefs if g != f["Primary genre"]]
+    cands = prefs + [g.title() for g in sound.get("genres", [])]
     genre2 = [g for i, g in enumerate(cands) if g and g.lower() != str(f["Primary genre"]).lower()
               and g.lower() not in [c.lower() for c in cands[:i]]]
     return [
@@ -1366,11 +1385,13 @@ def distrokid_fields(song: dict) -> list[dict]:
          "teach": False, "show": f["Release date"]},
         {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "css": "select[name=language]",
          "hints": ["Language"], "below": ["Language"]},
-        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "css": "select[name=genre1]", "hints": ["Primary genre", "Genre"],
+        {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "alts": genre1_alts, "css": "select[name=genre1]", "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
         # 1 つ目のジャンルの細かい分類（Electronic を選ぶと必須）。候補は 2 つ目のジャンルと同じく、組の音に近い順
-        {"key": "subgenre", "label": f"{f['Primary genre']} のサブジャンル", "type": "select", "value": genre2[0] if genre2 else "",
-         "alts": genre2[1:] + ["Electronica", "Downtempo"], "teach": False, "optional": True,
+        # サブジャンルは組の音の言葉そのもの（Synthwave・House など）を先に、無ければ近い大きな分け方。画面の選択肢にあるものだけ選ぶ
+        {"key": "subgenre", "label": f"{f['Primary genre']} のサブジャンル", "type": "select",
+         "value": (subs := [g.title() for g in sound.get("genres", [])] + genre2 + ["Electronica", "Downtempo"])[0],
+         "alts": subs[1:], "teach": False, "optional": True,
          "hints": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"], "below": [f"{f['Primary genre']} subgenre", "Subgenre", "Sub-genre"],
          "show": "・".join(genre2[:3]) + " など（近いものを選ぶ）"},
         {"key": "genre2", "label": "Secondary genre", "type": "select", "value": genre2[0] if genre2 else "", "alts": genre2[1:], "css": "select[name=genre2]",
@@ -1459,7 +1480,9 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
     from _common import load_artist
     art = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
     owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
-    rows = [("Performer", publish._credit_role(art), "input[name=performer-name]", song["artist"]),
+    # Performer：インストの組は本名（演奏した人）、それ以外はアーティスト名。Producer：全組とも本名（.env の OWNER_LEGAL_NAME）。決定 44
+    inst = bool(song.get("instrumental")) or (art.get("lyrics") or {}).get("mode") == "instrumental"
+    rows = [("Performer", "Performer" if inst else publish._credit_role(art), "input[name=performer-name]", owner if inst else song["artist"]),
             ("Producer", "Producer", "input[name=producer-name]", owner)]
     roles = sess.page.locator("input.dk-searchable-select__input")
     done, manual = [], []

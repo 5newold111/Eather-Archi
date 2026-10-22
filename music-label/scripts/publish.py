@@ -350,6 +350,47 @@ def _cover_text_note(song: dict) -> str:
     return "曲名・アーティスト名と同じ（OK）" if m else "⚠ 曲名かアーティスト名が変わっています。ジャケットを仕上げ直してください（finalize_cover.py）"
 
 
+# 組の音の言葉 → DistroKid のジャンル名の候補（上から順に。実際に選ぶのは、画面の選択肢にあるものだけ。決定 44）
+GENRE_MAP = [
+    (r"house|techno|disco|club|edm|garage|dance", ["Dance", "Electronic"]),
+    (r"synth|electro|retrowave|synthwave|chillwave|idm|electronica", ["Electronic", "Pop"]),
+    (r"lo-?fi|downtempo|ambient|chill|drone", ["Electronic", "Ambient", "New Age"]),
+    (r"singer|songwriter", ["Singer/Songwriter", "Folk"]),
+    (r"folk|acoustic|americana|bluegrass", ["Folk", "Singer/Songwriter"]),
+    (r"rock|jangle|shoegaze|grunge|punk", ["Rock", "Alternative"]),
+    (r"indie|alternative|alt-", ["Alternative", "Pop"]),
+    (r"r&b|rnb|soul|funk|neo-soul", ["R&B/Soul", "Pop"]),
+    (r"hip ?hop|rap|trap|boom ?bap", ["Hip Hop/Rap"]),
+    (r"jazz|swing|bossa", ["Jazz"]),
+    (r"country", ["Country"]),
+    (r"pop|sophisti|night pop|city", ["Pop"]),
+]
+DK_GENRES = OUT / "knowledge" / "distrokid_genres.json"   # 入力のときに読んだ DistroKid の実際の選択肢（browser_fill.py が書く）
+
+
+def dk_options(key: str) -> list[str]:
+    """前に DistroKid の画面で読んだ選択肢（genre1 / genre2 / sub:<ジャンル>）。まだ読んでいなければ空"""
+    try:
+        return list((read_json(DK_GENRES) if DK_GENRES.exists() else {}).get(key) or [])
+    except (OSError, ValueError):
+        return []
+
+
+def genre_prefs(words: list[str]) -> list[str]:
+    """ジャンルの言葉の並び → DistroKid のジャンル名の候補（重ならない順）"""
+    out = []
+    for w in words:
+        lw = str(w).lower()
+        if any(lw == g.lower() for _, gs in GENRE_MAP for g in gs):   # もう DistroKid の名前
+            out.append(next(g for _, gs in GENRE_MAP for g in gs if g.lower() == lw))
+            continue
+        for rx, gs in GENRE_MAP:
+            if re.search(rx, lw):
+                out += gs
+                break
+    return list(dict.fromkeys(out))
+
+
 def _credit_role(artist: dict) -> str:
     """Apple の Performer の役割：編成に合わせる（声の切れ端だけの組は Vocals ではなく Performer）"""
     form = str(artist.get("formation") or "")
@@ -373,7 +414,11 @@ def draft_fields(song: dict) -> dict:
     else:
         when = str(song["release_at"])[:10]
     lang = {"en": "English", "ja": "Japanese", "none": "Instrumental"}.get(song.get("language"), song.get("language") or "English")
-    genres = song.get("genre") or []
+    # ジャンルは DistroKid の一覧にある名前で（作業セットのジャンル → 組の音の言葉を置き換えた候補。前に読んだ選択肢があれば、その中のものだけ）
+    sound_words = list((a.get("sound") or {}).get("genres") or [])
+    cands = genre_prefs(list(song.get("genre") or []) + sound_words)
+    known = dk_options("genre1")
+    genres = [g for g in cands if not known or g in known] or cands
     return {
         "曲 ID": song["id"], "アカウント": ((label or {}).get("accounts") or {}).get("distrokid_email") or "本体アカウント（EtherArchi）",
         "Artist / Band name": song["artist"],
@@ -393,7 +438,8 @@ def draft_fields(song: dict) -> dict:
             if not ((a.get("distribution") or {}).get("spotify_uri") or artist_links(song["slug"]).get("spotify")) else
             f"Spotify：Yes（Artist ID {(a.get('distribution') or {}).get('spotify_uri') or artist_links(song['slug'])['spotify']['id']}）。"
             "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
-        "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 {_credit_role(a)}）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
+        "Track credits（Apple の決まり）": (f"Performer：本名（インストの組。役割 Performer）" if song.get("instrumental") or (a.get("lyrics") or {}).get("mode") == "instrumental"
+                                       else f"Performer：{song['artist']}（役割 {_credit_role(a)}）") + "／Producer：本名（.env の OWNER_LEGAL_NAME。全組共通・役割 Producer）。Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
         "ジャケットの文字": _cover_text_note(song),
         "アーティスト写真": "DistroKid の登録画面には欄が無い。配信が始まってアーティストのページができたら、ダッシュボードの「アーティスト写真」から Spotify・Apple Music・Amazon Music に入れる（決定 32）",
