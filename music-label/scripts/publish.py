@@ -360,6 +360,7 @@ def draft_fields(song: dict) -> dict:
         "音源ファイル": str(folder / audio), "ジャケット": str(folder / cover) if cover else "（まだ）",
         "歌詞": f"{_songs.cover_stem(song)}_歌詞.txt（同じフォルダ。Lyrics を提出する場合）",
         "ストア": "すべて（DistroKid の初期設定のまま）", "ISRC": "空欄（DistroKid が自動で付ける）",
+        "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
     }
 
