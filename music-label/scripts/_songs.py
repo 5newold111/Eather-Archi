@@ -53,6 +53,7 @@ def debut_songs() -> list[dict]:
                 "release_at": None, "style": s.get("style", ""), "lyrics": s.get("lyrics", ""),
                 "exclude": s.get("exclude", ""), "genre": list(s.get("genre") or []), "language": s.get("language", ""),
                 "instrumental": bool(s.get("instrumental")), "brief": None, "kit": kit_json.parent, "bpm": s.get("bpm"),
+                "episode": s.get("episode") or {},   # この曲のエピソード（決定 33）
             })
     return out
 
