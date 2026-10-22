@@ -469,7 +469,7 @@ def _pick(loc, avoid, field_only: bool = False):
 def find(sess: Session, site: str, f: dict):
     page = sess.page
     sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
-    if sel and _visible(page.locator(sel)):
+    if sel and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)):
         return page.locator(sel).first
     if f["type"] == "file":
         want = "audio" if f["key"] == "audio" else "image"
@@ -502,6 +502,11 @@ def find(sess: Session, site: str, f: dict):
                     return c
             except Exception:  # noqa: BLE001
                 continue
+    if f["type"] == "select":   # 見た目は別の部品で、本物の選ぶ箱が隠れている作り
+        for h in f.get("below", []) + f.get("hints", []):
+            sel = sess.js(HIDDEN_SELECT_JS, [h])
+            if sel:
+                return page.locator(sel).first
     if f.get("largest_textarea"):
         sel = sess.js("""() => { let best = null, size = 0;
             for (const t of document.querySelectorAll('textarea')) { const r = t.getBoundingClientRect();
@@ -563,6 +568,18 @@ BELOW_JS = r"""([hint, sel, maxdy]) => { const want = hint.trim().toLowerCase();
         const dy = r.top - lr.top; if (dy < -15 || dy > maxdy) continue;
         const d = Math.abs(dy) + Math.abs(r.left - lr.left) * 0.2; if (d < bd) { bd = d; best = c; } } }
     return best ? window.__postdogSel(best) : null; }"""
+# 見出しの近くの、隠れていてもよい選ぶ箱（select）。かたまりの中に 1 つだけのとき
+HIDDEN_SELECT_JS = r"""([hint]) => { const want = hint.trim().toLowerCase();
+    for (const el of document.querySelectorAll('label,span,div,p,h2,h3,h4,legend,strong,b')) {
+      const r = el.getBoundingClientRect(); if (!(r.width > 0 && r.height > 0)) continue;
+      if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim().toLowerCase().replace(/[:*]$/, '').trim() === want)) continue;
+      for (let up = el, i = 0; i < 4 && up; i++, up = up.parentElement) {
+        const ss = up.querySelectorAll('select'); if (ss.length === 1) return window.__postdogSel(ss[0]); if (ss.length > 1) break; } }
+    return null; }"""
+# クリックした部品のまわりにある、隠れた選ぶ箱
+SELECT_AROUND_JS = r"""e => { for (let up = e, i = 0; i < 4 && up; i++, up = up.parentElement) {
+      const ss = up.querySelectorAll('select'); if (ss.length === 1) return window.__postdogSel(ss[0]); if (ss.length > 1) break; }
+    return null; }"""
 FIELD_SEL = "textarea,input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),[contenteditable=true],[contenteditable='']"
 SLIDER_SEL = "[role=slider],input[type=range]"
 TIME_SEL = "input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=file])"
@@ -807,12 +824,17 @@ def teach(sess: Session, site: str, f: dict):
               [f"「{f['label']}」の入力欄を 1 回クリックしてください。場所を覚えて、次からは自動で入れます。",
                *([f["tip"]] if f.get("tip") else []),
                "（このクリックでボタンが押されることはありません）"],
-              [{"id": "skip", "label": "この欄はとばす（手で入れる）"}], pick=True)
+              [{"id": "skip", "label": "この欄はとばす（手で入れる）"},
+               {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}], pick=True)
     for _ in range(3):
         m = sess.wait({"action": "skip"})
         if m.get("action") != "picked" or not m.get("selector"):
             return None
         loc = sess.page.locator(m["selector"]).first
+        if f["type"] == "select" and not _is_field(loc):
+            near = loc.evaluate(SELECT_AROUND_JS)
+            if near:
+                m["selector"], loc = near, sess.page.locator(near).first
         if f["type"] in ("text", "date", "select") and not _is_field(loc):
             sess.show("そこは入力欄ではありません", [f"「{f['label']}」の、文字を入れる枠そのものをクリックしてください（ボタンやリンクは選べません）。"],
                       [{"id": "skip", "label": "この欄はとばす（手で入れる）"}], pick=True)
@@ -852,6 +874,13 @@ def put(sess: Session, loc, f: dict) -> bool:
                 return False
             return True
         tag = loc.evaluate("e => e.tagName.toLowerCase()")
+        if f["type"] == "select" and tag == "select" and not loc.is_visible():
+            return bool(loc.evaluate("""(e, v) => { const n = s => String(s).replace(/\s+/g, ' ').trim().toLowerCase();
+                const o = [...e.options].find(o => n(o.text) === n(v)) || [...e.options].find(o => n(o.text).includes(n(v)));
+                if (!o) return false; e.value = o.value;
+                e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true}));
+                if (window.jQuery) { try { window.jQuery(e).val(o.value).trigger('change'); } catch (x) {} }
+                return true; }""", str(v)))
         if f["type"] == "select" and tag == "select":
             try:
                 loc.select_option(label=str(v))
