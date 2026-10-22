@@ -604,3 +604,10 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 直したこと：丸を先に選び、そのあとで欄を入れる。最後に読み返して、空になった欄はもう一度だけ入れ直す。配信日は、選べるいちばん早い日（min）より前ならその日にし、入らなければ値を直接入れてサイトに知らせる
 - Track credits（Apple の決まり）：Performer＝組の名前（役割 Vocals。HOLLOWPLAN は Performer）、Producer＝本名（`.env` の `OWNER_LEGAL_NAME`、役割 Producer）を自動で入れる。役割は「打って選ぶ箱」なので、打ってから同じ名前の候補を押す
 - 同じ組の 2 曲目から：Spotify のアーティストのページがわかっていれば「Yes」を選び、下の欄に `spotify:artist:<ID>` を入れる。Apple などのページの住所はまだ記録していないので、そこは Gon さんが選ぶ
+
+## 40. DistroKid の差し戻し（Validation Errors）を見張って、自動で入れ直す（2026-10-22。39 を広げる）
+
+- SOFT CANTILEVER で出たエラー：primary genre・release date・Artist already in 〜?（5 つとも「Yes」のまま住所が空）・track credits。どれもシステムが入れられる項目
+- デビュー曲の Artist already in 〜? は、DistroKid の表示（「0 件」）に頼らず必ず「No（新しいページ）」を選ぶ（前の曲が無いため）。2 曲目からは、これまでどおり「0 件」のときだけ No、Spotify のページがわかっていれば Yes と URI
+- 「DistroKid に入力する」のあと、案内を出して待っている間に、2 秒ごとに差し戻しの欄（Validation Errors）を見張る。出たら、丸・Artist already in・空の欄・Track credits を入れ直し、エラーの文と入れ直したものを案内に出す。Gon さんは宣誓を確かめて、もう一度「Continue」を押すだけ
+- 同じ差し戻しの欄は 1 回だけ読む（DistroKid が出し直したら、また読む）

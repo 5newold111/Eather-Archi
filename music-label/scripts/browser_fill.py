@@ -364,14 +364,19 @@ class Session:
         self.overlay_host = _host(self.page.url)
         self.js(OVERLAY_JS, self.overlay)
 
-    def wait(self, auto: dict | None = None) -> dict:
-        """右下の案内のボタン（またはクリックで教える）を待つ。ブラウザを閉じられたら {'action': 'closed'}"""
+    def wait(self, auto: dict | None = None, tick=None) -> dict:
+        """右下の案内のボタン（またはクリックで教える）を待つ。ブラウザを閉じられたら {'action': 'closed'}。
+        tick：待っている間に 2 秒ごとに呼ぶ見張り（DistroKid の差し戻しの見張りなど）"""
         self.msg = None
         if AUTO:
             return auto or {"action": "continue"}
+        n = 0
         while self.msg is None:
             try:
                 self.page.wait_for_timeout(400)
+                n += 1
+                if tick and n % 5 == 0:
+                    tick()
                 if self.overlay and _host(self.page.url) == getattr(self, "overlay_host", "") and \
                         not self.page.evaluate("!!document.getElementById('postdog-overlay')"):
                     self.js(OVERLAY_JS, self.overlay)   # 同じサイトの中でページが切り替わったら案内を出し直す
@@ -1410,7 +1415,9 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
             pick.append((f"Artist already in Spotify? → Yes（前の曲のページ）", f'input[type=radio][name="{name}"][value=""]'))
             texts.append((f"Spotify のアーティスト URI（spotify:artist:{sp}）", "input.myCustomSpotifyUri", f"spotify:artist:{sp}"))
             continue
-        pick.append((f"Artist already in {svc}? → No（新しいページ）", f'input[type=radio][name="{name}"][value="new"][class*="ZeroMatches"]'))
+        # デビュー曲は前の曲が無いので必ず No（新しいページ）。2 曲目からは DistroKid が「0 件」と出したときだけ No
+        cond = "" if song.get("kind") == "debut" else '[class*="ZeroMatches"]'
+        pick.append((f"Artist already in {svc}? → No（新しいページ）", f'input[type=radio][name="{name}"][value="new"]{cond}'))
     return pick, texts
 
 
@@ -1485,6 +1492,41 @@ def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], 
     return done, missing
 
 
+# DistroKid の差し戻し（Validation Errors）の欄。まだ見ていないものだけを読む
+VALIDATION_JS = r"""() => {
+  // 見出しだけでなく、エラーの行まで入ったいちばん小さい囲み。前に読んだ囲み（とその外側・内側）は読まない
+  const all = [...document.querySelectorAll('body *')].filter(e => !e.closest('#postdog-overlay')
+      && !e.closest('[data-postdog-seen]') && !e.querySelector('[data-postdog-seen]')
+      && /Validation Errors/.test(e.innerText || '') && (e.innerText || '').split('\n').filter(x => x.trim()).length >= 2);
+  if (!all.length) return '';
+  const el = all.reduce((a, b) => (a.innerText.length <= b.innerText.length ? a : b));
+  el.dataset.postdogSeen = '1';
+  return el.innerText.slice(0, 3000);
+}"""
+
+
+def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
+    """差し戻されたとき：丸・Artist already in・欄・Track credits をもう一度入れる（入れ直したものの一覧）"""
+    fixed = []
+    d, _ = set_radios(sess, distrokid_radios(song))
+    a_items, a_texts = artist_id_radios(song)
+    ad, _ = set_radios(sess, a_items)
+    for label, css, val in a_texts:
+        loc = sess.page.locator(css)
+        if loc.count() and loc.first.is_visible():
+            loc.first.fill(val)
+            ad.append(label)
+    fixed += [x for x in ad if "Artist already" in x or "URI" in x]
+    bad = verify(sess, fields)
+    again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
+    if again:
+        done, _ = fill_fields(sess, "distrokid", again)
+        fixed += done
+    c, _ = fill_credits(sess, song)
+    fixed += c
+    return list(dict.fromkeys(fixed))
+
+
 def run_distrokid(sess: Session, song_id: str) -> int:
     song = _songs.by_id(song_id)
     if song is None:
@@ -1538,7 +1580,22 @@ def run_distrokid(sess: Session, song_id: str) -> int:
               [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"},
                {"id": "copy_parts", "label": "画面の部品をコピー（入らない欄があるとき・Claude に貼る用）"}],
               date_value=date.today().isoformat())
-    m = sess.wait({"action": "stop"})
+
+    def watch_errors():   # Gon さんが Continue を押して差し戻されたら、エラーの文を読んで入れ直す
+        txt = sess.js(VALIDATION_JS, default="")
+        if not txt:
+            return
+        print("   … DistroKid に差し戻されました：" + " ／ ".join(x.strip() for x in txt.splitlines()[1:6] if x.strip()))
+        fixed = distrokid_fix(sess, song, fields)
+        left = verify(sess, fields)
+        sess.show("DistroKid に差し戻されたので、入れ直しました",
+                  ["DistroKid のエラー：", *[x.strip() for x in txt.splitlines()[1:10] if x.strip()],
+                   ("入れ直したもの：" + "・".join(fixed)) if fixed else "入れ直せるものはありませんでした",
+                   *(["⚠ まだ入っていない欄（手で入れてください）：", *left] if left else []),
+                   "宣誓の 5 つのチェックを確かめて、もう一度「Continue」を押してください（押すのは Gon さんだけ）。"],
+                  [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"},
+                   {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}], date_value=date.today().isoformat())
+    m = sess.wait({"action": "stop"}, tick=watch_errors)
     if m.get("action") == "registered":
         day = m.get("date") or date.today().isoformat()
         r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
