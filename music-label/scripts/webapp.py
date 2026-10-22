@@ -95,6 +95,11 @@ def status_json() -> dict:
         weekly = []
     for x in songs:
         x["flow"] = "regular" if _timeline.in_regular(x["slug"]) else "debut"
+    try:   # アーティスト写真を各サイトに入れる（配信が始まった組から。決定 38）
+        import artist_photo
+        photo_todos = [{**t, "flow": "regular" if _timeline.in_regular(t["slug"]) else "debut"} for t in artist_photo.todos()]
+    except Exception:  # noqa: BLE001
+        photo_todos = []
     tl = _timeline.timeline()
     import _guide
     for key in ("debut", "regular"):
@@ -105,7 +110,7 @@ def status_json() -> dict:
                 except Exception as e:  # noqa: BLE001  説明が作れなくても画面は出す
                     ph["guide"] = {"cause": ph.get("detail", ""), "steps": [], "actions": [], "error": str(e)}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl,
-            "weekly_todos": weekly,
+            "weekly_todos": weekly, "photo_todos": photo_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j[k] for k in ("id", "label", "state", "started")} for j in list(JOBS.values())[-8:]]}
@@ -167,6 +172,15 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", "")))
         if song:
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
+    if action == "back":   # 間違えて進めた工程を戻す（決定 38）
+        import publish
+        song = _songs.by_id(str(p.get("id", "")))
+        to = str(p.get("to") or "")
+        if song and (not to or to in publish.BACK_TO):
+            return [PY, str(S / "publish.py"), "back", song["id"], *(["--to", to] if to else [])], \
+                f"戻す（{song['artist']}「{song['title']}」→ {publish.BACK_TO.get(to, '1 つ前')}）"
+    if action == "photo_undo" and p.get("slug") in _slugs() and p.get("service") in ("spotify", "apple", "amazon"):
+        return [PY, str(S / "artist_photo.py"), "undo", p["slug"], p["service"]], f"写真の記録を取り消す（{p['slug']} → {p['service']}）"
     if action == "fill_photo" and p.get("slug") in _slugs() and p.get("service") in ("spotify", "apple", "amazon"):
         return [PY, str(S / "browser_fill.py"), "photo", p["slug"], p["service"]], f"ブラウザで入力（写真：{p['slug']} → {p['service']}）"
     if action == "browser_login" and p.get("site") in ("suno", "distrokid", "spotify", "apple", "amazon"):
@@ -390,7 +404,7 @@ const daysSince=s=>Math.max(0,Math.round((D(DATA.timeline.today)-D(s))/DAY));
 let ACTS=[];
 function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
   switch(a.kind){
-   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
+   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
    case "copy":return `<button class="ghost" data-copy="${i}">${E(a.label)}</button>`;
    case "link":return `<a class="btn" href="${E(a.url)}" target="_blank" rel="noopener">${E(a.label)} ↗</a>`;
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
@@ -441,6 +455,9 @@ function todoList(key){
   const rows=DATA.timeline[key].rows;const items=[];
   rows.forEach((r,ri)=>{if(r.planned)return;r.phases.forEach((p,pi)=>{if(["wait","ng","run"].includes(p.state)&&!p.milestone)items.push([r,p,`${key}:${ri}:${pi}`])})});
   let html=items.sort((a,b)=>({ng:0,wait:1,run:2}[a[1].state]-{ng:0,wait:1,run:2}[b[1].state])).map(([r,p,gid])=>`<li class="${p.state} click" data-g2="${gid}" tabindex="0"><span class="who">${E(WHO(p.who)||"—")}</span><b>${E(r.artist)}</b> ${E(r.sub)}　${ICON[p.state]} <b>${E(p.name)}</b>：${E(WHO((p.guide||{}).cause||p.detail))} <span class="sub">→ 押すと、やることとボタン</span></li>`).join("");
+  html+=(DATA.photo_todos||[]).filter(t=>t.flow===key).map(t=>`<li class="wait"><span class="who">あなた</span><b>${E(t.artist)}</b>　● <b>アーティスト写真</b>：配信が始まったので、各サイトのアーティストのページに写真を入れる（${t.services.map(s=>E(s.name)+(s.state==="update"?"・入れ直し":"")).join("、")}）<br>`
+    +t.services.map(s=>`<button class="act-only" data-act="fill_photo" data-slug="${E(t.slug)}" data-service="${E(s.service)}">${E(s.name)} に写真を入れる</button>`).join(" ")
+    +` <a class="btn" href="/photos">アーティスト写真のページ ↗</a></li>`).join("");
   if(key==="regular")html+=DATA.weekly_todos.map(t=>`<li class="${t.sev==="ng"?"ng":""}"><b>${E(t.what)}</b>（${t.who.length}）<br>${E(t.who.join("、"))}<br><code>${E(t.where)}</code></li>`).join("");
   document.getElementById("todo-"+key).innerHTML=html?`<ul class="list">${html}</ul>`:`<p class="empty">いまやることはありません</p>`;
 }
@@ -464,7 +481,7 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
-  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;
+  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
 function render(){

@@ -122,6 +122,16 @@ def mark_done(slug: str, service: str, src: Path | None = None) -> None:
     write_json(RECORD, rec)
 
 
+def unmark(slug: str, service: str) -> bool:
+    """間違えて「保存した」を押したとき：記録を取り消す（決定 38）"""
+    rec = record()
+    if service in rec.get(slug, {}):
+        rec[slug].pop(service)
+        write_json(RECORD, rec)
+        return True
+    return False
+
+
 def status(slug: str) -> dict[str, str]:
     """サイトごと：done（今の写真を入れた）／update（前の写真のまま。入れ直す）／todo（まだ）"""
     rec = record().get(slug, {})
@@ -135,7 +145,7 @@ def status(slug: str) -> dict[str, str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="アーティスト写真を配信サイトのアーティストのページに入れる準備と記録")
-    ap.add_argument("cmd", nargs="?", default="status", choices=["status", "prepare", "done"])
+    ap.add_argument("cmd", nargs="?", default="status", choices=["status", "prepare", "done", "undo"])
     ap.add_argument("args", nargs="*")
     a = ap.parse_args()
     if a.cmd == "prepare":
@@ -145,6 +155,10 @@ def main() -> None:
             print(f"   {k}：{r[k]}")
         if r["_small"]:
             print("   ⚠ 元の写真が 800×800 より小さいので、Apple では断られるかもしれません")
+        return
+    if a.cmd == "undo":
+        ok = unmark(a.args[0], a.args[1])
+        print(f"【結果】{a.args[0]} の {SERVICES[a.args[1]]['name']} の写真の記録を" + ("取り消しました" if ok else "取り消せませんでした（記録がありません）"))
         return
     if a.cmd == "done":
         mark_done(a.args[0], a.args[1])
@@ -158,6 +172,28 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def todos() -> list[dict]:
+    """「今やること」に出す：配信が始まった組（配信中の曲がある・Spotify のアーティストのページが見つかった）で、
+    まだ今の写真を入れていないサイト（決定 32・38）"""
+    import _songs
+    try:
+        import publish
+    except Exception:  # noqa: BLE001
+        publish = None
+    live = {s["slug"] for s in _songs.all_songs() if _songs.state(s).get("status") == "live"}
+    out = []
+    for art in all_artists():
+        slug = art["slug"]
+        has_page = slug in live or bool(publish and (publish.artist_links(slug).get("spotify") or {}).get("id"))
+        if not has_page or current_photo(slug) is None:
+            continue
+        st = status(slug)
+        left = [{"service": k, "name": SERVICES[k]["name"], "state": v} for k, v in st.items() if v != "done"]
+        if left:
+            out.append({"slug": slug, "artist": art["name"], "services": left})
+    return out
 
 
 def photos_page(token: str) -> str:
@@ -178,8 +214,10 @@ def photos_page(token: str) -> str:
             cls, txt = ja[st[k]]
             btn = song_check._btn({"action": "fill_photo", "slug": slug, "service": k,
                                    "label": f"{svc['name']} に写真を入れる（ブラウザが開きます）"}, st[k] != "done")
+            undo = song_check._btn({"action": "photo_undo", "slug": slug, "service": k, "label": "← 記録を取り消す（間違えて「保存した」を押したとき）",
+                                    "confirm": f"{svc['name']} に写真を入れた記録を取り消します。よいですか？"}) if st[k] != "todo" else ""
             rows.append(f'<h4>{E(svc["name"])} <span class="badge {cls}">{E(txt)}</span></h4>{btn}'
-                        + song_check._btn({"action": "browser_login", "site": k, "label": "ログイン（初回だけ）"}))
+                        + song_check._btn({"action": "browser_login", "site": k, "label": "ログイン（初回だけ）"}) + undo)
         secs.append(f'<section><h2>{E(art["name"])}</h2><img class="cover" src="{song_check.furl(src)}" alt="アーティスト写真">'
                     f'<p class="sub">{E(src.name)}</p>{"".join(rows)}</section>')
     body = ("<h1>アーティスト写真を配信サイトに入れる</h1>"

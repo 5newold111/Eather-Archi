@@ -28,6 +28,7 @@
   python3 scripts/publish.py draft PDR-001          # DistroKid の下書きを表示（browser_fill.py が入力に使う）
   python3 scripts/publish.py registered PDR-001     # DistroKid に登録した（配信日は --date。省くと今日＝いちばん早い日）
   python3 scripts/publish.py track                  # 登録済みの曲が配信されたかを Spotify で確かめ、ISRC などを記録
+  python3 scripts/publish.py back PDR-001           # 間違えて進めた工程を 1 つ前に戻す（--to suno／master／ready／registered で行き先を選ぶ。決定 38）
 
 鍵（music-label/.env。会話には貼らない）：
   SPOTIFY_CLIENT_ID・SPOTIFY_CLIENT_SECRET … 配信の確認と ISRC の自動記録（Spotify for Developers で無料で作れる）
@@ -520,6 +521,9 @@ def cmd_registered(args) -> int:
     print(f"○ {song['artist']}「{song['title']}」を DistroKid 登録済みにしました（配信日 {day}）")
     if song["kind"] == "debut":
         a = load_artist(song["slug"])
+        if "debut_week_before" not in st:   # 登録を取り消したときに戻せるように、前の値を残す
+            st["debut_week_before"] = a.get("debut_week")
+            _songs.save_state(song, st)
         a["debut_week"] = monday_of(day).isoformat()   # 毎週の制作は、デビュー曲の配信週から数えて始まる
         save_artist(a)
         print(f"   デビュー週を {a['debut_week']} にしました（2 曲目以降の毎週の制作がここから始まります）")
@@ -739,6 +743,105 @@ def cmd_suno_request(args) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# 戻す（ダッシュボードで間違えて進めたとき。決定 38）。消さずに out/publish/undo/ に移すので、あとから取り出せる
+BACK_TO = {"suno": "Suno で作曲（取り込みを取り消す）", "master": "音量を整え直す（取り込んだ曲はそのまま）",
+           "ready": "登録の準備ができた（DistroKid の登録を取り消す）", "registered": "DistroKid 登録済み（配信中を取り消す）"}
+
+
+def default_back(status: str) -> str | None:
+    """1 つ前の工程"""
+    return {"live": "registered", "registered": "ready", "ready": "suno", "waiting_cover": "suno",
+            "waiting_ffmpeg": "suno", "imported": "suno"}.get(status)
+
+
+def back_options(song: dict) -> list[str]:
+    """この曲でいま選べる戻り先（近い順）"""
+    s = _songs.state(song).get("status", "")
+    order = {"live": ["registered", "ready", "suno"], "registered": ["ready", "suno"], "ready": ["suno", "master"],
+             "waiting_cover": ["suno", "master"], "waiting_ffmpeg": ["suno"], "imported": ["suno", "master"]}
+    return order.get(s, [])
+
+
+def _stash(paths: list[Path], song: dict) -> Path | None:
+    dest = PUB / "undo" / f"{song['key']}_{datetime.now():%Y%m%d-%H%M%S}"
+    moved = False
+    for p in paths:
+        if p.exists():
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(p), str(dest / p.name))
+            moved = True
+    return dest if moved else None
+
+
+def go_back(song: dict, to: str | None = None) -> str:
+    """戻して、表示用の一文を返す"""
+    st = _songs.state(song)
+    cur = st.get("status", "")
+    to = to or default_back(cur)
+    now_ja = {"": "Suno で作曲", "imported": "取り込み済み", "waiting_ffmpeg": "音量の道具待ち", "waiting_cover": "ジャケット待ち",
+              "ready": "登録の準備ができた", "registered": "DistroKid 登録済み", "live": "配信中"}.get(cur, cur)
+    if not to:
+        raise ValueError(f"いまは「{now_ja}」なので、これより前には戻せません")
+    if to not in back_options(song):
+        raise ValueError(f"いまの段階（{now_ja}）からは「{BACK_TO.get(to, to)}」に戻せません")
+    hist = st.setdefault("history", [])
+    hist.append({"from": cur, "to": to, "at": datetime.now().isoformat(timespec="seconds"), "by": "戻す"})
+    if to in ("registered", "ready", "suno"):   # 配信中を取り消す
+        for k in ("released", "isrc", "upc", "url", "spotify_track_id", "live_checked_at"):
+            st.pop(k, None)
+    if to in ("ready", "suno") and cur in ("registered", "live"):   # DistroKid の登録を取り消す
+        for k in ("registered_at", "release_date"):
+            st.pop(k, None)
+        if song["kind"] == "debut" and "debut_week_before" in st:
+            a = load_artist(song["slug"])
+            a["debut_week"] = st.pop("debut_week_before")
+            save_artist(a)
+    note = ""
+    if to == "suno":   # 取り込みを取り消す：テイク・音量を整えた音源・下書き・公開セットを「戻したもの」に移す
+        folder, _, _ = publish_folder(song)
+        dest = _stash([OUT / "takes" / song["key"], OUT / "masters" / song["key"], PUB / song["key"], folder], song)
+        reg = read_json(REGISTRY) if REGISTRY.exists() else {}
+        for v in reg.values():   # 取り込んだファイルは「楽曲情報」に残る。自動でまた取り込まないよう、印を付ける
+            if isinstance(v, dict) and v.get("song") in (song["id"], song["key"]):
+                v["undone"] = datetime.now().isoformat(timespec="seconds")
+        REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+        for k in ("take", "source", "imported_at", "generated_on", "ready_at"):
+            st.pop(k, None)
+        st["status"] = ""
+        note = (f"取り込んだもの・下書き・公開セットは {dest} に移しました。" if dest else "") + \
+            "Suno でいいねした 1 本を、もう一度「楽曲情報」にダウンロードすると取り込みます"
+    elif to == "master":   # 音量を整え直す：取り込んだ曲はそのまま、整えた音源と下書きをやり直す
+        dest = _stash([OUT / "masters" / song["key"], PUB / song["key"]], song)
+        sel_p = OUT / "takes" / song["key"] / "selection.json"
+        if sel_p.exists():
+            sel = read_json(sel_p)
+            sel.pop("master", None)
+            sel_p.write_text(json.dumps(sel, ensure_ascii=False, indent=1), encoding="utf-8")
+        st.pop("ready_at", None)
+        st["status"] = "imported"
+        note = "次の「曲を取り込む」（数分ごとの自動でも）で、音量からやり直します"
+    else:
+        st["status"] = to
+    _songs.save_state(song, st)
+    _book()
+    return f"{song['artist']}「{song['title']}」を「{BACK_TO[to]}」に戻しました。{note}"
+
+
+def cmd_back(args) -> int:
+    song = _songs.by_id(args.id)
+    if song is None:
+        sys.exit(f"[エラー] 曲 {args.id} が見つかりません")
+    try:
+        msg = go_back(song, args.to)
+    except ValueError as e:
+        print(f"【結果】まだ終わっていません：{e}")
+        return 2
+    print(f"○ {msg}")
+    print(f"【結果】{msg}")
+    return 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno の曲を取り込み、DistroKid の登録ボタンを押すだけの状態まで進める")
     sub = ap.add_subparsers(dest="cmd")
@@ -754,11 +857,14 @@ def main() -> None:
     p.add_argument("--quiet", action="store_true")
     p = sub.add_parser("suno-request", help="Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文を表示")
     p.add_argument("id", nargs="?", help="この曲だけ（省くと Suno で作る番の全曲）")
+    p = sub.add_parser("back", help="間違えて進めた工程を戻す")
+    p.add_argument("id")
+    p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
-          "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request}.get(args.cmd)
+          "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

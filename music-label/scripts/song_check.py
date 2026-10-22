@@ -168,7 +168,7 @@ table.kv{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px} .kv 
 button{font:inherit;border-radius:8px;padding:6px 14px;cursor:pointer;border:1px solid var(--accent);background:var(--card);color:var(--ink);margin:8px 8px 0 0}
 button.primary{background:var(--accent);color:#fff} #job{margin-top:8px;font-size:13px;color:var(--sub)}
 </style></head><body><main>
-<p><a href="/">← ダッシュボードへ</a>　<a href="/check">公開の準備の一覧</a></p>
+<p><button type="button" onclick="history.length>1?history.back():location.href='/'" style="margin:0 8px 0 0">← 前の画面へ</button><a href="/">ダッシュボードへ</a>　<a href="/check">公開の準備の一覧</a></p>
 __BODY__
 <div id="job"></div></main>
 <script>
@@ -222,7 +222,11 @@ def song_page(song_id: str, token: str) -> str | None:
     if all_done:
         head += "<section><h2>次にやること</h2><p>中身を確かめたら、DistroKid の登録画面に自動で入れます（最後の登録ボタンは Gon さんが押します）。</p>" + \
             _btn({"action": "fill_distrokid", "id": song["id"], "label": "DistroKid に入力する（ブラウザが開きます）"}, True) + "</section>"
-    body = head + episode_html(song.get("episode")) + "".join(secs)
+    import _guide
+    backs = _guide.back_actions(song)
+    back = ("<section><h2>間違えて進めたとき</h2><p class='sub'>前の工程に戻せます。消さずに「戻したもの」フォルダに移すので、あとから取り出せます。</p>"
+            + "".join(_btn(a) for a in backs) + "</section>") if backs else ""
+    body = head + episode_html(song.get("episode")) + "".join(secs) + back
     return PAGE.replace("__BODY__", body).replace("__TOKEN__", token).replace("__AUTO__", "false" if all_done else "true")
 
 

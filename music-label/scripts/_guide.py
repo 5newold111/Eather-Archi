@@ -39,7 +39,37 @@ def _late(phase: dict) -> str:
     return "（予定より遅れています）" if "予定は" in d else ""
 
 
+SONG_PHASES = ("Suno で作曲", "仕上げ", "DistroKid に登録", "配信待ち", "配信")
+
+
+def back_actions(song: dict | None) -> list[dict]:
+    """間違えて進めたときに戻すボタン（決定 38。消さずに「戻したもの」に移す）"""
+    if not song:
+        return []
+    try:
+        import publish
+        opts = publish.back_options(song)
+    except Exception:  # noqa: BLE001
+        return []
+    label = {"suno": "← Suno で作曲に戻す（取り込みを取り消す）", "master": "← 音量を整え直す",
+             "ready": "← DistroKid の登録を取り消す（登録前に戻す）", "registered": "← 配信中を取り消す"}
+    why = {"suno": "取り込んだ曲・下書き・公開セットを「戻したもの」フォルダに移して、Suno で作曲の段階に戻します（消しません）。",
+           "master": "音量を整えた音源と下書きを作り直します。", "ready": "DistroKid に登録した記録を取り消します（DistroKid の画面の登録そのものは取り消されません）。",
+           "registered": "配信中の記録（ISRC・URL）を取り消します。"}
+    return [{"kind": "run", "label": label[t], "action": "back", "id": song["id"], "to": t,
+             "confirm": why[t] + " よいですか？"} for t in opts]
+
+
 def explain(row: dict, phase: dict) -> dict:
+    g = _explain(row, phase)
+    if phase["name"].startswith(SONG_PHASES) and phase["state"] != "plan" and row.get("id"):
+        g = {**g, "actions": list(g.get("actions") or []) + back_actions(_songs.by_id(row["id"]))}
+        if g["actions"] and any(a.get("action") == "back" for a in g["actions"]):
+            g["steps"] = list(g.get("steps") or []) + ["間違えて進めてしまったときは、「←」のボタンで前の工程に戻せます"]
+    return g
+
+
+def _explain(row: dict, phase: dict) -> dict:
     name, state = phase["name"], phase["state"]
     song = _songs.by_id(row.get("id", "")) if row.get("id") else None
     title = f"「{row.get('title')}」" if row.get("title") else ""
