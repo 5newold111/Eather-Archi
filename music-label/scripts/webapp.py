@@ -15,6 +15,9 @@
   python3 scripts/webapp.py                 # この Mac のブラウザだけから見る（http://localhost:8765）
   python3 scripts/webapp.py --lan           # 家の Wi-Fi のスマホからも見る（合鍵つきの URL を表示。合鍵は .env の WEBAPP_KEY）
   python3 scripts/webapp.py --port 8800     # 番号を変える
+  python3 scripts/webapp.py --awake         # 動いている間、Mac が勝手に眠らないようにする（外出先から使うとき）
+  外出先のスマホから：Tailscale（Mac とスマホだけの専用の通り道）を入れ、Mac で一度だけ  tailscale serve --bg 8765
+                      → スマホで https://<この Mac の名前>.ts.net/phone （docs/18_phone.md・決定 28）
   python3 scripts/schedule.py install       # Mac の起動中はいつも動かしておく（仕事の名前 webapp）
 
 安全のため：
@@ -39,7 +42,7 @@ from datetime import date, datetime
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, ROOT, all_artists, load_dotenv  # noqa: E402
@@ -283,7 +286,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin-top:10px;font-size:14px;color:var(--sub)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a><span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
@@ -531,6 +534,14 @@ class Handler(BaseHTTPRequestHandler):
             page, _ = suno_page()
             back = '<p style="max-width:860px;margin:16px auto 0;padding:0 16px"><a href="/">← ダッシュボードへ</a></p>'
             return self._send(200, page.replace("<main>", back + "<main>", 1), extra=extra)
+        if path == "/phone":
+            import phone
+            return self._send(200, phone.phone_index(TOKEN), extra=extra)
+        m = re.fullmatch(r"/phone/([\w.\-]+)", path)
+        if m:
+            import phone
+            page = phone.phone_page(m.group(1), TOKEN)
+            return self._send(200, page, extra=extra) if page else self._send(404, "<p>その曲は見つかりません</p>")
         if path == "/check":
             import song_check
             return self._send(200, song_check.index_page(TOKEN), extra=extra)
@@ -546,6 +557,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, "<p>見つかりません</p>")
             import mimetypes
             ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
+            if (parse_qs(urlparse(self.path).query).get("dl") or [""])[0] == "1":   # スマホに保存する（DistroKid で選ぶため）
+                extra["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(f.name)}"
             return self._send(200, f.read_bytes(), ctype, extra=extra)
         if path == "/api/status":
             try:
@@ -560,6 +573,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._allowed() or not secrets.compare_digest(self.headers.get("X-Label-Token", ""), TOKEN):
             return self._json(403, {"error": "このページを開き直してから押してください"})
+        if urlparse(self.path).path == "/api/upload":
+            return self._upload()
         if urlparse(self.path).path != "/api/action":
             return self._json(404, {"error": "見つかりません"})
         try:
@@ -575,6 +590,89 @@ class Handler(BaseHTTPRequestHandler):
         if found[1].startswith("ブラウザで入力") and any(j["state"] == "running" and j["label"].startswith("ブラウザで入力") for j in JOBS.values()):
             return self._json(409, {"error": "ブラウザでの入力がまだ続いています。開いているブラウザの右下の案内で「終わる」か「閉じる」を押してから、もう一度押してください"})
         return self._json(200, {"job": start_job(*found)})
+
+
+UPLOAD_MAX = 400 * 1024 * 1024     # 1 曲の WAV でも足りる大きさ
+UPLOAD_EXT = {".wav", ".mp3", ".m4a", ".flac", ".aiff", ".aif"}
+
+
+def save_upload(song: dict, name: str, stream, size: int) -> Path:
+    """スマホから送られた曲を、Mac の「楽曲情報」（publish.py が見張る最初のフォルダ）に「曲名.拡張子」で置く。
+    曲名にしておくと、取り込み（publish.py scan）がどの曲か見分けられる"""
+    import publish
+    ext = Path(name).suffix.lower()
+    inbox = publish.inboxes()[0]
+    inbox.mkdir(parents=True, exist_ok=True)
+    stem = _songs.safe(song["title"])
+    dst, n = inbox / f"{stem}{ext}", 2
+    while dst.exists():
+        dst, n = inbox / f"{stem} ({n}){ext}", n + 1
+    part = dst.with_name(f".{dst.name}.part")   # 送り終わるまでは隠しておく（取り込みが途中のファイルを読まない）
+    left = size
+    with open(part, "wb") as out:
+        while left > 0:
+            chunk = stream.read(min(1 << 20, left))
+            if not chunk:
+                break
+            out.write(chunk)
+            left -= len(chunk)
+    if left > 0:
+        part.unlink(missing_ok=True)
+        raise ValueError("途中で切れました")
+    part.rename(dst)
+    return dst
+
+
+def _upload(self):
+    """POST /api/upload?id=<曲 ID>：スマホから曲を受け取り、取り込みを始める"""
+    song = _songs.by_id((parse_qs(urlparse(self.path).query).get("id") or [""])[0])
+    name = unquote(self.headers.get("X-Filename", ""))
+    try:
+        size = int(self.headers.get("Content-Length", "0"))
+    except ValueError:
+        size = 0
+    if song is None:
+        return self._json(404, {"error": "その曲は見つかりません"})
+    if Path(name).suffix.lower() not in UPLOAD_EXT:
+        return self._json(400, {"error": "曲のファイル（WAV・MP3・M4A・FLAC・AIFF）を選んでください"})
+    if not 0 < size <= UPLOAD_MAX:
+        return self._json(400, {"error": "ファイルが空か、大きすぎます（400 MB まで）"})
+    try:
+        dst = save_upload(song, name, self.rfile, size)
+    except (OSError, ValueError) as e:
+        return self._json(500, {"error": f"Mac に保存できませんでした（{e}）"})
+    return self._json(200, {"job": start_job(*command_for("scan", {})), "saved": dst.name})
+
+
+Handler._upload = _upload
+
+
+def tailscale_info() -> tuple[str | None, str | None]:
+    """Tailscale（Mac とスマホだけの専用の通り道）の、この Mac の住所（100.x.x.x）と名前（xxx.ts.net）。入っていなければ (None, None)"""
+    for exe in ("tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale", "/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"):
+        try:
+            r = subprocess.run([exe, "status", "--json"], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if r.returncode != 0:
+            continue
+        try:
+            me = json.loads(r.stdout).get("Self") or {}
+        except ValueError:
+            continue
+        ips = [x for x in me.get("TailscaleIPs") or [] if "." in x]
+        return (ips[0] if ips else None), (str(me.get("DNSName") or "").rstrip(".") or None)
+    return None, None
+
+
+def keep_awake() -> None:
+    """ダッシュボードが動いている間、Mac が勝手に眠らないようにする（画面は消えてよい。macOS の caffeinate）"""
+    if sys.platform == "darwin":
+        try:
+            subprocess.Popen(["/usr/bin/caffeinate", "-i", "-w", str(os.getpid())])
+            print("   Mac が勝手に眠らないようにしました（ダッシュボードを止めると元に戻ります。ふたを閉じると眠ります）")
+        except OSError:
+            pass
 
 
 def lan_address() -> str:
@@ -600,7 +698,10 @@ def lan_key() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="ダッシュボードのウェブアプリ（Mac の中で動く）")
     ap.add_argument("--port", type=int, default=int(os.environ.get("WEBAPP_PORT", "8765")))
-    ap.add_argument("--lan", action="store_true", help="家の Wi-Fi のほかの機器（スマホなど）からも見られるようにする（合鍵つき）")
+    ap.add_argument("--lan", action="store_true", default=os.environ.get("WEBAPP_LAN", "") == "1",
+                    help="家の Wi-Fi・Tailscale のほかの機器（スマホなど）からも見られるようにする（合鍵つき。.env の WEBAPP_LAN=1 でも）")
+    ap.add_argument("--awake", action="store_true", default=os.environ.get("WEBAPP_AWAKE", "") == "1",
+                    help="動いている間、Mac が勝手に眠らないようにする（外出先から使うとき。.env の WEBAPP_AWAKE=1 でも）")
     a = ap.parse_args()
     host = "0.0.0.0" if a.lan else "127.0.0.1"
     if a.lan:
@@ -610,6 +711,13 @@ def main() -> None:
     if a.lan:
         print(f"   スマホなど（同じ Wi-Fi）：http://{lan_address()}:{a.port}/?key={Handler.lan_key}")
         print("   （この URL は合鍵つき。ほかの人に教えない。1 回開けば、その機器では次から合鍵なしで開けます）")
+    ts_ip, ts_name = tailscale_info()
+    if ts_name:
+        print(f"   外出先のスマホ（Tailscale）：https://{ts_name}/phone　← Mac で一度だけ  tailscale serve --bg {a.port}  を実行しておく")
+        if a.lan and ts_ip:
+            print(f"   （tailscale serve を使わないとき：http://{ts_ip}:{a.port}/phone?key={Handler.lan_key}）")
+    if a.awake:
+        keep_awake()
     print("   止めるときは control + C")
     try:
         srv.serve_forever()
