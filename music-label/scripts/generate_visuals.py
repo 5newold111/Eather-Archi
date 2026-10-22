@@ -225,8 +225,15 @@ def prompts_cover(artist: dict, brief: dict) -> list[dict]:
         pass
     title = (brief.get("title_candidates") or [""])[0]
     out = []
-    variants = ["no text at all", "no text at all", "title only, small, matching the typography rule", "no text at all",
-                "no text at all", "title only, small, matching the typography rule"]
+    # 文字は画像を作る AI に描かせない。仕上げで cover_text.py が曲名とアーティスト名を重ねる（決定 36）。その場所を空けておく
+    try:
+        import cover_text
+        where = {"top": "the top fifth", "bottom": "the bottom fifth"}.get(cover_text.spec_for(artist.get("slug", ""))["place"],
+                                                                         "the top or bottom fifth")
+    except Exception:  # noqa: BLE001
+        where = "the top or bottom fifth"
+    room = f"no text at all; keep {where} of the image calm and uncluttered (small typography will be added there later)"
+    variants = [room] * 6
     for i in range(N_COVER):
         out.append({"kind": "cover", "no": i + 1, "prompt": scrub(
             f"Album cover artwork, square 1:1, 3000x3000. {visual_base(artist)} Series rule: {rule}. "

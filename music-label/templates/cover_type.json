@@ -1,0 +1,20 @@
+{
+ "_使い方": "ジャケットに重ねる曲名・アーティスト名の書体と置き方（cover_text.py。決定 36）。絵は文字なしで作り、仕組みがこの決まりで文字を重ねる（綴りは DistroKid に登録する曲名・アーティスト名と同じ）。font：music-label/fonts の書体（oswald・overpass・ibm-plex-sans・ibm-plex-mono・cormorant-garamond・inter。どれも商用で使える SIL Open Font License）。case：upper（全部大文字）／lower（全部小文字）／as_is（そのまま）。tracking：字間（文字の大きさに対する割合）。place：top／bottom／auto（絵の落ち着いている方）。align：left／center。size・artist_size：文字の高さ（ジャケットの一辺に対する割合）。jitter：手で刻んだような小さな揺れ。Gon さんが自由に書き換えてよい",
+ "default": {"font": "inter", "title_weight": "600", "artist_weight": "400", "case": "as_is", "tracking": 0.04,
+             "place": "auto", "align": "left", "size": 0.05, "artist_size": 0.03, "jitter": false},
+ "declan_fay": {"font": "oswald", "title_weight": "500", "artist_weight": "300", "case": "upper", "tracking": 0.18,
+                "place": "bottom", "align": "left", "size": 0.055, "artist_size": 0.03,
+                "_why": "設定書：細めのコンデンス・サンセリフの大文字を字間広めに"},
+ "hollowplan": {"font": "ibm-plex-sans", "title_weight": "500", "artist_weight": "300", "case": "upper", "tracking": 0.28,
+                "place": "bottom", "align": "left", "size": 0.034, "artist_size": 0.024,
+                "_why": "設定書：細い線のグロテスク体の大文字。字間を広く、建築図面の注記のように小さく"},
+ "nao_easterly": {"font": "overpass", "title_weight": "700", "artist_weight": "400", "case": "upper", "tracking": 0.12,
+                  "place": "top", "align": "center", "size": 0.06, "artist_size": 0.032,
+                  "_why": "設定書：道路標識に近い字幅の広いサンセリフ、全部大文字で字間広め（Overpass は道路標識の書体がもと）"},
+ "soft_cantilever": {"font": "ibm-plex-mono", "title_weight": "500", "artist_weight": "400", "case": "upper", "tracking": 0.2,
+                     "place": "bottom", "align": "left", "size": 0.045, "artist_size": 0.028,
+                     "_why": "設定書：図面の注記に使う角ばった等幅に近いサンセリフ、大文字のみで字間広く"},
+ "tidewool": {"font": "cormorant-garamond", "title_weight": "600", "artist_weight": "400", "case": "lower", "tracking": 0.15,
+              "place": "bottom", "align": "center", "size": 0.06, "artist_size": 0.034, "jitter": true,
+              "_why": "設定書：細めのセリフ体の小文字、字間を広く、手で刻んだような少しの揺れ"}
+}

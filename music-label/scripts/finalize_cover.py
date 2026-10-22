@@ -123,6 +123,13 @@ def main() -> None:
             sys.exit(f"[エラー] 選ばれた候補の画像がありません: {src}")
         dst = Path(args.out) if args.out else folder / "cover_final.jpg"
     rep = finalize(src, dst)
+    if args.brief and not args.demo and rep["ok"]:   # 曲名とアーティスト名を重ねる（決定 36。毎週の曲から。文字なしの版も残す）
+        import _songs
+        import cover_text
+        song = _songs.by_key(Path(args.brief).stem)
+        if song and song.get("title"):
+            tr = cover_text.apply(dst, song["artist"], song["title"], song["slug"])
+            print(f"   {'○' if tr['ok'] else '－'} 文字：" + ("・".join(tr.get("shown", [])) + f"（{tr.get('font')}・{tr.get('place')}）" if tr["ok"] else tr["reason"]))
     rel = dst.resolve().relative_to(ROOT) if dst.resolve().is_relative_to(ROOT) else dst
     step(("仕上がりました" if rep["ok"] else "仕上げましたが ✕ があります") + f": {rel}")
     if args.brief and not args.demo and rep["ok"] and not args.no_archive:

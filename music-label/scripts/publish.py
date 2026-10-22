@@ -334,6 +334,21 @@ def publish_folder(song: dict) -> tuple[Path, str, str]:
     return folder, f"{_songs.audio_stem(song)}.wav", cover_name
 
 
+def _cover_text_note(song: dict) -> str:
+    """ジャケットに入れた文字が、登録する曲名・アーティスト名と同じか（決定 36。違うとストアで差し戻される）"""
+    src = _songs.cover_source(song)
+    if not src:
+        return "（ジャケットがまだ）"
+    try:
+        import cover_text
+        m = cover_text.text_matches(Path(src), song["artist"], song["title"])
+    except Exception:  # noqa: BLE001
+        return "（確かめられませんでした）"
+    if m is None:
+        return "文字なし"
+    return "曲名・アーティスト名と同じ（OK）" if m else "⚠ 曲名かアーティスト名が変わっています。ジャケットを仕上げ直してください（finalize_cover.py）"
+
+
 def _credit_role(artist: dict) -> str:
     """Apple の Performer の役割：編成に合わせる（声の切れ端だけの組は Vocals ではなく Performer）"""
     form = str(artist.get("formation") or "")
@@ -379,6 +394,7 @@ def draft_fields(song: dict) -> dict:
             "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
         "Track credits（Apple の決まり）": f"Performer：{song['artist']}（役割 {_credit_role(a)}）／Producer：{os.environ.get('OWNER_LEGAL_NAME') or '本名（.env の OWNER_LEGAL_NAME）'}（役割 Producer）。Producer の名前は Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
+        "ジャケットの文字": _cover_text_note(song),
         "アーティスト写真": "DistroKid の登録画面には欄が無い。配信が始まってアーティストのページができたら、ダッシュボードの「アーティスト写真」から Spotify・Apple Music・Amazon Music に入れる（決定 32）",
         "Extras（有料の追加）": "すべてチェックしない（YouTube Content ID は AI の曲だと申し立てのトラブルになりやすいので付けない。必要になったら Gon さんが選ぶ）",
     }
