@@ -1,13 +1,13 @@
 # セキュリティポリシー
 
-エーテルアーキ公式サイト（<https://5newold111.github.io/Eather-Arch/>）のセキュリティに関する方針です。
+エーテルアーキ公式サイト（<https://5newold111.github.io/Eather-Archi/>）のセキュリティに関する方針です。
 
 ## 脆弱性の報告
 
 このサイトに関する脆弱性を見つけた場合は、公開の Issue ではなく
 **GitHub の非公開報告機能でご連絡ください**。
 
-- 報告フォーム: <https://github.com/5newold111/Eather-Arch/security/advisories/new>
+- 報告フォーム: <https://github.com/5newold111/Eather-Archi/security/advisories/new>
 
 リポジトリの **Security** タブ → **Report a vulnerability** からも同じ画面を開けます。
 やり取りは修正が公開されるまで非公開に保たれます。

@@ -76,8 +76,8 @@ Settings → Pages で `Source` を **GitHub Actions** に切り替えてくだ�
 
 以降は既定ブランチへプッシュするたびに自動で反映されます。
 
-- 設定: https://github.com/5newold111/Eather-Arch/settings/pages
-- 公開先: https://5newold111.github.io/Eather-Arch/
+- 設定: https://github.com/5newold111/Eather-Archi/settings/pages
+- 公開先: https://5newold111.github.io/Eather-Archi/
 
 ## カスタマイズのポイント
 
