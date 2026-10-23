@@ -151,6 +151,14 @@ def _explain(row: dict, phase: dict) -> dict:
                 {"kind": "folder", "label": "公開セットのフォルダを開く", "id": row.get("id")},
                 {"kind": "run", "label": "DistroKid にログイン（初回だけ）", "action": "browser_login", "site": "distrokid"},
                 {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
+        try:   # 登録を待つ曲がほかにもあれば、続けて入れるボタン（決定 51）
+            import _songs
+            n_wait = sum(1 for x in _songs.all_songs() if _songs.state(x).get("status") == "ready")
+        except Exception:  # noqa: BLE001
+            n_wait = 0
+        if n_wait > 1:
+            acts.insert(2, {"kind": "run", "label": f"登録を待つ {n_wait} 曲を続けて DistroKid に入力する（1 曲ずつ「登録した」で次へ）",
+                            "action": "fill_distrokid_all"})
         steps = ["「公開の準備を見る」で、ジャケット・音・下書き・公開セットを目で確かめる",
                  "「DistroKid に入力する」を押す → 専用のブラウザが開き、項目と音源・ジャケットが自動で入ります（初回だけ DistroKid へのログインを求められます）",
                  "ブラウザの右下の案内で、手で選ぶ項目（Explicit・AI の申告など）を確かめる",

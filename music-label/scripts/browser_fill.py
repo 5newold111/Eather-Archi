@@ -1806,7 +1806,36 @@ def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
     return list(dict.fromkeys(fixed))
 
 
-def run_distrokid(sess: Session, song_id: str) -> int:
+def waiting_for_distrokid() -> list[dict]:
+    """DistroKid に登録する段階の曲（公開セットができて、まだ登録していない）。デビュー曲を先に、曲 ID の順"""
+    out = [x for x in _songs.all_songs() if _songs.state(x).get("status") == "ready"]
+    return sorted(out, key=lambda x: (x.get("kind") != "debut", x["id"]))
+
+
+def run_distrokid_all(sess: Session) -> int:
+    """残りの曲を続けて入れる（決定 51）。1 曲ごとに Gon さんが Continue と「登録した」を押すと、次の曲を入れ始める"""
+    songs = waiting_for_distrokid()
+    if not songs:
+        print("【結果】DistroKid に登録を待っている曲はありません")
+        return 0
+    print("▶ DistroKid に続けて入れる曲：" + "・".join(f"{x['artist']}「{x['title']}」" for x in songs))
+    done = []
+    for i, x in enumerate(songs):
+        nxt = songs[i + 1] if i + 1 < len(songs) else None
+        print(f"\n▶ {i + 1}/{len(songs)} 曲目：{x['artist']}「{x['title']}」（{x['id']}）")
+        code = run_distrokid(sess, x["id"], f"{nxt['artist']}「{nxt['title']}」" if nxt else "")
+        if _songs.state(x).get("status") == "registered":
+            done.append(x)
+        if code == 3:
+            break
+    rest = [x for x in songs if x not in done]
+    print(f"【結果】登録した {len(done)} 曲：" + ("・".join(x["artist"] for x in done) or "なし")
+          + ("／まだの曲：" + "・".join(x["artist"] for x in rest) if rest else "／残りはありません"))
+    return 0 if not rest else 2
+
+
+def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
+    """1 曲を DistroKid に入れる。0：登録した／2：まだ登録しない／3：続けての入力をここでやめる（nxt があるとき：次の曲の名前）"""
     song = _songs.by_id(song_id)
     if song is None:
         sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
@@ -1877,6 +1906,8 @@ def run_distrokid(sess: Session, song_id: str) -> int:
     always.append("AI の申告で Yes のあとに質問が出たら：使ったもの（作曲・歌詞・声など Suno で作った部分）を正直に選ぶ")
     always.append("Release date・Primary genre が空のときは入れる（DistroKid が赤い枠を出す欄）")
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
+    later = ([{"id": "stop", "label": f"この曲は後で（次の曲へ：{nxt}）"}, {"id": "quit", "label": "続けての入力をここでやめる"}] if nxt
+             else [{"id": "stop", "label": "閉じる（まだ登録しない）"}])
     sess.show("DistroKid に下書きを入れました",
               [f"{song['artist']}「{song['title']}」",
                ("✓ 読み返して確かめました：" if not bad else "入れた：") + ("・".join(done) or "なし"),
@@ -1884,7 +1915,7 @@ def run_distrokid(sess: Session, song_id: str) -> int:
                *(["手で入れてください：", *manual] if manual else []), "画面で確かめて選ぶもの：", *always,
                "内容を確かめて、最後の登録ボタンを押してください（押すのは Gon さんだけ）。",
                "押し終わったら、配信日を選んで「登録した」を押すと、記録されます。"],
-              [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"},
+              [{"id": "registered", "label": "登録した", "primary": True}, *later,
                {"id": "copy_parts", "label": "画面の部品をコピー（入らない欄があるとき・Claude に貼る用）"}],
               date_value=date.today().isoformat())
 
@@ -1914,18 +1945,27 @@ def run_distrokid(sess: Session, song_id: str) -> int:
                    ("入れ直したもの：" + "・".join(fixed)) if fixed else "入れ直せるものはありませんでした",
                    *(["⚠ まだ入っていない欄（手で入れてください）：", *left] if left else []),
                    "宣誓の 5 つのチェックを確かめて、もう一度「Continue」を押してください（押すのは Gon さんだけ）。"],
-                  [{"id": "registered", "label": "登録した", "primary": True}, {"id": "stop", "label": "閉じる（まだ登録しない）"},
+                  [{"id": "registered", "label": "登録した", "primary": True}, *later,
                    {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}], date_value=date.today().isoformat())
     m = sess.wait({"action": "stop"}, tick=watch_errors)
     if m.get("action") == "registered":
         day = m.get("date") or date.today().isoformat()
         r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
         print(r.stdout.strip())
+        if nxt:   # 続けて入れるとき：次の曲へ進むか、ここでやめるか
+            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。", f"次の曲：{nxt}"],
+                      [{"id": "next", "label": f"次の曲へ（{nxt}）", "primary": True}, {"id": "quit", "label": "続けての入力をここでやめる"}])
+            go = sess.wait({"action": "next"})
+            print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
+            return 0 if go.get("action") == "next" else 3
         sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。"],
                   [{"id": "stop", "label": "閉じる", "primary": True}])
         sess.wait({"action": "stop"})
         print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
         return 0
+    if nxt and m.get("action") in ("quit", "closed"):
+        print("【結果】続けての入力をここでやめました（この曲はまだ登録していません）")
+        return 3
     if bad:
         print("【結果】まだ終わっていません：DistroKid の入っていない欄 → " + "／".join(bad))
     else:
@@ -2060,7 +2100,7 @@ def main() -> None:
     except ImportError:
         sys.exit("[案内] ブラウザで入力する部品がありません。ターミナルで  python3 -m pip install --user playwright  を 1 回実行してください")
     if a.what == "distrokid" and not a.args:
-        sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003）")
+        sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003。残りを続けて入れるときは all）")
     if a.what == "photo" and len(a.args or []) < 2:
         sys.exit("[エラー] 組とサイトを付けてください（例 photo tidewool spotify）")
     code, need = 0, None
@@ -2070,7 +2110,7 @@ def main() -> None:
             if a.what == "suno":
                 code = run_suno(sess, a.args)
             elif a.what == "distrokid":
-                code = run_distrokid(sess, a.args[0])
+                code = run_distrokid_all(sess) if a.args[0] == "all" else run_distrokid(sess, a.args[0])
             elif a.what == "photo":
                 code = run_photo(sess, a.args[0], a.args[1])
             elif a.what == "parts":   # いま開いている Suno（または DistroKid）の画面の部品の一覧

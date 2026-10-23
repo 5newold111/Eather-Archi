@@ -181,6 +181,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "fill_distrokid_all":   # 残りの曲を続けて入れる（決定 51）
+        return [PY, str(S / "browser_fill.py"), "distrokid", "all"], "ブラウザで入力（DistroKid：残りの曲を続けて）"
     if action == "fill_distrokid":
         song = _songs.by_id(str(p.get("id", "")))
         if song:
