@@ -539,7 +539,10 @@ group by b.id, b.week_start, a.name;
 -- =============================================================================
 -- 行単位のアクセス制御（RLS）
 -- 自動処理は service_role キーで接続する（RLS を通らない）。
--- ブラウザなどから anon キーで触られても、何も読めない・書けない状態にする。
+-- RLS を有効にしてポリシーを置かないことで、anon キーからも、ログインしただけの利用者（authenticated）からも、
+-- 何も読めない・書けない状態にする。
+-- 以前は authenticated に全操作を許していたが、Supabase は初期設定で誰でもアカウントを作れるため、
+-- 第三者が登録するだけで全データを読み書きできてしまう。どのスクリプトも使っていないので外した。
 -- =============================================================================
 do $$
 declare t text;
@@ -549,10 +552,7 @@ begin
     'briefs','brief_sources','generations','releases','collab_pairs','metrics','visual_assets','visual_decisions'
   ] loop
     execute format('alter table %I enable row level security', t);
-    -- ログイン済みの本人（オーナー）だけ全操作を許可。anon は何もできない。
-    execute format(
-      'create policy %I on %I for all to authenticated using (true) with check (true)',
-      t || '_owner_all', t
-    );
+    -- 以前のポリシーが残っていれば消す（実行済みのプロジェクトに当て直すとき用）
+    execute format('drop policy if exists %I on %I', t || '_owner_all', t);
   end loop;
 end $$;

@@ -16,23 +16,17 @@ values
   ('social',      'social',      false, 209715200, array['video/mp4','image/jpeg','image/png'])   -- SNS 用の縦動画。Instagram には期限付き URL で渡す
 on conflict (id) do nothing;
 
--- ログイン済みの本人だけが読み書きできる。anon には何も許可しない。
+-- ポリシーは置かない：anon からも、ログインしただけの利用者（authenticated）からも見えない。
+-- 自動処理（service_role キー）と rclone（S3 接続の鍵）は、ポリシーに関係なく読み書きできる。
+-- 以前は authenticated に読み書きを許していたが、Supabase は初期設定で誰でもアカウントを作れるため外した。
 do $$
 declare b text;
 begin
   foreach b in array array['masters','generations','covers','references','social'] loop
-    execute format(
-      'create policy %I on storage.objects for select to authenticated using (bucket_id = %L)',
-      b || '_read_owner', b);
-    execute format(
-      'create policy %I on storage.objects for insert to authenticated with check (bucket_id = %L)',
-      b || '_write_owner', b);
-    execute format(
-      'create policy %I on storage.objects for update to authenticated using (bucket_id = %L)',
-      b || '_update_owner', b);
-    execute format(
-      'create policy %I on storage.objects for delete to authenticated using (bucket_id = %L)',
-      b || '_delete_owner', b);
+    execute format('drop policy if exists %I on storage.objects', b || '_read_owner');
+    execute format('drop policy if exists %I on storage.objects', b || '_write_owner');
+    execute format('drop policy if exists %I on storage.objects', b || '_update_owner');
+    execute format('drop policy if exists %I on storage.objects', b || '_delete_owner');
   end loop;
 end $$;
 
