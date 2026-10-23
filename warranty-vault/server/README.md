@@ -45,6 +45,12 @@ Content-Type: application/json
 
 Upstash を設定しない場合はサーバーのメモリで数えるため、サーバーが複数台に増えると制限が緩くなる。
 
+### Node.js のバージョン
+
+`package.json` の `engines` で **Node.js 24.x（LTS）** を指定している。Vercel の Project Settings の指定より優先され、
+セキュリティ修正のマイナー・パッチ版は Vercel が自動で適用する。Node.js 20 は 2026-04-30 にサポートが終わり、
+Vercel でも 2026-10-01 に提供終了扱いになったため使わない。
+
 ### 必ず設定する：Anthropic の利用上限額
 
 コードの制限に加えて、万一の請求の上振れを確実に止めるため
