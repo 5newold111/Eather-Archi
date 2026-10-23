@@ -35,6 +35,9 @@ jobs:
       # SHA を確認してから書き換えること。
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # 公開物にはGitの認証情報が不要。.git/config にトークンを残さない
+          persist-credentials: false
       - name: Setup Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - name: Upload artifact
