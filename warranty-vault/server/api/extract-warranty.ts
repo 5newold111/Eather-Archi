@@ -7,6 +7,11 @@ import Anthropic from '@anthropic-ai/sdk';
  * 家電の保証書・レシート写真から情報を抽出するプロキシ。
  * ANTHROPIC_API_KEY はVercelの環境変数でのみ保持し、
  * リクエスト内容・画像はログに出力しない。
+ *
+ * このURLはアプリに埋め込まれるため第三者にも知られうる。APIキーの料金を
+ * 使い込まれないよう、送信元ごとの回数制限と1日の全体上限をサーバー側で掛ける。
+ * UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN を設定すると全インスタンス共通で数える。
+ * 未設定時はインスタンスごとのメモリで数える（簡易。インスタンスが増えると緩くなる）。
  */
 
 const MAX_IMAGE_BASE64_LENGTH = 8_000_000; // ~6MB画像相当。クライアントは1400pxに縮小して送る
@@ -80,11 +85,74 @@ const EXTRACTION_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** 送信元IPごとの上限（1時間あたり） */
+const PER_IP_LIMIT_PER_HOUR = Number(process.env.EXTRACT_LIMIT_PER_IP_PER_HOUR ?? 10);
+/** サービス全体の上限（1日あたり。UTC基準） */
+const GLOBAL_LIMIT_PER_DAY = Number(process.env.EXTRACT_LIMIT_GLOBAL_PER_DAY ?? 300);
+
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+const memoryCounters = new Map<string, { count: number; expiresAt: number }>();
+
+/** キーの回数を1増やして現在値を返す（期限切れでリセット） */
+async function increment(key: string, ttlSeconds: number): Promise<number> {
+  if (UPSTASH_URL && UPSTASH_TOKEN) {
+    const res = await fetch(`${UPSTASH_URL}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` },
+      body: JSON.stringify([
+        ['INCR', key],
+        ['EXPIRE', key, String(ttlSeconds), 'NX'],
+      ]),
+    });
+    if (!res.ok) throw new Error('rate limit store unavailable');
+    const [incr] = (await res.json()) as { result: number }[];
+    return incr.result;
+  }
+  const now = Date.now();
+  const entry = memoryCounters.get(key);
+  if (!entry || entry.expiresAt <= now) {
+    memoryCounters.set(key, { count: 1, expiresAt: now + ttlSeconds * 1000 });
+    return 1;
+  }
+  entry.count += 1;
+  return entry.count;
+}
+
+function clientIp(req: VercelRequest): string {
+  // Vercel が付与するヘッダーを優先（利用者が自分で付けた値は上書きされる）
+  const header = req.headers['x-vercel-forwarded-for'] ?? req.headers['x-forwarded-for'];
+  const value = Array.isArray(header) ? header[0] : header;
+  return value?.split(',')[0]?.trim() || 'unknown';
+}
+
+/** 上限内なら true。カウンタが使えない場合は料金保護を優先して拒否する */
+async function withinLimits(req: VercelRequest): Promise<boolean> {
+  const now = new Date();
+  const hour = now.toISOString().slice(0, 13);
+  const day = now.toISOString().slice(0, 10);
+  try {
+    const perIp = await increment(`extract:ip:${clientIp(req)}:${hour}`, 3600);
+    if (perIp > PER_IP_LIMIT_PER_HOUR) return false;
+    const global = await increment(`extract:global:${day}`, 86400);
+    return global <= GLOBAL_LIMIT_PER_DAY;
+  } catch {
+    return false;
+  }
+}
+
 const client = new Anthropic();
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method Not Allowed' });
+    return;
+  }
+
+  // アプリ（ネイティブ）はOriginを送らない。ブラウザからの呼び出しは用途外なので拒否する
+  if (req.headers.origin) {
+    res.status(403).json({ error: '読み取りに失敗しました' });
     return;
   }
 
@@ -101,6 +169,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     !ALLOWED_MEDIA_TYPES.includes(mediaType as AllowedMediaType)
   ) {
     res.status(400).json({ error: '読み取りに失敗しました' });
+    return;
+  }
+
+  // 入力チェックを通ったものだけ数える（不正な送信で正規利用者の枠を消費させない）
+  if (!(await withinLimits(req))) {
+    res.setHeader('Retry-After', '3600');
+    res.status(429).json({
+      error: '読み取りの回数が上限に達しました。時間をおいてお試しいただくか、手入力で登録してください。',
+    });
     return;
   }
 

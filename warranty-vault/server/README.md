@@ -32,6 +32,24 @@ Content-Type: application/json
 - モデルは `claude-sonnet-5`、構造化出力（JSON Schema）で常に固定形式のJSONを返す
 - 失敗時は `{ "error": "読み取りに失敗しました" }` を返し、アプリ側は
   「もう一度試す／手入力で登録する」画面へ遷移する
+- **回数制限（料金の使い込み対策）**：このURLはアプリに埋め込まれるため第三者にも知られうる。
+  送信元IPごとに1時間10回、全体で1日300回を超えると `429` を返す。ブラウザ（Originヘッダー付き）からの呼び出しは `403`
+
+### 回数制限の設定（Vercel の Environment Variables）
+
+| 変数 | 既定値 | 内容 |
+|---|---|---|
+| `EXTRACT_LIMIT_PER_IP_PER_HOUR` | `10` | 送信元IPごとの1時間あたりの上限 |
+| `EXTRACT_LIMIT_GLOBAL_PER_DAY` | `300` | サービス全体の1日あたりの上限（UTC基準） |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | なし | 設定すると全サーバー共通で回数を数える（推奨。Vercel の Marketplace から Upstash を無料枠で追加すると自動で入る） |
+
+Upstash を設定しない場合はサーバーのメモリで数えるため、サーバーが複数台に増えると制限が緩くなる。
+
+### 必ず設定する：Anthropic の利用上限額
+
+コードの制限に加えて、万一の請求の上振れを確実に止めるため
+[Anthropic Console](https://console.anthropic.com/) の **Settings → Limits** で月の利用上限額（Spend limit）を設定する。
+このプロキシ専用の Workspace を作り、そこで発行したAPIキーを使うと、他のサービス（Mesh-Order など）と上限を分けられる。
 
 ## コストの目安
 

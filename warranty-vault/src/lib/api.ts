@@ -23,6 +23,11 @@ export async function extractWarranty(
   } catch {
     throw new ExtractError('通信に失敗しました。電波の良い場所でもう一度お試しください。');
   }
+  if (response.status === 429) {
+    throw new ExtractError(
+      '読み取りの回数が上限に達しました。時間をおいてお試しいただくか、手入力で登録してください。',
+    );
+  }
   if (!response.ok) {
     throw new ExtractError('読み取りに失敗しました');
   }
