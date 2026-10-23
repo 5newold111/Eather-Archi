@@ -1587,6 +1587,17 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
     return done, manual
 
 
+def _visible_first(loc):
+    """同じ名前の丸が画面に見えるものと隠れたもの（作り直しの残り）の両方にあるとき、見えている方"""
+    for i in range(min(loc.count(), 8)):
+        try:
+            if loc.nth(i).is_visible() or loc.nth(i).evaluate("e => { const l = e.closest('label') || e.parentElement; return !!(l && l.offsetParent); }"):
+                return loc.nth(i)
+        except Exception:  # noqa: BLE001
+            pass
+    return loc.first
+
+
 def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], list[str]]:
     """選ぶ（見えない作りのボタンは、要素そのものを押す）。選べたもの／画面に無かったもの"""
     done, missing = [], []
@@ -1595,7 +1606,7 @@ def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], 
         if loc.count() == 0:
             missing.append(label)
             continue
-        el = loc.first
+        el = _visible_first(loc)
         try:
             if not el.is_checked():
                 try:
@@ -1625,9 +1636,9 @@ VALIDATION_JS = r"""() => {
 # システムが Chrome から離れたあとも、そのページが開いている間は働く（DistroKid の検索がとても遅いことがあるため。決定 48）
 GUARD_NO_JS = r"""([names, rxs]) => {
   window.__pdNo = names;
-  const rx = new RegExp(rxs, 'i');
-  const confirmBox = () => { const box = document.querySelector('.swal2-popup');
-      if (box && rx.test(box.innerText || '')) { const b = box.querySelector('.swal2-confirm'); if (b) b.click(); } };
+  const [rx, ctx, danger] = rxs.map(x => new RegExp(x, 'i'));
+  const confirmBox = () => { const box = document.querySelector('.swal2-popup'); const t = box ? (box.innerText || '') : '';
+      if (box && !danger.test(t) && (rx.test(t) || ctx.test(t))) { const b = box.querySelector('.swal2-confirm'); if (b) b.click(); } };
   const fix = () => { for (const n of window.__pdNo || []) {
       const no = document.querySelector(`input[type=radio][name="${n}"][value="new"]`);
       if (no && !no.checked) { no.click(); no.dispatchEvent(new Event('change', {bubbles: true})); setTimeout(confirmBox, 600); } } };
@@ -1641,22 +1652,31 @@ GUARD_NO_JS = r"""([names, rxs]) => {
 
 # 「No（新しいページ）」を選んだときに DistroKid が出す確認の小窓（SweetAlert）。文がこの内容のときだけ OK を押す（決定 49）
 NEW_PAGE_CONFIRM = r"new (artist )?(page|profile)|don'?t (yet )?have|no (other )?releases|create (a )?new|separate (artist )?(page|profile)|not grouped|won'?t be grouped"
-MODAL_JS = r"""(rx) => {
+# 「No」を自分で押した直後に出た小窓は、その「No」の確認とみて、アーティスト・ページ・サイトの話なら OK を押す（Apple の文は Spotify と違うため。決定 50）。
+# 消す・取り消すなどの小窓は、どちらのときも押さない
+PICKED_CONTEXT = r"artist|page|profile|spotify|apple|itunes|youtube|google|music|sure|confirm"
+DANGER = r"delete|remove|discard|erase|lose|cancel (the|this|your) (release|upload)|refund"
+MODAL_JS = r"""([rx, ctx, danger, loose]) => {
   const box = document.querySelector('.swal2-popup.swal2-show, .swal2-popup');
   if (!box || box.offsetParent === null && getComputedStyle(box).position !== 'fixed') return null;
   const text = (box.innerText || '').replace(/\s+/g, ' ').trim();
-  const ok = new RegExp(rx, 'i').test(text);
+  const ok = !new RegExp(danger, 'i').test(text) && (new RegExp(rx, 'i').test(text) || (loose && new RegExp(ctx, 'i').test(text)));
   if (ok) { const b = box.querySelector('.swal2-confirm'); if (b) b.click(); }
   return {text: text.slice(0, 400), clicked: ok};
 }"""
 
 
-def confirm_new_page(sess: Session) -> list[str]:
-    """確認の小窓が出ていれば、文を読み、新しいページを作る確認なら OK を押す。出ていた文の一覧"""
+def confirm_new_page(sess: Session, picked: bool = False) -> list[str]:
+    """確認の小窓が出ていれば、文を読み、新しいページを作る確認なら OK を押す。出ていた文の一覧。
+    picked：いま「No」を押した直後（小窓が遅れて出ることがあるので 4 秒まで待ち、アーティスト・ページの話なら OK）"""
     out = []
-    for _ in range(4):
-        sess.page.wait_for_timeout(500)
-        r = sess.page.evaluate(MODAL_JS, NEW_PAGE_CONFIRM)
+    for i in range(4):
+        r = None
+        for _ in range(14 if picked and i == 0 else 2):
+            sess.page.wait_for_timeout(300)
+            r = sess.page.evaluate(MODAL_JS, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER, picked])
+            if r:
+                break
         if not r:
             break
         out.append(("OK を押しました：" if r["clicked"] else "押していません（内容が違う）：") + r["text"])
@@ -1710,7 +1730,7 @@ def guard_artist_no(sess: Session, song: dict, a_done: list[str]) -> None:
         names = [n for n, _ in ARTIST_ID_RADIOS]
     if names:
         try:
-            sess.page.evaluate(GUARD_NO_JS, [names, NEW_PAGE_CONFIRM])
+            sess.page.evaluate(GUARD_NO_JS, [names, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER]])
         except Exception:  # noqa: BLE001
             pass
 
@@ -1721,10 +1741,16 @@ def apply_choices(sess: Session, song: dict) -> tuple[list[str], list[str], list
     a_items, a_texts = artist_id_radios(song)
     a_done = []
     for item in a_items:   # 1 つずつ選び、確認の小窓が出たら（新しいページを作る確認のときだけ）OK を押してから次へ
-        d, _ = set_radios(sess, [item])
-        confirm_new_page(sess)
-        if sess.page.locator(item[1]).count() and sess.page.locator(item[1]).first.is_checked():
-            a_done += d
+        for t in range(3):   # 選んだ丸が取り消されたら、少し待ってやり直す（Apple は検索が遅い）
+            d, _ = set_radios(sess, [item])
+            confirm_new_page(sess, picked=True)
+            sess.page.wait_for_timeout(800)
+            loc = sess.page.locator(item[1])
+            if loc.count() and _visible_first(loc).is_checked():
+                a_done += d
+                break
+            print(f"   … {item[0]} が取り消されました。やり直します（{t + 1} 回目）")
+            sess.settle(1500)
     for label, css, val in a_texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
         loc = sess.page.locator(css)
         if loc.count() and loc.first.is_visible():
@@ -1738,7 +1764,7 @@ def _unchecked(sess: Session, song: dict) -> list[tuple[str, str]]:
     out = []
     for label, css in distrokid_radios(song) + a_items:
         loc = sess.page.locator(css)
-        if loc.count() and not loc.first.is_checked():
+        if loc.count() and not _visible_first(loc).is_checked():
             out.append((label, css))
     return out
 
@@ -1754,7 +1780,7 @@ def stabilize(sess: Session, song: dict, fields: list[dict], rounds: int = 3) ->
         print(f"   … 戻された項目を入れ直します（{i + 1} 回目）：" + "・".join([l for l, _ in off] + bad)[:300])
         for item in off:
             set_radios(sess, [item])
-            confirm_new_page(sess)
+            confirm_new_page(sess, picked=True)
         again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
         if again:
             fill_fields(sess, "distrokid", again, fresh=False)
@@ -1873,7 +1899,7 @@ def run_distrokid(sess: Session, song_id: str) -> int:
             if off:
                 for item in off:
                     set_radios(sess, [item])
-                    confirm_new_page(sess)
+                    confirm_new_page(sess, picked=True)
                 print("   … あとから戻された丸を入れ直しました：" + "・".join(l for l, _ in off))
             lost = [f for f in keep if any(b.startswith(f["label"]) for b in verify(sess, keep))]
             if lost:
