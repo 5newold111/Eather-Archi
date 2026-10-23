@@ -152,6 +152,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "dashboard.py")], "ダッシュボードの書き出し"
     if action == "images" and p.get("slug") in _slugs():
         return [PY, str(S / "kit_images.py"), "--only", p["slug"]], f"写真とジャケットを作る（{p['slug']}）"
+    if action == "artist_page" and p.get("slug") in _slugs():   # Spotify のアーティストのページを手で記録する（決定 53）
+        page = str(p.get("page") or "").strip()
+        if re.fullmatch(r"[\w:/.?=&-]{22,200}", page):
+            return [PY, str(S / "publish.py"), "artist-page", p["slug"], page], f"Spotify のページの記録（{p['slug']}）"
     if action == "registered":
         song = _songs.by_id(str(p.get("id", "")))
         day = str(p.get("date") or date.today().isoformat())
@@ -466,6 +470,7 @@ function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
    case "folder":return `<button class="ghost act-only" data-act="open_folder" data-id="${id}">${E(a.label)}</button>`;
    case "artist_folder":return `<button class="ghost act-only" data-act="open_artist" data-slug="${slug}">${E(a.label)}</button>`;
+   case "artist_page":return `<span class="act-only"><input type="text" id="ap-${slug}" placeholder="spotify:artist:… か https://open.spotify.com/artist/…" style="min-width:18em"> <button data-act="artist_page" data-slug="${slug}">${E(a.label)}</button></span>`;
    case "registered":return `<span class="act-only"><input type="date" id="d-${id}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${id}">${E(a.label)}</button></span>`;
   }return""}
 function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].rows[+ri],p=r.phases[+pi],g=p.guide||{cause:p.detail,steps:[],actions:[]};
@@ -543,6 +548,7 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
+  if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});

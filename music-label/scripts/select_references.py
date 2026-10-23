@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import pick_scene, production_status, rel, scene_growth  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
+from _common import pick_scene, production_status, rel, scene_growth, scene_of_type  # noqa: E402  その週に作る組かどうか（デビュー前・隔週・休止）・表示用の場所
 from _life import choice_boost, pick_moment  # noqa: E402  管理表の人生（歌のもとになる瞬間・その組が選んだ参考曲）
 ARTISTS_DIR = ROOT / "templates" / "artists"     # Postdog Records（ドライブ）の設定書
 LABELS_DIR = ROOT / "templates" / "labels"       # 子レーベル（設定書を artists 配列で内包）
@@ -460,6 +460,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, help="乱数の種（同じ結果を再現したいとき）")
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "briefs", help="出力フォルダ")
     ap.add_argument("--force", action="store_true", help="デビュー前・隔週の休み・休止の組も作る")
+    ap.add_argument("--scene", help="場面を決めて作る（live / party / personal / drive。集中配信で曲ごとに場面を散らすとき）")
     ap.add_argument("--overwrite", action="store_true",
                     help="Claude が書き足し済みのブリーフも作り直す（既定では守る）")
     args = ap.parse_args()
@@ -548,7 +549,7 @@ def main() -> None:
             last = (json.loads(prev_p.read_text(encoding="utf-8")).get("scene") or {}).get("type") if prev_p.exists() else None
         except (OSError, ValueError):
             last = None
-        scene = pick_scene(artist, week_monday, last) if slug != "demo" else None
+        scene = (scene_of_type(artist, args.scene) if args.scene else pick_scene(artist, week_monday, last)) if slug != "demo" else None
         artist["_scene"] = scene["type"] if scene else None
         base = scene_base(slug, scene, args.out) if scene else None
         artist["_base_slots"] = {(sl, rid) for sl, rid in (base or {}).pop("_slots", [])}

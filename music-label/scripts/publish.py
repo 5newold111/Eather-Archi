@@ -53,7 +53,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import OUT, ROOT, load_artist, load_dotenv, monday_of, notify, read_json, save_artist, step  # noqa: E402
+from _common import OUT, ROOT, all_artists, load_artist, load_dotenv, monday_of, notify, read_json, save_artist, step  # noqa: E402
 
 load_dotenv()
 import _archive as archive  # noqa: E402
@@ -415,7 +415,7 @@ def draft_fields(song: dict) -> dict:
         sf, _ = archive.artist_folder(song["artist"], "music", _songs.folder_name(song))
         if sf is not None and (sf / audio).exists():
             folder = sf
-    if song["kind"] == "debut" or not song.get("release_at"):
+    if song["kind"] == "debut" or not song.get("release_at") or song.get("sprint"):   # 集中配信の曲も、いちばん早い日（決定 53）
         when = "いちばん早い日（登録する日。DistroKid の画面で選べる最短の日付）"
     else:
         when = str(song["release_at"])[:10]
@@ -577,6 +577,11 @@ def cmd_registered(args) -> int:
     st.update({"status": "registered", "registered_at": date.today().isoformat(), "release_date": day.isoformat()})
     _songs.save_state(song, st)
     print(f"○ {song['artist']}「{song['title']}」を DistroKid 登録済みにしました（配信日 {day}）")
+    if song.get("sprint") and song.get("brief"):   # 集中配信の曲：ブリーフの配信日時も、登録した配信日にそろえる（SNS の投稿の時刻など。決定 53）
+        import sprint
+        b = read_json(song["brief"])
+        b["release_at"] = sprint.release_at_asap(day)
+        Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if song["kind"] == "debut":
         a = load_artist(song["slug"])
         if "debut_week_before" not in st:   # 登録を取り消したときに戻せるように、前の値を残す
@@ -900,6 +905,21 @@ def cmd_back(args) -> int:
     return 0
 
 
+def cmd_artist_page(args) -> int:
+    """デビュー曲の Spotify のアーティストのページを手で記録する（DistroKid の曲のページに出た URI か、Spotify の住所を貼る）。
+    2 曲目からの DistroKid 登録で「Yes」とこの ID を使い、同じページにまとめる（決定 53）"""
+    m = re.search(r"(?:spotify:artist:|open\.spotify\.com/(?:intl-\w+/)?artist/)([A-Za-z0-9]{22})", args.page) or re.fullmatch(r"([A-Za-z0-9]{22})", args.page.strip())
+    if not m:
+        print("[エラー] Spotify のアーティストの URI（spotify:artist:…）か住所（https://open.spotify.com/artist/…）を貼ってください")
+        return 2
+    if not any(a.get("slug") == args.slug for a in all_artists()):
+        print(f"[エラー] 組 {args.slug} が見つかりません")
+        return 2
+    save_artist_link(args.slug, "spotify", m.group(1), f"https://open.spotify.com/artist/{m.group(1)}")
+    print(f"【結果】{args.slug} の Spotify のアーティストのページを記録しました：spotify:artist:{m.group(1)}")
+    return 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno の曲を取り込み、DistroKid の登録ボタンを押すだけの状態まで進める")
     sub = ap.add_subparsers(dest="cmd")
@@ -918,11 +938,15 @@ def main() -> None:
     p = sub.add_parser("back", help="間違えて進めた工程を戻す")
     p.add_argument("id")
     p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
+    p = sub.add_parser("artist-page", help="Spotify のアーティストのページを手で記録する（2 曲目からを同じページにまとめる）")
+    p.add_argument("slug")
+    p.add_argument("page", help="spotify:artist:… か https://open.spotify.com/artist/…")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
-          "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back}.get(args.cmd)
+          "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
+          "artist-page": cmd_artist_page}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

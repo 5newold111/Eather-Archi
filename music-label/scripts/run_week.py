@@ -289,6 +289,14 @@ def stage_status(week: date, a) -> None:
 STAGES = {"brief": stage_brief, "lyrics": stage_lyrics, "takes": stage_takes, "finish": stage_finish, "status": stage_status}
 
 
+def sprint_weeks() -> list[date]:
+    """集中配信（sprint.py）で作った曲のうち、まだ DistroKid に登録していない曲がある制作週"""
+    import _songs
+    ws = {date.fromisoformat(s["week"]) for s in _songs.weekly_songs()
+          if s.get("sprint") and _songs.state(s).get("status") not in ("registered", "live")}
+    return sorted(ws)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="1 週間ぶんの処理を段階ごとにまとめて流す")
     ap.add_argument("stage", choices=[*STAGES, "all", "auto"])
@@ -301,12 +309,18 @@ def main() -> None:
     print(f"=== 制作週 {week}：{a.stage} ===")
     if a.stage in ("all", "auto"):
         names = ("brief", "lyrics", "takes", "finish", "status") if a.stage == "all" else ("lyrics", "takes", "finish", "status")
-        for name in names:
-            print(f"\n----- {name} -----")
-            try:
-                STAGES[name](week, a)
-            except SystemExit as e:   # 準備ができていない段階は飛ばして次へ
-                print(f"  {e}")
+        weeks = [week]
+        if a.stage == "auto":   # 集中配信で前倒しした週も、毎時の仕上げで進める（決定 53）
+            weeks += [w for w in sprint_weeks() if w != week]
+        for w in weeks:
+            if w != week:
+                print(f"\n=== 集中配信の曲（制作週 {w}）===")
+            for name in names:
+                print(f"\n----- {name} -----")
+                try:
+                    STAGES[name](w, a)
+                except SystemExit as e:   # 準備ができていない段階は飛ばして次へ
+                    print(f"  {e}")
         return
     STAGES[a.stage](week, a)
 

@@ -164,6 +164,18 @@ def pick_scene(artist: dict, week_monday, last: str | None = None) -> dict | Non
     return out
 
 
+def scene_of_type(artist: dict, k: str) -> dict | None:
+    """場面の種類を決めて、その場面の情報を返す（集中配信で曲ごとに場面を散らすとき。決定 53）"""
+    if k not in SCENE_TYPES:
+        return None
+    t = SCENE_TYPES[k]
+    out = {"type": k, "name": t["name"], "en": t["en"], **t["spec"]}
+    g = scene_growth(artist.get("slug", "")).get("weights") or {}
+    if k in g:
+        out["growth_multiplier"] = g[k]
+    return out
+
+
 def load_label(slug: str | None) -> dict:
     """子レーベルの設定書。Postdog Records（drive）は設定書ファイルが無いので既定値を返す"""
     if not slug or slug == MAIN_LABEL:

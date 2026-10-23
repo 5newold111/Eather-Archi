@@ -156,6 +156,20 @@ def _explain(row: dict, phase: dict) -> dict:
             n_wait = sum(1 for x in _songs.all_songs() if _songs.state(x).get("status") == "ready")
         except Exception:  # noqa: BLE001
             n_wait = 0
+        try:   # 2 曲目から：Spotify のアーティストのページがわかるまで登録を待つ（決定 53）
+            import browser_fill
+            song = _songs.by_id(str(row.get("id") or ""))
+            held = song is not None and not browser_fill.same_page_ready(song)
+        except Exception:  # noqa: BLE001
+            held = False
+        if held:
+            acts.insert(1, {"kind": "artist_page", "slug": row.get("slug"), "label": "Spotify のページを記録する"})
+            return {"cause": f"{title}の準備はできています。ただ、{row.get('artist', 'この組')} の Spotify のアーティストのページがまだわからないので、"
+                             "登録は少し待ちます（いま登録すると、デビュー曲と別のページができるおそれがあります）。",
+                    "steps": ["デビュー曲が Spotify に出ると、毎日の確認でページが自動で記録され、登録できるようになります",
+                              "早く進めたいとき：DistroKid のデビュー曲のページに出る Spotify の URI（spotify:artist:…）をコピーし、"
+                              "下の欄に貼って「Spotify のページを記録する」を押す"],
+                    "actions": acts}
         if n_wait > 1:
             acts.insert(2, {"kind": "run", "label": f"登録を待つ {n_wait} 曲を続けて DistroKid に入力する（1 曲ずつ「登録した」で次へ）",
                             "action": "fill_distrokid_all"})

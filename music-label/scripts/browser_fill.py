@@ -1808,10 +1808,28 @@ def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
     return list(dict.fromkeys(fixed))
 
 
+def same_page_ready(song: dict) -> bool:
+    """2 曲目からの曲を、デビュー曲と同じ Spotify のアーティストのページにまとめられるか（ページの ID がわかっているか）。
+    デビュー曲が配信される前に 2 曲目を「No（新しいページ）」で出すと、ページが別々にできるおそれがある（決定 53）"""
+    if song.get("kind") == "debut":
+        return True
+    try:
+        import publish
+        from _common import load_artist
+        a = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
+        return bool((a.get("distribution") or {}).get("spotify_uri") or (publish.artist_links(song["slug"]).get("spotify") or {}).get("id"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def waiting_for_distrokid() -> list[dict]:
-    """DistroKid に登録する段階の曲（公開セットができて、まだ登録していない）。デビュー曲を先に、曲 ID の順"""
+    """DistroKid に登録する段階の曲（公開セットができて、まだ登録していない）。デビュー曲を先に、曲 ID の順。
+    2 曲目からの曲は、その組の Spotify のアーティストのページがわかってから（決定 53）"""
     out = [x for x in _songs.all_songs() if _songs.state(x).get("status") == "ready"]
-    return sorted(out, key=lambda x: (x.get("kind") != "debut", x["id"]))
+    held = [x for x in out if not same_page_ready(x)]
+    if held:
+        print("   ・Spotify のアーティストのページがまだわからないので、あとにする曲：" + "・".join(f"{x['artist']}「{x['title']}」" for x in held))
+    return sorted([x for x in out if x not in held], key=lambda x: (x.get("kind") != "debut", x["id"]))
 
 
 def run_distrokid_all(sess: Session) -> int:
@@ -1964,6 +1982,17 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     if not wait_for_form(sess, "DistroKid", "登録の画面（Upload）を開いてから"):
         print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
         return 2
+    if not same_page_ready(song):   # 2 曲目から：デビュー曲と同じページにまとめるため、ページの ID がわかるまで待つ（決定 53）
+        sess.show("まだ登録しない方がよい曲です",
+                  [f"{song['artist']} の Spotify のアーティストのページが、まだわかっていません。",
+                   "いま登録すると、デビュー曲と別のアーティストのページができるおそれがあります。",
+                   "デビュー曲が Spotify に出ると、毎日の確認でページが自動で記録されます。早く進めたいときは、"
+                   "DistroKid のデビュー曲のページに出る Spotify の URI（spotify:artist:…）を、ダッシュボードの「Spotify のページを記録する」に貼ってください。"],
+                  [{"id": "stop", "label": "待つ（閉じる）", "primary": True},
+                   {"id": "anyway", "label": "それでも入れる（別のページになるかもしれない）"}])
+        if sess.wait({"action": "stop"}).get("action") != "anyway":
+            print("【結果】まだ終わっていません：Spotify のアーティストのページがわかるまで待ちます")
+            return 3 if nxt else 2
     fields, draft = distrokid_fields(song)
     owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
     owner_ng = "" if re.fullmatch(r"[A-Za-z][A-Za-z.'\-]*( [A-Za-z][A-Za-z.'\-]*)+", owner) else \
