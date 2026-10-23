@@ -31,6 +31,7 @@ Supabase Pro（月約 $25、保管 100 GB 込み）で 3 年ほど収まりま�
 2. 「Settings → Billing」で Pro プランに変更（保管 1 GB の無料枠では足りません）
 3. 「SQL Editor」で `supabase/schema.sql` の内容を貼り付けて実行（テーブルができます）
 4. 続けて `supabase/storage.sql` を実行（非公開バケットとアクセス制御ができます）
+   - **Authentication → Sign In / Providers の「Allow new users to sign up」をオフにする**（誰でもアカウントを作れる初期設定のままにしない。このシステムはログインを使わず、service_role キーだけで動く）
 5. 「Settings → API」で次の 2 つを控える
    - `Project URL`
    - `service_role` キー（**自動処理専用。絶対に公開しない**）
