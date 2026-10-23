@@ -101,6 +101,12 @@ def status_json() -> dict:
         photo_todos = [{**t, "flow": "regular" if _timeline.in_regular(t["slug"]) else "debut"} for t in artist_photo.todos()]
     except Exception:  # noqa: BLE001
         photo_todos = []
+    try:   # 登録した曲の歌詞を DistroKid に出す（決定 52）
+        import browser_fill
+        lyric_todos = [{"id": x["id"], "artist": x["artist"], "title": x["title"],
+                        "flow": "regular" if _timeline.in_regular(x["slug"]) else "debut"} for x in browser_fill.lyrics_todo()]
+    except Exception:  # noqa: BLE001
+        lyric_todos = []
     tl = _timeline.timeline()
     import _guide
     for key in ("debut", "regular"):
@@ -123,7 +129,7 @@ def status_json() -> dict:
                 except Exception as e:  # noqa: BLE001  説明が作れなくても画面は出す
                     ph["guide"] = {"cause": ph.get("detail", ""), "steps": [], "actions": [], "error": str(e)}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl,
-            "weekly_todos": weekly, "photo_todos": photo_todos,
+            "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j[k] for k in ("id", "label", "state", "started")} for j in list(JOBS.values())[-8:]]}
@@ -181,6 +187,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "fill_lyrics":   # 登録した曲の歌詞を DistroKid の歌詞の画面に入れる（決定 52）
+        song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
+        return [PY, str(S / "browser_fill.py"), "lyrics", song["id"] if song else "all"], \
+            "ブラウザで入力（歌詞" + (f"：{song['artist']}「{song['title']}」）" if song else "：まだ出していない曲を続けて）")
     if action == "fill_distrokid_all":   # 残りの曲を続けて入れる（決定 51）
         return [PY, str(S / "browser_fill.py"), "distrokid", "all"], "ブラウザで入力（DistroKid：残りの曲を続けて）"
     if action == "fill_distrokid":
@@ -506,6 +516,10 @@ function todoList(key){
   html+=(DATA.photo_todos||[]).filter(t=>t.flow===key).map(t=>`<li class="wait"><span class="who">あなた</span><b>${E(t.artist)}</b>　● <b>アーティスト写真</b>：配信が始まったので、各サイトのアーティストのページに写真を入れる（${t.services.map(s=>E(s.name)+(s.state==="update"?"・入れ直し":"")).join("、")}）<br>`
     +t.services.map(s=>`<button class="act-only" data-act="fill_photo" data-slug="${E(t.slug)}" data-service="${E(s.service)}">${E(s.name)} に写真を入れる</button>`).join(" ")
     +` <a class="btn" href="/photos">アーティスト写真のページ ↗</a></li>`).join("");
+  const lt=(DATA.lyric_todos||[]).filter(t=>t.flow===key);
+  html+=lt.map(t=>`<li class="wait"><span class="who">あなた</span><b>${E(t.artist)}</b> 「${E(t.title)}」　● <b>歌詞</b>：DistroKid に登録したので、配信サイトの決まりに合わせた歌詞を出す（入力は自動・「Submit」は Gon さん）<br>`
+    +`<button class="act-only" data-act="fill_lyrics" data-id="${E(t.id)}">歌詞を DistroKid に入れる</button></li>`).join("");
+  if(lt.length>1)html+=`<li class="wait"><button class="act-only" data-act="fill_lyrics">歌詞がまだの ${lt.length} 曲を続けて入れる</button></li>`;
   if(key==="regular")html+=DATA.weekly_todos.map(t=>`<li class="${t.sev==="ng"?"ng":""}"><b>${E(t.what)}</b>（${t.who.length}）<br>${E(t.who.join("、"))}<br><code>${E(t.where)}</code></li>`).join("");
   document.getElementById("todo-"+key).innerHTML=html?`<ul class="list">${html}</ul>`:`<p class="empty">いまやることはありません</p>`;
 }

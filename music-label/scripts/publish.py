@@ -436,7 +436,8 @@ def draft_fields(song: dict) -> dict:
         "Explicit lyrics": "No（Clean）", "AI の申告": "はい（歌詞・ボーカル・演奏・作曲のうち、使ったものすべて）",
         "Songwriter（本名）": os.environ.get("OWNER_LEGAL_NAME") or "（.env の OWNER_LEGAL_NAME に本名を入れると自動で入ります）",
         "音源ファイル": str(folder / audio), "ジャケット": str(folder / cover) if cover else "（まだ）",
-        "歌詞": f"{_songs.cover_stem(song)}_歌詞.txt（同じフォルダ。Lyrics を提出する場合）",
+        "歌詞": "登録のあと、DistroKid の歌詞の画面に 歌詞_配信用.txt（配信サイトの決まりに合わせて作り直したもの）を自動で入れる"
+                if not song.get("instrumental") and song.get("lyrics") else "なし（インスト）",
         "ストア": "すべて（DistroKid の初期設定のまま）", "ISRC": "空欄（DistroKid が自動で付ける）",
         "サブジャンル（1 つ目のジャンルの細かい分類）": "その組の音に近いものを自動で選ぶ（候補：" + " → ".join(g.title() for g in ((a.get("sound") or {}).get("genres") or [])[:4]) + "。無ければ近いもの）",
         "Artist already in Apple Music / Spotify / YouTube Music / Instagram / Facebook?": (
@@ -465,7 +466,12 @@ def write_draft(song: dict, st: dict) -> None:
            "- 配信が始まると、毎日の確認で ISRC・UPC・配信 URL が楽曲管理シートに自動で入ります"]
     (d / "DistroKid下書き.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     if song.get("lyrics"):
-        (d / "歌詞.txt").write_text(song["lyrics"].strip() + "\n", encoding="utf-8")
+        (d / "歌詞.txt").write_text(song["lyrics"].strip() + "\n", encoding="utf-8")   # Suno に入れた歌詞（札・指示つき）
+        try:   # 配信サイトに出す歌詞（札・指示を外し、決まりに合わせたもの。決定 52）
+            import store_lyrics
+            store_lyrics.write_for_song(song)
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 配信用の歌詞を作れませんでした（{e}）")
     ep = song.get("episode") or {}
     if ep:   # この曲のエピソード（決定 33）。曲の紹介・SNS・インタビューの元に
         li = lambda xs: "、".join(xs) if isinstance(xs, list) else str(xs or "")  # noqa: E731

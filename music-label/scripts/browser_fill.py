@@ -57,6 +57,8 @@ S = Path(__file__).resolve().parent
 SITES = {"suno": os.environ.get("POSTDOG_SUNO_URL", "https://suno.com/create"),
          "distrokid": os.environ.get("POSTDOG_DISTROKID_URL", "https://distrokid.com/new/"),
          # アーティスト写真を入れるサイト（artist_photo.py。決定 32）
+         # 登録のあとに歌詞を出す画面（DistroKid の「Enhance your music」→ Lyrics。決定 52）
+         "distrokid_lyrics": os.environ.get("POSTDOG_DISTROKID_LYRICS_URL", "https://distrokid.com/lyrics/"),
          "spotify": "https://artists.spotify.com/", "apple": "https://artists.apple.com/", "amazon": "https://artists.amazonmusic.com/"}
 LEARNED = OUT / "browser" / "fields.json"
 PROFILE = Path(os.environ.get("POSTDOG_BROWSER_PROFILE", str(Path.home() / ".postdog-browser")))
@@ -1834,6 +1836,122 @@ def run_distrokid_all(sess: Session) -> int:
     return 0 if not rest else 2
 
 
+def lyrics_for(song: dict) -> str:
+    """配信サイトに出す歌詞（公開セットの 歌詞_配信用.txt。無ければ作る）。インストは空"""
+    try:
+        import store_lyrics
+        return store_lyrics.write_for_song(song).get("store") or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def lyrics_todo() -> list[dict]:
+    """歌詞をまだ出していない曲（DistroKid に登録済み・配信中で、歌詞がある）"""
+    out = [x for x in _songs.all_songs() if _songs.state(x).get("status") in ("registered", "live")
+           and not _songs.state(x).get("lyrics_submitted_at") and not x.get("instrumental") and str(x.get("lyrics") or "").strip()]
+    return sorted(out, key=lambda x: (x.get("kind") != "debut", x["id"]))
+
+
+def _open_song_lyrics(sess: Session, song: dict) -> bool:
+    """歌詞の画面で、この曲の歌詞を入れる欄を開く。曲名の行を探して押す（「Submit」などは押さない）。欄が見えたら True"""
+    box = "textarea, [contenteditable=true]"
+    for _ in range(2):
+        if _visible(sess.page.locator(box)):
+            return True
+        for role in ("link", "button"):
+            loc = sess.page.get_by_role(role, name=re.compile(re.escape(song["title"]), re.I))
+            for i in range(min(loc.count(), 5)):
+                el = loc.nth(i)
+                try:
+                    name = (el.inner_text(timeout=1000) or "").strip()
+                    if el.is_visible() and not NEVER.search(name.replace(song["title"], "")):
+                        el.click(timeout=3000)
+                        sess.settle(2500)
+                        break
+                except Exception:  # noqa: BLE001
+                    pass
+            if _visible(sess.page.locator(box)):
+                return True
+    return _visible(sess.page.locator(box))
+
+
+def run_lyrics(sess: Session, song_id: str, nxt: str = "") -> int:
+    """登録した曲の歌詞を、DistroKid の歌詞の画面に入れる（決定 52）。「Submit」は Gon さんが押す。
+    0：出した／2：まだ出していない／3：続けての入力をやめる"""
+    song = _songs.by_id(song_id)
+    if song is None:
+        sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
+    text = lyrics_for(song)
+    if not text:
+        print(f"【結果】{song['artist']}「{song['title']}」は歌詞がありません（インスト）")
+        return 0
+    sess.goto(SITES["distrokid_lyrics"])
+    if not sess.ensure_login("distrokid"):
+        print("【結果】まだ終わっていません：DistroKid にログインできていません")
+        return 2
+    sess.settle(2000)
+    for _ in range(3):
+        if _open_song_lyrics(sess, song):
+            break
+        sess.show("この曲の歌詞の画面を開いてください",
+                  [f"{song['artist']}「{song['title']}」の歌詞を入れる画面（歌詞の欄がある画面）を開いて、「続ける」を押してください。",
+                   "DistroKid の「Enhance your music」→「Lyrics」、または登録した曲のページの「Lyrics」から開けます。"],
+                  [{"id": "continue", "label": "続ける", "primary": True}, {"id": "stop", "label": "やめる"},
+                   {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}])
+        if sess.wait({"action": "continue"}).get("action") != "continue":
+            print("【結果】まだ終わっていません：歌詞の画面が開けませんでした")
+            return 2
+    f = {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": text, "largest_textarea": True,
+         "hints": ["Lyrics", "Paste your lyrics", "Enter lyrics", "Type lyrics", "歌詞"], "avoid": r"search|title|name|email|artist",
+         "tip": "DistroKid の歌詞を入れる大きな欄をクリックしてください"}
+    done, manual = fill_fields(sess, "distrokid_lyrics", [f])
+    bad = verify(sess, [f]) if done else ["歌詞（Lyrics）"]
+    notes = []
+    try:
+        import store_lyrics
+        notes = [n for n in store_lyrics.write_for_song(song)["notes"]][:6]
+    except Exception:  # noqa: BLE001
+        pass
+    later = ([{"id": "stop", "label": f"この曲は後で（次の曲へ：{nxt}）"}, {"id": "quit", "label": "続けての入力をここでやめる"}] if nxt
+             else [{"id": "stop", "label": "閉じる（まだ出さない）"}])
+    sess.show("歌詞を入れました" if not bad else "歌詞の欄に入りませんでした",
+              [f"{song['artist']}「{song['title']}」",
+               "Suno の札（[Verse] など）と音の指示を外し、配信サイトの決まりに合わせた歌詞です（公開セットの 歌詞_配信用.txt）。",
+               *(["⚠ 欄に入りませんでした。公開セットの 歌詞_配信用.txt をコピーして貼ってください"] if bad else []),
+               *(["確かめること：", *notes] if notes else []),
+               "曲を聞きながら読んで、違うところがあれば直してから「Submit」を押してください（押すのは Gon さんだけ）。",
+               "押したら「出した」を押すと記録されます。"],
+              [{"id": "submitted", "label": "出した", "primary": True}, *later,
+               {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}])
+    m = sess.wait({"action": "stop"})
+    if m.get("action") == "submitted":
+        st = _songs.state(song)
+        st["lyrics_submitted_at"] = date.today().isoformat()
+        _songs.save_state(song, st)
+        print(f"【結果】{song['artist']}「{song['title']}」の歌詞を出したことを記録しました（DistroKid の確認に 1 日ほど、各サイトに出るまで 1〜2 週間）")
+        return 0
+    if nxt and m.get("action") in ("quit", "closed"):
+        return 3
+    print("【結果】まだ終わっていません：歌詞の「出した」はまだ押されていません")
+    return 2
+
+
+def run_lyrics_all(sess: Session) -> int:
+    songs = lyrics_todo()
+    if not songs:
+        print("【結果】歌詞を出していない曲はありません")
+        return 0
+    print("▶ 歌詞を続けて入れる曲：" + "・".join(f"{x['artist']}「{x['title']}」" for x in songs))
+    for i, x in enumerate(songs):
+        nxt = songs[i + 1] if i + 1 < len(songs) else None
+        print(f"\n▶ {i + 1}/{len(songs)} 曲目：{x['artist']}「{x['title']}」（{x['id']}）")
+        if run_lyrics(sess, x["id"], f"{nxt['artist']}「{nxt['title']}」" if nxt else "") == 3:
+            break
+    rest = lyrics_todo()
+    print("【結果】" + ("歌詞は全部出しました" if not rest else "歌詞がまだの曲：" + "・".join(x["artist"] for x in rest)))
+    return 0 if not rest else 2
+
+
 def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     """1 曲を DistroKid に入れる。0：登録した／2：まだ登録しない／3：続けての入力をここでやめる（nxt があるとき：次の曲の名前）"""
     song = _songs.by_id(song_id)
@@ -1952,16 +2070,22 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         day = m.get("date") or date.today().isoformat()
         r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
         print(r.stdout.strip())
-        if nxt:   # 続けて入れるとき：次の曲へ進むか、ここでやめるか
-            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。", f"次の曲：{nxt}"],
-                      [{"id": "next", "label": f"次の曲へ（{nxt}）", "primary": True}, {"id": "quit", "label": "続けての入力をここでやめる"}])
-            go = sess.wait({"action": "next"})
-            print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
-            return 0 if go.get("action") == "next" else 3
-        sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。"],
-                  [{"id": "stop", "label": "閉じる", "primary": True}])
-        sess.wait({"action": "stop"})
         print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
+        has_lyr = bool(lyrics_for(song))
+        lyr_btn = [{"id": "lyrics", "label": "続けて歌詞を出す（DistroKid の歌詞の画面に自動で入れる）", "primary": True}] if has_lyr else []
+        if nxt:   # 続けて入れるとき：歌詞を出してから次の曲へ／次の曲へ／ここでやめる
+            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。", f"次の曲：{nxt}"],
+                      lyr_btn + [{"id": "next", "label": f"次の曲へ（{nxt}）", "primary": not has_lyr},
+                                 {"id": "quit", "label": "続けての入力をここでやめる"}])
+        else:
+            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。"],
+                      lyr_btn + [{"id": "stop", "label": "閉じる", "primary": not has_lyr}])
+        go = sess.wait({"action": "next" if nxt else "stop"})
+        if go.get("action") == "lyrics":
+            lc = run_lyrics(sess, song["id"], nxt)
+            return 3 if lc == 3 else 0
+        if nxt:
+            return 0 if go.get("action") == "next" else 3
         return 0
     if nxt and m.get("action") in ("quit", "closed"):
         print("【結果】続けての入力をここでやめました（この曲はまだ登録していません）")
@@ -2071,7 +2195,7 @@ def run_login(sess: Session, site: str) -> int:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno と DistroKid の入力を、システムが専用のブラウザで行う（押すのは Gon さん）")
-    ap.add_argument("what", choices=["suno", "distrokid", "photo", "login", "forget", "reset", "parts"])
+    ap.add_argument("what", choices=["suno", "distrokid", "lyrics", "photo", "login", "forget", "reset", "parts"])
     ap.add_argument("args", nargs="*", help="suno：曲 ID（省くと全曲）／distrokid：曲 ID／login・forget：suno か distrokid")
     a = ap.parse_args()
     if a.what == "forget":
@@ -2111,6 +2235,8 @@ def main() -> None:
                 code = run_suno(sess, a.args)
             elif a.what == "distrokid":
                 code = run_distrokid_all(sess) if a.args[0] == "all" else run_distrokid(sess, a.args[0])
+            elif a.what == "lyrics":   # 歌詞を DistroKid の歌詞の画面に入れる（曲 ID か all。決定 52）
+                code = run_lyrics_all(sess) if not a.args or a.args[0] == "all" else run_lyrics(sess, a.args[0])
             elif a.what == "photo":
                 code = run_photo(sess, a.args[0], a.args[1])
             elif a.what == "parts":   # いま開いている Suno（または DistroKid）の画面の部品の一覧

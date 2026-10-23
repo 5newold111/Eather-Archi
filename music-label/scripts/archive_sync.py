@@ -95,6 +95,9 @@ def items_for(a: dict) -> list[tuple[str, str | None, Path, str]]:
         if lyr.exists():
             out.append(("music", sub, lyr, f"{stem}_歌詞.txt"))
         import publish as _pub
+        slyr = _pub.PUB / song["key"] / "歌詞_配信用.txt"   # 配信サイトに出す歌詞（決定 52）
+        if slyr.exists():
+            out.append(("music", sub, slyr, f"{stem}_歌詞_配信用.txt"))
         epi = _pub.PUB / song["key"] / "エピソード.md"   # この曲のエピソード（決定 33）
         if epi.exists():
             out.append(("music", sub, epi, f"{stem}_エピソード.md"))
