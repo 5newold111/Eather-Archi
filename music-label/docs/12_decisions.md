@@ -780,3 +780,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - DistroKid に登録のマス：「✓ DistroKid に登録できた → 次へ進める（配信待ちへ）」（配信日を選んで押す。`publish.py registered`）
   - 配信待ちのマス：「✓ 配信を見つけた → 次へ進める（配信中へ）」（住所を貼って押す。決定 55）
   - 前の工程が表の上で済んでいなくても出す（手で登録したときなど）。同じボタンは下の並びから外す
+
+## 59. ブラウザの入力は、Playwright が入っている Python で動かす（2026-10-24。TIDEWOOL の DistroKid 入力で「部品がありません」）
+
+- 見立て：ダッシュボードは `schedule.py install` を実行した Python で動く。Python の版が上がる（3.13 → 3.14 など）と、`pip install --user` で入れた部品は版ごとの場所にあるので、新しい版から見えなくなる（前回の SyntaxWarning から、Mac では 3.14 が動いている）
+- 直したこと：
+  - ブラウザの入力（Suno・DistroKid・歌詞・写真）を始めるとき、Playwright が入っている Python を探して使う（いまの Python → Homebrew・python.org 版・版ごとの python3.x・pyenv の順。`_common.python_with`）
+  - どの Python にも無いときの案内に、その Python の場所と、そのままコピーして使える入れ方（`--user`、断られたら `--break-system-packages`）を出す
+  - ポップアップの「ブラウザ入力の部品を入れる」の判定も、ほかの Python に入っていれば「入っている」とみる

@@ -277,6 +277,11 @@ def start_job(cmd: list[str], label: str) -> str:
     with LOCK:
         JOBS[jid] = job
 
+    if label.startswith("ブラウザで入力") and cmd and cmd[0] == PY:   # Playwright が入っている Python で動かす（決定 59）
+        import _common
+        _common._PY_WITH.pop("playwright", None)   # 入れ直した直後でも見つけられるように、毎回探す
+        cmd = [_common.python_with("playwright") or PY, *cmd[1:]]
+
     def run():
         try:
             load_dotenv(override=True)   # あとで直した .env（本名・鍵など）を、ダッシュボードを動かしたままでも使う

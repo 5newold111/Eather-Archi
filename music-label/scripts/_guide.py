@@ -31,7 +31,10 @@ def _has_playwright() -> bool:
     if os.path.isdir(user):
         site.addsitedir(user)
     importlib.invalidate_caches()
-    return importlib.util.find_spec("playwright") is not None
+    if importlib.util.find_spec("playwright") is not None:
+        return True
+    import _common   # ダッシュボードの Python に無くても、ほかの Python に入っていれば、ブラウザの入力はそちらで動く（決定 59）
+    return bool(_common.python_with("playwright"))
 
 
 def _late(phase: dict) -> str:

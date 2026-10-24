@@ -2251,7 +2251,13 @@ def main() -> None:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        sys.exit("[案内] ブラウザで入力する部品がありません。ターミナルで  python3 -m pip install --user playwright  を 1 回実行してください")
+        import shlex
+        py = shlex.quote(sys.executable)
+        sys.exit("[案内] ブラウザで入力する部品（Playwright）が、この Python に入っていません：" + sys.executable + "\n"
+                 "       （Python の版が上がると、前に入れた部品が見えなくなります）\n"
+                 "       ターミナルに次をコピーして 1 回実行してください：\n"
+                 f"       {py} -m pip install --user playwright || {py} -m pip install --user --break-system-packages playwright\n"
+                 "       ダッシュボードのポップアップの「ブラウザ入力の部品を入れる」でも同じことができます")
     if a.what == "distrokid" and not a.args:
         sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003。残りを続けて入れるときは all）")
     if a.what == "photo" and len(a.args or []) < 2:

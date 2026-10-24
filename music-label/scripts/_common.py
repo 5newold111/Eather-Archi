@@ -51,6 +51,41 @@ def ssl_context():
         return ssl.create_default_context()
 
 
+_PY_WITH: dict[str, str | None] = {}
+
+
+def python_with(module: str = "playwright") -> str | None:
+    """その部品（例 playwright）が入っている Python を探す（決定 59）。
+    Python の版が上がる（3.13 → 3.14 など）と、版ごとの置き場所に入れた部品が新しい版から見えなくなるため、
+    いま動いている Python → よく使われる場所の Python（Homebrew・python.org 版・版ごとの python3.x）の順に試す"""
+    import glob
+    import shutil
+    import subprocess
+    if module in _PY_WITH:
+        return _PY_WITH[module]
+    cands = [sys.executable, shutil.which("python3") or ""]
+    for d in ("/opt/homebrew/bin", "/usr/local/bin", "/Library/Frameworks/Python.framework/Versions/Current/bin", "/usr/bin"):
+        cands.append(f"{d}/python3")
+        cands += sorted(glob.glob(f"{d}/python3.[0-9]*"), reverse=True)
+    cands += sorted(glob.glob("/Library/Frameworks/Python.framework/Versions/3.*/bin/python3"), reverse=True)
+    cands += sorted(glob.glob(str(Path.home() / ".pyenv/versions/*/bin/python3")), reverse=True)
+    seen = set()
+    for c in cands:
+        if not c or c in seen or not Path(c).exists() or c.endswith("-config"):
+            continue
+        seen.add(c)
+        try:
+            ok = subprocess.run([c, "-c", f"import {module}, sys; assert sys.version_info >= (3, 10)"],
+                                capture_output=True, timeout=20).returncode == 0
+        except Exception:  # noqa: BLE001
+            ok = False
+        if ok:
+            _PY_WITH[module] = c
+            return c
+    _PY_WITH[module] = None
+    return None
+
+
 def rel(p: Path) -> str:
     """表示用の場所。music-label の中なら短く、外（一時フォルダなど）ならそのまま"""
     p = Path(p).resolve()
