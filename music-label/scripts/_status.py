@@ -157,7 +157,6 @@ def system_blockers() -> list[tuple[str, str, str]]:
     """仕組み全体の詰まり：(重要度 ng/normal, 内容, 直し方)"""
     out = []
     songs = _songs.all_songs()
-    states = [_songs.state(s).get("status") for s in songs]
     if not shutil.which("ffmpeg"):
         out.append(("ng", "音量を整える道具（ffmpeg）が入っていません", "brew install ffmpeg"))
     if not os.environ.get("OPENAI_API_KEY"):

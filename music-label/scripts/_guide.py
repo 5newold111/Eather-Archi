@@ -62,7 +62,28 @@ def back_actions(song: dict | None) -> list[dict]:
 
 def explain(row: dict, phase: dict) -> dict:
     # 戻すボタンは、工程ごとではなく曲の行ごとに、ポップアップの上の「← 戻る」の欄に出す（webapp.py の rows[].back）
-    return _explain(row, phase)
+    g = _explain(row, phase)
+    fwd = forward_actions(row, phase)
+    if fwd:   # 同じボタンは下の並びから外す（日付・住所の欄が 2 つにならないように）
+        kinds = {a["kind"] for a in fwd}
+        g = {**g, "forward": fwd, "actions": [a for a in g.get("actions", []) if a.get("kind") not in kinds]}
+    return g
+
+
+def forward_actions(row: dict, phase: dict) -> list[dict]:
+    """うまくいったのに表が進んでいないとき、ポップアップの上の「→ 次に進める」の欄に出すボタン（決定 58）。
+    DistroKid に登録できた → 登録の記録（配信日つき）で「配信待ち」へ／配信を見つけた → 「配信中」へ"""
+    if row.get("planned") or not row.get("id") or (phase.get("state") == "done" and not phase.get("milestone")):
+        return []
+    song = _songs.by_id(row["id"])
+    if song is None:
+        return []
+    st = _songs.state(song).get("status") or ""
+    if phase["name"] == "DistroKid に登録" and st not in ("registered", "live"):
+        return [{"kind": "registered", "id": row["id"], "label": "✓ DistroKid に登録できた → 次へ進める（配信待ちへ）"}]
+    if phase["name"] == "配信待ち" and st == "registered":
+        return [{"kind": "mark_live", "id": row["id"], "label": "✓ 配信を見つけた → 次へ進める（配信中へ）"}]
+    return []
 
 
 def _explain(row: dict, phase: dict) -> dict:
@@ -152,7 +173,6 @@ def _explain(row: dict, phase: dict) -> dict:
                 {"kind": "run", "label": "DistroKid にログイン（初回だけ）", "action": "browser_login", "site": "distrokid"},
                 {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
         try:   # 登録を待つ曲がほかにもあれば、続けて入れるボタン（決定 51）
-            import _songs
             n_wait = sum(1 for x in _songs.all_songs() if _songs.state(x).get("status") == "ready")
         except Exception:  # noqa: BLE001
             n_wait = 0
