@@ -662,9 +662,8 @@ def cmd_track(args) -> int:
     except Exception as e:  # noqa: BLE001
         print(f"－ Spotify につながりませんでした：{e}")
         return 0
-    if not token:
-        print("－ Spotify の鍵（SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET）が .env にないので、配信の確認を飛ばしました")
-        return 0
+    if not token:   # 鍵が無いとき：Apple Music・Deezer・song.link・Spotify の曲のページ（・Claude の Web 検索）で確かめる（決定 57）
+        return track_without_key(waiting, args)
     changed = False
     for song in waiting:
         try:
@@ -902,6 +901,49 @@ def cmd_back(args) -> int:
         return 2
     print(f"○ {msg}")
     print(f"【結果】{msg}")
+    return 0
+
+
+def track_without_key(waiting: list[dict], args) -> int:
+    import store_check
+    changed = False
+    for song in waiting:
+        r = store_check.check(song)
+        for n in r["notes"]:
+            print(f"   － {song['artist']}「{song['title']}」：{n}")
+        if not r["live"]:
+            print(f"   ・{song['artist']}「{song['title']}」：まだ Apple Music・Deezer・Spotify に出ていません")
+            continue
+        sp, ap, dz = r["spotify"], r["apple"], r["deezer"]
+        found = {"isrc": dz.get("isrc", ""), "upc": dz.get("upc", ""), "url": sp.get("url") or ap.get("url") or dz.get("url", ""),
+                 "released": ap.get("released") or dz.get("released") or date.today().isoformat(),
+                 "spotify_track_id": sp.get("track_id", ""), "apple_url": ap.get("url", ""), "deezer_url": dz.get("url", ""),
+                 "youtube_music_url": r.get("youtube_music", "")}
+        st = _songs.state(song)
+        st.update({"status": "live", **{k: v for k, v in found.items() if v}, "live_checked_at": date.today().isoformat(),
+                   "live_checked_by": "store_check"})
+        _songs.save_state(song, st)
+        changed = True
+        where = "・".join(n for n, x in (("Spotify", sp.get("url")), ("Apple Music", ap.get("url")), ("Deezer", dz.get("url"))) if x)
+        print(f"   ○ {song['artist']}「{song['title']}」が配信中になりました（{where} で確認）" + (f"。ISRC {found['isrc']}" if found["isrc"] else ""))
+        notify("配信が始まりました", f"{song['artist']}「{song['title']}」（{where}）")
+        if sp.get("artist_id"):   # 2 曲目から DistroKid で「Yes」とこの ID を使い、同じページにまとめる
+            save_artist_link(song["slug"], "spotify", sp["artist_id"], f"https://open.spotify.com/artist/{sp['artist_id']}")
+        elif not sp.get("url"):
+            print("   ・Spotify ではまだ見つかりません（Apple Music などには出ています）。Spotify のアーティストのページは次の確認で探します")
+        if ap.get("artist_id"):
+            save_artist_link(song["slug"], "apple", ap["artist_id"], ap.get("artist_url", ""))
+    if changed:
+        _book()
+    # 配信中なのに Spotify のアーティストのページがまだわからない組は、次の曲の登録のために探し続ける
+    todo = {}
+    for s in _songs.all_songs():   # 1 組 1 曲（デビュー曲を先に）
+        if _songs.state(s).get("status") == "live" and not (artist_links(s["slug"]).get("spotify") or {}).get("id"):
+            todo.setdefault(s["slug"], s)
+    for song in todo.values():
+        sp = store_check.check(song).get("spotify") or {}
+        if sp.get("artist_id"):
+            save_artist_link(song["slug"], "spotify", sp["artist_id"], f"https://open.spotify.com/artist/{sp['artist_id']}")
     return 0
 
 

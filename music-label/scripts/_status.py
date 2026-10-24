@@ -68,13 +68,10 @@ def song_step(song: dict, name: str) -> dict:
                      f"python3 scripts/publish.py draft {song['id']}", since)
     if s == "registered":
         rel = _d(st.get("release_date"))
-        if not (os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET")):
-            return _step(name, "ng", YOU, f"{title}登録済み。Spotify の鍵がないので配信を確かめられません",
-                         "python3 scripts/setup_keys.py --only spotify", st.get("registered_at"))
         if rel and (today - rel).days > 7:
             return _step(name, "ng", YOU, f"{title}配信日（{rel}）から 1 週間たっても Spotify に出ていません。DistroKid の画面で状態を確認",
                          "DistroKid → My Music", st.get("registered_at"))
-        return _step(name, "run", AUTO, f"{title}登録済み。配信待ち（配信日 {rel or '—'}）", "毎日 10:15 に確認", st.get("registered_at"))
+        return _step(name, "run", AUTO, f"{title}登録済み。配信待ち（配信日 {rel or '—'}）", "毎日 10:15 に確認（Spotify・Apple Music・Deezer）", st.get("registered_at"))
     if s == "live":
         return _step(name, "ok", "", f"{title}配信中（ISRC {st.get('isrc') or '—'}）", st.get("url", ""), st.get("released"))
     return _step(name, "wait", "", f"{title}{s}")
@@ -165,9 +162,7 @@ def system_blockers() -> list[tuple[str, str, str]]:
         out.append(("ng", "音量を整える道具（ffmpeg）が入っていません", "brew install ffmpeg"))
     if not os.environ.get("OPENAI_API_KEY"):
         out.append(("ng", "画像（写真・ジャケット）を作る OpenAI の鍵がありません", "python3 scripts/setup_keys.py --only openai"))
-    if not (os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET")):
-        sev = "ng" if "registered" in states else "normal"
-        out.append((sev, "Spotify の鍵がないので、配信の確認と ISRC の記録が自動になりません", "python3 scripts/setup_keys.py --only spotify"))
+    # Spotify の鍵が無くても、配信の確認は Apple Music・Deezer・song.link で自動で進む（決定 57）。鍵は入れなくてよい
     from _guide import _has_playwright
     if not _has_playwright():
         out.append(("normal", "Suno・DistroKid に自動で入力する部品（Playwright）が入っていません（無くても、手でコピーして貼れば進められます）",

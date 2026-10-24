@@ -206,7 +206,8 @@ def _explain(row: dict, phase: dict) -> dict:
                                 {"kind": "run", "label": "配信を確かめる", "action": "track"}, live_btn]}
         ms = next((x for x in row.get("phases", []) if x.get("milestone")), None)
         when = f"配信日（{ms['start']}）に" if ms else "配信日に"
-        return {"cause": f"{title}は DistroKid に登録済みです。{when}各ストアに並びます。毎朝自動で確かめ、配信が始まったら ISRC・UPC・配信 URL を記録します。",
+        return {"cause": f"{title}は DistroKid に登録済みです。{when}各ストアに並びます。毎朝自動で確かめ（Spotify の鍵が無くても、Apple Music・Deezer・"
+                         "Spotify の曲のページで確かめます）、配信が始まったら ISRC・UPC・配信 URL と、Spotify のアーティストのページを記録します。",
                 "steps": ["待つだけで大丈夫です。", "すぐに確かめたいときは「配信を確かめる」を押す", live_step],
                 "actions": [{"kind": "run", "label": "配信を確かめる", "action": "track", "primary": True}, live_btn]}
 
