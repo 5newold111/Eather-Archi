@@ -1970,6 +1970,41 @@ def run_lyrics_all(sess: Session) -> int:
     return 0 if not rest else 2
 
 
+STATE_JS = r"""() => { const vis = x => x.offsetParent !== null;
+    const v = s => { const e = [...document.querySelectorAll(s)].find(vis); return e ? (e.type === 'radio' ? null : e.value) : '（欄が無い）'; };
+    const r = n => { const all = [...document.querySelectorAll(`input[type=radio][name^="${n}"]`)];
+        const on = all.filter(e => e.checked).map(e => (e.value || 'Yes') + (vis(e) || vis(e.parentElement || e) ? '' : '（隠れ）'));
+        return (on.join('+') || '（未選択）') + `/${all.length}個`; };
+    const g = [...document.querySelectorAll('select[name=genre1]')].map(x => `${vis(x) ? '見える' : '隠れ'}:${(x.selectedOptions[0] || {}).text || ''}/${x.options.length}件`).join(' ');
+    // Track credits の役割（打って選ぶ箱）：Performer・Producer の名前の欄の近くの役割の箱の中身
+    const role = n => { const e = [...document.querySelectorAll(`input[name=${n}]`)].find(vis); if (!e) return '（欄が無い）';
+        let box = e.parentElement; for (let i = 0; i < 5 && box && !box.querySelector('.dk-searchable-select__input, .dk-searchable-select'); i++) box = box.parentElement;
+        const sel = box && box.querySelector('.dk-searchable-select');
+        const inp = box && box.querySelector('.dk-searchable-select__input');
+        return ((inp && inp.value) || (sel && sel.innerText.trim().slice(0, 40)) || '（空）'); };
+    const appleUri = v('input.myCustomAppleUri, input[name*="AppleUri" i], input[class*="AppleUri" i]');
+    return {release: v('input[name=releaseDate]'), genre1: v('select[name=genre1]'), genre1_boxes: g, first: v('input[name=songwriter_real_name_first1]'),
+            last: v('input[name=songwriter_real_name_last1]'), performer: v('input[name=performer-name]'), performer_role: role('performer-name'),
+            producer: v('input[name=producer-name]'), producer_role: role('producer-name'),
+            performers: document.querySelectorAll('input[name=performer-name]').length, producers: document.querySelectorAll('input[name=producer-name]').length,
+            spotify: r('spotifyArtistID'), apple: r('appleArtistID'), apple_uri: appleUri, youtube: r('googleArtistID'),
+            instagram: r('instagramProfileArtistID'), facebook: r('facebookProfileArtistID'),
+            modal: ((document.querySelector('.swal2-popup.swal2-show') || {}).innerText || '').replace(/\s+/g, ' ').slice(0, 120)}; }"""
+
+
+def log_state(sess: Session, when: str) -> None:
+    """画面の状態をログに 1 行で残す（本名は「（あり）」とだけ書く）"""
+    try:
+        snap = sess.page.evaluate(STATE_JS)
+        glog = sess.page.evaluate("() => (window.__pdLog || []).slice(-12)")
+        if glog:
+            print("   記録：ジャンルの変わり方 → " + " ／ ".join(glog))
+        print(f"   記録：{when} → " + "・".join(f"{k}={'（あり）' if k in ('first', 'last', 'producer') and v and v != '（欄が無い）' else v}"
+                                         for k, v in snap.items()))
+    except Exception as e:  # noqa: BLE001
+        print(f"   記録：画面を読めませんでした（{e}）")
+
+
 def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     """1 曲を DistroKid に入れる。0：登録した／2：まだ登録しない／3：続けての入力をここでやめる（nxt があるとき：次の曲の名前）"""
     song = _songs.by_id(song_id)
@@ -2024,22 +2059,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
             fill_fields(sess, "distrokid", again, fresh=False)
             bad = verify(sess, fields)
     # 何が入っているかを記録に残す（ダッシュボードのログにも出る。差し戻されたとき、どこで止まったかを確かめるため）
-    try:
-        snap = sess.page.evaluate("""() => { const v = s => { const e = [...document.querySelectorAll(s)].find(x => x.offsetParent !== null);
-                return e ? (e.type === 'radio' ? null : e.value) : '（欄が無い）'; };
-            const r = n => { const e = document.querySelector(`input[type=radio][name^="${n}"]:checked`); return e ? (e.value || 'Yes') : '（未選択）'; };
-            const g = [...document.querySelectorAll('select[name=genre1]')].map(x => `${x.offsetParent !== null ? '見える' : '隠れ'}:${(x.selectedOptions[0] || {}).text || ''}/${x.options.length}件`).join(' ');
-            return {release: v('input[name=releaseDate]'), genre1: v('select[name=genre1]'), genre1_boxes: g, first: v('input[name=songwriter_real_name_first1]'),
-                    last: v('input[name=songwriter_real_name_last1]'), performer: v('input[name=performer-name]'), producer: v('input[name=producer-name]'),
-                    spotify: r('spotifyArtistID'), apple: r('appleArtistID'), youtube: r('googleArtistID'),
-                    instagram: r('instagramProfileArtistID'), facebook: r('facebookProfileArtistID')}; }""")
-        glog = sess.page.evaluate("() => (window.__pdLog || []).slice(-12)")
-        if glog:
-            print("   記録：ジャンルの変わり方 → " + " ／ ".join(glog))
-        print("   記録：入れ終わったときの画面 → " + "・".join(f"{k}={'（あり）' if k in ('first', 'last', 'producer') and v and v != '（欄が無い）' else v}"
-                                                   for k, v in snap.items()))
-    except Exception as e:  # noqa: BLE001
-        print(f"   記録：画面を読めませんでした（{e}）")
+    log_state(sess, "入れ終わったときの画面")
     # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
     always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
               "Extras（有料の追加）・Discovery Pack：チェックしない"]
@@ -2085,7 +2105,18 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
                 print("   … あとから空になった欄を入れ直しました：" + "・".join(f["label"] for f in lost))
             return
         print("   … DistroKid に差し戻されました：" + " ／ ".join(x.strip() for x in txt.splitlines()[1:6] if x.strip()))
+        log_state(sess, "差し戻されたときの画面")
+        try:   # 画面の部品の一覧を自動で残す（Gon さんがコピーしなくても、あとで Claude が読めるように。決定 60）
+            from datetime import datetime as _dt
+            pp = save_parts(sess, "distrokid")
+            if pp and pp.exists():
+                keep = pp.with_name(f"distrokid_parts_{song['id']}_{_dt.now():%Y%m%d_%H%M%S}.txt")
+                keep.write_text(pp.read_text(encoding="utf-8"), encoding="utf-8")
+                print(f"   記録：差し戻されたときの画面の部品の一覧を保存しました → {keep}")
+        except Exception:  # noqa: BLE001
+            pass
         fixed = distrokid_fix(sess, song, fields)
+        log_state(sess, "入れ直したあとの画面")
         left = verify(sess, fields)
         sess.show("DistroKid に差し戻されたので、入れ直しました",
                   ["DistroKid のエラー：", *[x.strip() for x in txt.splitlines()[1:10] if x.strip()],

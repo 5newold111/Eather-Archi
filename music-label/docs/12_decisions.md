@@ -788,3 +788,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - ブラウザの入力（Suno・DistroKid・歌詞・写真）を始めるとき、Playwright が入っている Python を探して使う（いまの Python → Homebrew・python.org 版・版ごとの python3.x・pyenv の順。`_common.python_with`）
   - どの Python にも無いときの案内に、その Python の場所と、そのままコピーして使える入れ方（`--user`、断られたら `--break-system-packages`）を出す
   - ポップアップの「ブラウザ入力の部品を入れる」の判定も、ほかの Python に入っていれば「入っている」とみる
+
+## 60. DistroKid に差し戻されたとき、画面の状態を自動で残す（2026-10-24。TIDEWOOL で Apple の No と Track credits が差し戻された）
+
+- このセッション（クラウド）からはオーナーの Mac のブラウザを操作できないので、本物の画面を見て直すには、オーナーが画面の部品の一覧をコピーして貼る必要があった
+- 直したこと：
+  - 差し戻し（Validation Errors）を見つけたら、画面の部品の一覧を自動で保存する（`out/browser/distrokid_parts_<曲 ID>_<日時>.txt`。ログに場所を出す）
+  - 「記録：…の画面」の 1 行を、差し戻されたとき・入れ直したあとにも出す。中身を増やした：Track credits の役割（performer_role・producer_role）、Performer・Producer の欄の数、Apple などの丸は「選ばれている値（隠れているものは（隠れ））／丸の数」、Apple の住所の欄、開いている確認の小窓の文
+- 本名はログに出さない（「（あり）」とだけ書く）
