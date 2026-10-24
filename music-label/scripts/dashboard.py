@@ -1,0 +1,430 @@
+#!/usr/bin/env python3
+"""
+管理画面（out/dashboard.html）を作る。中身はウェブアプリ（webapp.py）と同じガントチャートの画面で、データを埋め込んだ読むだけの形
+（ボタンは無い。ボタンで動かしたいときは http://localhost:8765 のウェブアプリを開く）。
+タブ「定期配信」（既定）と「デビュー」。工程が進んだ曲は消さずに残す（_timeline.py。決定 54）。
+前の形（下の一覧）は --classic で out/dashboard_classic.html に作る。
+
+  ・アーティストごとの進み具合：名前の確認 → 写真・ジャケット → デビュー曲 → 毎週の制作 → 写真の刷新 の段階と、
+    いま止まっているところ・担当（あなた／Claude／自動）・何日止まっているか・次の一歩（_status.py）
+  ・仕組みの詰まり：鍵・ffmpeg・SSD・定期実行の登録とエラー・「ダウンロード」を読む許可
+  ・管理表の「詰まっているところ」タブのうち、完了していないもの
+  ・人がやること（今すぐ）：ロゴや写真の選択待ち、Suno の節・テイク待ち、最終確認の ✕、DistroKid 登録の期限、ISRC の記入
+  ・今週と来週の制作の進み具合（組ごと）
+  ・これから配信される曲と、最近配信した曲
+  ・伸びている組・下がっている組（成長分析）
+  ・今月の Suno のダウンロード数、鍵の設定状況、定期実行の最後の動き
+
+使い方
+  python3 scripts/dashboard.py            # 作る
+  python3 scripts/dashboard.py --open     # 作ってブラウザで開く
+  python3 scripts/dashboard.py --text     # ターミナルに、組ごとの詰まりだけを表示
+  （定期実行では 15 分ごとと、曲を取り込んだときに自動で作り直す。
+    同じものを「ダウンロード/SUNO楽曲/ローカル保存（一時保存）/ダッシュボード.html」と、SSD の 01_管理表 にも置く）
+"""
+from __future__ import annotations
+
+import argparse
+import html
+import os
+import re
+import sys
+import webbrowser
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import OUT, ROOT, all_artists, as_date, load_dotenv, monday_of, read_json  # noqa: E402
+
+load_dotenv()
+JST = ZoneInfo("Asia/Tokyo")
+CSS = """
+:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--line:#e2ddd2;--accent:#a07a3c;--ng:#b3412e;--ok:#4f7a4a}
+@media (prefers-color-scheme: dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--line:#34322d;--accent:#d2ad6b;--ng:#e07a66;--ok:#8fbf86}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
+main{max-width:1180px;margin:0 auto;padding:32px 16px 64px}h1{font-weight:500;letter-spacing:.04em;margin:0}
+.sub{color:var(--sub);margin:2px 0 24px;font-size:13px}h2{font-weight:500;font-size:18px;border-bottom:1px solid var(--line);padding-bottom:6px;margin:32px 0 12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(220px,100%),1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.big{font-size:26px;font-variant-numeric:tabular-nums}.label{color:var(--sub);font-size:13px}
+ul.todo{list-style:none;padding:0;margin:0}ul.todo li{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;margin:8px 0}
+ul.todo li.ng{border-left-color:var(--ng)}code{font-size:12px;color:var(--sub);word-break:break-all}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--sub);font-weight:500}tr:last-child td{border-bottom:none}.ok{color:var(--ok)}.ngc{color:var(--ng)}.empty{color:var(--sub)}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}.chip{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px}
+.acts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px}
+.act{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:14px 16px}
+.act.ng{border-left-color:var(--ng)}.act.wait{border-left-color:var(--accent)}.act.run{border-left-color:var(--sub)}.act.ok{border-left-color:var(--ok)}
+.act h3{margin:0 0 8px;font-weight:500;font-size:16px}.act h3 small{color:var(--sub);font-weight:400;margin-left:6px;font-size:12px}
+.steps{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 10px}.st{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--sub)}
+.st.ok{background:var(--ok);border-color:var(--ok);color:var(--card)}.st.ng{background:var(--ng);border-color:var(--ng);color:var(--card)}
+.st.wait{border-color:var(--accent);color:var(--accent);font-weight:600}.st.run{border-style:dashed;color:var(--ink)}
+.do{font-size:13px;margin:6px 0 0;padding-top:6px;border-top:1px dashed var(--line)}.who{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:6px;color:var(--sub)}
+.days{color:var(--ng);font-size:12px;margin-left:4px}
+.wrap td{white-space:normal;min-width:90px}
+"""
+
+
+def esc(x) -> str:
+    return html.escape(str(x))
+
+
+def todos() -> list[tuple[str, str, list[str], str]]:
+    """(重要度 ng/normal, やること, 対象の一覧, 場所やコマンド)。同じ種類はまとめる"""
+    now = datetime.now(timezone.utc)
+    names = {a["slug"]: a["name"] for a in all_artists()}
+    groups: dict[tuple[str, str, str], list[str]] = {}
+
+    def add(sev: str, what: str, who: str, where: str) -> None:
+        groups.setdefault((sev, what, where), []).append(who)
+
+    crit = read_json(ROOT / "templates" / "visual_criteria.json")
+    for cand in sorted((OUT / "visuals").glob("**/candidates.json")):
+        folder = cand.parent
+        kinds = {c["kind"] for c in read_json(cand) if c.get("file")}
+        chosen = {read_json(p).get("kind") for p in folder.glob("selection_*.json")}
+        need = kinds - chosen
+        if folder.relative_to(OUT / "visuals").parts[0] not in names:   # 保管庫へ移した組の古い候補
+            continue
+        if need and (not crit.get("locked") or "reshoot" in folder.parts):
+            rel = folder.relative_to(OUT / "visuals").as_posix()
+            add("normal", "ロゴ・写真・ジャケットを選ぶ", f"{names.get(folder.relative_to(OUT / 'visuals').parts[0], rel)}（{'・'.join(sorted(need))}）",
+                "out/visuals/index.html")
+    week = monday_of(date.today())
+    for bp in sorted((OUT / "briefs").glob(f"{week}_*.json")):
+        if "." in bp.stem:
+            continue
+        b = read_json(bp)
+        if b.get("artist_slug") not in names:
+            continue
+        who = names.get(b["artist_slug"], b["artist_slug"])
+        if b.get("lyrics_mode") in ("core_fixed", "topic_only") and not bp.with_suffix(".lyrics_final.txt").exists():
+            add("normal", "Suno の Write Lyrics で節を書かせて保存", who, f"out/briefs/{week}_<組>.verses.txt")
+        sel = OUT / "takes" / bp.stem / "selection.json"
+        if sel.exists():   # Suno で作る番は、ガントチャートと「今やること」に出る（publish.py の流れ）
+            st = read_json(sel)
+            r = next((t for t in st.get("takes", []) if t["take"] == st.get("decision", {}).get("selected")), None)
+            if r and not r["passed"]:
+                add("ng", "最終確認で ✕（選び直すか、このまま進めるか）", f"{who}（{'、'.join(r['hard_fail'])}）", "run_week.py status")
+            if st.get("decision", {}).get("action") == "human_from_shortlist" and not st["decision"].get("selected"):
+                add("normal", "機械が絞った 2 本から選ぶ", who, "select_takes.py <ブリーフ> --choose 番号")
+    for mp in sorted((OUT / "distrokid").glob("*/*.metadata.json")):
+        if mp.parent.name.startswith("2000-"):
+            continue
+        m = read_json(mp)
+        if m.get("artist_slug") not in names:
+            continue
+        who = names.get(m["artist_slug"], m["artist_slug"])
+        days = (datetime.fromisoformat(m["release_at_utc"].replace("Z", "+00:00")) - now).days
+        untitled = str(m.get("title", "")).startswith("（")
+        if untitled and 0 <= days <= 16:
+            add("ng", f"タイトルを決める（制作週 {mp.parent.name}）", f"{who}（あと {days} 日）",
+                f"distrokid_sheet.py --week {mp.parent.name} --title <組>=\"…\"")
+        elif m.get("status") in ("planned", "mastered") and 0 <= days <= 16:
+            add("ng" if days <= 9 else "normal", f"DistroKid に登録（制作週 {mp.parent.name}）", f"{who}「{m.get('title')}」（あと {days} 日）",
+                f"out/distrokid/{mp.parent.name}/sheet.md")
+        if m.get("status") in ("uploaded", "live") and not m.get("isrc"):
+            add("normal", "登録後の ISRC を書く", f"{who}「{m.get('title')}」", "out/distrokid/<週>/<組>.metadata.json")
+    for a in all_artists():
+        d = as_date(a.get("debut_week"))
+        if d and d > date.today() and a.get("expansion"):
+            add("normal", "新人のデビュー予約（取り消すなら今）", f"{a['name']}（{d} の週）", "expand_label.py cancel --artist <組>")
+    for sev, what, who, where in book_todos(names):
+        add(sev, what, who, where)
+    return [(sev, what, who, where) for (sev, what, where), who in groups.items()]
+
+
+def book_todos(names: dict[str, str]) -> list[tuple[str, str, str, str]]:
+    """アーティスト管理表の返事待ち（提案）と、採用したのに入手していない参考曲"""
+    try:
+        from _artist_book import PENDING, TAB_ORDER, TABS, XlsxBook, open_book
+        b = open_book()
+        if getattr(b, "offline", False):   # SSD が無い：管理表は読まない（仕組みの詰まりに出す）
+            return []
+        if hasattr(b, "path") and not b.path.exists():
+            return [("normal", "アーティスト管理表を作る", "（まだ無い）", "artist_book.py init → import-json proposals/<日付>")]
+        data = b.read()
+    except Exception as e:  # noqa: BLE001
+        return [("normal", "アーティスト管理表を読めない（共有設定か鍵を確認）", str(e)[:60], "docs/13_artist_book.md")]
+    out = []
+    if PENDING.exists():   # Google の表を閲覧のみで読んでいる間に貯まった機械の提案
+        n = sum(len(v) for v in XlsxBook(PENDING).read().values())
+        if n:
+            out.append(("normal", f"Google の管理表に入れていない機械の提案が {n} 件", PENDING.name,
+                        "中身を Google の表に貼る（サービスアカウントを設定すると直接入る：docs/13）"))
+    acts = {r["id"]: r for r in data["acts"]}
+    st = lambda r: str(r.get("status") or "").strip()  # noqa: E731
+    for r in data["acts"]:
+        if st(r) == "提案":
+            docs = sorted((ROOT / "proposals").glob(f"*/{r['id']}.md")) or sorted((ROOT / "proposals").glob(f"{r['id']}.md"))
+            where = docs[-1].relative_to(ROOT).as_posix() if docs else "artist_book.py render で資料を作る"
+            out.append(("normal", "新しい組の提案を読んで、採用・保留・却下を決める", r.get("name", r["id"]),
+                        f"{where}（まとめて採用：artist_book.py adopt <ID>）"))
+        elif st(r) in ("", "採用") and r["id"] not in names:
+            out.append(("normal", "採用した組を設定書に反映（火曜の朝に自動でも動く）", r.get("name", r["id"]), "artist_book.py pull"))
+    for tab in TAB_ORDER:
+        if tab in ("acts", "changes"):
+            continue
+        for r in data[tab]:
+            act = acts.get(r.get("act_id"), {})
+            if st(r) == "提案" and st(act) != "提案":   # 組ごと提案中のものは上でまとめて出す
+                out.append(("normal", f"『{TABS[tab][0]}』の提案に返事（採用・却下）", act.get("name", r.get("act_id")),
+                            "artists.xlsx の状態の列"))
+    for r in data["changes"]:
+        if st(r) == "提案":
+            out.append(("normal", "変更の提案（方針転換など）に返事", f"{acts.get(r.get('act_id'), {}).get('name', r.get('act_id'))}"
+                        f"（{r.get('tab')}『{r.get('field')}』）", "採用 → artist_book.py apply-changes → pull"))
+    for r in data["choices"]:
+        act = acts.get(r.get("act_id"), {})
+        if st(r) in ("", "採用") and st(act) in ("", "採用") and not r.get("acquired"):
+            out.append(("normal", "参考曲を正規に入手して解析（入手に ○）", f"{r.get('title')}／{r.get('artist')}（{act.get('name', '')}）",
+                        "out/references/ → analyze_track.py"))
+    return out
+
+
+def week_table(week: date) -> str:
+    try:
+        from run_week import status_rows
+        rows = status_rows(week)
+    except Exception:  # noqa: BLE001
+        rows = []
+    if not rows:
+        return f"<p class='empty'>{week} の週のブリーフはまだありません</p>"
+    cols = list(rows[0])
+    body = "".join("<tr>" + "".join(f"<td class='{'ok' if str(r[c]).startswith('○') else ''}'>{esc(r[c])}</td>" for c in cols) + "</tr>"
+                   for r in rows)
+    return f"<div class='tbl'><table><tr>{''.join(f'<th>{esc(c)}</th>' for c in cols)}</tr>{body}</table></div>"
+
+
+STATUS_JA = {"planned": "未登録", "mastered": "音源完成・未登録", "uploaded": "登録済み", "live": "配信中", "takedown": "取り下げ"}
+
+
+def releases_table() -> str:
+    now = datetime.now(timezone.utc)
+    rows = []
+    for mp in (OUT / "distrokid").glob("*/*.metadata.json"):
+        if mp.parent.name.startswith("2000-"):
+            continue
+        m = read_json(mp)
+        rel = datetime.fromisoformat(m["release_at_utc"].replace("Z", "+00:00"))
+        if -14 <= (rel - now).days <= 21:
+            rows.append((rel, m))
+    if not rows:
+        return "<p class='empty'>前後 3 週間の配信はありません</p>"
+    rows.sort(key=lambda x: x[0])
+    names = {a["slug"]: a["name"] for a in all_artists()}
+    body = "".join(f"<tr><td>{r.astimezone(JST):%m/%d %H:%M}</td><td>{esc(names.get(m['artist_slug'], m['artist_slug']))}</td>"
+                   f"<td>{esc(m.get('title'))}</td><td>{esc(STATUS_JA.get(m.get('status'), m.get('status')))}</td><td>{esc(m.get('isrc') or '—')}</td></tr>"
+                   for r, m in rows)
+    return ("<div class='tbl'><table><tr><th>配信（日本時間）</th><th>組</th><th>曲</th><th>状態</th><th>ISRC</th></tr>"
+            f"{body}</table></div>")
+
+
+def growth_cards() -> str:
+    p = OUT / "growth" / "hints.json"
+    if not p.exists():
+        return "<p class='empty'>成長分析はまだです（成績が集まると木曜に自動で作られます）</p>"
+    names = {a["slug"]: a["name"] for a in all_artists()}
+    mark = {"up": ("伸びている", "ok"), "down": ("下がっている", "ngc"), "flat": ("横ばい", ""), "new": ("データ不足", "")}
+    cards = []
+    for slug, h in sorted(read_json(p).items(), key=lambda x: ["up", "flat", "new", "down"].index(x[1].get("artist_trend", "new"))):
+        t, cls = mark.get(h.get("artist_trend"), ("—", ""))
+        ratio = f"（{h['growth_ratio']}）" if h.get("growth_ratio") else ""
+        piv = f"<div class='label ngc'>方針転換 レベル {h['pivot']['level']}</div>" if h.get("pivot") else ""
+        cards.append(f"<div class='card'><div class='label'>{esc(names.get(slug, slug))}</div><div class='{cls}'>{t}{ratio}</div>{piv}</div>")
+    return f"<div class='cards'>{''.join(cards)}</div>"
+
+
+def key_cards() -> str:
+    groups = {"Claude": ["ANTHROPIC_API_KEY"], "OpenAI": ["OPENAI_API_KEY"], "Spotify": ["SPOTIFY_CLIENT_ID", "SPOTIFY_CLIENT_SECRET"], "Supabase": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+              "R2": ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"],
+              "YouTube": ["YOUTUBE_REFRESH_TOKEN"], "Instagram": ["IG_ACCESS_TOKEN"], "TikTok": ["TIKTOK_REFRESH_TOKEN"]}
+    cards = []
+    for name, keys in groups.items():
+        ok = all(os.environ.get(k) for k in keys)
+        cards.append(f"<div class='card'><div class='label'>{name}</div><div class='{'ok' if ok else 'ngc'}'>{'設定済み' if ok else '未設定'}</div></div>")
+    return f"<div class='cards'>{''.join(cards)}</div><p class='sub'>接続まで確かめるときは <code>python3 scripts/setup_keys.py --check</code></p>"
+
+
+def schedule_cards() -> str:
+    logs = OUT / "logs"
+    cards = []
+    for job in ("intake", "release", "post", "trends", "brief", "auto", "growth", "backup", "monthly"):
+        f = logs / f"{job}.log"
+        if not f.exists():
+            cards.append(f"<div class='card'><div class='label'>{job}</div><div class='empty'>まだ動いていません</div></div>")
+            continue
+        text = f.read_text(encoding="utf-8", errors="replace")
+        starts = re.findall(r"===== (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) ", text)
+        codes = re.findall(r"→ 終了コード (\d+)", text.split("=====")[-1])
+        ok = all(c == "0" for c in codes)
+        cards.append(f"<div class='card'><div class='label'>{job}</div><div>{esc(starts[-1] if starts else '—')}</div>"
+                     f"<div class='{'ok' if ok else 'ngc'}'>{'正常' if ok else 'エラーあり（ログを確認）'}</div></div>")
+    return f"<div class='cards'>{''.join(cards)}</div>"
+
+
+def downloads_cards() -> str:
+    try:
+        from run_week import downloads_this_month
+        dl = downloads_this_month()
+    except Exception:  # noqa: BLE001
+        dl = {}
+    if not dl:
+        return "<p class='empty'>今月のダウンロードはまだありません</p>"
+    return "<div class='cards'>" + "".join(
+        f"<div class='card'><div class='label'>{esc(l)}</div><div class='big {'ngc' if n >= cap * 0.8 else ''}'>{n}<span class='label'> / {cap}</span></div></div>"
+        for l, (n, cap) in sorted(dl.items())) + "</div>"
+
+
+STATE_JA = {"ok": "済み", "run": "自動で進行中", "wait": "番を待っている", "ng": "止まっている", "off": "まだ先"}
+
+
+def artist_section() -> str:
+    """アーティストごとの進み具合と詰まり"""
+    from _status import artists_overview
+    rows = artists_overview()
+    if not rows:
+        return "<p class='empty'>組がまだありません</p>"
+    count: dict[str, int] = {}
+    for r in rows:
+        b = r["blocker"]
+        k = "すべて順調" if not b else ("止まっている" if b["state"] == "ng" else f"{b['who']}の番" if b["state"] == "wait" else "自動で進行中")
+        count[k] = count.get(k, 0) + 1
+    chips = "".join(f"<span class='chip'>{esc(k)}：{v} 組</span>" for k, v in count.items())
+    cards = []
+    for r in rows:
+        b = r["blocker"]
+        strip = "".join(f"<span class='st {s['state']}' title='{esc(STATE_JA[s['state']])}：{esc(s['detail'])}'>{esc(s['name'])}</span>"
+                        for s in r["steps"])
+        todo = ""
+        for s in r["steps"]:
+            if s["state"] in ("ok", "off"):
+                continue
+            days = (date.today() - s["since"]).days if s["since"] else None
+            stuck = f"<span class='days'>{days} 日</span>" if days and days > 0 else ""
+            todo += (f"<div class='do'><span class='who'>{esc(s['who'] or '—')}</span><b>{esc(s['name'])}</b>：{esc(s['detail'])}{stuck}"
+                     + (f"<br><code>{esc(s['action'])}</code>" if s["action"] else "") + "</div>")
+        if not todo:
+            todo = "<div class='do ok'>すべて順調です</div>"
+        cards.append(f"<div class='act {b['state'] if b else 'ok'}'><h3>{esc(r['name'])}<small>{esc(r['label'])}</small></h3>"
+                     f"<div class='steps'>{strip}</div>{todo}</div>")
+    legend = "<p class='sub'>丸の色：緑＝済み・赤＝止まっている・金の枠＝だれかの番・点線＝自動で進行中・灰＝まだ先。日数は止まっている日数</p>"
+    return f"<div class='chips'>{chips}</div><div class='acts'>{''.join(cards)}</div>{legend}"
+
+
+def system_section() -> str:
+    from _status import system_blockers
+    items = system_blockers()
+    if not items:
+        return "<p class='empty'>仕組みの詰まりはありません</p>"
+    return "<ul class='todo'>" + "".join(f"<li class='{sev}'><b>{esc(what)}</b><br><code>{esc(how)}</code></li>"
+                                         for sev, what, how in sorted(items, key=lambda x: x[0] != "ng")) + "</ul>"
+
+
+def tracker_section() -> str:
+    from _status import tracker_rows
+    rows, src = tracker_rows()
+    if not rows:
+        return f"<p class='empty'>完了していない項目はありません（{esc(src)}）</p>"
+    cols = [c for c in ("順番", "詰まっていること", "担当", "次の一歩", "状態") if c in rows[0]]
+    body = "".join("<tr>" + "".join(f"<td>{esc(r.get(c, ''))}</td>" for c in cols) + "</tr>" for r in rows)
+    return (f"<div class='tbl'><table class='wrap'><tr>{''.join(f'<th>{esc(c)}</th>' for c in cols)}</tr>{body}</table></div>"
+            f"<p class='sub'>読んだ場所：{esc(src)}。書き換えは管理表の「詰まっているところ」タブで</p>")
+
+
+def text_report() -> str:
+    """ターミナル用：組ごとの詰まり"""
+    from _status import artists_overview, system_blockers
+    lines = ["■ アーティストごとの詰まり"]
+    for r in artists_overview():
+        strip = " → ".join(f"{s['name']}{ {'ok': '○', 'run': '…', 'wait': '●', 'ng': '✕', 'off': '－'}[s['state']] }" for s in r["steps"])
+        lines.append(f"  {r['name']}：{strip}")
+        for s in r["steps"]:
+            if s["state"] in ("wait", "ng", "run"):
+                days = f"（{(date.today() - s['since']).days} 日）" if s["since"] else ""
+                lines.append(f"     [{s['who'] or '—'}] {s['name']}：{s['detail']}{days}" + (f"  → {s['action']}" if s["action"] else ""))
+    sb = system_blockers()
+    if sb:
+        lines.append("■ 仕組みの詰まり")
+        lines += [f"  {'✕' if sev == 'ng' else '・'} {what}  → {how}" for sev, what, how in sb]
+    return "\n".join(lines)
+
+
+def copies(page: str) -> list[str]:
+    """同じ画面をローカル保存と SSD にも置く（Finder から開けるように）"""
+    out = []
+    try:
+        import _archive as archive
+        p = archive.local_root() / "ダッシュボード.html"
+        p.write_text(page, encoding="utf-8")
+        out.append(f"{archive.LOCAL_NAME}/{p.name}")
+        base, _ = archive.root()
+        if base is not None:
+            q = archive.child(base, archive.BOOK_DIR) / "ダッシュボード.html"
+            q.write_text(page, encoding="utf-8")
+            out.append(f"SSD の {archive.BOOK_DIR}/{q.name}")
+    except Exception:  # noqa: BLE001  置けなくても本体の画面は作る
+        pass
+    return out
+
+
+def build() -> Path:
+    """ウェブアプリと同じガントチャートの画面を、データを埋め込んだ読むだけの形で書き出す（ボタンなし）"""
+    from webapp import render_page, status_json
+    page = render_page(status_json())
+    p = OUT / "dashboard.html"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(page, encoding="utf-8")
+    build.copies = copies(page)
+    return p
+
+
+def build_classic() -> Path:
+    """前の形の管理画面（組の伸び・Suno のダウンロード数・定期実行・鍵のカードつき）。--classic で使う"""
+    now = datetime.now(JST)
+    week = monday_of(date.today())
+    items = todos()
+    todo_html = "".join(f"<li class='{sev}'><b>{esc(what)}</b>（{len(who)}）<br>{esc('、'.join(who))}<br><code>{esc(where)}</code></li>"
+                        for sev, what, who, where in sorted(items, key=lambda x: x[0] != "ng")) or "<li>今すぐやることはありません</li>"
+    page = (f"<!doctype html><html lang='ja'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
+            f"<meta http-equiv='refresh' content='900'><title>EtherArchi Label</title><style>{CSS}</style></head><body><main>"
+            f"<h1>EtherArchi Label</h1><p class='sub'>{now:%Y-%m-%d %H:%M} 時点（15 分ごとに自動で作り直し）</p>"
+            f"<h2>アーティストごとの進み具合</h2>{artist_section()}"
+            f"<h2>仕組みの詰まり</h2>{system_section()}"
+            f"<h2>管理表の「詰まっているところ」（完了していないもの）</h2>{tracker_section()}"
+            f"<h2>人がやること（毎週の制作）</h2><ul class='todo'>{todo_html}</ul>"
+            f"<h2>今週の制作（{week} の週）</h2>{week_table(week)}"
+            f"<h2>来週の制作（{week + timedelta(weeks=1)} の週）</h2>{week_table(week + timedelta(weeks=1))}"
+            f"<h2>配信の予定と最近の配信</h2>{releases_table()}"
+            f"<h2>組の伸び</h2>{growth_cards()}"
+            f"<h2>今月の Suno のダウンロード</h2>{downloads_cards()}"
+            f"<h2>定期実行</h2>{schedule_cards()}"
+            f"<h2>鍵</h2>{key_cards()}"
+            f"</main></body></html>")
+    p = OUT / "dashboard_classic.html"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(page, encoding="utf-8")
+    return p
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="管理画面（out/dashboard.html）を作る")
+    ap.add_argument("--open", action="store_true")
+    ap.add_argument("--text", action="store_true", help="組ごとの詰まりをターミナルに表示（画面は作らない）")
+    ap.add_argument("--classic", action="store_true", help="前の形の管理画面（out/dashboard_classic.html）も作る")
+    a = ap.parse_args()
+    if a.text:
+        print(text_report())
+        return
+    if a.classic:
+        print(f"▶ 前の形の管理画面: {build_classic().relative_to(ROOT)}")
+    p = build()
+    print(f"▶ 管理画面を作りました: {p.relative_to(ROOT)}" + (f"（{'・'.join(build.copies)} にも）" if getattr(build, "copies", None) else ""))
+    if a.open:
+        webbrowser.open(p.resolve().as_uri())
+
+
+if __name__ == "__main__":
+    main()

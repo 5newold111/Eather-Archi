@@ -1,0 +1,14 @@
+anthropic>=1.0
+certifi
+librosa>=0.10
+soundfile
+numpy
+openpyxl          # アーティスト台帳（artists.xlsx）の読み書き
+pillow            # ジャケットと写真を 3000×3000 に整える（kit_images.py・make_covers.py）
+fonttools         # ジャケットの文字入れで、書体に無い文字（□ になる字）を確かめる（cover_text.py）
+
+# 任意：アーティスト台帳を Google スプレッドシートで使うとき（サービスアカウントの署名）
+# cryptography
+
+# 任意：テイクの歌詞照合（select_takes.py）。入れると自動で文字起こしする（初回にモデルを数百 MB ダウンロード）
+# faster-whisper
