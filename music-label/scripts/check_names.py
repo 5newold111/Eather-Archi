@@ -107,7 +107,7 @@ def q_spotify(name: str) -> list[str] | None:
                                      headers={"Authorization": f"Basic {auth}", "Content-Type": "application/x-www-form-urlencoded"})
         with urllib.request.urlopen(req, timeout=20, context=ssl_context()) as r:
             _spotify_token = json.loads(r.read())["access_token"]
-    d = get_json("https://api.spotify.com/v1/search?" + urllib.parse.urlencode({"q": f'artist:"{name}"', "type": "artist", "limit": 25}),
+    d = get_json("https://api.spotify.com/v1/search?" + urllib.parse.urlencode({"q": f'artist:"{name}"', "type": "artist", "limit": 10}),
                  headers={"Authorization": f"Bearer {_spotify_token}"})
     return [a.get("name", "") for a in d.get("artists", {}).get("items", [])]
 

@@ -633,7 +633,7 @@ def save_artist_link(slug: str, service: str, ident: str, url: str = "") -> None
 
 def find_on_spotify(token: str, song: dict) -> dict | None:
     q = urllib.parse.quote(f'track:"{song["title"]}" artist:"{song["artist"]}"')
-    items = spotify_get(token, f"search?q={q}&type=track&limit=20").get("tracks", {}).get("items", [])
+    items = spotify_get(token, f"search?q={q}&type=track&limit=10").get("tracks", {}).get("items", [])
     for t in items:
         if _songs.norm(t.get("name")) == _songs.norm(song["title"]) and \
                 any(_songs.norm(x.get("name")) == _songs.norm(song["artist"]) for x in t.get("artists", [])):

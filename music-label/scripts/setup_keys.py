@@ -230,8 +230,9 @@ SERVICES = {
     "spotify": {
         "title": "Spotify（配信が始まったかの確認と ISRC・UPC・配信 URL の自動記録）",
         "url": "https://developer.spotify.com/dashboard",
-        "steps": ["Spotify のアカウントでログイン → Create app（名前 etherarchi-label、Redirect URI は http://127.0.0.1:8765/callback で可）",
-                  "使う API に Web API を選んで保存 → Settings で Client ID と Client secret（View client secret）をコピー"],
+        "steps": ["Spotify Premium のアカウントでログイン（2026-02 から、アプリを作る人は Premium が必要。作れるアプリは 1 人 1 つ）",
+                  "Create app（名前 etherarchi-label、説明は「Postdog Records の配信確認」など、Redirect URI は http://127.0.0.1:8765/callback）",
+                  "使う API に Web API を選び、利用規約に同意して保存 → Settings で Client ID と Client secret（View client secret）をコピー"],
         "keys": [("SPOTIFY_CLIENT_ID", False), ("SPOTIFY_CLIENT_SECRET", True)], "check": check_spotify},
     "owner": {
         "title": "オーナーの本名（DistroKid の作詞作曲者の欄。手元の .env だけに入り、GitHub には入らない）",
