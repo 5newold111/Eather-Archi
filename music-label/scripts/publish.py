@@ -905,6 +905,40 @@ def cmd_back(args) -> int:
     return 0
 
 
+def cmd_live(args) -> int:
+    """配信が始まったことを手で記録する（Gon さんが Spotify・Apple Music などで見つけたとき。Spotify の鍵が無くても進められる。決定 55）。
+    Spotify の曲の住所があれば記録し、鍵があれば ISRC なども取りに行く。アーティストの住所があれば、2 曲目から同じページにまとめるのに使う"""
+    song = _songs.by_id(args.id)
+    if song is None:
+        print(f"[エラー] 曲 {args.id} が見つかりません")
+        return 2
+    st = _songs.state(song)
+    if st.get("status") not in ("registered", "live"):
+        print(f"[エラー] {song['artist']}「{song['title']}」はまだ DistroKid に登録した記録がありません（先に「登録した」を）")
+        return 2
+    found = {}
+    try:
+        token = spotify_token()
+        if token:
+            found = find_on_spotify(token, song) or {}
+    except Exception:  # noqa: BLE001
+        found = {}
+    tm = re.search(r"open\.spotify\.com/(?:intl-\w+/)?track/([A-Za-z0-9]{22})", args.track or "")
+    if tm and not found.get("url"):
+        found.update({"url": f"https://open.spotify.com/track/{tm.group(1)}", "spotify_track_id": tm.group(1)})
+    day = args.date or date.today().isoformat()
+    st.update({"status": "live", "released": st.get("released") or found.get("released") or day,
+               "live_checked_at": date.today().isoformat(), "live_marked_by": "owner", **{k: v for k, v in found.items() if v}})
+    _songs.save_state(song, st)
+    print(f"○ {song['artist']}「{song['title']}」を配信中にしました" + (f"（ISRC {found['isrc']}）" if found.get("isrc") else ""))
+    if args.artist:
+        cmd_artist_page(argparse.Namespace(slug=song["slug"], page=args.artist))
+    elif not (artist_links(song["slug"]).get("spotify") or {}).get("id"):
+        print("   ・Spotify のアーティストのページはまだ記録されていません（2 曲目からの登録の前に、アーティストの住所を記録してください）")
+    _book()
+    return 0
+
+
 def cmd_artist_page(args) -> int:
     """デビュー曲の Spotify のアーティストのページを手で記録する（DistroKid の曲のページに出た URI か、Spotify の住所を貼る）。
     2 曲目からの DistroKid 登録で「Yes」とこの ID を使い、同じページにまとめる（決定 53）"""
@@ -938,6 +972,11 @@ def main() -> None:
     p = sub.add_parser("back", help="間違えて進めた工程を戻す")
     p.add_argument("id")
     p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
+    p = sub.add_parser("live", help="配信が始まったことを手で記録する（Spotify の鍵が無くても）")
+    p.add_argument("id")
+    p.add_argument("--track", help="Spotify の曲の住所（https://open.spotify.com/track/…）")
+    p.add_argument("--artist", help="Spotify のアーティストの住所（https://open.spotify.com/artist/…）")
+    p.add_argument("--date", help="配信が始まった日（省くと今日）")
     p = sub.add_parser("artist-page", help="Spotify のアーティストのページを手で記録する（2 曲目からを同じページにまとめる）")
     p.add_argument("slug")
     p.add_argument("page", help="spotify:artist:… か https://open.spotify.com/artist/…")
@@ -946,7 +985,7 @@ def main() -> None:
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
           "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
-          "artist-page": cmd_artist_page}.get(args.cmd)
+          "artist-page": cmd_artist_page, "live": cmd_live}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

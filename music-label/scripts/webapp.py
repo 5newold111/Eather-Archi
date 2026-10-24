@@ -152,6 +152,13 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "dashboard.py")], "ダッシュボードの書き出し"
     if action == "images" and p.get("slug") in _slugs():
         return [PY, str(S / "kit_images.py"), "--only", p["slug"]], f"写真とジャケットを作る（{p['slug']}）"
+    if action == "mark_live":   # 配信が始まったことを手で記録する（決定 55）
+        song = _songs.by_id(str(p.get("id", "")))
+        ok = lambda v: not v or re.fullmatch(r"https://open\.spotify\.com/[\w/?=&.-]{10,200}", v)  # noqa: E731
+        tr, ar = str(p.get("track") or "").strip(), str(p.get("artist") or "").strip()
+        if song and ok(tr) and ok(ar):
+            return [PY, str(S / "publish.py"), "live", song["id"], *(["--track", tr] if tr else []), *(["--artist", ar] if ar else [])], \
+                f"配信中の記録（{song['artist']}「{song['title']}」）"
     if action == "artist_page" and p.get("slug") in _slugs():   # Spotify のアーティストのページを手で記録する（決定 53）
         page = str(p.get("page") or "").strip()
         if re.fullmatch(r"[\w:/.?=&-]{22,200}", page):
@@ -470,6 +477,7 @@ function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
    case "folder":return `<button class="ghost act-only" data-act="open_folder" data-id="${id}">${E(a.label)}</button>`;
    case "artist_folder":return `<button class="ghost act-only" data-act="open_artist" data-slug="${slug}">${E(a.label)}</button>`;
+   case "mark_live":return `<span class="act-only" style="display:block"><input type="text" id="lt-${id}" placeholder="Spotify の曲の住所（https://open.spotify.com/track/…・なくても可）" style="min-width:22em;margin:2px 0"><br><input type="text" id="la-${id}" placeholder="Spotify のアーティストの住所（https://open.spotify.com/artist/…）" style="min-width:22em;margin:2px 0"><br><button data-act="mark_live" data-id="${id}">${E(a.label)}</button></span>`;
    case "artist_page":return `<span class="act-only"><input type="text" id="ap-${slug}" placeholder="spotify:artist:… か https://open.spotify.com/artist/…" style="min-width:18em"> <button data-act="artist_page" data-slug="${slug}">${E(a.label)}</button></span>`;
    case "registered":return `<span class="act-only"><input type="date" id="d-${id}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${id}">${E(a.label)}</button></span>`;
   }return""}
@@ -548,6 +556,8 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
+  if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
+    if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;

@@ -186,25 +186,29 @@ def _explain(row: dict, phase: dict) -> dict:
 
     if name == "配信待ち":
         d = phase.get("detail", "")
+        # Gon さんが Spotify・Apple Music などで配信を見つけたら、手で「配信中」にできる（Spotify の鍵が無くても。決定 55）
+        live_btn = {"kind": "mark_live", "id": row.get("id"), "label": "配信を見つけた（配信中にする）"}
+        live_step = ("配信を見つけたら：Spotify の曲の住所（共有 → リンクをコピー）と、アーティストの住所（アーティストのページの共有 → リンクをコピー）を"
+                     "下の欄に貼って「配信を見つけた」を押す。アーティストの住所は、2 曲目からを同じページにまとめるのに使います")
         if "鍵" in d:
             return {"cause": "DistroKid には登録済みです。ただ、Spotify の鍵が無いので、配信が始まったかを自動で確かめられません。",
-                    "steps": ["「Spotify の開発者ページを開く」でアプリを作り、Client ID と Client secret をコピー",
-                              "「鍵を入れる（ターミナルが開きます）」を押し、質問に貼って Enter",
-                              "終わったら「配信を確かめる」を押す"],
-                    "actions": [{"kind": "link", "label": "Spotify の開発者ページを開く", "url": SPOTIFY_DASH},
+                    "steps": [live_step,
+                              "自動で確かめたいとき：「Spotify の開発者ページを開く」でアプリを作り、Client ID と Client secret をコピー →"
+                              "「鍵を入れる（ターミナルが開きます）」に貼って Enter → 「配信を確かめる」"],
+                    "actions": [live_btn, {"kind": "link", "label": "Spotify の開発者ページを開く", "url": SPOTIFY_DASH},
                                 {"kind": "terminal", "label": "鍵を入れる（ターミナルが開きます）", "key": "spotify"},
                                 {"kind": "run", "label": "配信を確かめる", "action": "track"}]}
         if "1 週間" in d:
             return {"cause": "配信日から 1 週間たっても Spotify に出ていません。DistroKid で審査中か、差し戻しになっている可能性があります。",
                     "steps": ["「DistroKid の My Music を開く」で、この曲の状態を確かめる",
-                              "差し戻しの知らせがあれば、その文を Claude に貼って相談する"],
+                              "差し戻しの知らせがあれば、その文を Claude に貼って相談する", live_step],
                     "actions": [{"kind": "link", "label": "DistroKid の My Music を開く", "url": DISTROKID_MYMUSIC},
-                                {"kind": "run", "label": "配信を確かめる", "action": "track"}]}
+                                {"kind": "run", "label": "配信を確かめる", "action": "track"}, live_btn]}
         ms = next((x for x in row.get("phases", []) if x.get("milestone")), None)
         when = f"配信日（{ms['start']}）に" if ms else "配信日に"
         return {"cause": f"{title}は DistroKid に登録済みです。{when}各ストアに並びます。毎朝自動で確かめ、配信が始まったら ISRC・UPC・配信 URL を記録します。",
-                "steps": ["待つだけで大丈夫です。", "すぐに確かめたいときは「配信を確かめる」を押す"],
-                "actions": [{"kind": "run", "label": "配信を確かめる", "action": "track", "primary": True}]}
+                "steps": ["待つだけで大丈夫です。", "すぐに確かめたいときは「配信を確かめる」を押す", live_step],
+                "actions": [{"kind": "run", "label": "配信を確かめる", "action": "track", "primary": True}, live_btn]}
 
     if phase.get("milestone"):
         if state == "done":
