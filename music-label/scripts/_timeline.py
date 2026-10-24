@@ -6,7 +6,10 @@
                名前の確認 → 写真・ジャケット → Suno で作曲 → 仕上げ（取り込み・音量・ジャケット）→ DistroKid に登録 → 配信待ち → ◆ デビュー
   定期配信   … デビュー曲が配信された組（デビュー曲の作業セットが無い組も）。毎週（隔週）の 1 曲ごとに
                ブリーフ → Suno で作曲 → 仕上げ → DistroKid に登録 → 配信待ち → ◆ 配信。これから作る週は「予定」として並べる
-  デビュー曲が配信されたら（Spotify で確かめたら）、その組は自動で定期配信のほうに移る。
+  デビュー曲が配信されたら（Spotify で確かめたら）、その組の「これから作る週（予定）」は定期配信のほうに並ぶ。
+  工程が進んだ曲は表から消さない（オーナーの指示 2026-10-24。決定 54）：
+    ・デビューの表は、デビュー曲が配信されたあとも ◆ デビューまで済んだ行として残す
+    ・定期配信の表は、毎週の曲（集中配信の曲も）を、デビュー曲の配信を待たずに、配信が終わった曲も含めて全部並べる
 
 工程の状態：done（済み）・run（自動で進行中）・wait（だれかの番）・ng（止まっている・予定より遅れている）・plan（予定）
 日付は、終わった工程は実際の日（取り込み・登録・配信の記録）、これからの工程は予定の日。
@@ -102,9 +105,9 @@ def debut_rows() -> list[dict]:
     rows = []
     for a in all_artists():
         slug = a.get("slug")
-        if not slug or in_regular(slug):
-            continue
-        song = next(s for s in _songs.debut_songs() if s["slug"] == slug)
+        song = next((s for s in _songs.debut_songs() if s["slug"] == slug), None) if slug else None
+        if song is None:
+            continue   # デビュー曲の作業セットが無い組（最初から定期配信）
         kit_day = _d(song["week"]) or today
         steps = {s["name"]: s for s in _status.artist_steps(a)}
         phases = []
@@ -138,17 +141,14 @@ def regular_rows(weeks_ahead: int = 4) -> list[dict]:
     rows = []
     for a in all_artists():
         slug = a.get("slug")
-        if not slug or not in_regular(slug):
+        if not slug:
             continue
         songs = sorted([s for s in _songs.weekly_songs() if s["slug"] == slug], key=lambda s: s["week"])
         weeks_with_song = {s["week"] for s in songs}
-        for s in songs:
-            st = _songs.state(s)
-            rel = _d(s.get("release_at"))
-            if st.get("status") == "live" and (today - (_d(st.get("released")) or rel or today)).days > 21:
-                continue   # 3 週間より前に配信した曲は表に出さない
-            rows.append(_weekly_row(a, s, rel))
-        # これから作る週（予定）
+        for s in songs:   # 作った曲は、デビュー曲の配信を待たずに、配信が終わったあとも並べる（消さない）
+            rows.append(_weekly_row(a, s, _d(s.get("release_at"))))
+        if not in_regular(slug):
+            continue   # これから作る週（予定）は、デビューを終えた組だけ
         for k in range(0, weeks_ahead + 1):
             w = this_monday + timedelta(weeks=k)
             if w.isoformat() in weeks_with_song:

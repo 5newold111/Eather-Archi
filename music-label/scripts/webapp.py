@@ -95,7 +95,7 @@ def status_json() -> dict:
     except Exception:  # noqa: BLE001  毎週の制作のやることが読めなくても画面は出す
         weekly = []
     for x in songs:
-        x["flow"] = "regular" if _timeline.in_regular(x["slug"]) else "debut"
+        x["flow"] = "debut" if x.get("kind") == "debut" else "regular"   # デビュー曲はデビューの表、毎週の曲は定期配信の表（決定 54）
     try:   # アーティスト写真を各サイトに入れる（配信が始まった組から。決定 38）
         import artist_photo
         photo_todos = [{**t, "flow": "regular" if _timeline.in_regular(t["slug"]) else "debut"} for t in artist_photo.todos()]
@@ -104,7 +104,7 @@ def status_json() -> dict:
     try:   # 登録した曲の歌詞を DistroKid に出す（決定 52）
         import browser_fill
         lyric_todos = [{"id": x["id"], "artist": x["artist"], "title": x["title"],
-                        "flow": "regular" if _timeline.in_regular(x["slug"]) else "debut"} for x in browser_fill.lyrics_todo()]
+                        "flow": "debut" if x.get("kind") == "debut" else "regular"} for x in browser_fill.lyrics_todo()]
     except Exception:  # noqa: BLE001
         lyric_todos = []
     tl = _timeline.timeline()
