@@ -197,7 +197,8 @@ def for_song(song: dict) -> dict:
     """{store: 載せる歌詞, changes: 直したこと, notes: 確かめること}。インスト・歌詞なしは store が空"""
     if song.get("instrumental") or not str(song.get("lyrics") or "").strip():
         return {"store": "", "changes": [], "notes": []}
-    store, changes = to_store(song["lyrics"], is_latin(song), singer_names(song))
+    from _common import no_line_end_punct
+    store, changes = to_store(no_line_end_punct(song["lyrics"]), is_latin(song), singer_names(song))   # 行末の句読点は入れない（決定 92）
     return {"store": store, "changes": changes,
             "notes": check(store) + ["Suno が歌詞と違う言葉で歌っているところがあれば直す（配信サイトは聞こえるとおりの歌詞を求めます）"]}
 

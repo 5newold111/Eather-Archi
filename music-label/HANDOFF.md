@@ -29,7 +29,7 @@
 | 影響を受けたアーティスト | SSDDB の中から組ごとに 3 組まで選んで管理表の「影響」に足し、その曲を参考曲のいちばん優先にして、歌詞・メロディーも先に起こす。ダッシュボードの「影響を受けたアーティストを選ぶ（SSDDB から）」か `python3 scripts/influences.py --apply`（決定 91） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜91） |
+| 決めたこと | `docs/12_decisions.md`（1〜92） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |

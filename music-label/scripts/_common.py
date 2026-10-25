@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -84,6 +85,25 @@ def python_with(module: str = "playwright") -> str | None:
             return c
     _PY_WITH[module] = None
     return None
+
+
+# 歌詞の行末に句読点を付けない（オーナーの指示 2026-10-25。決定 92）
+# 消すのは句読点（、。，．,.;:；：）だけ。? ! … と「...」、閉じかっこ、[Verse] などのタグの行はそのまま
+_LINE_END_PUNCT = re.compile(r"(?<!\.)[、。，．,.;:；：]+(?=[」』）)\"'”’]*\s*$)")
+
+
+def no_line_end_punct(text: str) -> str:
+    """歌詞の各行の行末の句読点を消す"""
+    if not text:
+        return text
+    out = []
+    for line in str(text).split("\n"):
+        body = line.rstrip()
+        if body.endswith("...") or re.search(r"(?:\b[A-Za-z]\.){2,}$", body) or re.fullmatch(r"\s*(\[[^\]]*\]\s*)+", body) or "{{SUNO_" in body:
+            out.append(line)
+            continue
+        out.append(_LINE_END_PUNCT.sub("", body))
+    return "\n".join(out)
 
 
 def rel(p: Path) -> str:

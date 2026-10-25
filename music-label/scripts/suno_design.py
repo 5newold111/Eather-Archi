@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import load_artist  # noqa: E402
+from _common import load_artist, no_line_end_punct  # noqa: E402
 import _songs  # noqa: E402
 
 STYLE_MAX = 1000     # Suno のスタイル欄の上限（文字）
@@ -244,7 +244,7 @@ def design(song: dict) -> dict:
     mapping.append(("除外するスタイル", exclude, "設定書の禁止事項（never・avoid）＋ 曲ごとの指定"))
 
     # --- 1 歌詞
-    lyrics = "" if song.get("instrumental") else str(song.get("lyrics") or "")
+    lyrics = "" if song.get("instrumental") else no_line_end_punct(str(song.get("lyrics") or ""))   # 行末の句読点は入れない（決定 92）
     if lyrics:
         secs = re.findall(r"^\s*\[(intro|verse|pre-chorus|chorus|bridge|outro|post-chorus|final chorus|hook)[^\]]*\]", lyrics, re.I | re.M)
         checks.append(("歌詞", "ok" if len(secs) >= 3 else "warn", f"セクションのタグ {len(secs)} 個（Verse・Chorus など）"))

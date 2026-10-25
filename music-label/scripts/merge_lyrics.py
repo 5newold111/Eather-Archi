@@ -22,6 +22,9 @@ from __future__ import annotations
 import argparse, json, re, sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _common import no_line_end_punct  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
 PLACEHOLDERS = ["{{SUNO_VERSE_1}}", "{{SUNO_PRE_CHORUS}}", "{{SUNO_VERSE_2}}", "{{SUNO_BRIDGE}}"]
 HEADINGS = {"{{SUNO_VERSE_1}}": ["verse 1", "verse1", "verse one"], "{{SUNO_PRE_CHORUS}}": ["pre-chorus", "pre chorus", "prechorus"],
@@ -175,7 +178,10 @@ def main() -> None:
 
     if args.show_prompt or not args.verses:
         print("=== Suno の Write Lyrics に貼る指示文（節だけを書かせる） ===\n")
-        print(brief.get("suno_lyric_prompt") or "（このブリーフは core_fixed ではないか、まだ write_brief.py を通していません）")
+        lp = brief.get("suno_lyric_prompt") or ""
+        if lp and "end any line with" not in lp.lower():
+            lp += " Do not end any line with a comma, period, semicolon or colon - end each line on the word itself."   # 決定 92
+        print(lp or "（このブリーフは core_fixed ではないか、まだ write_brief.py を通していません）")
         print("\n=== 出てきた節を保存するファイル名の例 ===")
         print(f"  {args.brief.with_suffix('.suno_verses.txt')}")
         print("  見出し [Verse 1] [Pre-Chorus] [Verse 2]（必要なら [Bridge]）を付けて保存し、--verses で渡してください")
@@ -186,6 +192,7 @@ def main() -> None:
         final, problems, warnings = topic_only_merge(text, core, artist)
         for w in warnings: print(f"  [注意] {w}")
         for p in problems: print(f"  [問題] {p}")
+        final = no_line_end_punct(final)   # 行末の句読点を消す（Suno が書いた行も。決定 92）
         brief["suno_lyrics_final"] = final
         brief["merge"] = {"mode": "topic_only", "problems": problems, "warnings": warnings, "suno_share_actual": 1.0, "verses_file": str(args.verses)}
         args.brief.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -254,6 +261,7 @@ def main() -> None:
         print(f"  [問題] {p}")
     print(f"  Suno が書いた割合: {share:.0%}（目標 {artist.get('lyrics', {}).get('suno_share', 0.45):.0%}）")
 
+    final = no_line_end_punct(final)   # 行末の句読点を消す（Suno が書いた節も。決定 92）
     brief["suno_lyrics_final"] = final
     brief["merge"] = {"problems": problems, "warnings": warnings, "suno_share_actual": round(share, 2), "verses_file": str(args.verses)}
     args.brief.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

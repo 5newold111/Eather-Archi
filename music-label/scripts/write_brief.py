@@ -181,6 +181,10 @@ Hard rules (never break):
    (b) vocal_instruction says where the peak sits and how endings are held; (c) the lyrics follow the rhythm: lines of the chorus
    carry about notes_per_phrase syllables, verses follow notes_per_bar density, and pickups become short lead-in words. Never write
    pitch sequences. Rule 5 still applies to what is kept from a phrase.
+16. Line endings (owner's rule): never end a lyric line with punctuation - no commas, periods, semicolons or colons
+   (no 、 or 。 in Japanese). End each line on the word itself; let the line break do the pause. "?" and "!" may stay only
+   when they change the meaning. This applies to suno_lyrics, every core line, and suno_lyric_prompt must tell Suno's
+   lyric writer the same ("do not end any line with a comma or period").
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
 - "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the
@@ -203,6 +207,25 @@ Lyrics modes (artist profile -> lyrics.mode):
 - "instrumental": suno_lyrics is "[Instrumental]" plus any vowel/one-word fragments the artist uses; core and
   suno_lyric_prompt are empty.
 Return only the JSON object described by the schema."""
+
+
+NO_END_PUNCT_NOTE = "Do not end any line with a comma, period, semicolon or colon - end each line on the word itself."
+
+
+def line_end_rule(result: dict) -> None:
+    """歌詞の行末に句読点を付けない（オーナーの指示。決定 92）：歌詞・核の行から消し、Suno の歌詞づくりへの指示にも書き足す"""
+    from _common import no_line_end_punct
+    result["suno_lyrics"] = no_line_end_punct(result.get("suno_lyrics", ""))
+    core = result.get("core") or {}
+    for k in ("chorus_lines", "bridge_lines"):
+        if isinstance(core.get(k), list):
+            core[k] = [no_line_end_punct(x) for x in core[k]]
+    for k in ("hook_line", "trend_language_line"):
+        if isinstance(core.get(k), str):
+            core[k] = no_line_end_punct(core[k])
+    lp = str(result.get("suno_lyric_prompt") or "").strip()
+    if lp and "end any line with" not in lp.lower():
+        result["suno_lyric_prompt"] = lp + " " + NO_END_PUNCT_NOTE
 
 
 def load_json(p: Path) -> dict:
@@ -561,6 +584,7 @@ def main() -> None:
         problems = validate(result, artist, brief)
         if problems:
             print("  [要確認] " + " / ".join(problems))
+        line_end_rule(result)   # 歌詞の行末の句読点を消す（決定 92）
         brief["title_candidates"] = result["title_candidates"]
         brief["suno_style_prompt"] = result["suno_style_prompt"]
         brief["suno_lyrics"] = result["suno_lyrics"]

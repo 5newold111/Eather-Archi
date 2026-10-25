@@ -41,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _artist_book import PENDING, TAB_ORDER, TABS, ReadOnlyBook, XlsxBook, adopted, append_rows, open_book  # noqa: E402
 from _common import (MAIN_LABEL, MAIN_LABEL_NAME, OUT, ROOT, SCENE_TYPES, all_artists, label_slug_of, load_dotenv, scene_type_of,  # noqa: E402
-                     load_label, read_json, save_artist, step, write_json)
+                     load_label, no_line_end_punct, read_json, save_artist, step, write_json)
 
 load_dotenv()
 FORMATION = {"ソロ": "solo", "デュオ": "duo", "バンド": "band", "ボーカルグループ": "vocal_group", "プロデューサー": "producer"}
@@ -305,7 +305,8 @@ Rules:
   year and which elements (slots: lyrics, worldview, instruments, performance, structure, harmony, groove, phrase,
   vocal) to borrow. Never invent a song; if unsure, leave it out.
 - seeds: 6-10 song ideas tied to timeline moments. lyrics: 2 original sketches (4-line chorus, 2-4 line verse opening)
-  written in the act's own voice; never quote or imitate a real lyric.
+  written in the act's own voice; never quote or imitate a real lyric. Never end a lyric line with a comma, period,
+  semicolon or colon (the owner's rule): end each line on the word itself.
 - music: voice spec in note names, 2-3 recurring tics writable as Suno tags, genres, BPM range, etc.
 - visual: the face is never shown (pick a concealment method); describe space, light, palette, logo idea.
 - Do not overlap the existing acts listed (voice range/sex, formation, origin, scene).
@@ -427,6 +428,10 @@ def cmd_propose(a) -> None:
             print(f"   ✕ 提案を作れませんでした：{msg}")
             continue
         p.setdefault("act", {}).update(label=MAIN_LABEL_NAME if label == MAIN_LABEL else label)
+        for r in p.get("lyrics", []) if isinstance(p.get("lyrics"), list) else []:   # 歌詞の試作の行末の句読点を消す（決定 92）
+            for k in ("chorus", "verse"):
+                if isinstance(r.get(k), str):
+                    r[k] = no_line_end_punct(r[k])
         p["act"].pop("axis", None)
         probs = validate_proposal(p)
         if probs:
