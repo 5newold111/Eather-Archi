@@ -34,6 +34,7 @@
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |
 | 外出先からスマホで進める | `docs/18_phone.md`（Tailscale・スマホのページ /phone。決定 28） |
 | 集中配信（最初の 5 組を今月中に 5 曲ずつ） | `python3 scripts/sprint.py plan` → `make` → `status`（決定 53） |
+| DistroKid の登録の流れ（工程・選ぶもの・Gon さんが押すもの・差し戻しの対処） | `docs/19_distrokid.md` |
 | 残り 4 組のデビューの段取り | `docs/17_debut_plan.md`（順番・1 組ぶんの流れ・DistroKid で選ぶもの） |
 
 ## 詰まっているところ（2026-10-13 時点。最新は管理表の「詰まっているところ」タブ）
