@@ -408,7 +408,8 @@ def copied_phrases(lyrics: str, brief: dict) -> list[str]:
 
 def validate(result: dict, artist: dict, brief: dict) -> list[str]:
     problems = []
-    same = copied_phrases(result.get("suno_lyrics", ""), brief)
+    # 参考曲と同じ言い回しの確かめ：オーナーの指示で既定は切る（同じ言い回しでもよい。決定 88）。.env の CHECK_SAME_PHRASES=1 で戻せる
+    same = copied_phrases(result.get("suno_lyrics", ""), brief) if os.environ.get("CHECK_SAME_PHRASES") == "1" else []
     if same:
         problems.append("参考曲の歌詞と同じ言い回しがある（DistroKid・配信サイトで止められる心配。書き換える）：" + " ／ ".join(same))
     text = json.dumps(result, ensure_ascii=False)
