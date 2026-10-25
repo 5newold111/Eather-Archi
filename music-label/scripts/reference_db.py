@@ -175,6 +175,22 @@ def _who(f: Path, top: Path) -> tuple[str, str]:
     return title or stem, artist
 
 
+def _measure(analyze_track, f: Path) -> dict:
+    """解析する。そのまま読めない音源（M4A など）は、ffmpeg で一時的に WAV にしてから読む（元のファイルは変えない）"""
+    try:
+        return analyze_track.measure(f)
+    except Exception:  # noqa: BLE001
+        import shutil
+        import subprocess
+        import tempfile
+        if not shutil.which("ffmpeg"):
+            raise
+        with tempfile.TemporaryDirectory() as d:
+            w = Path(d) / "tmp.wav"
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(f), "-ac", "1", "-ar", "22050", str(w)], check=True)
+            return analyze_track.measure(w)
+
+
 def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict]]:
     """「既存楽曲」の音源を解析する（新しい曲だけ。1 回に limit 曲まで。0 なら全部）。解析済みの全曲の (ファイル, シート) を返す"""
     dirs = audio_dirs()
@@ -208,7 +224,7 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
         title, artist = _who(f, top)
         print(f"【進み具合】{i}/{len(run)} 曲目：{artist}「{title}」を解析しています（{f.name}）", flush=True)
         try:
-            m = analyze_track.measure(f)
+            m = _measure(analyze_track, f)
         except Exception as e:  # noqa: BLE001  1 曲読めなくても次へ
             print(f"   ✕ 解析できませんでした（{type(e).__name__}: {str(e)[:120]}）")
             index[rid] = {"sig": sig, "file": str(f), "error": str(e)[:200]}
