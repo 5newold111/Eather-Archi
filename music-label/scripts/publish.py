@@ -398,12 +398,13 @@ def genre_prefs(words: list[str]) -> list[str]:
 
 
 def _credit_role(artist: dict) -> str:
-    """Apple の Performer の役割：編成に合わせる（声の切れ端だけの組は Vocals ではなく Performer）"""
+    """Apple の Performer の役割（DistroKid の役割の一覧の名前のまま）。歌のある組は「Singing & vocals」（オーナーの指示 2026-10-25。決定 62）。
+    歌の無い組（声の切れ端・演奏だけ）は Performer"""
     form = str(artist.get("formation") or "")
     sex = str((artist.get("vocal") or {}).get("sex") or "")
     if form == "producer" or sex == "none":
-        return "Performer"   # 声の切れ端・演奏（DistroKid の役割の一覧の名前のまま）
-    return "Vocals"
+        return "Performer"
+    return "Singing & vocals"
 
 
 def draft_fields(song: dict) -> dict:

@@ -1480,6 +1480,87 @@ def distrokid_radios(song: dict) -> list[tuple[str, str]]:
     ]
 
 
+def ai_parts(song: dict) -> list[str]:
+    """DistroKid の「Which parts of this song were AI-generated?」で選ぶもの（決定 61。オーナーの指示）。
+    この仕組みの曲は、歌詞（Claude と Suno）・作曲・音（声と演奏）をすべて AI で作るので：
+      歌のある曲 → lyrics・music・all_audio／インスト → music・all_audio
+    人が歌った・弾いた部分がある曲は、ブリーフや作業セットに "ai_parts": ["lyrics", "music", "part_audio"] のように書くと、それを使う"""
+    if song.get("ai_parts"):
+        return list(song["ai_parts"])
+    inst = bool(song.get("instrumental")) or not str(song.get("lyrics") or "").strip()
+    return (["music"] if inst else ["lyrics", "music"]) + ["all_audio"]
+
+
+AI_PART_TEXT = {"lyrics": r"^\s*lyrics\b", "music": r"^\s*music\b", "all_audio": r"^\s*all of the audio", "part_audio": r"^\s*part of the audio"}
+AI_PARTS_JS = r"""([want, rx]) => {
+  const vis = e => e && e.offsetParent !== null;
+  const title = [...document.querySelectorAll('body *')].filter(e => vis(e) && !e.closest('#postdog-overlay')
+      && /which parts of this song were ai-generated/i.test(e.textContent || '') && e.children.length < 40);
+  if (!title.length) return null;
+  // 質問と選択肢を含む、いちばん小さい囲み
+  let box = title.reduce((a, b) => (a.textContent.length <= b.textContent.length ? a : b));
+  for (let i = 0; i < 6 && box && !/all of the audio/i.test(box.textContent || ''); i++) box = box.parentElement;
+  if (!box) return null;
+  const isOn = e => { if (!e) return false; if (e.type === 'checkbox' || e.type === 'radio') return e.checked;
+      if (e.getAttribute('aria-checked') === 'true' || e.getAttribute('aria-pressed') === 'true') return true;
+      const inp = e.querySelector && e.querySelector('input[type=checkbox],input[type=radio]'); if (inp) return inp.checked;
+      return /\b(selected|active|checked|is-checked)\b/.test(e.className || ''); };
+  const own = e => (e.innerText || e.textContent || '').replace(/\s+/g, ' ').trim();
+  const cands = [...box.querySelectorAll('label, [role=checkbox], [role=option], button, li, div')].filter(vis);
+  const out = [];
+  for (const [key, pat] of Object.entries(rx)) {
+    const re = new RegExp(pat, 'i');
+    // その言葉で始まる、いちばん小さい部品（中にチェックの箱があればそれも）
+    const hits = cands.filter(e => re.test(own(e)) && own(e).length < 120);
+    if (!hits.length) { out.push({key, found: false}); continue; }
+    const el = hits.reduce((a, b) => (own(a).length <= own(b).length ? a : b));
+    const inp = el.matches('input') ? el : (el.querySelector('input[type=checkbox],input[type=radio]')
+        || (el.htmlFor && document.getElementById(el.htmlFor)) || (el.closest('label') && el.closest('label').querySelector('input')));
+    const target = inp || el.closest('[role=checkbox]') || el;
+    const on = isOn(inp || target);
+    const should = want.includes(key);
+    let clicked = false;
+    if (on !== should && (should || key === 'part_audio' || key === 'all_audio')) {
+      (inp && !vis(inp) ? (el.closest('label') || el) : target).click(); clicked = true; }
+    out.push({key, found: true, was: on, clicked});
+  }
+  // 小窓（ダイアログ）なら、その中の保存のボタンを押す（ページの Continue は押さない）
+  const dlg = box.closest('[role=dialog], [aria-modal=true], .swal2-popup, .modal, [class*=modal], [class*=Modal], [class*=dialog]');
+  let saved = '';
+  if (dlg) {
+    const btn = [...dlg.querySelectorAll('button, [role=button], input[type=button], input[type=submit]')].filter(vis)
+      .find(b => b.id !== 'distroDoneButtonWithAPI' && /^(save|done|confirm|ok|apply|update|save selections|continue)$/i.test(own(b) || b.value || ''));
+    if (btn) { setTimeout(() => btn.click(), 400); saved = own(btn) || btn.value; }
+  }
+  return {parts: out, saved, modal: !!dlg};
+}"""
+
+
+def answer_ai_parts(sess: Session, song: dict, wait_ms: int = 0) -> str:
+    """「Which parts of this song were AI-generated?」が出ていれば、ai_parts(song) のとおりに選ぶ。選んだことの一文（出ていなければ ""）。
+    wait_ms：「AI を使った？ → Yes」を押した直後など、質問が遅れて出るのを待つ長さ"""
+    want = ai_parts(song)
+    r = None
+    for _ in range(max(1, wait_ms // 400)):
+        try:
+            r = sess.page.evaluate(AI_PARTS_JS, [want, AI_PART_TEXT])
+        except Exception:  # noqa: BLE001
+            r = None
+        if r or wait_ms <= 0:
+            break
+        sess.page.wait_for_timeout(400)
+    if not r or not (any(p.get("clicked") for p in r["parts"]) or r.get("saved")):
+        return ""   # 出ていない・もう選んである（見張りが 2 秒ごとに呼ぶので、何もしなかったときは黙る）
+    ja = {"lyrics": "歌詞", "music": "作曲", "all_audio": "音のすべて", "part_audio": "音の一部"}
+    missing = [ja[p["key"]] for p in r["parts"] if not p["found"] and p["key"] in want]
+    msg = ("AI で作った部分 → " + "・".join(ja[k] for k in want) + " を選びました"
+           + (f"（「{r['saved']}」も押しました）" if r.get("saved") else "")
+           + (f"。見つからなかった選択肢：{'・'.join(missing)}" if missing else ""))
+    print("   … " + msg)
+    sess.page.wait_for_timeout(800)
+    return msg
+
+
 def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     """Artist already in 〜?：前の曲がまだ配信されていない（DistroKid が『0 件』と出す）組は「No（新しいページ）」。
     前の曲のページが見つかっている組は、そのページを選ぶ（Spotify は配信の確認で記録した ID）。わからなければ Gon さんに"""
@@ -1500,7 +1581,8 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     return pick, texts
 
 
-ROLE_CANDS = {"Vocals": ["Vocals", "Lead Vocals", "Vocalist", "Lead Vocalist", "Vocal", "Singer", "Performer"],
+ROLE_CANDS = {"Singing & vocals": ["Singing & vocals", "Singing & Vocal", "Singing and vocals", "Vocals", "Lead Vocals", "Vocalist", "Singer"],
+              "Vocals": ["Vocals", "Lead Vocals", "Vocalist", "Lead Vocalist", "Vocal", "Singer", "Performer"],
               "Performer": ["Performer", "Main Performer", "Featured Performer", "Musician", "Artist"],
               "Producer": ["Producer", "Music Producer", "Record Producer"]}
 
@@ -1556,6 +1638,89 @@ def _searchable_pick(sess: Session, inp, text: str) -> bool:
     return True
 
 
+NEAR_JS = r"""([tag, nameCss, labelRx]) => {
+  const vis = e => e && e.offsetParent !== null;
+  const SEL = 'input.dk-searchable-select__input';
+  let start = null;
+  if (nameCss) start = [...document.querySelectorAll(nameCss)].find(vis);
+  else {   // 見出し（Primary genre など）の文字で始まる、いちばん小さい部品
+    const rx = new RegExp(labelRx, 'i');
+    const hits = [...document.querySelectorAll('label, legend, h1, h2, h3, h4, h5, h6, p, span, div, strong, b')]
+      .filter(e => vis(e) && !e.closest('#postdog-overlay') && rx.test((e.innerText || '').trim()) && (e.innerText || '').length < 80);
+    start = hits.length ? hits.reduce((a, b) => (a.innerText.length <= b.innerText.length ? a : b)) : null;
+  }
+  if (!start) return false;
+  // 上の階層へたどり、打って選ぶ箱が 1 つだけ入っているいちばん小さい囲みを探す（見つけた部品そのものから。見出しを含む囲みが選ばれていることがある）
+  let box = start;
+  for (let i = 0; i < 7 && box; i++, box = box.parentElement) {
+    // 見出しから探すとき：ふつうの選ぶ箱（select）がある・Track credits の欄まで入った囲みは、別の欄なのでやめる
+    if (!nameCss && ([...box.querySelectorAll('select')].some(vis) || box.querySelector('input[name=performer-name], input[name=producer-name]'))) return false;
+    const inside = [...box.querySelectorAll(SEL)].filter(vis);
+    if (inside.length === 1) { document.querySelectorAll(`[data-pd-near="${tag}"]`).forEach(e => e.removeAttribute('data-pd-near'));
+      inside[0].setAttribute('data-pd-near', tag); return true; }
+    if (inside.length > 1) return false;   // 別の欄の箱まで入ってしまった
+  }
+  return false;
+}"""
+
+
+def searchable_near(sess: Session, tag: str, name_css: str | None = None, label_rx: str | None = None):
+    """名前の欄（name_css）か見出し（label_rx）の近くにある「打って選ぶ箱」。無ければ None"""
+    try:
+        if sess.page.evaluate(NEAR_JS, [tag, name_css, label_rx]):
+            return sess.page.locator(f'[data-pd-near="{tag}"]').first
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _searchable_value(sess: Session, inp) -> str:
+    """打って選ぶ箱で、いま選ばれているもの（箱の中の文字か、箱の近くに出ている選んだものの名前）"""
+    try:
+        return inp.evaluate("""e => { const box = e.closest('.dk-searchable-select') || e.parentElement;
+            return (e.value || (box ? box.innerText : '') || '').replace(/\\s+/g, ' ').trim(); }""")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def fill_genre_boxes(sess: Session, fields: list[dict]) -> tuple[list[str], list[str]]:
+    """Primary genre・Secondary genre が「打って選ぶ箱」の画面：見出しの近くの箱に、DistroKid の一覧の名前で入れる（決定 61）。
+    ふつうの選ぶ箱（select）だけの画面では何もしない（fill_fields が入れる）"""
+    done, manual = [], []
+    for key, rx in (("genre1", r"^primary genre"), ("genre2", r"^secondary genre")):
+        f = next((x for x in fields if x["key"] == key), None)
+        want = (f or {}).get("chosen") or (f or {}).get("value")
+        if not want:
+            continue
+        box = searchable_near(sess, key, label_rx=rx)
+        if box is None:
+            continue
+        if _norm(_searchable_value(sess, box)).startswith(_norm(want)):
+            done.append(f"{f['label']}（{want}）")
+            continue
+        ok = False
+        try:
+            for word in dict.fromkeys([want, want.split("/")[0], want.split()[0]]):
+                box.click()
+                box.fill("")
+                box.type(word, delay=40)
+                sess.page.wait_for_timeout(700)
+                opts = _visible_options(sess)
+                hit = next((o for o in opts if _norm(o.inner_text()) == _norm(want)), None) or \
+                    next((o for o in opts if _norm(o.inner_text()).startswith(_norm(want))), None)
+                if hit is not None:
+                    hit.click()
+                    sess.page.wait_for_timeout(500)
+                    ok = True
+                    break
+        except Exception:  # noqa: BLE001
+            ok = False
+        (done if ok else manual).append(f"{f['label']}（{want}）" if ok else f"{f['label']}：{want}（打って選ぶ箱に入りませんでした）")
+        if ok:
+            print(f"   … {f['label']} を打って選ぶ箱で「{want}」にしました")
+    return done, manual
+
+
 def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
     """Track credits（Apple の決まり：Performer と Producer を 1 人ずつ以上）。Performer＝組の名前、Producer＝本名"""
     import publish
@@ -1566,7 +1731,6 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
     inst = bool(song.get("instrumental")) or (art.get("lyrics") or {}).get("mode") == "instrumental"
     rows = [("Performer", "Performer" if inst else publish._credit_role(art), "input[name=performer-name]", owner if inst else song["artist"]),
             ("Producer", "Producer", "input[name=producer-name]", owner)]
-    roles = sess.page.locator("input.dk-searchable-select__input")
     done, manual = [], []
     for i, (who, role, name_css, name) in enumerate(rows):
         name_loc = sess.page.locator(name_css)
@@ -1574,7 +1738,13 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
             continue   # この画面には Track credits の欄が無い
         ok = True
         try:
-            if roles.count() > i and not _searchable_pick(sess, roles.nth(i), role):
+            # 役割の箱は「名前の欄と同じ行」にあるものを使う。画面の上からの順番では選ばない
+            # （Primary genre も同じ「打って選ぶ箱」になっていると、1 つ目はジャンルの箱になってしまう。決定 61）
+            box = searchable_near(sess, f"role-{i}", name_css=name_css)
+            if box is None:   # 同じ行に見つからない作り：打って選ぶ箱が役割の 2 つだけの画面なら、これまでどおり上からの順番で
+                allbox = sess.page.locator("input.dk-searchable-select__input:visible")
+                box = allbox.nth(i) if allbox.count() == len(rows) else None
+            if box is None or not _searchable_pick(sess, box, role):
                 ok = False
             if name:
                 name_loc.first.fill(name)
@@ -1740,6 +1910,8 @@ def guard_artist_no(sess: Session, song: dict, a_done: list[str]) -> None:
 def apply_choices(sess: Session, song: dict) -> tuple[list[str], list[str], list[str]]:
     """丸（はい／いいえ）と Artist already in を選ぶ。(選べた丸, 選べなかった丸, Artist already in)"""
     r_done, r_miss = set_radios(sess, distrokid_radios(song))
+    if answer_ai_parts(sess, song, wait_ms=2400):   # 「AI を使った？ → Yes」で出る「どの部分を AI で作ったか」（決定 61）
+        r_done.append("AI で作った部分")
     a_items, a_texts = artist_id_radios(song)
     a_done = []
     for item in a_items:   # 1 つずつ選び、確認の小窓が出たら（新しいページを作る確認のときだけ）OK を押してから次へ
@@ -1804,6 +1976,10 @@ def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
         fixed += done
     c, _ = fill_credits(sess, song)
     fixed += c
+    g, _ = fill_genre_boxes(sess, fields)
+    fixed += g
+    if answer_ai_parts(sess, song):
+        fixed.append("AI で作った部分")
     stabilize(sess, song, fields)
     return list(dict.fromkeys(fixed))
 
@@ -2045,9 +2221,11 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     guard_artist_no(sess, song, a_done)
     d2, m2 = fill_fields(sess, "distrokid", [f for f in fields if f not in first], fresh=False)
     c_done, c_manual = fill_credits(sess, song)
+    g_done, g_manual = fill_genre_boxes(sess, fields)   # Primary genre が「打って選ぶ箱」の画面（決定 61）
+    answer_ai_parts(sess, song)
     guard_genres(sess, fields)
-    done += d2 + r_done + a_done + c_done
-    manual += m2 + c_manual
+    done += d2 + r_done + a_done + c_done + g_done
+    manual += m2 + c_manual + g_manual
     r_miss = stabilize(sess, song, fields) or r_miss
     a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done) or any(f"in {svc}?" in m for m in r_miss)]
     r_miss = [m for m in r_miss if "Artist already" not in m]
@@ -2070,7 +2248,8 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         always.insert(0, f"Artist already in 〜?（{'・'.join(a_left)}）：同じ組の前の曲があれば、そのページ（Yes）を選ぶ。無ければ No")
     if r_miss:
         always.insert(0, "画面に無かった／選べなかった項目（出ていれば選ぶ）：" + "・".join(r_miss))
-    always.append("AI の申告で Yes のあとに質問が出たら：使ったもの（作曲・歌詞・声など Suno で作った部分）を正直に選ぶ")
+    always.append("AI で作った部分（Which parts … AI-generated?）：" + "・".join({"lyrics": "Lyrics", "music": "Music", "all_audio": "All of the audio",
+                  "part_audio": "Part of the audio"}[k] for k in ai_parts(song)) + " をシステムが選びます。人が歌った・弾いた部分がある曲なら、画面で直してください")
     always.append("Release date・Primary genre が空のときは入れる（DistroKid が赤い枠を出す欄）")
     print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
     later = ([{"id": "stop", "label": f"この曲は後で（次の曲へ：{nxt}）"}, {"id": "quit", "label": "続けての入力をここでやめる"}] if nxt
@@ -2093,6 +2272,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         if not txt:
             # 待っている間も、DistroKid があとから戻した丸（Artist already in など）・ジャンル・配信日を、黙って入れ直す
             confirm_new_page(sess)   # 見張りが選び直したときの確認の小窓
+            answer_ai_parts(sess, song)   # Gon さんが「Edit selections」を押したときなどに出る、AI で作った部分の質問
             off = _unchecked(sess, song)
             if off:
                 for item in off:

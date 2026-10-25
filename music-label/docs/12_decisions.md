@@ -796,3 +796,19 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 差し戻し（Validation Errors）を見つけたら、画面の部品の一覧を自動で保存する（`out/browser/distrokid_parts_<曲 ID>_<日時>.txt`。ログに場所を出す）
   - 「記録：…の画面」の 1 行を、差し戻されたとき・入れ直したあとにも出す。中身を増やした：Track credits の役割（performer_role・producer_role）、Performer・Producer の欄の数、Apple などの丸は「選ばれている値（隠れているものは（隠れ））／丸の数」、Apple の住所の欄、開いている確認の小窓の文
 - 本名はログに出さない（「（あり）」とだけ書く）
+
+## 61. DistroKid：AI で作った部分の質問に自動で答える・Primary genre の「打って選ぶ箱」に入れる・役割の箱を取り違えない（2026-10-25。オーナーの指示）
+
+- AI で作った部分（「Which parts of this song were AI-generated?」）：「AI を使った？ → Yes」のあとに出る質問に、システムが答える（オーナーの指示。これまでは Gon さんが選んでいた）
+  - この仕組みの曲は、歌詞（Claude と Suno）・作曲・音（声と演奏）をすべて AI で作るので：歌のある曲 → Lyrics・Music・All of the audio／インスト → Music・All of the audio
+  - 人が歌った・弾いた部分がある曲は、ブリーフや作業セットに `"ai_parts": ["lyrics", "music", "part_audio"]` のように書くと、それを使う
+  - 小窓（ダイアログ）なら、その中の「Save」などのボタンも押す。ページの Continue は押さない。Gon さんが「Edit selections」を押して出し直したときも、待っている間の見張りが答える
+- Primary genre・Secondary genre：「打って選ぶ箱」（Track credits の役割と同じ作り）の画面では、見出しの近くの箱にジャンルの名前を打って、DistroKid の一覧の同じ名前を選ぶ（オーナーの指示：「Primary genre も選択式なので忘れず入力する」）
+- Track credits の役割（決定 62 で Performer の役割も変更）：これまで画面の「打って選ぶ箱」を上から順番（1 つ目＝Performer、2 つ目＝Producer）で選んでいた。Primary genre も同じ作りの箱になると、1 つ目はジャンルの箱になり、Performer の役割をジャンルの箱に打ち込んでいた（TIDEWOOL の「Track credits が足りない」とジャンルが入らない、の両方の原因と見ている）→ 名前の欄と同じ行にある箱を探して使う。見つからない作りで、打って選ぶ箱が役割の 2 つだけの画面なら、これまでどおり上からの順番で
+
+## 62. Track credits の Performer の役割は「Singing & vocals」（2026-10-25。オーナーの指示）
+
+- 歌のある組の Performer の役割は、DistroKid の一覧の「Singing & vocals」を選ぶ（これまでは「Vocals」に近い名前を探していた）。打って探す言葉は Singing & vocals → Vocals → Lead Vocals … の順
+- 歌の無い組（HOLLOWPLAN：インスト。Performer は本名）は、これまでどおり「Performer」
+
+
