@@ -330,6 +330,26 @@ def diagnose(f: Path, err: str = "") -> tuple[str, str]:
     return "まだ解析していません（次の回に解析します）", "そのまま待つか、ダッシュボードの「既存楽曲を解析する」を押す"
 
 
+def _missing(sheet: dict) -> list[str]:
+    """音源の解析で、測れなかった・読めなかった項目（測れるはずのものだけ）"""
+    ref, g, st = sheet.get("reference") or {}, sheet.get("groove") or {}, sheet.get("structure") or {}
+    m = sheet.get("_measure") or {}
+    out = []
+    if not g.get("bpm"):
+        out.append("テンポ（BPM）が測れていない")
+    if not m.get("key"):
+        out.append("キーが測れていない")
+    if len(st.get("sections") or []) <= 1:
+        out.append("曲の区切りが見つからない")
+    if ref.get("artist_name") in (None, "", "?"):
+        out.append("アーティスト名が読めない")
+    if not ref.get("tags"):
+        out.append("ジャンルが書かれていない")
+    if not ref.get("release_year"):
+        out.append("年が書かれていない")
+    return out
+
+
 CATEGORY = [("iCloud", "iCloud にだけある"), (".m4p", "コピー防止つき（.m4p）"), ("DRM", "コピー防止つき（DRM）"), ("解析しない形式", "解析しない形式"),
             ("ファイルを読めません", "ファイルを読めない"), ("中身が空", "中身が空"), ("音声ファイルとして読めません", "音声ファイルとして読めない"),
             ("音声が入っていません", "音声が入っていない"), ("短すぎ", "短すぎる（10 秒未満）"), ("メモリ", "メモリが足りない"),
@@ -348,7 +368,7 @@ def audio_report() -> int:
         print("【結果】「既存楽曲」のフォルダが見つかりません（SSD をつないでから、もう一度動かしてください）")
         return 2
     index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
-    done, bad = 0, []
+    done, bad, partial = 0, [], []
     for top in dirs:
         for f in sorted(p for p in top.rglob("*") if p.is_file() and p.name != ".DS_Store" and not p.name.startswith("._")):
             st = f.stat()
@@ -356,6 +376,9 @@ def audio_report() -> int:
             ent = index.get(rid) or {}
             if f.suffix.lower() in AUDIO_TAKE and (AUDIO_CACHE / f"{rid}.json").exists() and not ent.get("error"):
                 done += 1
+                miss = _missing(json.loads((AUDIO_CACHE / f"{rid}.json").read_text(encoding="utf-8")))
+                if miss:
+                    partial.append((f.relative_to(top), miss))
                 continue
             if f.suffix.lower() in TEXT_EXT | TABLE_EXT | {".jpg", ".jpeg", ".png", ".pdf", ".json"}:
                 continue   # 曲ではないもの（メモ・画像・表）は数えない
@@ -370,10 +393,20 @@ def audio_report() -> int:
         lines += [f"## {g}（{len(items)} 曲）", "", f"理由：{items[0][1]}", f"直し方：{items[0][2]}", ""]
         lines += [f"- {rel}" + (f"　…{why}" if why != items[0][1] else "") for rel, why, _ in items[:200]]
         lines.append("")
+    if partial:   # 解析はできたが、測れなかった・読めなかった項目がある曲（決定 84）
+        cnt: dict[str, int] = {}
+        for _, miss in partial:
+            for m in miss:
+                cnt[m] = cnt.get(m, 0) + 1
+        lines += [f"## 解析はできたが、足りない項目がある曲（{len(partial)} 曲）", "",
+                  "項目ごとの曲数：" + "・".join(f"{k} {v} 曲" for k, v in sorted(cnt.items(), key=lambda x: -x[1])), "",
+                  "（声の性別・楽器・歌詞のテーマ・世界観は、音源からは測れないので、どの曲も空です。ここには数えていません）", ""]
+        lines += [f"- {rel}：{'・'.join(miss)}" for rel, miss in partial[:300]]
+        lines.append("")
     AUDIO_REPORT.parent.mkdir(parents=True, exist_ok=True)
     AUDIO_REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
-    print(f"【結果】解析できた曲 {done}・できていない曲 {len(bad)}" + (
+    print(f"【結果】解析できた曲 {done}（うち足りない項目がある曲 {len(partial)}）・できていない曲 {len(bad)}" + (
         "（理由ごとの一覧：" + "・".join(f"{g} {len(v)} 曲" for g, v in groups.items()) + "）" if bad else "") + f"。くわしくは {AUDIO_REPORT}")
     return 0
 
