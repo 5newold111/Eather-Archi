@@ -40,7 +40,7 @@
 | 19 | AI を使った？ | Yes → 作った部分：歌のある曲 Lyrics・Music・All of the audio／インスト Music・All of the audio。小窓の Save まで（決定 61） | 自動 |
 | 20 | 試聴の始まり | サービスにまかせる | 自動 |
 | — | Price | $0.99（初期設定のまま） | 触らない |
-| 21 | Track credits（Apple Music の Additional requirements） | ＋を押して出す（決定 66）。Performer：歌のある 4 組はアーティスト名＋Singing & vocals、HOLLOWPLAN は本名＋Performer。Producer：本名＋Producer。役割の箱は名前と同じ行（決定 61・62） | 自動 |
+| 21 | Track credits（Apple Music の Additional requirements） | ＋を押して出た行の「役割の箱」と、その下の「名前の欄」に入れる（決定 66・70）。Performer：歌のある 4 組はアーティスト名＋Singing & vocals、HOLLOWPLAN は本名＋Performer。Producer：本名＋Producer。役割の箱は名前と同じ行（決定 61・62） | 自動 |
 | — | Extras・Discovery Pack | チェックしない | **押さない** |
 | 22 | 宣誓のチェック（Non-standard cApiTaliZatiOn を含む） | 文を読んで、当てはまるものだけ | **Gon さん** |
 | 23 | Continue | 最後の登録ボタン | **Gon さん** |

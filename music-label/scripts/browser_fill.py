@@ -1610,7 +1610,7 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     return pick, texts
 
 
-ROLE_CANDS = {"Singing & vocals": ["Singing & vocals", "Singing & Vocal", "Singing and vocals", "Vocals", "Lead Vocals", "Vocalist", "Singer"],
+ROLE_CANDS = {"Singing & vocals": ["Singing & vocals", "Singer & vocals", "Singing & Vocal", "Singer & Vocal", "Singing and vocals", "Vocals", "Lead Vocals", "Vocalist", "Singer"],
               "Vocals": ["Vocals", "Lead Vocals", "Vocalist", "Lead Vocalist", "Vocal", "Singer", "Performer"],
               "Performer": ["Performer", "Main Performer", "Featured Performer", "Musician", "Artist"],
               "Producer": ["Producer", "Music Producer", "Record Producer"]}
@@ -1635,7 +1635,8 @@ def _searchable_pick(sess: Session, inp, text: str) -> bool:
     cands = ROLE_CANDS.get(text, [text])
     side = re.compile(r"background|backing|co-|assistant|additional", re.I)
     seen: dict[str, str] = {}   # 選択肢の名前 → 打った言葉
-    for word in dict.fromkeys(c.split()[-1][:6] for c in cands):
+    # 名前ぜんぶ（例 Singing & vocals）を先に打ち、出なければ最後の言葉の頭（vocals など）で探す（決定 70）
+    for word in dict.fromkeys([*cands[:4], *(c.split()[-1][:6] for c in cands)]):
         inp.click()
         inp.fill("")
         inp.type(word, delay=40)
@@ -1660,6 +1661,11 @@ def _searchable_pick(sess: Session, inp, text: str) -> bool:
     inp.type(seen[pick], delay=40)
     sess.page.wait_for_timeout(700)
     hit = next((o for o in _visible_options(sess) if (o.inner_text() or "").strip() == pick), None)
+    if hit is None:   # 打った言葉で出なければ、名前ぜんぶを打ち直す
+        inp.fill("")
+        inp.type(pick, delay=40)
+        sess.page.wait_for_timeout(700)
+        hit = next((o for o in _visible_options(sess) if (o.inner_text() or "").strip() == pick), None)
     if hit is None:
         return False
     hit.click()
@@ -1894,6 +1900,119 @@ CREDITS_SAVE_JS = r"""() => {
 }"""
 
 
+# Apple Music の「Add credits for each song」の欄：＋で出る行の「役割の箱」と、そのすぐ下の「名前の欄」を組にして印を付ける（決定 70）
+APPLE_ROWS_JS = r"""() => {
+  const vis = e => e && e.offsetParent !== null;
+  const rx = /apple music requires at least one performer and producer|add credits for each song/i;
+  const t = [...document.querySelectorAll('body *')].filter(e => vis(e) && !e.closest('#postdog-overlay')
+      && rx.test(e.textContent || '') && e.children.length < 30);
+  if (!t.length) return null;
+  let block = t.reduce((a, b) => (a.textContent.length <= b.textContent.length ? a : b));
+  const ROLE = 'input.dk-searchable-select__input, select, [role=combobox]';
+  // 役割の箱が入るまで外側へ広げる（＋を押す前は箱が無いので、＋のある囲みまで）。ジャンルや言語の箱まで入ったら広げすぎ
+  let scope = block;
+  for (let i = 0; i < 6 && scope.parentElement; i++) {
+    const up = scope.parentElement;
+    if (up.querySelector('select[name=genre1], select[name=language], input[name=bandname]')) break;
+    scope = up;
+    if ([...scope.querySelectorAll(ROLE)].some(vis)) break;
+  }
+  const dlg = [...document.querySelectorAll('[role=dialog], [aria-modal=true], .swal2-popup, [class*=modal i]')].find(d => vis(d) && [...d.querySelectorAll(ROLE)].some(vis));
+  if (dlg) scope = dlg;   // ＋で小窓が開く作り
+  const status = /not yet complete/i.test(block.closest('div, section') ? (scope.innerText || '') : '') ? 'incomplete' : '';
+  document.querySelectorAll('[data-pd-crole],[data-pd-cname]').forEach(e => { e.removeAttribute('data-pd-crole'); e.removeAttribute('data-pd-cname'); });
+  const roles = [...scope.querySelectorAll(ROLE)].filter(e => vis(e) && !e.closest('#postdog-overlay'));
+  const names = [...scope.querySelectorAll('input[type=text], input:not([type])')].filter(e => vis(e) && !e.matches('input.dk-searchable-select__input, [role=combobox]'));
+  const rows = [];
+  roles.forEach((rl, i) => {
+    const nm = names.find(n => rl.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING && !n.hasAttribute('data-pd-cname'));
+    rl.setAttribute('data-pd-crole', String(i));
+    if (nm) nm.setAttribute('data-pd-cname', String(i));
+    // 行の見出し（Performer・Producer）：役割の箱と名前の欄をどちらも含む、いちばん小さい囲みの文字
+    let row = rl.parentElement;
+    while (row && nm && !row.contains(nm)) row = row.parentElement;
+    const txt = ((row || rl.parentElement).innerText || '').toLowerCase();
+    const label = /producer/.test(txt) && !/performer/.test(txt) ? 'producer' : (/performer/.test(txt) && !/producer/.test(txt) ? 'performer' : '');
+    const val = rl.tagName === 'SELECT' ? ((rl.selectedOptions[0] || {}).text || '') : (rl.value || '');
+    rows.push({i, label, kind: rl.tagName === 'SELECT' ? 'select' : 'searchable', role: val.trim(), name: nm ? nm.value : null});
+  });
+  return {rows, status};
+}"""
+
+
+def _pick_role(sess: Session, box, role: str) -> bool:
+    """役割の箱（打って選ぶ箱か、ふつうの選ぶ箱）で role を選び、選べたかを箱の中身で確かめる"""
+    cands = ROLE_CANDS.get(role, [role])
+    is_select = box.evaluate("e => e.tagName === 'SELECT'")
+    if is_select:
+        opts = box.evaluate("e => [...e.options].map(o => o.text.trim())")
+        hit = next((o for c in cands for o in opts if _norm(o) == _norm(c)), None) or \
+            next((o for c in cands for o in opts if _norm(o).startswith(_norm(c))), None)
+        if hit is None:
+            return False
+        box.select_option(label=hit)
+        return _norm(box.evaluate("e => (e.selectedOptions[0] || {}).text || ''")) == _norm(hit)
+    if not _searchable_pick(sess, box, role):
+        return False
+    got = _norm(_searchable_value(sess, box))
+    return any(got.startswith(_norm(c)) for c in cands)
+
+
+def fill_apple_rows(sess: Session, want: dict[str, tuple[str, str]]) -> tuple[list[str], list[str]]:
+    """Apple Music の credits の欄（＋で出る行）に入れる。want：{"performer": (役割, 名前), "producer": (役割, 名前)}。
+    行の見出しで Performer・Producer を見分け、見出しが無ければ上から Performer → Producer。足りなければ ＋ をもう一度押す"""
+    done, manual = [], []
+    filled: set[str] = set()
+    for attempt in range(3):
+        try:
+            r = sess.page.evaluate(APPLE_ROWS_JS)
+        except Exception:  # noqa: BLE001
+            return done, manual
+        if r is None:
+            return done, manual   # Apple Music の credits の欄が無い画面
+        rows = r["rows"]
+        free = [k for k in ("performer", "producer") if k not in filled]
+        plan = []
+        for row in rows:
+            k = row["label"] if row["label"] in free else (free[0] if not row["label"] and free else None)
+            if k and k in free:
+                plan.append((row, k))
+                free.remove(k)
+        for row, k in plan:
+            role, name = want[k]
+            box = sess.page.locator(f'[data-pd-crole="{row["i"]}"]').first
+            ok = _pick_role(sess, box, role)
+            nm = sess.page.locator(f'[data-pd-cname="{row["i"]}"]')
+            if nm.count() and name:
+                nm.first.fill(name)
+                ok = ok and _norm(_read(nm.first)) == _norm(name)
+            else:
+                ok = False
+            label = {"performer": "Performer", "producer": "Producer"}[k]
+            if ok:
+                filled.add(k)
+                done.append(f"Apple Music の credits の {label}（{role}）")
+                print(f"   … Apple Music の credits：{label} を「{role}」・名前ありで入れました")
+            else:
+                print(f"   － Apple Music の credits：{label} の役割「{role}」か名前が入りませんでした（いま：{row['role'] or '空'}）")
+        if not free or len(filled) == 2:
+            break
+        try:   # 足りない行がある：＋をもう一度押して、新しい行を出す
+            pr = sess.page.evaluate(PLUS_JS)
+        except Exception:  # noqa: BLE001
+            break
+        if not (pr or {}).get("plus"):
+            break
+        sess.page.locator('[data-pd-plus="1"]').first.click()
+        print(f"   … Apple Music の credits の「{pr.get('text') or '＋'}」を押して、行を足しました")
+        sess.page.wait_for_timeout(1500)
+    for k in ("performer", "producer"):
+        if k not in filled:
+            role, name = want[k]
+            manual.append(f"Apple Music の credits の {k.title()}：役割 {role}／名前 {name}（＋を押した行に入れてください）")
+    return done, manual
+
+
 def open_apple_credits(sess: Session) -> str:
     """Apple Music の credits の欄が「＋」の後ろに隠れていれば、＋を押して出す。
     ""：その欄が無い画面／"ok"：欄が出た／"noplus"：＋が見つからない／"nofields"：押しても欄が出ない"""
@@ -1967,6 +2086,13 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
             done.append(f"Track credits の {who}（{role}）")
         else:
             manual.append(f"Track credits の {who}：役割 {role}／名前 {name or '（.env の OWNER_LEGAL_NAME が空）'}")
+    # Apple Music の「Add credits for each song」の欄：＋で出た行（役割の箱＋その下の名前の欄）にも入れる（決定 70）。
+    # 「＋」を押すと、役割は DistroKid の初めの値（Sampler など）・名前は空の行が出るので、ここで役割と名前を入れ直す
+    a_done, a_manual = fill_apple_rows(sess, {"performer": (rows[0][1], rows[0][3]), "producer": (rows[1][1], rows[1][3])})
+    done += a_done
+    if a_done:
+        manual = [m for m in manual if not m.startswith("Track credits")]   # Apple の行に入ったなら、ふつうの欄の分は足りている
+    manual += a_manual
     if opened in ("noplus", "nofields") and not done:
         manual.append("Apple Music の credits（Additional requirements）：「＋」を押して Performer と Producer を入れてください"
                       "（欄の作りが読めませんでした。画面の部品の一覧を保存したので、Claude に見せると次から自動にできます）")
@@ -2178,6 +2304,39 @@ def _sec_artist_do(c: DK) -> None:
     c.sess.settle(3000)
 
 
+NO_TEXT_JS = r"""(name) => {
+  const vis = e => e && e.offsetParent !== null;
+  const r = [...document.querySelectorAll(`input[type=radio][name="${name}"][value="new"]`)].find(e => vis(e) || vis(e.parentElement)) ||
+            document.querySelector(`input[type=radio][name="${name}"][value="new"]`);
+  if (!r) return '';
+  const cands = [r.closest('label'), r.id && document.querySelector(`label[for="${r.id}"]`), r.parentElement, r.nextElementSibling].filter(Boolean);
+  // 丸のまわりに無ければ、その質問の囲みの中で「No -」で始まる文字の部品
+  let box = r.parentElement;
+  for (let i = 0; i < 4 && box; i++, box = box.parentElement) {
+    const t = [...box.querySelectorAll('label, span, div, p')].find(e => vis(e) && /^no\s*[-–—]/i.test((e.innerText || '').trim()));
+    if (t) { cands.push(t); break; }
+  }
+  const el = cands.find(e => vis(e) && /^no\b/i.test((e.innerText || '').trim())) || cands.find(vis);
+  if (!el) return '';
+  document.querySelectorAll('[data-pd-notext]').forEach(e => e.removeAttribute('data-pd-notext'));
+  el.setAttribute('data-pd-notext', '1');
+  return (el.innerText || '').trim().slice(0, 60);
+}"""
+
+
+def _click_no_text(sess: Session, css: str) -> None:
+    m = re.search(r'name="([^"]+)"', css)
+    if not m:
+        return
+    try:
+        t = sess.page.evaluate(NO_TEXT_JS, m.group(1))
+        if t:
+            sess.page.locator('[data-pd-notext="1"]').first.click()
+            print(f"   … 「{t}」の文字を押して選びました")
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _sec_ids_do(c: DK) -> None:
     items, texts = artist_id_radios(c.song)
     for item in items:   # 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す
@@ -2189,6 +2348,9 @@ def _sec_ids_do(c: DK) -> None:
             if not loc.count() or _visible_first(loc).is_checked():
                 break
             print(f"   … {item[0]} が取り消されました。やり直します（{t + 1} 回目）")
+            if t == 1:   # 2 回目もだめ：丸ではなく「No - …」の文字そのものを押す（丸が隠れている・押しても効かない作り。決定 70）
+                _click_no_text(c.sess, item[1])
+                confirm_new_page(c.sess, picked=True)
             c.sess.settle(1500)
     for label, css, val in texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
         loc = c.sess.page.locator(css)

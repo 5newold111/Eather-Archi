@@ -877,3 +877,14 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 入れ終わったとき・差し戻されたとき・入れ直したあとに、ページ全体の写しを `out/browser/screens/<曲 ID>_filled.png`（`_rejected`・`_refilled`）に残す（同じ曲の前の写しは上書き）
 - ダッシュボードの「DistroKid に登録」のポップアップに「DistroKid の画面の写し（入れ終わったとき・日時）を見る」が出る。オーナーはそれを見て、必要ならそのまま Claude に貼れる
 - 写しには本名が写るので、リポジトリには入れない（out/ は送らない）
+
+## 70. Apple Music の「＋」で出た行に役割と名前を入れる・デビュー曲の Artist already in を確実に No にする（2026-10-25。オーナーの報告）
+
+- 報告 1：「Add credits for each song on this release」の ＋ を押すと、Performer の役割が「Sampler」（DistroKid の初めの値）のまま、その下の名前の欄が空だった
+  - 原因：＋で出る行は、名前の欄に `performer-name` などの名前が付いていない作りで、これまでの仕組みはその行を見つけられず、何も入れていなかった
+  - 直したこと：Apple Music の欄の中を上から見て、「役割の箱」と、そのすぐ下の「名前の欄」を組にして入れる。行の見出し（Performer・Producer）があれば見出しで、無ければ上から Performer → Producer。行が足りなければ ＋ をもう一度押す
+    - Performer：役割 Singing & vocals（オーナーの指示。一覧の名前に合わせて Singer & vocals なども候補）・名前はアーティスト名（HOLLOWPLAN は本名・役割 Performer）
+    - Producer：役割 Producer・名前は本名
+  - 役割は、名前ぜんぶ（例 Singing & vocals）を先に打って探し、選んだあと箱の中身で確かめる（Sampler のまま残らない）
+- 報告 2：HOLLOWPLAN の「Artist already in YouTube Music?」が No になっていなかった（オーナーの指示：デビュー曲は Spotify・Apple Music・YouTube Music とも No）
+  - デビュー曲は 5 つとも No を選ぶ作りのまま。丸を押しても選べないとき（丸が隠れている・押しても戻る作り）は、2 回目から「No - …」の文字そのものを押して選ぶ。確認の小窓が出れば OK
