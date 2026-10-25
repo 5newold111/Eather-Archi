@@ -202,11 +202,19 @@ def system_blockers() -> list[tuple[str, str, str]]:
         f = logs / f"{job}.log"
         if not f.exists():
             continue
-        last = f.read_text(encoding="utf-8", errors="replace").split("=====")[-1]
+        parts = f.read_text(encoding="utf-8", errors="replace").split("\n===== ")
+        last = parts[-1]
         if "フルディスクアクセス" in last:
             out.append(("ng", "自動の処理が「ダウンロード」フォルダを読めません", "システム設定 → プライバシーとセキュリティ → フルディスクアクセス に python3 を追加"))
-        elif any(c != "0" for c in __import__("re").findall(r"→ 終了コード (\d+)", last)):
-            out.append(("ng", f"定期実行「{ja}」の最後の実行でエラーがありました", f"out/logs/{job}.log を確認"))
+        elif any(c != "0" for c in re.findall(r"→ 終了コード (\d+)", last)):
+            # いつ動いたか・何が起きたか（エラーの行）をそのまま出す（ログを開かなくてもわかるように。決定 81）
+            when = (re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2})", last) or [None, ""])[1]
+            lines = [ln.strip() for ln in last.splitlines() if ln.strip()]
+            hits = [ln for ln in lines if re.search(r"\[失敗\]|\[停止\]|\[エラー\]|✕|Error|エラー|Traceback|一部失敗|見つかりません|ありません", ln)
+                    and "終了コード" not in ln]
+            tail = " ／ ".join(dict.fromkeys(hits[-4:])) or " ／ ".join(lines[-3:])
+            out.append(("ng", f"定期実行「{ja}」の最後の実行（{when}）でエラーがありました：{tail[:400]}",
+                        f"out/logs/{job}.log を確認 → 直したら「もう一度動かす」（python3 scripts/schedule.py run {job}）"))
     return out
 
 

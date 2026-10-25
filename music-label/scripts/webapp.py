@@ -159,6 +159,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "publish.py"), "track"], "配信の確認"
     if action == "ref_audio":   # SSD の「既存楽曲」の音源を全部解析して、参考曲に登録する（決定 76）
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
+    if action == "rerun_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 定期実行をいま動かし直す（決定 81）
+        return [PY, str(S / "schedule.py"), "run", p["job"]], f"定期実行をもう一度（{p['job']}）"
     if action == "sync":
         return [PY, str(S / "archive_sync.py")], "保管（ローカルと SSD）"
     if action == "dashboard":
@@ -277,6 +279,10 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
 
 def _fix_buttons(how: str) -> list[dict]:
     """「仕組みの詰まり」の直し方を、ワンクリックのボタンにする"""
+    m = re.search(r"schedule\.py run (\w+)", how)
+    if m:   # 定期実行のエラー：直したあとに、いま動かし直す
+        warn = "（ブリーフは Claude に全組ぶんを書かせるので、料金がかかります）" if m.group(1) == "brief" else ""
+        return [{"kind": "run", "label": "もう一度動かす", "action": "rerun_job", "job": m.group(1), "confirm": f"定期実行「{m.group(1)}」をいま動かします{warn}。よいですか？"}]
     for key, needle in (("openai", "--only openai"), ("anthropic", "--only anthropic"), ("spotify", "--only spotify"), ("owner", "--only owner"),
                         ("ffmpeg", "brew install ffmpeg"), ("playwright", "playwright"), ("schedule", "schedule.py install")):
         if needle in how:
@@ -536,7 +542,7 @@ const daysSince=s=>Math.max(0,Math.round((D(DATA.timeline.today)-D(s))/DAY));
 let ACTS=[];
 function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
   switch(a.kind){
-   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.redo?`data-redo="1"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
+   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.redo?`data-redo="1"`:""} ${a.job?`data-job="${E(a.job)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
    case "cover_pick":return `<span class="act-only" style="display:inline-block;width:150px;vertical-align:top;font-size:12px"><img src="${E(a.img)}" alt="ジャケットの候補 ${E(a.no)}" loading="lazy" style="width:150px;height:150px;object-fit:cover;border-radius:6px;display:block;margin-bottom:4px;border:1px solid var(--line)"><button data-act="cover" data-id="${id}" data-no="${E(a.no)}">${E(a.label)}</button>${a.note?`<span class="sub" style="display:block">${E(a.note)}</span>`:""}</span>`;
    case "copy":return `<button class="ghost" data-copy="${i}">${E(a.label)}</button>`;
    case "link":return `<a class="btn" href="${E(a.url)}" target="_blank" rel="noopener">${E(a.label)} ↗</a>`;
@@ -635,7 +641,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
-  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;
+  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
 // ---- 不定期配信（決定 72）：組を選んで曲の案を作る → ポップアップで直す・却下して作り直す・作曲へ進める
