@@ -37,9 +37,27 @@ def _errors():
     return anthropic
 
 
+# 決まった形（JSON スキーマ）のうち、API が受け付けない制約（数の上限・下限・文字数など）。送る前に外す（決定 80）
+UNSUPPORTED = {"minItems", "maxItems", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf",
+               "minLength", "maxLength", "pattern", "uniqueItems", "minProperties", "maxProperties"}
+
+
+def api_schema(schema):
+    """API に送れる形にする（受け付けない制約を外す。説明の文はそのまま）"""
+    if isinstance(schema, dict):
+        return {k: api_schema(v) for k, v in schema.items() if k not in UNSUPPORTED}
+    if isinstance(schema, list):
+        return [api_schema(x) for x in schema]
+    return schema
+
+
 def _stream(client, **kw):
-    with client.beta.messages.stream(model=MODEL, betas=BETAS, fallbacks="default", **kw) as stream:
-        return stream.get_final_message()
+    try:
+        with client.beta.messages.stream(model=MODEL, betas=BETAS, fallbacks="default", **kw) as stream:
+            return stream.get_final_message()
+    except TypeError:   # 古い anthropic（自動の切り替えを知らない）：切り替えなしで送る
+        with client.messages.stream(model=MODEL, **kw) as stream:
+            return stream.get_final_message()
 
 
 def call_json(system: str, content, schema: dict, effort: str = "high", max_tokens: int = 32000) -> tuple[dict | None, str]:
@@ -55,7 +73,7 @@ def call_json(system: str, content, schema: dict, effort: str = "high", max_toke
         msg = _stream(client, max_tokens=max_tokens,
                       system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
                       messages=[{"role": "user", "content": content}],
-                      output_config={"effort": effort, "format": {"type": "json_schema", "schema": schema}})
+                      output_config={"effort": effort, "format": {"type": "json_schema", "schema": api_schema(schema)}})
     except anthropic.AuthenticationError:
         return None, "ANTHROPIC_API_KEY が無効（401）。set_key.py ANTHROPIC_API_KEY で入れ直す"
     except anthropic.RateLimitError as e:
@@ -64,6 +82,8 @@ def call_json(system: str, content, schema: dict, effort: str = "high", max_toke
         return None, f"API エラー {e.status_code}: {e.message}"
     except anthropic.APIConnectionError as e:
         return None, f"接続できない（ネットワーク／証明書）: {e}"
+    except Exception as e:  # noqa: BLE001  部品が古いなど
+        return None, f"送れませんでした（{type(e).__name__}: {str(e)[:200]}）。ターミナルで  python3 -m pip install -U anthropic  を実行してください"
     if msg.stop_reason == "refusal":
         cat = getattr(getattr(msg, "stop_details", None), "category", None)
         return None, f"安全上の理由で断られた（{cat}）"

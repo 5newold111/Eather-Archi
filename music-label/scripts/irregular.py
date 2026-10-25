@@ -220,7 +220,9 @@ def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: 
     d = read_json(dp)
     if r.returncode != 0 or not d.get("suno_style_prompt"):
         print((r.stdout + r.stderr)[-800:])
-        return fail("Claude が案を書けませんでした（下の記録を見てください）。もう一度「作り直す」を押してください", 1)
+        why = next((ln.strip()[len("応答："):] for ln in r.stdout.splitlines() if ln.strip().startswith("応答：")), "")
+        why = why or next((ln.strip() for ln in (r.stdout + r.stderr).splitlines() if "Error" in ln or "エラー" in ln), "")
+        return fail("Claude が案を書けませんでした" + (f"：{why[:300]}" if why else "（下の記録を見てください）") + "。直してから「もう一度作る」を押してください", 1)
 
     _progress(4, N, "案ができました。ポップアップで確かめてください")
     d["irregular"].update({"status": "proposed", "proposed_at": datetime.now().strftime("%Y-%m-%d %H:%M")})

@@ -337,40 +337,41 @@ def validate(result: dict, artist: dict, brief: dict) -> list[str]:
 
 
 def call_claude(system: str, user: str) -> tuple[dict | None, str]:
-    """Claude を呼んで JSON を受け取る。(結果, 状態メッセージ)"""
+    """Claude を呼んで JSON を受け取る。(結果, 状態メッセージ)。呼び方は _claude.py と同じ（決定 80）：
+    受け付けない制約（数の上限など）は外して送る・長い答えでも切れないよう max_tokens を大きく・拒否時はサーバー側で別モデルに自動で切り替え"""
     try:
         import anthropic
     except ImportError:
-        return None, "anthropic パッケージが無い（pip install anthropic）"
+        return None, "anthropic パッケージが無い（python3 -m pip install -r requirements.txt）"
+    import _claude
     client = anthropic.Anthropic()
     try:
-        # ストリーミング：長い出力でもタイムアウトしない。拒否時はサーバー側で別モデルに自動フォールバック
-        with client.beta.messages.stream(
-            model=MODEL,
-            max_tokens=16000,
-            system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],   # 固定部分はキャッシュ
-            messages=[{"role": "user", "content": user}],
-            output_config={"effort": "high", "format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        ) as stream:
-            msg = stream.get_final_message()
+        msg = _claude._stream(client, max_tokens=64000,
+                              system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],   # 固定部分はキャッシュ
+                              messages=[{"role": "user", "content": user}],
+                              output_config={"effort": "high", "format": {"type": "json_schema", "schema": _claude.api_schema(OUTPUT_SCHEMA)}})
     except anthropic.AuthenticationError:
-        return None, "ANTHROPIC_API_KEY が無効（401）。set_key.py ANTHROPIC_API_KEY で入れ直す"
+        return None, "ANTHROPIC_API_KEY が無効（401）。setup_keys.py --only anthropic で入れ直す"
+    except anthropic.PermissionDeniedError as e:
+        return None, f"この鍵では使えません（403）: {e.message}"
     except anthropic.RateLimitError as e:
-        return None, f"回数制限か残高不足（429）: {e}"
+        return None, f"回数制限か残高不足（429）。console.anthropic.com の Billing で残高を確かめる: {e}"
     except anthropic.APIStatusError as e:
         return None, f"API エラー {e.status_code}: {e.message}"
     except anthropic.APIConnectionError as e:
         return None, f"接続できない（ネットワーク／証明書）: {e}"
+    except Exception as e:  # noqa: BLE001  部品が古いなど
+        return None, f"送れませんでした（{type(e).__name__}: {str(e)[:200]}）。ターミナルで  python3 -m pip install -U anthropic  を実行してください"
     if msg.stop_reason == "refusal":
         cat = getattr(getattr(msg, "stop_details", None), "category", None)
         return None, f"安全上の理由で生成が拒否された（{cat}）。歌詞テーマや語を見直す"
+    if msg.stop_reason == "max_tokens":
+        return None, "答えが長すぎて途中で切れた（max_tokens 不足）"
     text = "".join(b.text for b in msg.content if b.type == "text")
     try:
         return json.loads(text), f"OK（入力 {msg.usage.input_tokens} / 出力 {msg.usage.output_tokens} トークン、モデル {msg.model}）"
     except json.JSONDecodeError:
-        return None, "返答が JSON として読めない（max_tokens 不足の可能性）"
+        return None, "返答が JSON として読めない"
 
 
 def main() -> None:
@@ -431,7 +432,7 @@ def main() -> None:
 
         print(f"  Claude（{MODEL}）に送っています…")
         result, status = call_claude(SYSTEM, user)
-        print(f"  {status}")
+        print(f"  応答：{status}")
         if not result:
             continue
         problems = validate(result, artist, brief)
