@@ -297,8 +297,14 @@ def assign_slots(artist: dict, refs: list[Reference], rng: random.Random, trend_
                 pool = strict_pool
             else:
                 # 音域まで合う曲が足りない → 性別だけ合う曲まで広げる
-                pool = [r for r in pool if vocal_compatible(r, artist, strict=False)]
+                loose = [r for r in pool if vocal_compatible(r, artist, strict=False)]
                 print(f"    [注意] 音域まで合う参考曲が {len(strict_pool)} 件しかないため、枠「{slot}」は性別だけ合う曲から選びます")
+                if not loose:   # 声の性別がわかる曲が無い：声の情報が無い曲（既存楽曲の音源の解析など）から選ぶ（決定 79）
+                    loose = [r for r in pool if r.vocal_sex in (None, "")]
+                    if loose:
+                        print(f"    [注意] 性別まで合う参考曲が無いため、枠「{slot}」は声の情報が無い曲（音源の解析だけの曲など）から選びます。"
+                              "歌い方は組の声の設定のほうを優先します")
+                pool = loose
         if not pool:
             raise RuntimeError(
                 f"枠「{slot}」に使える参考曲がありません。"

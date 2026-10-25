@@ -201,7 +201,8 @@ def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: 
     r = subprocess.run(args, capture_output=True, text=True)
     if r.returncode != 0 or not out_p.exists():
         print((r.stdout + r.stderr)[-800:])
-        return fail("参考曲の割り当てができませんでした（下の記録を見てください）", 1)
+        why = next((ln.strip() for ln in (r.stdout + r.stderr).splitlines() if "[失敗]" in ln or "Error" in ln or "エラー" in ln), "")
+        return fail("参考曲の割り当てができませんでした" + (f"：{why.replace('[失敗]', '').strip()[:200]}" if why else "（下の記録を見てください）"), 1)
     skel = read_json(out_p)
     out_p.unlink()
     skel["irregular"] = meta
