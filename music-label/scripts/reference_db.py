@@ -532,6 +532,8 @@ def digest(res: dict) -> dict:
         "themes": themes[:25],
         "owner_notes": (memos[:25] + notes[:5]),
         "real_names": names,   # write_brief.py が「出力に入れてはいけない語」として使う（Claude には渡さない）
+        # そのうちアーティスト名（曲名とは分ける。ふつうの言葉だけの曲名は止めない。決定 82）
+        "real_artists": sorted({str(s["reference"].get("artist_name", "")) for s in all_sheets} - {"", "?"}),
     }
 
 

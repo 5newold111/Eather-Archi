@@ -237,8 +237,7 @@ def _banned(d: dict, text: str) -> list[str]:
     try:
         import write_brief
         a = load_artist(d["artist_slug"], d.get("label_slug"))
-        low = text.lower()
-        return sorted({t for t in write_brief.banned_terms(a) if len(t) >= 3 and t.lower() in low})
+        return write_brief.real_name_hits(a, text)   # ふつうの 1 語・ふつうの言葉だけの曲名は止めない（決定 82）
     except Exception:  # noqa: BLE001
         return []
 

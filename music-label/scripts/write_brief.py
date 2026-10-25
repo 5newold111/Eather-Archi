@@ -292,20 +292,91 @@ def build_user_message(brief: dict, artist: dict, excerpts: dict) -> str:
 
 
 def banned_terms(artist: dict) -> list[str]:
-    terms = list(artist.get("profile", {}).get("favorite_artists_real", []))
-    terms += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
-    terms += real_names(artist)   # 管理表の『影響』『参考曲の候補』の実名
+    return [t for t, _ in _real_terms(artist)]
+
+
+def _real_terms(artist: dict) -> list[tuple[str, bool]]:
+    """実在の名前の一覧：(名前, アーティスト名か)。管理表の影響・好きなアーティスト・参考データベースのアーティスト名と曲名"""
+    terms = [(t, True) for t in artist.get("profile", {}).get("favorite_artists_real", []) or []]
+    terms += [(i.get("name", ""), True) for i in artist.get("persona", {}).get("influences", [])]
+    terms += [(t, True) for t in real_names(artist)]   # 管理表の『影響』『参考曲の候補』の実名
     if DB_DIGEST.exists():        # 参考データベースのアーティスト名・曲名（3 文字以上。短い語は普通の言葉と重なるため）
-        terms += [n for n in load_json(DB_DIGEST).get("real_names", []) if len(n) >= 3]
-    return [t for t in terms if t and t not in ("（bio のみ）",)]
+        d = load_json(DB_DIGEST)
+        arts = set(d.get("real_artists") or [])
+        terms += [(n, n in arts or not d.get("real_artists")) for n in d.get("real_names", []) if len(n) >= 3]
+    seen, out = set(), []
+    for t, a in terms:
+        if t and t not in ("（bio のみ）",) and t.lower() not in seen:
+            seen.add(t.lower())
+            out.append((t, a))
+    return out
+
+
+_WORDS: set[str] | None = None
+# 辞書が無いとき（Mac 以外）の、よく使う英語の言葉
+_COMMON = set("""a about after again against all alone always am an and angel another any are around as at away baby back bad be beautiful
+because bed been before begin being better between big black bleed blood blue body born boy break breathe bright broken burn but by call
+can change city close cold come crazy crowd cry dance dark day dead dear deep desire do down dream drive drop dust easy echo else empty end
+energy ever every eyes face fade fall far fast feel feeling fever fire first flick fly for forever free friend from game ghost girl give go
+gold gone good gravity happy have he heart heaven hello help her here high hold home hope horizon hot how human i if in inside intro into
+is it just keep key kid kill kiss know last late leave let lie life light like line little live lonely long lose loud love lover low lucky
+mad make man me melody memory midnight mind miss money moon more morning move my name need never new next night no not nothing now ocean of
+off oh old on one only open or other our out over pain paradise party people play please pop power pretty rain real red remember ride right
+rise river road rock run sad same say sea see shadow shadows shed shine show sky sleep slow smile so some something song soul space stand
+star stars stay still stop storm story strange summer sun sweet take talk tell than that the then there these they thing think this those
+through time to together tonight too touch town true try turn two under up us voice wait wake walk want war water wave way we what when where
+which while white who why wild will wind winter with without wonder world yeah yes yesterday you young your""".split())
+
+
+def _dictionary() -> set[str]:
+    """英語の辞書（Mac の /usr/share/dict/words。小文字の見出し語だけ＝人名・地名は入らない）"""
+    global _WORDS
+    if _WORDS is None:
+        _WORDS = set(_COMMON)
+        for p in (Path("/usr/share/dict/words"), Path("/usr/share/dict/web2")):
+            try:
+                _WORDS |= {w.strip() for w in p.read_text(encoding="utf-8", errors="ignore").splitlines() if w.strip().islower()}
+                break
+            except OSError:
+                continue
+    return _WORDS
+
+
+def _ordinary_word(w: str) -> bool:
+    w = w.lower().strip("'")
+    d = _dictionary()
+    if w in d:
+        return True
+    for suf, add in (("s", ""), ("es", ""), ("ed", ""), ("ed", "e"), ("ing", ""), ("ing", "e"), ("'s", ""), ("ies", "y")):
+        if w.endswith(suf) and (w[: -len(suf)] + add) in d:
+            return True
+    return False
+
+
+def ordinary(term: str) -> bool:
+    """ふつうの言葉だけでできているか（英字の言葉で、どれも辞書にある。数字・記号・日本語・造語を含めば False）"""
+    words = term.split()
+    return bool(words) and all(re.fullmatch(r"[A-Za-z']+", w) and _ordinary_word(w) for w in words)
+
+
+def real_name_hits(artist: dict, text: str) -> list[str]:
+    """文の中の、実在の名前（Suno が断る・まねの心配）。オーナーの指示（決定 82）：
+    1 語のふつうの言葉（Time・Hope など）は止めない（造語は止める）。曲名はふつうの言葉だけなら止めない。
+    2 語以上のアーティスト名（ふつうの言葉の組み合わせでも）は止める。言葉の途中には当てない（[Intro] の intro は名前として数えない）"""
+    hits = []
+    for t, is_artist in _real_terms(artist):
+        if ordinary(t) and (len(t.split()) == 1 or not is_artist):
+            continue
+        if re.search(r"(?<![A-Za-z0-9])" + re.escape(t) + r"(?![A-Za-z0-9])", text, re.I):
+            hits.append(t)
+    return sorted(set(hits))
 
 
 def validate(result: dict, artist: dict, brief: dict) -> list[str]:
     problems = []
     text = json.dumps(result, ensure_ascii=False)
-    for t in banned_terms(artist):
-        if t.lower() in text.lower():
-            problems.append(f"実在アーティスト名が含まれている: {t}")
+    for t in real_name_hits(artist, text):
+        problems.append(f"実在アーティスト名が含まれている: {t}")
     if len(result["suno_style_prompt"]) > 900:
         problems.append(f"Suno のスタイル指示が長すぎる（{len(result['suno_style_prompt'])} 文字 > 900）")
     for opt in result["phrase_transform_options"]:
