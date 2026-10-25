@@ -1712,17 +1712,111 @@ def _searchable_value(sess: Session, inp) -> str:
         return ""
 
 
+# 見出し（Primary genre など）の近くの「押すと一覧が開く箱」か「選ぶ箱」を探して印を付ける（決定 67）
+TRIGGER_JS = r"""([tag, labelRx, otherRx]) => {
+  const vis = e => e && e.offsetParent !== null;
+  const rx = new RegExp(labelRx, 'i'), other = new RegExp(otherRx, 'i');
+  const hits = [...document.querySelectorAll('label, legend, h1, h2, h3, h4, h5, h6, p, span, div, strong, b')]
+    .filter(e => vis(e) && !e.closest('#postdog-overlay') && rx.test((e.innerText || '').trim()) && (e.innerText || '').length < 80);
+  if (!hits.length) return null;
+  const start = hits.reduce((a, b) => (a.innerText.length <= b.innerText.length ? a : b));
+  // 押す場所は、外側の囲みより中のボタンを先に（囲みの真ん中を押しても、ボタンに当たらないことがある）
+  const kinds = [['select', 'select'], ['[role=combobox], [aria-haspopup]', 'menu'], ['button, [role=button]', 'menu'],
+                 ['input:not([type=hidden]):not([type=radio]):not([type=checkbox])', 'menu'],
+                 ['[class*=select i], [class*=dropdown i], [class*=picker i]', 'menu']];
+  let box = start;
+  for (let i = 0; i < 6 && box; i++, box = box.parentElement) {
+    if (box !== start && other.test(box.innerText || '')) return null;   // 別の欄（Secondary genre など）まで入ってしまった
+    for (const [css, kind] of kinds) {
+      const el = [...box.querySelectorAll(css)].find(e => vis(e) && !e.closest('#postdog-overlay') && e !== start && !e.contains(start)
+          && !/continue|submit|save|done|cancel|remove|delete|edit|upload|learn more|add\b|select all/i.test((e.innerText || e.getAttribute('aria-label') || '').trim()));
+      if (el) {
+        document.querySelectorAll(`[data-pd-gt="${tag}"]`).forEach(e => e.removeAttribute('data-pd-gt'));
+        el.setAttribute('data-pd-gt', tag);
+        return {kind: el.tagName === 'SELECT' ? 'select' : kind, text: (el.tagName === 'SELECT' ? ((el.selectedOptions[0] || {}).text || '')
+                : (el.innerText || el.value || '')).replace(/\s+/g, ' ').trim().slice(0, 60)};
+      }
+    }
+  }
+  return null;
+}"""
+
+# 開いた一覧の中から、その名前の選択肢を探して印を付ける（いちばん小さい、名前がちょうど同じもの → 名前で始まるもの）
+OPTION_JS = r"""([want, tag]) => {
+  const vis = e => e && e.offsetParent !== null;
+  const norm = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const w = norm(want);
+  const trig = document.querySelector(`[data-pd-gt="${tag}"]`);
+  const cands = [...document.querySelectorAll('[role=option], li, [class*=option i], [class*=item i], a, button, div, span')]
+    .filter(e => vis(e) && !e.closest('#postdog-overlay') && e !== trig && !(trig && trig.contains(e)) && e.children.length < 4);
+  const exact = cands.filter(e => norm(e.innerText) === w);
+  const pick = (exact.length ? exact : cands.filter(e => norm(e.innerText).startsWith(w) && norm(e.innerText).length < w.length + 25))
+    .sort((a, b) => a.innerText.length - b.innerText.length)[0];
+  document.querySelectorAll('[data-pd-opt]').forEach(e => e.removeAttribute('data-pd-opt'));
+  if (!pick) return '';
+  pick.setAttribute('data-pd-opt', '1');
+  return pick.innerText.trim();
+}"""
+
+
+def pick_dropdown_near(sess: Session, key: str, label_rx: str, want: str) -> bool | None:
+    """見出しの近くの「選ぶ箱」か「押すと一覧が開く箱」で want を選ぶ。None：そういう箱が無い／True：選べた／False：選べなかった"""
+    other = r"secondary genre" if key == "genre1" else r"primary genre"
+    try:
+        r = sess.page.evaluate(TRIGGER_JS, [key, label_rx, other])
+    except Exception:  # noqa: BLE001
+        return None
+    if not r:
+        return None
+    trig = sess.page.locator(f'[data-pd-gt="{key}"]').first
+    bare = lambda t: _norm(re.sub(r"[▾▼⌄˅›»\u25bc\u25be]+", " ", str(t or "")))  # noqa: E731  開く印を外して比べる
+    if bare(r.get("text")) == _norm(want):
+        return True
+    try:
+        if r["kind"] == "select":
+            opts = trig.evaluate("e => [...e.options].map(o => o.text.trim())")
+            hit = next((o for o in opts if _norm(o) == _norm(want)), None) or next((o for o in opts if _norm(o).startswith(_norm(want))), None)
+            if hit is None:
+                return False
+            trig.select_option(label=hit)
+            ok = _norm(trig.evaluate("e => (e.selectedOptions[0] || {}).text || ''")) == _norm(hit)
+        else:
+            trig.click()
+            sess.page.wait_for_timeout(700)
+            if sess.page.evaluate("() => { const a = document.activeElement; return !!a && a.tagName === 'INPUT' && a.type !== 'radio' && a.type !== 'checkbox'; }"):
+                sess.page.keyboard.type(want.split("/")[0], delay=40)   # 一覧に絞り込みの欄があれば打つ
+                sess.page.wait_for_timeout(700)
+            name = sess.page.evaluate(OPTION_JS, [want, key])
+            if not name:
+                sess.page.keyboard.press("Escape")
+                return False
+            sess.page.locator('[data-pd-opt="1"]').first.click()
+            sess.page.wait_for_timeout(600)
+            again = sess.page.evaluate(TRIGGER_JS, [key, label_rx, other]) or {}
+            ok = bare(again.get("text")) in (_norm(want), _norm(name))
+        if ok:
+            print(f"   … {({'genre1': 'Primary genre', 'genre2': 'Secondary genre'}).get(key, key)} の一覧から「{want}」を選びました")
+        return ok
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def fill_genre_boxes(sess: Session, fields: list[dict]) -> tuple[list[str], list[str]]:
     """Primary genre・Secondary genre が「打って選ぶ箱」の画面：見出しの近くの箱に、DistroKid の一覧の名前で入れる（決定 61）。
     ふつうの選ぶ箱（select）だけの画面では何もしない（fill_fields が入れる）"""
     done, manual = [], []
-    for key, rx in (("genre1", r"^primary genre"), ("genre2", r"^secondary genre")):
+    for key, rx in (("genre1", r"^(primary genre|genre)\b"), ("genre2", r"^secondary genre")):
         f = next((x for x in fields if x["key"] == key), None)
         want = (f or {}).get("chosen") or (f or {}).get("value")
         if not want:
             continue
         box = searchable_near(sess, key, label_rx=rx)
-        if box is None:
+        if box is None:   # 打って選ぶ箱ではない：押すと一覧が開く箱・見出しの近くの選ぶ箱で入れる（決定 67）
+            r = pick_dropdown_near(sess, key, rx, want)
+            if r is True:
+                done.append(f"{f['label']}（{want}）")
+            elif r is False:
+                manual.append(f"{f['label']}：{want}（一覧から選べませんでした）")
             continue
         if _norm(_searchable_value(sess, box)).startswith(_norm(want)):
             done.append(f"{f['label']}（{want}）")
@@ -1747,6 +1841,16 @@ def fill_genre_boxes(sess: Session, fields: list[dict]) -> tuple[list[str], list
         (done if ok else manual).append(f"{f['label']}（{want}）" if ok else f"{f['label']}：{want}（打って選ぶ箱に入りませんでした）")
         if ok:
             print(f"   … {f['label']} を打って選ぶ箱で「{want}」にしました")
+    if manual:   # 選べなかった：本物の画面に合わせて直すため、画面の部品の一覧を残す（決定 67）
+        try:
+            from datetime import datetime as _dt
+            p = save_parts(sess, "distrokid")
+            if p and p.exists():
+                keep = p.with_name(f"distrokid_parts_genre_{_dt.now():%Y%m%d_%H%M%S}.txt")
+                keep.write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+                print(f"   記録：ジャンルを選べなかった画面の部品の一覧を保存しました → {keep}")
+        except Exception:  # noqa: BLE001
+            pass
     return done, manual
 
 

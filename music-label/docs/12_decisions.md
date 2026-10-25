@@ -847,3 +847,14 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 消す・閉じる・取り消す・編集の印（remove・delete・close・cancel・edit など）は押さない
   - 欄は見えているものだけを数える（閉じた小窓の中に、隠れた欄が前からあることがある）
   - 「＋」が見つからない・押しても欄が出ないときは、画面の部品の一覧を `out/browser/distrokid_parts_<曲 ID>_credits.txt` に残し、Gon さんに手で入れてもらう案内を出す
+
+## 67. Primary genre の入れ漏れを無くす（2026-10-25。「Select the primary genre of this album or single.」と差し戻された）
+
+- 決定 61 で入れられるようにしたのは、ジャンルの箱が「打って選ぶ箱」の画面だけだった。本物の画面は、押すと一覧が開く別の作りの箱と見ている
+- 直したこと：ジャンルは、次の順に、入るまで試す
+  1. 欄の名前（`genre1`・`genre2`）の選ぶ箱（これまでどおり）
+  2. 見出し（Primary genre・Genre・Secondary genre）の近くの「打って選ぶ箱」（決定 61）
+  3. 見出しの近くの「選ぶ箱」か「押すと一覧が開く箱」：中のボタンを押して一覧を開き（絞り込みの欄があれば打ち）、名前がちょうど同じ選択肢を選ぶ。選んだあと、箱に出ている名前で確かめる
+  - 見出しの近くでも、Continue・Save・取り消し・消す・Edit・Upload・Add・Learn more などのボタンは押さない。Secondary genre の欄まで入った囲みでは探さない
+- 差し戻しの見張り（決定 39）は、この文を見つけるとジャンルも入れ直す（distrokid_fix → fill_genre_boxes）
+- それでも選べなかったときは、画面の部品の一覧を `out/browser/distrokid_parts_genre_<日時>.txt` に残す
