@@ -25,10 +25,10 @@
 | SSD をつないだとき | 自動で（定期実行 ssd）：SSD が無い間に「ダウンロード/SUNO楽曲」へ入った曲を SSD の「楽曲情報」へ移す → ローカル保存の中身を SSD に写す → 配信が始まった曲はローカル保存から片付ける → Mac に通知（決定 21） |
 | 公開の流れ | ダッシュボードの「Suno に入力する」でシステムが欄を埋める → Create（オーナー）→ いいねした 1 本を SSD の「Postdog Records/楽曲情報」へダウンロード（名前は自動で <曲名>_<アーティスト名>_<生成日> に）→ 自動で音量・ジャケット・DistroKid の下書き・公開セット → ダッシュボードの「DistroKid に入力する」でシステムが下書きを入れ、オーナーが登録ボタン → ISRC などは自動で記録（`docs/15_publish.md`・`scripts/publish.py`） |
 | ダッシュボード（ウェブアプリ） | ブラウザで http://localhost:8765（`python3 scripts/webapp.py`。`schedule.py install` で常に起動）。フェーズ表（タブ：定期配信＝既定・不定期配信・デビュー。工程が進んだ曲は消さずに残す。決定 54）。マスを押すと止まっている原因・Gon さんがやること・ワンクリックのボタン（Suno・DistroKid への自動入力〔`browser_fill.py`〕・取り込み・写真・登録の記録・鍵の設定など。決定 22）。スマホから見るときは `--lan` |
-| 参考データベース | SSD の「データベース」などの名前のフォルダ（Excel・CSV・SQLite・解析シート）と、「既存楽曲」の WAV・MP3・M4A（1 曲ずつ解析して解析シートに。決定 76）。`python3 scripts/reference_db.py --show` で読み方を確認。毎週のブリーフ作りの最初に自動で取り込み、傾向は `out/reference_db/digest.md` |
+| 参考データベース | SSD の「データベース」などの名前のフォルダ（Excel・CSV・SQLite・解析シート）と、「既存楽曲」の WAV・MP3・M4A（1 曲ずつ解析して解析シートに。入れると自動で解析・登録。決定 76・78）。`python3 scripts/reference_db.py --show` で読み方を確認。毎週のブリーフ作りの最初に自動で取り込み、傾向は `out/reference_db/digest.md` |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜76） |
+| 決めたこと | `docs/12_decisions.md`（1〜78） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |

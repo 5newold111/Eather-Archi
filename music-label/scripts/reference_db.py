@@ -191,8 +191,13 @@ def _measure(analyze_track, f: Path) -> dict:
             return analyze_track.measure(w)
 
 
+NEW_AUDIO: list[str] = []   # この回に新しく解析した曲（「アーティスト「曲名」」。通知に使う）
+
+
 def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict]]:
-    """「既存楽曲」の音源を解析する（新しい曲だけ。1 回に limit 曲まで。0 なら全部）。解析済みの全曲の (ファイル, シート) を返す"""
+    """「既存楽曲」の音源を解析する（新しい曲だけ。1 回に limit 曲まで。0 なら全部）。解析済みの全曲の (ファイル, シート) を返す。
+    新しく解析した曲は NEW_AUDIO に入る。書き込みの途中（最後に変わってから 1 分以内）のファイルは次の回に回す（決定 78）"""
+    import time as _time
     dirs = audio_dirs()
     if not dirs:
         if not quiet:
@@ -203,16 +208,23 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
     index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
     files = [(top, f) for top in dirs for f in files_in(top) if f.suffix.lower() in AUDIO_TAKE]
     todo, out, seen = [], [], set()
+    busy = 0
     for top, f in files:
         st = f.stat()
         rid = "aud-" + _h.sha1(f"{f.relative_to(top)}|{st.st_size}".encode()).hexdigest()[:12]
         seen.add(rid)
+        if _time.time() - st.st_mtime < 60 and not (AUDIO_CACHE / f"{rid}.json").exists():
+            busy += 1   # コピーの途中かもしれない：次の回に解析する
+            continue
         cache = AUDIO_CACHE / f"{rid}.json"
         if cache.exists() and index.get(rid, {}).get("sig") == f"{st.st_size}|{int(st.st_mtime)}":
             out.append((f, json.loads(cache.read_text(encoding="utf-8"))))
         else:
             todo.append((top, f, rid, cache, f"{st.st_size}|{int(st.st_mtime)}"))
-    print(f"▶ 既存楽曲：{len(files)} 曲（解析済み {len(out)}・まだ {len(todo)}）" + "".join(f"\n   ・{d}" for d in dirs))
+    if quiet and not todo:   # 自動の見張り：新しい曲が無ければ何も言わない
+        return out
+    print(f"▶ 既存楽曲：{len(files)} 曲（解析済み {len(out)}・まだ {len(todo)}" + (f"・コピー中 {busy}" if busy else "") + "）"
+          + "".join(f"\n   ・{d}" for d in dirs))
     if todo:
         try:
             import analyze_track
@@ -241,6 +253,7 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
         cache.write_text(json.dumps(sheet, ensure_ascii=False, indent=1), encoding="utf-8")
         index[rid] = {"sig": sig, "file": str(f), "at": datetime.now().isoformat(timespec="seconds")}
         out.append((f, sheet))
+        NEW_AUDIO.append(f"{artist}「{title}」")
         print(f"   ○ {m['bpm']} BPM・{m['key']}・{m['duration_sec']} 秒・セクション {len(m['sections'])}")
     for rid in [k for k in index if k not in seen]:   # 既存楽曲から消えた曲は取り下げる
         (AUDIO_CACHE / f"{rid}.json").unlink(missing_ok=True)
@@ -761,7 +774,11 @@ def main() -> None:
     ap.add_argument("--quiet", action="store_true", help="SSD が無いときは何も言わない（自動実行用）")
     ap.add_argument("--artists", action="store_true", help="組ごとの近い参考曲だけ作り直す")
     ap.add_argument("--audio-limit", type=int, default=20, help="「既存楽曲」の音源を 1 回に何曲まで解析するか（0＝全部）")
+    ap.add_argument("--watch", action="store_true",
+                    help="自動の見張り用：「既存楽曲」に新しく入った曲だけ解析し、あったときだけ参考曲に登録して Mac に知らせる（決定 78）")
     args = ap.parse_args()
+    if args.watch:
+        args.quiet, args.audio_limit = True, 0
     if args.artists:
         if not build_artist_digests():
             print("－ まだ参考曲を取り込んでいません。SSD をつないで python3 scripts/reference_db.py を実行してください")
@@ -771,11 +788,14 @@ def main() -> None:
         return
     paths, where = candidates()
     audio = [] if args.show else analyze_audio(args.audio_limit, quiet=args.quiet)
+    if args.watch and not NEW_AUDIO:
+        return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}
         n, d = write_outputs(res, "SSD の既存楽曲", [])
         print(f"   取り込み：参考曲 {n} 曲（既存楽曲の解析。out/references/{PREFIX}aud-*.json）")
         build_artist_digests()
+        _tell_new()
         return
     if not paths:
         cached = len(list(REF_DIR.glob(f"{PREFIX}*.json"))) if REF_DIR.exists() else 0
@@ -803,6 +823,15 @@ def main() -> None:
     if res["skipped"]:
         print(f"   読まなかったもの {len(res['skipped'])} 件（out/reference_db/summary.md）")
     build_artist_digests()
+    _tell_new()
+
+
+def _tell_new() -> None:
+    """新しく解析して登録した曲を Mac に知らせる"""
+    if NEW_AUDIO:
+        from _common import notify
+        print(f"【結果】既存楽曲の新しい曲 {len(NEW_AUDIO)} 曲を解析して、参考曲に登録しました：" + "・".join(NEW_AUDIO[:10]))
+        notify("参考曲に登録しました", f"既存楽曲の新しい曲 {len(NEW_AUDIO)} 曲を解析しました：" + "・".join(NEW_AUDIO[:3]))
 
 
 if __name__ == "__main__":

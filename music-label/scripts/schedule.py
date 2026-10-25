@@ -20,6 +20,8 @@
     release  毎日 10:15     DistroKid に登録した曲が Spotify に出たかを確かめ、ISRC・UPC・配信 URL を楽曲管理シートに記録（publish.py track）
     ssd      SSD をつないだとき  SSD が無い間に「ダウンロード/SUNO楽曲」へ入った曲を SSD の「楽曲情報」へ移し、ローカル保存の中身を SSD に写し、
                             配信が始まった曲はローカル保存から片付けて、Mac に知らせる（archive_sync.py --on-mount → publish.py scan）
+    refs     既存楽曲に曲が入ったとき・SSD をつないだとき・30 分ごと  SSD の「既存楽曲」に新しく入った WAV・MP3・M4A だけを解析して、
+                            参考曲の解析シートに登録し、Mac に知らせる（reference_db.py --watch。決定 78）
     webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
 
 使い方
@@ -67,6 +69,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "intake":  ("Suno の曲の取り込み → 音量・ジャケット・DistroKid の下書き・公開セット", [["publish.py", "scan", "--quiet"]]),
     "release": ("配信の確認と ISRC・UPC・配信 URL の記録", [["publish.py", "track", "--quiet"]]),
     "ssd":     ("SSD をつないだとき：楽曲のデータを SSD へ移す・保管・取り込み", [["archive_sync.py", "--on-mount"], ["publish.py", "scan", "--quiet"]]),
+    "refs":    ("既存楽曲に入った曲の解析 → 参考曲に登録", [["reference_db.py", "--watch"]]),
 }
 
 
@@ -94,12 +97,17 @@ def calendar(job: str) -> dict:
         return {"StartCalendarInterval": [{"Hour": 10, "Minute": 15}]}
     if job == "ssd":   # ドライブがつながるたびに動く（SSD でなければすぐ終わる）
         return {"StartOnMount": True}
+    if job == "refs":   # 既存楽曲のフォルダに何か入ったらすぐ・SSD をつないだとき・念のため 30 分ごと（決定 78）
+        sys.path.insert(0, str(S))
+        import reference_db
+        dirs = [str(d) for d in reference_db.audio_dirs()]
+        return {**({"WatchPaths": dirs} if dirs else {}), "StartOnMount": True, "StartInterval": 1800}
     raise KeyError(job)
 
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
-        "release": "15 10 * * *", "ssd": "*/30 * * * *"}
+        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）
