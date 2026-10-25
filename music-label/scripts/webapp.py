@@ -137,9 +137,10 @@ def status_json() -> dict:
     try:   # 既存楽曲で、まだ Claude に調べてもらっていない曲の数と料金の目安（決定 85）
         import reference_db
         n_en = len(reference_db.enrich_pending())
-        ref_enrich = {"pending": n_en, "yen": [n_en * reference_db.YEN_PER_SONG[0], n_en * reference_db.YEN_PER_SONG[1]]}
+        ref_enrich = {"pending": n_en, "yen": [n_en * reference_db.YEN_PER_SONG[0], n_en * reference_db.YEN_PER_SONG[1]],
+                      "lyrics": len(reference_db.lyrics_pending()), "whisper": reference_db.whisper_ready()}
     except Exception:  # noqa: BLE001
-        ref_enrich = {"pending": 0, "yen": [0, 0]}
+        ref_enrich = {"pending": 0, "yen": [0, 0], "lyrics": 0, "whisper": True}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -167,6 +168,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
     if action == "rerun_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 定期実行をいま動かし直す（決定 81）
         return [PY, str(S / "schedule.py"), "run", p["job"]], f"定期実行をもう一度（{p['job']}）"
+    if action == "ref_lyrics":   # 既存楽曲の歌詞を Mac の中で聞き取る（無料。決定 86）
+        return [PY, str(S / "reference_db.py"), "--audio-lyrics", "30"], "既存楽曲の歌詞を聞き取る"
     if action == "ref_enrich":   # 音源から測れない項目を Claude に Web で調べてもらう（決定 85。料金がかかるので押す前に確認）
         return [PY, str(S / "reference_db.py"), "--audio-enrich", "50"], "参考曲の足りない項目を Claude に調べてもらう"
     if action == "ref_audio_report":   # 解析できていない曲を調べる（決定 83）
@@ -284,7 +287,9 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
             # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
             "playwright": f"{{ {shlex.quote(PY)} -m pip install --user playwright || {shlex.quote(PY)} -m pip install --user --break-system-packages playwright; }}"
                           f" && {shlex.quote(PY)} -m playwright install chromium",
-            "schedule": [PY, "scripts/schedule.py", "install"]}
+            "schedule": [PY, "scripts/schedule.py", "install"],
+            # 歌詞を聞き取る部品（決定 86）。最初の聞き取りのときに、モデル（約 500 MB）を自動でダウンロードする
+            "whisper": f"{{ {shlex.quote(PY)} -m pip install --user faster-whisper || {shlex.quote(PY)} -m pip install --user --break-system-packages faster-whisper; }}"}
 
 
 def _fix_buttons(how: str) -> list[dict]:
@@ -440,7 +445,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
@@ -718,6 +723,10 @@ function render(){
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
   irrForm();irrDrafts();
+  {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）
+   bl.hidden=!(re0.lyrics&&re0.whisper);bw.hidden=!(re0.lyrics&&!re0.whisper);
+   if(re0.lyrics){bl.textContent=`歌詞を聞き取る（${re0.lyrics} 曲・無料）`;bw.textContent=`歌詞を聞き取る部品を入れる（${re0.lyrics} 曲が待っています・ターミナルが開きます）`;
+    bl.dataset.confirm=`既存楽曲 ${re0.lyrics} 曲のうち ${Math.min(re0.lyrics,30)} 曲の歌詞を、Mac の中で聞き取ります（1 曲 1〜3 分・料金はかかりません）。始めますか？`}}
   {const b=document.getElementById("ref-enrich"),re=DATA.ref_enrich||{pending:0,yen:[0,0]};b.hidden=!re.pending;   // 参考曲の足りない項目（決定 85）
    if(re.pending){const n=Math.min(re.pending,50),lo=Math.round(re.yen[0]*n/re.pending),hi=Math.round(re.yen[1]*n/re.pending);
     b.textContent=`足りない項目を Claude に調べてもらう（${re.pending} 曲）`;

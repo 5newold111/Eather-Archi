@@ -351,6 +351,140 @@ def _missing(sheet: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# 歌詞を曲から聞き取る（Mac の中の Whisper。無料。決定 86）
+WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "small")   # small：速さと正確さの釣り合い（medium にすると正確・遅い）
+_WM = None
+
+
+def whisper_ready() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def transcribe(f: Path) -> dict:
+    """歌を聞き取る。{text（行ごと・段落は空行）, language, clarity（clear / unclear / none）, 確かさの数字}"""
+    global _WM
+    from faster_whisper import WhisperModel
+    if _WM is None:
+        _WM = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
+    segs, info = _WM.transcribe(str(f), vad_filter=True, beam_size=5, condition_on_previous_text=False)
+    segs = [x for x in segs if (x.text or "").strip()]
+    lines, prev_end = [], None
+    for x in segs:
+        if prev_end is not None and x.start - prev_end > 4:   # 4 秒以上あいたら段落を分ける
+            lines.append("")
+        lines.append(x.text.strip())
+        prev_end = x.end
+    dur = sum(max(0.0, x.end - x.start) for x in segs)
+    lp = sum(x.avg_logprob * (x.end - x.start) for x in segs) / dur if dur else -9.0
+    ns = sum(x.no_speech_prob for x in segs) / len(segs) if segs else 1.0
+    cr = max((x.compression_ratio for x in segs), default=0.0)
+    txt = [ln for ln in lines if ln]
+    words = sum(len(ln.split()) if ln.isascii() else len(ln) // 2 for ln in txt)
+    repeated = len(txt) >= 6 and len(set(txt)) <= len(txt) // 3   # 同じ行ばかり：聞き違い（同じ言葉のくり返し）の心配
+    if not txt or dur < 15 or words < 12:
+        clarity = "none"       # 歌がほとんど無い（インスト・語りが少しだけ）
+    elif lp > -0.9 and ns < 0.6 and cr < 2.4 and not repeated:
+        clarity = "clear"
+    else:
+        clarity = "unclear"
+    return {"text": "\n".join(lines).strip(), "language": info.language, "language_probability": round(float(info.language_probability), 2),
+            "avg_logprob": round(lp, 2), "no_speech": round(ns, 2), "compression": round(cr, 2), "vocal_sec": round(dur, 1),
+            "clarity": clarity, "model": WHISPER_MODEL, "at": datetime.now().isoformat(timespec="seconds")}
+
+
+def _put_lyrics(d: dict, tr: dict) -> None:
+    """聞き取った歌詞と、その形（1 行の音の数・韻・くり返し・曲名の位置）を解析シートに入れる"""
+    import analyze_track
+    ly = d.setdefault("lyrics", {})
+    meta = {k: v for k, v in tr.items() if k != "text"}
+    ly["transcript_meta"] = meta
+    if tr["clarity"] == "none":
+        ly.pop("transcript", None)
+        ly["instrumental_guess"] = True
+        if tr["vocal_sec"] < 5 and not (d.get("vocal") or {}).get("sex"):
+            d.setdefault("vocal", {})["sex"] = "none"
+        return
+    ly["transcript"] = tr["text"]   # オーナーの指示：言い回しまで分析シートに載せる（新しい歌詞を書く Claude には渡さない。決定 86）
+    ly.pop("instrumental_guess", None)
+    title = (d.get("reference") or {}).get("title", "")
+    ls = analyze_track.lyrics_structure(tr["text"], title)
+    ascii_text = tr["text"].isascii()
+    per = {}
+    for sec in ls["sections"]:
+        key = f"section{sec['index']}({sec['guess']})"
+        if ascii_text:
+            per[key] = sec["syllables_per_line"]
+    if not ascii_text:   # 日本語など：1 行の文字数（読みの音の数の目安）
+        paras = [p for p in tr["text"].split("\n\n") if p.strip()]
+        per = {f"section{i}": [len(re.sub(r"\s", "", ln)) for ln in p.splitlines() if ln.strip()] for i, p in enumerate(paras, 1)}
+        ly["count_unit"] = "文字"
+    ly["syllables_per_line"] = per
+    ly["rhyme"] = {"scheme": " / ".join(sec["rhyme_scheme"] for sec in ls["sections"])} if ascii_text else ly.get("rhyme", {})
+    ly["title_word"] = {"count": ls["title_count"], "positions": [f"line {i + 1}" for i in ls["title_line_positions"]]}
+    ly["repetition_pattern"] = f"繰り返し段落 {sum(1 for x in ls['sections'] if x['guess'] == 'chorus')} / 全 {len(ls['sections'])} 段落"
+    if tr["language_probability"] >= 0.7:
+        d.setdefault("reference", {})["language"] = tr["language"]
+
+
+def lyrics_pending() -> list[tuple[Path, Path]]:
+    """まだ歌詞を聞き取っていない曲：(解析シート, 音源ファイル)"""
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    out = []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        f = Path((index.get(p.stem) or {}).get("file", ""))
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not (d.get("lyrics") or {}).get("transcript_meta") and f.is_file():
+            out.append((p, f))
+    return out
+
+
+def audio_lyrics(limit: int = 0, quiet: bool = False) -> int:
+    """既存楽曲の歌詞を聞き取って、解析シートに入れる（1 回に limit 曲まで。0 なら全部）"""
+    pend = lyrics_pending()
+    if not pend:
+        if not quiet:
+            print("【結果】聞き取る曲はありません（全部聞き取り済みか、SSD がつながっていません）")
+        return 0
+    if not whisper_ready():
+        print("【結果】歌を聞き取る部品（faster-whisper）が入っていません。ターミナルで  python3 -m pip install faster-whisper  を実行してください"
+              "（最初の 1 回だけ、聞き取りのモデル 約 500 MB をダウンロードします）")
+        return 2
+    run = pend[:limit] if limit > 0 else pend
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲の歌詞を聞き取ります（Mac の中で。1 曲 1〜3 分。料金はかかりません）")
+    n = {"clear": 0, "unclear": 0, "none": 0}
+    for i, (p, f) in enumerate(run, 1):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ref = d.get("reference") or {}
+        print(f"【進み具合】{i}/{len(run)} 曲目：{ref.get('artist_name')}「{ref.get('title')}」の歌詞を聞き取っています", flush=True)
+        try:
+            tr = transcribe(f)
+        except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
+            print(f"   ✕ 聞き取れませんでした（{type(e).__name__}: {str(e)[:160]}）")
+            continue
+        _put_lyrics(d, tr)
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        n[tr["clarity"]] += 1
+        print("   " + {"clear": "○ はっきり聞き取れました", "unclear": "△ 聞き取りがあやしい（Claude に Web で確かめてもらう対象にしました）",
+                      "none": "－ 歌がほとんどありません（インストか、歌が少ない曲）"}[tr["clarity"]]
+              + f"（{tr['language']}・{len([x for x in tr['text'].splitlines() if x.strip()])} 行）")
+    if sum(n.values()):
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
+    left = len(pend) - len(run)
+    print(f"【結果】歌詞を聞き取りました：はっきり {n['clear']}・あやしい {n['unclear']}・歌なし {n['none']}"
+          + ("。あやしい曲は「足りない項目を Claude に調べてもらう」で確かめられます" if n["unclear"] else "")
+          + (f"。まだ {left} 曲あります" if left > 0 else ""))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # 音源から測れない項目（声・楽器・歌詞のテーマ・世界観）を、Claude に Web で調べてもらって足す（決定 85）
 YEN_PER_SONG = (20, 50)   # 1 曲あたりの料金の目安（Web 検索と、その結果を読む分）
 ENRICH_SYSTEM = """You fill in a music reference sheet for a songwriting team. You get one song (title, artist, and what a machine measured from
@@ -359,11 +493,14 @@ the audio: tempo, key, length). Use web search to identify THIS recording, then 
 - Describe attributes only. Never quote lyric lines, never write melodies. The theme is one plain sentence in your own words.
 - If you cannot identify the song with reasonable confidence, set found=false and leave fields empty or "unknown". Do not guess.
 - Write descriptive text (theme, sub_themes, mood, setting, timbre, delivery, formation, background) in Japanese. Instrument names may be English.
-- Keep it short. Search at most a few times."""
+- Keep it short. Search at most a few times.
+- If "heard_lyrics" is given (an automatic transcription that may contain mishearings), compare it with what you find and fill
+  lyrics_check: whether it matches, and up to 10 short corrections (heard -> actual, a few words each). Do not reproduce the full lyrics.
+  Also describe the lyric shape (sections, rhyme, point of view, hook, phrasing habits) in Japanese without quoting lines."""
 _U = ["unknown"]
 ENRICH_SCHEMA = {"type": "object", "additionalProperties": False,
                  "required": ["found", "identified_as", "confidence", "vocal", "instruments", "genre_tags", "lyrics", "worldview",
-                              "note_placement", "release_year", "sources"],
+                              "note_placement", "release_year", "lyrics_check", "sources"],
                  "properties": {
                      "found": {"type": "boolean"}, "identified_as": {"type": "string"},
                      "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
@@ -385,6 +522,13 @@ ENRICH_SCHEMA = {"type": "object", "additionalProperties": False,
                                    | {"eras": {"type": "array", "items": {"type": "string"}}}},
                      "note_placement": {"type": "string"},
                      "release_year": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+                     "lyrics_check": {"type": "object", "additionalProperties": False, "required": ["status", "note", "corrections", "shape"],
+                                      "properties": {"status": {"type": "string", "enum": ["matches", "partly", "differs", "not_found", "not_checked"]},
+                                                     "note": {"type": "string"},
+                                                     "corrections": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                                                     "required": ["heard", "actual"],
+                                                                     "properties": {"heard": {"type": "string"}, "actual": {"type": "string"}}}},
+                                                     "shape": {"type": "string"}}},
                      "sources": {"type": "array", "items": {"type": "string"}}}}
 
 
@@ -397,8 +541,10 @@ def enrich_pending() -> list[Path]:
         except (OSError, ValueError):
             continue
         ref = d.get("reference") or {}
-        if not d.get("_enriched") and ref.get("artist_name") not in (None, "", "?") and ref.get("title"):
-            out.append(p)
+        ly = d.get("lyrics") or {}
+        unclear = (ly.get("transcript_meta") or {}).get("clarity") == "unclear" and not ly.get("web_check")
+        if (not d.get("_enriched") or unclear) and ref.get("artist_name") not in (None, "", "?") and ref.get("title"):
+            out.append(p)   # まだ調べていない曲と、歌詞の聞き取りがあやしい曲（決定 86）
     return out
 
 
@@ -443,6 +589,17 @@ def _merge_enrich(d: dict, e: dict) -> None:
         d.setdefault("performance", {})["note_placement"] = e["note_placement"]
     if e.get("release_year") and not ref.get("release_year"):
         ref["release_year"] = e["release_year"]
+    lc = e.get("lyrics_check") or {}
+    if lc.get("status") and lc["status"] != "not_checked" and (d.get("lyrics") or {}).get("transcript"):
+        ly = d["lyrics"]
+        fixed = 0
+        for c in lc.get("corrections") or []:   # 聞き違いを直す（聞き取った文に同じ言葉があるときだけ）
+            if c.get("heard") and c.get("actual") and c["heard"] in ly["transcript"]:
+                ly["transcript"] = ly["transcript"].replace(c["heard"], c["actual"])
+                fixed += 1
+        ly["web_check"] = {"status": lc["status"], "note": lc.get("note", ""), "fixed": fixed, "at": datetime.now().isoformat(timespec="seconds")}
+        if lc.get("shape"):
+            ly["shape_ja"] = lc["shape"]
     if e.get("sources"):
         d.setdefault("visual_web", {"sources": []}).setdefault("sources", []).extend(
             {"kind": "other", "url": u, "fetched_at": datetime.now().date().isoformat()} for u in e["sources"][:8])
@@ -469,7 +626,10 @@ def audio_enrich(limit: int = 50) -> int:
         d = json.loads(p.read_text(encoding="utf-8"))
         ref, m = d.get("reference") or {}, d.get("_measure") or {}
         print(f"【進み具合】{i}/{len(run)} 曲目：{ref.get('artist_name')}「{ref.get('title')}」を調べています", flush=True)
+        ly = d.get("lyrics") or {}
+        heard = ly.get("transcript") if (ly.get("transcript_meta") or {}).get("clarity") == "unclear" else None
         user = json.dumps({"title": ref.get("title"), "artist": ref.get("artist_name"), "year": ref.get("release_year"),
+                           **({"heard_lyrics": heard[:4000]} if heard else {}),
                            "genre_tags": ref.get("tags"), "measured": {"bpm": (d.get("groove") or {}).get("bpm"), "key": m.get("key"),
                                                                        "duration_sec": m.get("duration_sec")}}, ensure_ascii=False)
         try:
@@ -1083,9 +1243,13 @@ def main() -> None:
     ap.add_argument("--watch", action="store_true",
                     help="自動の見張り用：「既存楽曲」に新しく入った曲だけ解析し、あったときだけ参考曲に登録して Mac に知らせる（決定 78）")
     ap.add_argument("--audio-report", action="store_true", help="「既存楽曲」の解析できていない曲と、その理由・直し方を一覧にする（決定 83）")
+    ap.add_argument("--audio-lyrics", type=int, metavar="N", nargs="?", const=0,
+                    help="既存楽曲の歌詞を Mac の中で聞き取って、解析シートに入れる（N 曲まで。省くと全部。無料。決定 86）")
     ap.add_argument("--audio-enrich", type=int, metavar="N", nargs="?", const=50,
                     help="音源から測れない項目（声・楽器・テーマ・世界観）を Claude に Web で調べてもらう（1 回に N 曲まで。既定 50。決定 85）")
     args = ap.parse_args()
+    if args.audio_lyrics is not None:
+        sys.exit(audio_lyrics(args.audio_lyrics))
     if args.audio_enrich is not None:
         sys.exit(audio_enrich(args.audio_enrich))
     if args.audio_report:
@@ -1102,6 +1266,8 @@ def main() -> None:
     paths, where = candidates()
     audio = [] if args.show else analyze_audio(args.audio_limit, quiet=args.quiet)
     if args.watch and not NEW_AUDIO:
+        if whisper_ready() and lyrics_pending():   # 歌詞の聞き取りがまだの曲：1 回に 5 曲ずつ、自動で聞き取る（決定 86）
+            audio_lyrics(5, quiet=True)
         return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}

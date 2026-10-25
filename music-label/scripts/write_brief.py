@@ -223,6 +223,9 @@ def slot_excerpts(brief: dict, refs_dir: Path | None) -> dict[str, dict]:
                 data = json.loads(json.dumps(sheet.get(sec, {})))
                 if sec == "lyrics" and isinstance(data, dict) and "key_words" in data:
                     data["key_words"] = [{"category": k.get("category")} for k in data["key_words"]]   # 語そのものは渡さない
+                if sec == "lyrics" and isinstance(data, dict):   # 聞き取った歌詞の文そのものは渡さない（形だけ。決定 86）
+                    data.pop("transcript", None)
+                    data.pop("web_check", None)
                 entry[sec] = data
         else:
             entry["note"] = "解析シートなし。タイトルと組の固定制約から推定すること（具体的な模倣は禁止）"
@@ -375,8 +378,39 @@ def real_name_hits(artist: dict, text: str) -> list[str]:
     return sorted(set(hits))
 
 
+def _grams(text: str) -> set[str]:
+    """言い回しを比べる単位：英語は 5 語続き、日本語などは 8 文字続き"""
+    out = set()
+    words = re.findall(r"[a-z']+", text.lower())
+    out |= {" ".join(words[i:i + 5]) for i in range(len(words) - 4)}
+    cjk = re.sub(r"[\sA-Za-z0-9'\W_]", "", text)
+    out |= {cjk[i:i + 8] for i in range(len(cjk) - 7)}
+    return out
+
+
+def copied_phrases(lyrics: str, brief: dict) -> list[str]:
+    """新しい歌詞に、参考曲の聞き取った歌詞と同じ言い回し（英語 5 語・日本語 8 文字以上の続き）が無いか（決定 86）"""
+    refs_dir = Path(brief["references_dir"]) if brief.get("references_dir") else None
+    if not refs_dir or not lyrics:
+        return []
+    mine = _grams(lyrics)
+    hits = []
+    for src in (brief.get("slots") or {}).values():
+        p = refs_dir / f"{src.get('reference_id')}.json"
+        try:
+            t = ((load_json(p).get("lyrics") or {}).get("transcript") or "") if p.exists() else ""
+        except (OSError, ValueError):
+            t = ""
+        if t:
+            hits += sorted(mine & _grams(t))
+    return list(dict.fromkeys(hits))[:5]
+
+
 def validate(result: dict, artist: dict, brief: dict) -> list[str]:
     problems = []
+    same = copied_phrases(result.get("suno_lyrics", ""), brief)
+    if same:
+        problems.append("参考曲の歌詞と同じ言い回しがある（DistroKid・配信サイトで止められる心配。書き換える）：" + " ／ ".join(same))
     text = json.dumps(result, ensure_ascii=False)
     for t in real_name_hits(artist, text):
         problems.append(f"実在アーティスト名が含まれている: {t}")
