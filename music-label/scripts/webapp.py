@@ -166,6 +166,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "publish.py"), "track"], "配信の確認"
     if action == "ref_audio":   # SSD の「既存楽曲」の音源を全部解析して、参考曲に登録する（決定 76）
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
+    if action == "ack_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 直したので表示を消す（決定 89）
+        return [PY, str(S / "schedule.py"), "ack", p["job"]], f"定期実行のエラーの表示を消す（{p['job']}）"
     if action == "rerun_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 定期実行をいま動かし直す（決定 81）
         return [PY, str(S / "schedule.py"), "run", p["job"]], f"定期実行をもう一度（{p['job']}）"
     if action == "ref_lyrics":   # 既存楽曲の歌詞を Mac の中で聞き取る（無料。決定 86）
@@ -297,7 +299,9 @@ def _fix_buttons(how: str) -> list[dict]:
     m = re.search(r"schedule\.py run (\w+)", how)
     if m:   # 定期実行のエラー：直したあとに、いま動かし直す
         warn = "（ブリーフは Claude に全組ぶんを書かせるので、料金がかかります）" if m.group(1) == "brief" else ""
-        return [{"kind": "run", "label": "もう一度動かす", "action": "rerun_job", "job": m.group(1), "confirm": f"定期実行「{m.group(1)}」をいま動かします{warn}。よいですか？"}]
+        return [{"kind": "run", "label": "直したので表示を消す", "action": "ack_job", "job": m.group(1),
+                 "confirm": "このエラーの表示を消しますか？（原因を直したとき。次の定期実行は、いつもどおり動きます）"},
+                {"kind": "run", "label": "もう一度動かす", "action": "rerun_job", "job": m.group(1), "confirm": f"定期実行「{m.group(1)}」をいま動かします{warn}。よいですか？"}]
     for key, needle in (("openai", "--only openai"), ("anthropic", "--only anthropic"), ("spotify", "--only spotify"), ("owner", "--only owner"),
                         ("ffmpeg", "brew install ffmpeg"), ("playwright", "playwright"), ("schedule", "schedule.py install")):
         if needle in how:

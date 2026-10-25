@@ -31,6 +31,7 @@
   python scripts/schedule.py uninstall            # 登録を外す
   python scripts/schedule.py status               # 登録の状態（○ 登録済み／✕ 未登録）
   python scripts/schedule.py run post             # 1 つの仕事を今すぐ動かす（ログは out/logs/<仕事>.log）
+  python scripts/schedule.py ack brief            # 直したエラーの表示を消す（ダッシュボードの「仕組みの詰まり」から消える）
   python scripts/schedule.py cron                 # Mac 以外（Linux など）向けの crontab の行を表示
 """
 from __future__ import annotations
@@ -182,6 +183,18 @@ def run_job(job: str) -> int:
     return code
 
 
+def ack_job(job: str) -> int:
+    """定期実行のエラーの表示を消す：ログの最後に「確認済み」の区切りを足す（ログそのものは消さない。決定 89）"""
+    log = OUT / "logs" / f"{job}.log"
+    if not log.exists():
+        print(f"【結果】{job} のログがありません")
+        return 0
+    with log.open("a", encoding="utf-8") as f:
+        f.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M} {job}：エラーの表示を消しました（オーナーが直した。前の記録は上に残っています） =====\n→ 終了コード 0\n")
+    print(f"【結果】定期実行「{job}」のエラーの表示を消しました。次の定期実行はいつもどおり動きます")
+    return 0
+
+
 def trim(log: Path, keep: int = 4000) -> None:
     """ログは新しい 4,000 行だけ残す"""
     lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -191,7 +204,7 @@ def trim(log: Path, keep: int = 4000) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="定期実行の設定（Mac の launchd）")
-    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "cron", "status"])
+    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "ack", "cron", "status"])
     ap.add_argument("job", nargs="?", help="run のときの仕事の名前")
     ap.add_argument("--only", help="install / write をこの仕事だけに（カンマ区切り）")
     a = ap.parse_args()
@@ -214,6 +227,10 @@ def main() -> None:
             sys.exit(f"[エラー] 仕事の名前: {', '.join(JOBS)}")
         step(f"{a.job}：{JOBS[a.job][0]} を実行しています（ログ out/logs/{a.job}.log）")
         sys.exit(run_job(a.job))
+    if a.command == "ack":   # エラーの表示を消す（決定 89）
+        if a.job not in JOBS:
+            sys.exit(f"[エラー] 仕事の名前: {', '.join(JOBS)}")
+        sys.exit(ack_job(a.job))
     if a.command == "cron":
         print("# crontab -e で貼り付ける行（Mac 以外向け）")
         for j in jobs:
