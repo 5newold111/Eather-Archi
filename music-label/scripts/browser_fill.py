@@ -1289,7 +1289,19 @@ PARTS_JS = r"""() => {
     if (out.length >= 300) break;
   }
   const log = window.__postdogLog ? '押したボタンの記録：\n' + window.__postdogLog + '\n' : '';
-  return log + out.sort((a, b) => parseInt(a) - parseInt(b)).join('\n'); }"""
+  // 画面の様子（決定 77）：どの画面か・登録画面の欄があるか・欄がいくつ見えているか・見出し・埋め込みの枠（iframe）
+  const all = [...document.querySelectorAll('input,select,textarea')];
+  const shown = all.filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+  const heads = [...document.querySelectorAll('h1,h2,h3,[role=dialog] h1,[role=dialog] h2,.swal2-title')].filter(vis).map(h => cut(h.innerText, 50)).filter(Boolean).slice(0, 8);
+  const frames = [...document.querySelectorAll('iframe')].map(f => { const r = f.getBoundingClientRect(); return `${cut(f.src || '（中身だけ）', 60)}（${Math.round(r.width)}×${Math.round(r.height)}）`; });
+  const dlg = [...document.querySelectorAll('[role=dialog],[aria-modal=true],.swal2-popup,[class*=modal i]')].filter(vis).map(d => cut(d.innerText, 60));
+  const head = `画面：${location.href}　題：${cut(document.title, 60)}\n`
+    + `登録画面の欄（アーティスト名 bandname）：${document.querySelector('input[name=bandname]') ? 'あり' : 'なし'}　入力欄：全部 ${all.length}・見えている ${shown.length}\n`
+    + `見出し：${heads.join(' ／ ') || '（なし）'}\n`
+    + (dlg.length ? `開いている小窓：${dlg.join(' ／ ')}\n` : '')
+    + (frames.length ? `埋め込みの枠（iframe）：${frames.join(' ／ ')}\n` : '')
+    + `ページの高さ：${document.documentElement.scrollHeight}　いまの位置：${Math.round(scrollY)}\n`;
+  return head + log + out.sort((a, b) => parseInt(a) - parseInt(b)).join('\n'); }"""
 
 
 def save_parts(sess: Session, site: str) -> Path | None:
