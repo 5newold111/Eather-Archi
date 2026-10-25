@@ -373,7 +373,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .x{position:absolute;right:10px;top:8px;background:transparent;color:var(--sub);font-size:22px;padding:2px 10px}
 .badge{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;border:1.5px solid}.badge.done{border-color:var(--good)}.badge.wait{border-color:var(--warn)}.badge.ng{border-color:var(--crit)}.badge.run{border-style:dashed}.badge.plan{border-style:dotted;border-color:var(--muted)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
-#dlg-job{margin-top:10px;font-size:14px;color:var(--sub)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
+#dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub)}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
@@ -498,7 +498,12 @@ function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].r
    ${(r.back||[]).length?`<div class="backbox"><b>← 戻る（間違えて進めたとき）</b><span class="sub">　前の工程に戻します。消さずに「戻したもの」に移すので、あとから取り出せます</span><div class="acts">${r.back.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    <h4>${p.state==="ng"?"止まっている原因":"いまの状態"}</h4><p>${E(WHO(g.cause))}</p>
    ${(g.steps||[]).length?`<h4>Gon さんがやること</h4><ol>${g.steps.map(x=>`<li>${E(WHO(x))}</li>`).join("")}</ol>`:""}
-   ${ACTS.length?`<div class="acts">${ACTS.map((a,i)=>actHTML(a,i,r)).join("")}</div>`:""}<div id="dlg-job"></div>`;
+   ${ACTS.length?`<div class="acts">${ACTS.map((a,i)=>actHTML(a,i,r)).join("")}</div>`:""}`;
+  // 動いている仕事（「ブラウザで入力（…）実行中…」など）は、ポップアップの上部（見出しのすぐ下）に出す（決定 64）
+  const badge=document.querySelector("#dlg-body .badge");const dj=document.createElement("div");dj.id="dlg-job";
+  (badge?badge.parentNode.insertBefore(dj,badge.nextElementSibling&&badge.nextElementSibling.nextElementSibling||null):document.getElementById("dlg-body").prepend(dj));
+  const rj=(DATA.jobs||[]).filter(j=>j.state==="running").reverse().find(j=>String(j.label).includes(r.artist))||(DATA.jobs||[]).filter(j=>j.state==="running").pop();
+  if(rj){dj.className="job running";dj.textContent=`${rj.label}　実行中…`;if(!watching[rj.id])watch(rj.id)}
   const dlg=document.getElementById("dlg");if(!dlg.open)dlg.showModal()}
 document.addEventListener("click",e=>{const c=e.target.closest("[data-copy]");if(!c)return;const t=(ACTS[+c.dataset.copy]||{}).text||"";
   const done=()=>{const o=c.textContent;c.textContent="コピーしました";setTimeout(()=>c.textContent=o,1600)};
