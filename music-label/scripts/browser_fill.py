@@ -338,7 +338,10 @@ class Session:
             self.ctx = pw.chromium.launch_persistent_context(executable_path=exe, **opts) if exe else \
                 pw.chromium.launch_persistent_context(**opts)
         self.msg: dict | None = None
-        self.ctx.expose_binding("postdog", lambda source, payload: setattr(self, "msg", payload))
+        try:
+            self.ctx.expose_binding("postdog", lambda source, payload: setattr(self, "msg", payload))
+        except Exception as e:  # noqa: BLE001  前の入力のつなぎが残っている：開き直してもらうため上に知らせる
+            raise RuntimeError(f"案内とのつなぎを作れませんでした（{str(e).splitlines()[0][:120]}）") from e
         self.ctx.add_init_script(INIT_JS)
         self.ctx.add_init_script(f"if (!({FRAME_GUARD})) window.__postdogParts = {PARTS_JS};")
         self.page = self.ctx.new_page() if self.cdp or not self.ctx.pages else self.ctx.pages[0]
@@ -347,7 +350,18 @@ class Session:
         self.overlay: dict | None = None
 
     def goto(self, url: str) -> None:
-        self.page.goto(url, wait_until="domcontentloaded")
+        for i in range(2):   # 開いたばかりの Chrome で、移動が空振りして about:blank のままになることがあるので 1 回だけやり直す（決定 63）
+            try:
+                self.page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            except Exception as e:  # noqa: BLE001
+                if i:
+                    raise
+                print(f"   … {url} を開けませんでした（{str(e).splitlines()[0][:120]}）。もう一度開きます")
+                self.page.wait_for_timeout(1500)
+                continue
+            if not self.page.url.startswith("about:"):
+                break
+            self.page.wait_for_timeout(1500)
         self.settle()
 
     def settle(self, ms: int = 1500) -> None:
@@ -2475,7 +2489,24 @@ def main() -> None:
         sys.exit("[エラー] 組とサイトを付けてください（例 photo tidewool spotify）")
     code, need = 0, None
     with sync_playwright() as pw:
-        sess = Session(pw)
+        try:
+            sess = Session(pw)
+        except SystemExit:
+            raise
+        except Exception as e:  # noqa: BLE001  つないだあとの準備で失敗：専用の Chrome を開き直して 1 回だけやり直す（決定 63）
+            import traceback
+            first = str(e).splitlines()[0][:200] if str(e) else type(e).__name__
+            print(f"   … 専用の Chrome の準備でつまずきました（{first}）。Chrome を開き直してやり直します")
+            (OUT / "browser").mkdir(parents=True, exist_ok=True)
+            (OUT / "browser" / "last_error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+            quit_chrome()
+            try:
+                sess = Session(pw)
+            except Exception as e2:  # noqa: BLE001
+                (OUT / "browser" / "last_error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+                print(f"【結果】まだ終わっていません：専用の Chrome の準備ができませんでした（{str(e2).splitlines()[0][:200] if str(e2) else type(e2).__name__}）。"
+                      "この文を Claude に貼ってください（くわしくは out/browser/last_error.txt）")
+                sys.exit(2)
         try:
             if a.what == "suno":
                 code = run_suno(sess, a.args)
