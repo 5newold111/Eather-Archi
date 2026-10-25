@@ -888,3 +888,14 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 役割は、名前ぜんぶ（例 Singing & vocals）を先に打って探し、選んだあと箱の中身で確かめる（Sampler のまま残らない）
 - 報告 2：HOLLOWPLAN の「Artist already in YouTube Music?」が No になっていなかった（オーナーの指示：デビュー曲は Spotify・Apple Music・YouTube Music とも No）
   - デビュー曲は 5 つとも No を選ぶ作りのまま。丸を押しても選べないとき（丸が隠れている・押しても戻る作り）は、2 回目から「No - …」の文字そのものを押して選ぶ。確認の小窓が出れば OK
+
+## 71. Performer の役割は必ず Singing & vocals。ほかの役割（Sampled artist など）には逃げない（2026-10-25。オーナーの指示）
+
+- 報告：Performer の選択肢が「Sampled artist」になっていた。オーナーの指示：「Sampled artist ではなく Singing & vocals を必ず選ぶ」
+- 直したこと
+  - 役割は、選択肢の名前がまったく同じもの（大文字小文字・「and」と「&」の違いだけは同じとみる）だけを選ぶ。前は名前の近いもの（Vocals・Singer など）も候補にしていたが、やめた
+  - 選んだあとに箱の中身を読み、Singing & vocals になっていなければ打ち直す。押しても入らない作りなら、キーボード（↓と Enter）で、光っている選択肢が Singing & vocals のときだけ決める
+  - 見張り（約 6 秒ごとの見直し）も「役割が Singing & vocals か」を見る。Sampled artist のままなら「まだ」として入れ直す。それでもだめならポップアップに「役割が違う行があります：Sampled artist」と出す
+  - 打って出る選択肢は、DistroKid の作りの名前が違っても拾う（option・listbox など）
+  - インストの組（HOLLOWPLAN）は前どおり役割 Performer・名前は本名。Producer は役割 Producer
+- あわせて：「Artist already in」の No が取り消される作り（丸が隠れていて、スクリプトで押すと戻る）に合わせ、丸の文字（label）を人と同じように押すのを先にした。もう選ばれている丸は押し直さない。ページの中の見張りがスクリプトで押し直すのは 2 回までにした（取り合いで Yes に戻るのを防ぐ）

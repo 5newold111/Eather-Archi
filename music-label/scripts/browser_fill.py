@@ -1610,30 +1610,50 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     return pick, texts
 
 
-ROLE_CANDS = {"Singing & vocals": ["Singing & vocals", "Singer & vocals", "Singing & Vocal", "Singer & Vocal", "Singing and vocals", "Vocals", "Lead Vocals", "Vocalist", "Singer"],
+# 役割の候補。Singing & vocals は同じ名前の書き方の違いだけ。Sampled artist などほかの役割には決して逃げない（オーナーの指示。決定 71）
+ROLE_CANDS = {"Singing & vocals": ["Singing & vocals", "Singing and vocals", "Singing & vocal", "Singer & vocals", "Singer & vocal"],
               "Vocals": ["Vocals", "Lead Vocals", "Vocalist", "Lead Vocalist", "Vocal", "Singer", "Performer"],
               "Performer": ["Performer", "Main Performer", "Featured Performer", "Musician", "Artist"],
               "Producer": ["Producer", "Music Producer", "Record Producer"]}
 
 
+def _role_key(v) -> str:
+    """役割の名前を比べる形に（大文字小文字・「and」と「&」・空白の違いを同じにする）"""
+    return re.sub(r"[^a-z0-9&]", "", re.sub(r"\band\b", "&", str(v).lower()))
+
+
+def role_is(value, role: str) -> bool:
+    """箱の中身 value が role（とその書き方の違い）と同じか。前の方が同じだけ（Sampled artist と Sampler など）は違うとみる"""
+    got = _role_key(value)
+    return bool(got) and any(got == _role_key(c) for c in ROLE_CANDS.get(role, [role]))
+
+
+# 打って選ぶ箱を打ったときに出る選択肢（DistroKid の作りの名前が違っても拾う）。ふつうの選ぶ箱の中の option は除く
+OPTIONS_JS = r"""() => {
+  const vis = e => e && e.offsetParent !== null;
+  document.querySelectorAll('[data-pd-opt]').forEach(e => e.removeAttribute('data-pd-opt'));
+  for (const css of ['.dk-searchable-select__option', '[role=option]', '[class*="option" i]:not(option):not(select)', '[role=listbox] li, [class*="menu" i] li']) {
+    const hits = [...document.querySelectorAll(css)].filter(e => vis(e) && !e.closest('#postdog-overlay') && e.tagName !== 'OPTION'
+        && !e.querySelector('[role=option], [class*="option" i]') && (e.innerText || '').trim() && (e.innerText || '').length < 60);
+    if (hits.length) { hits.slice(0, 80).forEach((e, i) => e.setAttribute('data-pd-opt', i)); return hits.slice(0, 80).map(e => e.innerText.trim()); }
+  }
+  return [];
+}"""
+
+
 def _visible_options(sess: Session) -> list:
-    out = []
-    for css in (".dk-searchable-select__option", "[role=option]"):
-        loc = sess.page.locator(css)
-        for i in range(min(loc.count(), 60)):
-            if loc.nth(i).is_visible():
-                out.append(loc.nth(i))
-        if out:
-            break
-    return out
+    try:
+        names = sess.page.evaluate(OPTIONS_JS)
+    except Exception:  # noqa: BLE001
+        return []
+    return [sess.page.locator(f'[data-pd-opt="{i}"]').first for i in range(len(names))]
 
 
 def _searchable_pick(sess: Session, inp, text: str) -> bool:
     """DistroKid の「打って選ぶ箱」（Track credits の役割）：候補の言葉を打って画面に出た選択肢を集め、
-    まず候補と同じ名前（Vocals → Lead Vocals → …の順）、無ければ近い名前を選ぶ。
-    コーラスや補助の役割（Background・Backing・Co-・Assistant）は、近い名前としては選ばない。出た選択肢は記録する（決定 48）"""
+    候補と名前がまったく同じものだけを選ぶ（近い名前には逃げない。Sampled artist などが選ばれないように。決定 71）。
+    選んだあとに箱の中身を読んで確かめ、違えば打ち直す・キーボード（↓と Enter）で選ぶ。出た選択肢は記録する（決定 48）"""
     cands = ROLE_CANDS.get(text, [text])
-    side = re.compile(r"background|backing|co-|assistant|additional", re.I)
     seen: dict[str, str] = {}   # 選択肢の名前 → 打った言葉
     # 名前ぜんぶ（例 Singing & vocals）を先に打ち、出なければ最後の言葉の頭（vocals など）で探す（決定 70）
     for word in dict.fromkeys([*cands[:4], *(c.split()[-1][:6] for c in cands)]):
@@ -1646,31 +1666,40 @@ def _searchable_pick(sess: Session, inp, text: str) -> bool:
             if n:
                 seen.setdefault(n, word)
     names = list(seen)
-    pick = next((n for c in cands for n in names if _norm(n) == _norm(c)), None) or \
-        next((n for c in cands for n in names if not side.search(n) and _norm(n).startswith(_norm(c))), None) or \
-        next((n for c in cands for n in names if not side.search(n) and _norm(c) in _norm(n)), None)
+    pick = next((n for c in cands for n in names if _role_key(n) == _role_key(c)), None)
     if names:
         _remember_options("roles", names)
     if pick is None:
         if names:
-            print("   － 役割の選択肢に「" + text + "」に近いものがありませんでした。出た選択肢：" + "・".join(names[:20]))
+            print("   － 役割の選択肢に「" + text + "」がありませんでした。出た選択肢：" + "・".join(names[:20]))
         inp.fill("")
         return False
-    inp.click()
-    inp.fill("")
-    inp.type(seen[pick], delay=40)
-    sess.page.wait_for_timeout(700)
-    hit = next((o for o in _visible_options(sess) if (o.inner_text() or "").strip() == pick), None)
-    if hit is None:   # 打った言葉で出なければ、名前ぜんぶを打ち直す
+    for typed in dict.fromkeys([pick, seen[pick]]):
+        inp.click()
         inp.fill("")
-        inp.type(pick, delay=40)
+        inp.type(typed, delay=40)
         sess.page.wait_for_timeout(700)
         hit = next((o for o in _visible_options(sess) if (o.inner_text() or "").strip() == pick), None)
-    if hit is None:
-        return False
-    hit.click()
-    sess.page.wait_for_timeout(400)
-    return True
+        if hit is not None:
+            hit.click()
+            sess.page.wait_for_timeout(500)
+            if role_is(_searchable_value(sess, inp), text):
+                return True
+    # 押しても入らない作り：↓で選択肢を 1 つずつ動かし、光っている選択肢が同じ名前のときだけ Enter
+    inp.click()
+    inp.fill("")
+    inp.type(pick, delay=40)
+    sess.page.wait_for_timeout(700)
+    for _ in range(12):
+        inp.press("ArrowDown")
+        sess.page.wait_for_timeout(150)
+        lit = sess.page.evaluate("""() => { const e = document.querySelector('[role=option][aria-selected=true], [class*="option" i][class*="focus" i],'
+            + '[class*="option" i][class*="highlight" i], [class*="option" i][class*="active" i]'); return e ? e.innerText.trim() : ''; }""")
+        if lit and _role_key(lit) == _role_key(pick):
+            inp.press("Enter")
+            sess.page.wait_for_timeout(500)
+            break
+    return role_is(_searchable_value(sess, inp), text)
 
 
 NEAR_JS = r"""([tag, nameCss, labelRx]) => {
@@ -1712,8 +1741,10 @@ def searchable_near(sess: Session, tag: str, name_css: str | None = None, label_
 def _searchable_value(sess: Session, inp) -> str:
     """打って選ぶ箱で、いま選ばれているもの（箱の中の文字か、箱の近くに出ている選んだものの名前）"""
     try:
-        return inp.evaluate("""e => { const box = e.closest('.dk-searchable-select') || e.parentElement;
-            return (e.value || (box ? box.innerText : '') || '').replace(/\\s+/g, ' ').trim(); }""")
+        return inp.evaluate("""e => { if (e.value) return e.value.trim();
+            const box = e.closest('.dk-searchable-select') || e.parentElement;
+            const shown = box && box.querySelector('[class*="single-value" i], [class*="selected" i], [class*="value" i]');
+            return ((shown ? shown.innerText : '') || '').replace(/\\s+/g, ' ').trim(); }""")
     except Exception:  # noqa: BLE001
         return ""
 
@@ -1946,16 +1977,12 @@ def _pick_role(sess: Session, box, role: str) -> bool:
     is_select = box.evaluate("e => e.tagName === 'SELECT'")
     if is_select:
         opts = box.evaluate("e => [...e.options].map(o => o.text.trim())")
-        hit = next((o for c in cands for o in opts if _norm(o) == _norm(c)), None) or \
-            next((o for c in cands for o in opts if _norm(o).startswith(_norm(c))), None)
+        hit = next((o for c in cands for o in opts if _role_key(o) == _role_key(c)), None)
         if hit is None:
             return False
         box.select_option(label=hit)
-        return _norm(box.evaluate("e => (e.selectedOptions[0] || {}).text || ''")) == _norm(hit)
-    if not _searchable_pick(sess, box, role):
-        return False
-    got = _norm(_searchable_value(sess, box))
-    return any(got.startswith(_norm(c)) for c in cands)
+        return role_is(box.evaluate("e => (e.selectedOptions[0] || {}).text || ''"), role)
+    return _searchable_pick(sess, box, role) and role_is(_searchable_value(sess, box), role)
 
 
 def fill_apple_rows(sess: Session, want: dict[str, tuple[str, str]]) -> tuple[list[str], list[str]]:
@@ -2009,7 +2036,7 @@ def fill_apple_rows(sess: Session, want: dict[str, tuple[str, str]]) -> tuple[li
     for k in ("performer", "producer"):
         if k not in filled:
             role, name = want[k]
-            manual.append(f"Apple Music の credits の {k.title()}：役割 {role}／名前 {name}（＋を押した行に入れてください）")
+            manual.append(f"Apple Music の credits の {k.title()}：役割 {role}（Sampled artist などほかの役割は選ばない）／名前 {name}（＋を押した行に入れてください）")
     return done, manual
 
 
@@ -2039,10 +2066,20 @@ def open_apple_credits(sess: Session) -> str:
     return "ok" if sess.page.locator("input[name=performer-name]:visible, input[name=producer-name]:visible").count() else "nofields"
 
 
-def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
-    """Track credits（Apple の決まり：Performer と Producer を 1 人ずつ以上）。Performer＝組の名前、Producer＝本名"""
+def credit_rows(song: dict) -> list[tuple[str, str, str, str]]:
+    """Track credits に入れるもの：（行・役割・名前の欄・名前）。
+    Performer：インストの組は本名（演奏した人）・役割 Performer、それ以外はアーティスト名・役割 Singing & vocals。Producer：全組とも本名（.env の OWNER_LEGAL_NAME）。決定 44・62"""
     import publish
     from _common import load_artist
+    art = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
+    owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
+    inst = bool(song.get("instrumental")) or (art.get("lyrics") or {}).get("mode") == "instrumental"
+    return [("Performer", "Performer" if inst else publish._credit_role(art), "input[name=performer-name]", owner if inst else song["artist"]),
+            ("Producer", "Producer", "input[name=producer-name]", owner)]
+
+
+def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
+    """Track credits（Apple の決まり：Performer と Producer を 1 人ずつ以上）。Performer＝組の名前、Producer＝本名"""
     opened = open_apple_credits(sess)   # 「＋」の後ろに隠れている credits の欄を出す（決定 66）
     if opened in ("noplus", "nofields"):
         try:   # 本物の画面に合わせて直すため、画面の部品の一覧を残す
@@ -2053,12 +2090,7 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
                 print(f"   記録：Apple Music の credits の欄の画面の部品の一覧を保存しました → {keep}")
         except Exception:  # noqa: BLE001
             pass
-    art = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
-    owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
-    # Performer：インストの組は本名（演奏した人）、それ以外はアーティスト名。Producer：全組とも本名（.env の OWNER_LEGAL_NAME）。決定 44
-    inst = bool(song.get("instrumental")) or (art.get("lyrics") or {}).get("mode") == "instrumental"
-    rows = [("Performer", "Performer" if inst else publish._credit_role(art), "input[name=performer-name]", owner if inst else song["artist"]),
-            ("Producer", "Producer", "input[name=producer-name]", owner)]
+    rows = credit_rows(song)
     done, manual = [], []
     for i, (who, role, name_css, name) in enumerate(rows):
         name_loc = sess.page.locator(name_css + ":visible")
@@ -2085,7 +2117,7 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
         if ok and _norm(_read(name_loc.first)) == _norm(name):
             done.append(f"Track credits の {who}（{role}）")
         else:
-            manual.append(f"Track credits の {who}：役割 {role}／名前 {name or '（.env の OWNER_LEGAL_NAME が空）'}")
+            manual.append(f"Track credits の {who}：役割 {role}（ほかの役割は選ばない）／名前 {name or '（.env の OWNER_LEGAL_NAME が空）'}")
     # Apple Music の「Add credits for each song」の欄：＋で出た行（役割の箱＋その下の名前の欄）にも入れる（決定 70）。
     # 「＋」を押すと、役割は DistroKid の初めの値（Sampler など）・名前は空の行が出るので、ここで役割と名前を入れ直す
     a_done, a_manual = fill_apple_rows(sess, {"performer": (rows[0][1], rows[0][3]), "producer": (rows[1][1], rows[1][3])})
@@ -2132,7 +2164,19 @@ def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], 
                 try:
                     el.check(timeout=3000)
                 except Exception:  # noqa: BLE001  見た目だけの丸の下に隠れたボタン
-                    el.evaluate("e => { e.click(); e.dispatchEvent(new Event('change', {bubbles: true})); }")
+                    # まず丸の文字（label）を人と同じように押す。スクリプトで押すと取り消す作りがある（決定 71）
+                    try:
+                        lab = el.locator("xpath=ancestor::label[1]")
+                        if not lab.count():
+                            rid = el.get_attribute("id")
+                            lab = sess.page.locator(f'label[for="{rid}"]') if rid else lab
+                        if lab.count() and lab.first.is_visible():
+                            lab.first.click(timeout=3000)
+                            sess.page.wait_for_timeout(300)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    if not el.is_checked():
+                        el.evaluate("e => { e.click(); e.dispatchEvent(new Event('change', {bubbles: true})); }")
             (done if el.is_checked() else missing).append(label)
         except Exception:  # noqa: BLE001
             missing.append(label)
@@ -2161,9 +2205,13 @@ GUARD_NO_JS = r"""([names, rxs]) => {
   const [rx, ctx, danger] = rxs.map(x => new RegExp(x, 'i'));
   const confirmBox = () => { const box = document.querySelector('.swal2-popup'); const t = box ? (box.innerText || '') : '';
       if (box && !danger.test(t) && (rx.test(t) || ctx.test(t))) { const b = box.querySelector('.swal2-confirm'); if (b) b.click(); } };
+  window.__pdTries = window.__pdTries || {};
   const fix = () => { for (const n of window.__pdNo || []) {
       const no = document.querySelector(`input[type=radio][name="${n}"][value="new"]`);
-      if (no && !no.checked) { no.click(); no.dispatchEvent(new Event('change', {bubbles: true})); setTimeout(confirmBox, 600); } } };
+      if (no && no.checked) { window.__pdTries[n] = 0; continue; }
+      // スクリプトで押しても戻される丸は 2 回までにする（取り合いにならないよう、あとは外から文字を押して直す。決定 71）
+      if (no && (window.__pdTries[n] || 0) < 2) { window.__pdTries[n] = (window.__pdTries[n] || 0) + 1;
+        no.click(); no.dispatchEvent(new Event('change', {bubbles: true})); setTimeout(confirmBox, 600); } } };
   if (!window.__pdObs) {
     window.__pdObs = new MutationObserver(() => { clearTimeout(window.__pdT); window.__pdT = setTimeout(fix, 400); });
     window.__pdObs.observe(document.body, {childList: true, subtree: true});
@@ -2340,18 +2388,20 @@ def _click_no_text(sess: Session, css: str) -> None:
 def _sec_ids_do(c: DK) -> None:
     items, texts = artist_id_radios(c.song)
     for item in items:   # 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す
-        for t in range(3):
-            set_radios(c.sess, [item])
-            confirm_new_page(c.sess, picked=True)
-            c.sess.page.wait_for_timeout(800)
+        for t in range(4):
             loc = c.sess.page.locator(item[1])
             if not loc.count() or _visible_first(loc).is_checked():
-                break
-            print(f"   … {item[0]} が取り消されました。やり直します（{t + 1} 回目）")
-            if t == 1:   # 2 回目もだめ：丸ではなく「No - …」の文字そのものを押す（丸が隠れている・押しても効かない作り。決定 70）
+                break   # もう選ばれている丸は押さない（押し直すと取り消す作りがある）
+            if t:
+                print(f"   … {item[0]} が取り消されました。やり直します（{t} 回目）")
+            if t == 0:
+                set_radios(c.sess, [item])
+            else:   # 2 回目から：丸ではなく「No - …」の文字そのものを人と同じように押す（丸が隠れている・スクリプトで押すと戻る作り。決定 70・71）
                 _click_no_text(c.sess, item[1])
-                confirm_new_page(c.sess, picked=True)
-            c.sess.settle(1500)
+            confirm_new_page(c.sess, picked=True)
+            c.sess.page.wait_for_timeout(800)
+            if t:
+                c.sess.settle(1500)
     for label, css, val in texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
         loc = c.sess.page.locator(css)
         if loc.count() and loc.first.is_visible():
@@ -2438,13 +2488,27 @@ def _sec_credits_ok(c: DK):
         st = c.sess.page.evaluate(STATE_JS)
     except Exception:  # noqa: BLE001
         return False
-    fill = lambda v: bool(v) and v not in ("（欄が無い）", "（空）")  # noqa: E731
+    (_, p_role, _, p_name), (_, r_role, _, r_name) = credit_rows(c.song)
+    try:   # Apple Music の「＋」で出た行：役割が同じ名前（Sampled artist などは「まだ」）で、名前も入っているか（決定 70・71）
+        ar = c.sess.page.evaluate(APPLE_ROWS_JS)
+    except Exception:  # noqa: BLE001
+        ar = None
+    rows = (ar or {}).get("rows") or []
+    if rows:
+        has = lambda role, name: any(role_is(x["role"], role) and _norm(x.get("name") or "") == _norm(name) for x in rows)  # noqa: E731
+        if not (has(p_role, p_name) and has(r_role, r_name)):
+            bad = [x["role"] for x in rows if x["role"] and not (role_is(x["role"], p_role) or role_is(x["role"], r_role))]
+            c.notes["credits"] = "役割が違う行があります：" + "・".join(bad) if bad else "Performer か Producer の行が足りません"
+            return False
     if st.get("performers", 0) == 0 and st.get("producers", 0) == 0:
+        if rows:
+            return True
         try:   # ＋の後ろに隠れている作り：Apple Music の欄があれば「まだ」
             return False if (c.sess.page.evaluate(PLUS_JS) or {}).get("found") else None
         except Exception:  # noqa: BLE001
             return None
-    return all(fill(st.get(k)) for k in ("performer", "performer_role", "producer", "producer_role"))
+    return (_norm(st.get("performer")) == _norm(p_name) and role_is(st.get("performer_role"), p_role)
+            and _norm(st.get("producer")) == _norm(r_name) and role_is(st.get("producer_role"), r_role))
 
 
 def dk_sections(song: dict) -> list[dict]:
