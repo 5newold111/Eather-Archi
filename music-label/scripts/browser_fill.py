@@ -1492,7 +1492,7 @@ ARTIST_ID_RADIOS = [("spotifyArtistID", "Spotify"), ("appleArtistID", "Apple Mus
                     ("instagramProfileArtistID", "Instagram"), ("facebookProfileArtistID", "Facebook")]
 
 
-def distrokid_radios(song: dict) -> list[tuple[str, str]]:
+def distrokid_radios(song: dict) -> list[tuple[str, str]]:   # 今は dk_sections が使う。下書きの説明用に残す
     """[(何を選ぶか, CSS)]"""
     inst = "1" if song.get("instrumental") else "0"
     return [
@@ -2016,7 +2016,9 @@ def set_radios(sess: Session, items: list[tuple[str, str]]) -> tuple[list[str], 
 # DistroKid の差し戻し（Validation Errors）の欄。まだ見ていないものだけを読む
 VALIDATION_JS = r"""() => {
   // 見出しだけでなく、エラーの行まで入ったいちばん小さい囲み。前に読んだ囲み（とその外側・内側）は読まない
-  const all = [...document.querySelectorAll('body *')].filter(e => !e.closest('#postdog-overlay')
+  // 画面に見えている部品だけ（ページの中の script の文字を読まない。決定 68）
+  const all = [...document.querySelectorAll('body *')].filter(e => !/^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(e.tagName)
+      && e.offsetParent !== null && !e.closest('#postdog-overlay')
       && !e.closest('[data-postdog-seen]') && !e.querySelector('[data-postdog-seen]')
       && /Validation Errors/.test(e.innerText || '') && (e.innerText || '').split('\n').filter(x => x.trim()).length >= 2);
   if (!all.length) return '';
@@ -2129,81 +2131,246 @@ def guard_artist_no(sess: Session, song: dict, a_done: list[str]) -> None:
             pass
 
 
-def apply_choices(sess: Session, song: dict) -> tuple[list[str], list[str], list[str]]:
-    """丸（はい／いいえ）と Artist already in を選ぶ。(選べた丸, 選べなかった丸, Artist already in)"""
-    r_done, r_miss = set_radios(sess, distrokid_radios(song))
-    if answer_ai_parts(sess, song, wait_ms=2400):   # 「AI を使った？ → Yes」で出る「どの部分を AI で作ったか」（決定 61）
-        r_done.append("AI で作った部分")
-    a_items, a_texts = artist_id_radios(song)
-    a_done = []
-    for item in a_items:   # 1 つずつ選び、確認の小窓が出たら（新しいページを作る確認のときだけ）OK を押してから次へ
-        for t in range(3):   # 選んだ丸が取り消されたら、少し待ってやり直す（Apple は検索が遅い）
-            d, _ = set_radios(sess, [item])
-            confirm_new_page(sess, picked=True)
-            sess.page.wait_for_timeout(800)
-            loc = sess.page.locator(item[1])
-            if loc.count() and _visible_first(loc).is_checked():
-                a_done += d
+# ---------------------------------------------------------------------------
+# DistroKid の登録画面を「上から順に 1 項目ずつ」入れて確かめる（決定 68）
+# 本物の画面の並び（2026-10-22 の画面の部品の一覧から）。前は同じ項目を何か所もの処理で入れ直していたのを、ここ 1 か所にまとめた。
+# 入れる・確かめる・入れ直す（読み返し・待っている間の見張り・差し戻し）は、すべてこの表を使う。
+# 画面の上から：前に出した？ → アーティスト名 → Artist already in ×5 → 配信日 → 言語 → ジャンル → ジャケット →
+#   曲名 → featured → バージョン → 音源 → Dolby → カバー？ → Songwriter → Explicit → Clean → インスト？ → AI → 試聴 → credits
+# そのあとは Gon さん：Extras は押さない → 宣誓のチェック → Continue
+# ---------------------------------------------------------------------------
+class DK:
+    """1 曲ぶんの入力の材料（欄の決め方・入れたもの）"""
+    def __init__(self, sess: Session, song: dict, fields: list[dict]):
+        self.sess, self.song = sess, song
+        self.f = {x["key"]: x for x in fields}
+        self.fields = fields
+        self.notes: dict[str, str] = {}   # 項目ごとのひとこと（ポップアップの一覧に出す）
+
+
+def _radio(css: str):
+    def do(c: DK) -> None:
+        set_radios(c.sess, [("", css)])
+
+    def ok(c: DK):
+        loc = c.sess.page.locator(css)
+        return None if not loc.count() else _visible_first(loc).is_checked()
+    return do, ok
+
+
+def _field(*keys: str):
+    def do(c: DK) -> None:
+        fs = [c.f[k] for k in keys if k in c.f and c.f[k].get("value") not in (None, "")]
+        if fs:
+            fill_fields(c.sess, "distrokid", fs, fresh=False)
+
+    def ok(c: DK):
+        fs = [c.f[k] for k in keys if k in c.f and c.f[k].get("value") not in (None, "")]
+        if not fs:
+            return None
+        return not verify(c.sess, fs)
+    return do, ok
+
+
+def _sec_artist_do(c: DK) -> None:
+    fill_fields(c.sess, "distrokid", [c.f["artist"]], fresh=False)
+    c.sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで同じ名前を探し始め、Artist already in を作り直す）
+    c.sess.settle(3000)
+
+
+def _sec_ids_do(c: DK) -> None:
+    items, texts = artist_id_radios(c.song)
+    for item in items:   # 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す
+        for t in range(3):
+            set_radios(c.sess, [item])
+            confirm_new_page(c.sess, picked=True)
+            c.sess.page.wait_for_timeout(800)
+            loc = c.sess.page.locator(item[1])
+            if not loc.count() or _visible_first(loc).is_checked():
                 break
             print(f"   … {item[0]} が取り消されました。やり直します（{t + 1} 回目）")
-            sess.settle(1500)
-    for label, css, val in a_texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
-        loc = sess.page.locator(css)
+            c.sess.settle(1500)
+    for label, css, val in texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
+        loc = c.sess.page.locator(css)
         if loc.count() and loc.first.is_visible():
             loc.first.fill(val)
-            a_done.append(label)
-    return r_done, r_miss, a_done
+    names = [n for n, _ in ARTIST_ID_RADIOS if any(css.startswith(f'input[type=radio][name="{n}"][value="new"]') for _, css in items)]
+    if names:   # 「No」にした丸は、ページの中の見張りで守る（DistroKid の検索が遅れて作り直しても選び直す）
+        try:
+            c.sess.page.evaluate(GUARD_NO_JS, [names, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER]])
+        except Exception:  # noqa: BLE001
+            pass
 
 
-def _unchecked(sess: Session, song: dict) -> list[tuple[str, str]]:
-    a_items, _ = artist_id_radios(song)
-    out = []
-    for label, css in distrokid_radios(song) + a_items:
-        loc = sess.page.locator(css)
-        if loc.count() and not _visible_first(loc).is_checked():
-            out.append((label, css))
+def _sec_ids_ok(c: DK):
+    items, _ = artist_id_radios(c.song)
+    states = []
+    for _, css in items:
+        loc = c.sess.page.locator(css)
+        if loc.count():
+            states.append(_visible_first(loc).is_checked())
+    if not states:   # 2 曲目からで、0 件と出ていない：どれを選ぶかは Gon さん（Yes の候補を選ぶ）
+        c.notes["ids"] = "前の曲のページの候補が出ていれば、それ（Yes）を選んでください"
+        return None
+    return all(states)
+
+
+def _sec_genre1_do(c: DK) -> None:
+    f = c.f["genre1"]
+    fill_fields(c.sess, "distrokid", [f], fresh=False)          # 1 欄の名前の選ぶ箱
+    if verify(c.sess, [f]):
+        fill_genre_boxes(c.sess, [x for x in c.fields if x["key"] == "genre1"])   # 2・3 打って選ぶ箱・押すと一覧が開く箱
+    if "subgenre" in c.f:
+        fill_fields(c.sess, "distrokid", [c.f["subgenre"]], fresh=False)
+    guard_genres(c.sess, c.fields)
+
+
+def _genre_ok(key: str, label_rx: str):
+    def ok(c: DK):
+        f = c.f.get(key)
+        if not f or not f.get("value"):
+            return None
+        sel = c.sess.page.locator(f["css"])
+        if sel.count() and any(sel.nth(i).is_visible() for i in range(sel.count())):
+            if key == "genre2":   # 任意の欄：一覧に候補が 1 つも無ければ、空のままでよい
+                opts = [_norm(o) for o in sel.first.evaluate("e => [...e.options].map(o => o.text)")]
+                if not any(_norm(x) in opts for x in [f["value"], *(f.get("alts") or [])] if x):
+                    c.notes[key] = "一覧に合うジャンルが無いので空のまま（任意の欄）"
+                    return None
+            return not verify(c.sess, [f])
+        want = f.get("chosen") or f["value"]
+        box = searchable_near(c.sess, key, label_rx=label_rx)
+        if box is not None:
+            return _norm(_searchable_value(c.sess, box)).startswith(_norm(want))
+        try:
+            r = c.sess.page.evaluate(TRIGGER_JS, [key, label_rx, r"secondary genre" if key == "genre1" else r"primary genre"])
+        except Exception:  # noqa: BLE001
+            r = None
+        if not r:
+            return False if key == "genre1" else None
+        return _norm(re.sub(r"[▾▼⌄˅›»]+", " ", r.get("text") or "")) == _norm(want)
+    return ok
+
+
+def _sec_genre2_do(c: DK) -> None:
+    f = c.f.get("genre2")
+    if not f or not f.get("value"):
+        return
+    fill_fields(c.sess, "distrokid", [f], fresh=False)
+    if verify(c.sess, [f]):
+        fill_genre_boxes(c.sess, [f])
+    guard_genres(c.sess, c.fields)
+
+
+def _sec_ai_do(c: DK) -> None:
+    set_radios(c.sess, [("", 'input[type=radio][name^="ai_gate_"][value="1"]')])
+    answer_ai_parts(c.sess, c.song, wait_ms=2400)   # 「どの部分を AI で作ったか」の質問（決定 61）
+
+
+def _sec_credits_do(c: DK) -> None:
+    fill_credits(c.sess, c.song)
+
+
+def _sec_credits_ok(c: DK):
+    try:
+        st = c.sess.page.evaluate(STATE_JS)
+    except Exception:  # noqa: BLE001
+        return False
+    fill = lambda v: bool(v) and v not in ("（欄が無い）", "（空）")  # noqa: E731
+    if st.get("performers", 0) == 0 and st.get("producers", 0) == 0:
+        try:   # ＋の後ろに隠れている作り：Apple Music の欄があれば「まだ」
+            return False if (c.sess.page.evaluate(PLUS_JS) or {}).get("found") else None
+        except Exception:  # noqa: BLE001
+            return None
+    return all(fill(st.get(k)) for k in ("performer", "performer_role", "producer", "producer_role"))
+
+
+def dk_sections(song: dict) -> list[dict]:
+    """登録画面の項目を、本物の画面の上から順に。do：入れる／ok：入っているか（None＝この画面に無い）／again：見張りで入れ直してよいか"""
+    inst = "1" if song.get("instrumental") else "0"
+    S_ = lambda key, name, pair, again=True: {"key": key, "name": name, "do": pair[0], "ok": pair[1], "again": again}  # noqa: E731
+    return [
+        S_("previous", "前に出したことがある？ → No", _radio('input[type=radio][name^="previouslyReleased_"][value="0"]')),
+        {"key": "artist", "name": "アーティスト名", "do": _sec_artist_do, "ok": _field("artist")[1], "again": False},
+        {"key": "ids", "name": "Artist already in（Spotify・Apple Music・YouTube Music・Instagram・Facebook）", "do": _sec_ids_do, "ok": _sec_ids_ok, "again": True},
+        S_("release", "配信日", _field("release")),
+        S_("language", "言語", _field("language")),
+        {"key": "genre1", "name": "Primary genre", "do": _sec_genre1_do, "ok": _genre_ok("genre1", r"^(primary genre|genre)\b"), "again": True},
+        {"key": "genre2", "name": "Secondary genre", "do": _sec_genre2_do, "ok": _genre_ok("genre2", r"^secondary genre"), "again": True},
+        S_("cover", "ジャケット", _field("cover"), again=False),
+        S_("title", "曲名", _field("title")),
+        S_("feat", "曲名に featured artist を出す？ → No", _radio('input[type=radio][name^="feat_"][value="0"]')),
+        S_("version", "バージョン → ふつうの版", _radio('input[type=radio][name^="version_"][value=""]')),
+        S_("audio", "音源", _field("audio"), again=False),
+        S_("dolby", "Dolby Atmos → No", _radio('input[type=radio][name="dolby_1"][value="0"]')),
+        S_("coversong", "カバー曲？ → No（自分で書いた曲）", _radio('input[type=radio][name^="coversong_"][value="0"]')),
+        S_("songwriter", "Songwriter（役割・名・姓）", _field("songwriter_role", "songwriter_first", "songwriter_middle", "songwriter_last")),
+        S_("explicit", "Explicit → No", _radio('input[type=radio][name^="explicit_"][value="0"]')),
+        S_("cleaned", "Clean 版が別にある？ → No", _radio('input[type=radio][name^="cleaned_"][value="0"]')),
+        S_("instrumental", "インスト？ → " + ("歌詞なし" if inst == "1" else "歌詞あり"),
+           _radio(f'input[type=radio][name^="instrumental_"][value="{inst}"]')),
+        {"key": "ai", "name": "AI を使った？ → Yes（作った部分：" + "・".join({"lyrics": "Lyrics", "music": "Music", "all_audio": "All of the audio",
+                                                                            "part_audio": "Part of the audio"}[k] for k in ai_parts(song)) + "）",
+         "do": _sec_ai_do, "ok": _radio('input[type=radio][name^="ai_gate_"][value="1"]')[1], "again": True},
+        S_("preview", "試聴の始まり → サービスにまかせる", _radio('input[type=radio][name="previewStart_1"][value="no"]')),
+        {"key": "credits", "name": "Track credits（Performer・Producer）", "do": _sec_credits_do, "ok": _sec_credits_ok, "again": True},
+    ]
+
+
+def dk_check(c: DK, secs: list[dict]) -> dict[str, bool | None]:
+    out = {}
+    for s in secs:
+        try:
+            out[s["key"]] = s["ok"](c)
+        except Exception:  # noqa: BLE001
+            out[s["key"]] = False
     return out
 
 
-def stabilize(sess: Session, song: dict, fields: list[dict], rounds: int = 3) -> list[str]:
-    """DistroKid が画面を作り直して戻した丸・欄を、落ち着くまで入れ直す（最大 rounds 回）。最後まで戻せなかった丸の一覧"""
+def dk_fill(c: DK, secs: list[dict], show_steps: bool = True) -> None:
+    """上から順に入れる（工程の表示は「k/N：項目の名前」）"""
+    for i, s in enumerate(secs, 1):
+        if show_steps:
+            step(i, len(secs) + 2, s["name"])
+        try:
+            s["do"](c)
+        except BrowserClosed:
+            raise
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 「{s['name']}」を入れられませんでした（{str(e).splitlines()[0][:120]}）")
+
+
+def dk_refill(c: DK, secs: list[dict], quiet: bool = False, rounds: int = 3) -> dict[str, bool | None]:
+    """読み返して、入っていない項目だけを上から入れ直す（最大 rounds 回）。最後の状態"""
+    st = dk_check(c, secs)
     for i in range(rounds):
-        sess.settle(2500)
-        off = _unchecked(sess, song)
-        bad = verify(sess, fields)
-        if not off and not bad:
-            return []
-        print(f"   … 戻された項目を入れ直します（{i + 1} 回目）：" + "・".join([l for l, _ in off] + bad)[:300])
-        for item in off:
-            set_radios(sess, [item])
-            confirm_new_page(sess, picked=True)
-        again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
-        if again:
-            fill_fields(sess, "distrokid", again, fresh=False)
-    sess.settle(1500)
-    return [l for l, _ in _unchecked(sess, song)]
+        bad = [s for s in secs if st[s["key"]] is False and s["again"]]
+        if not bad:
+            break
+        if not quiet:
+            print(f"   … 入っていない項目を、上から入れ直します（{i + 1} 回目）：" + "・".join(s["name"][:30] for s in bad))
+        for s in bad:
+            try:
+                s["do"](c)
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001
+                pass
+        c.sess.settle(1500)
+        st = dk_check(c, secs)
+    return st
 
 
-def distrokid_fix(sess: Session, song: dict, fields: list[dict]) -> list[str]:
-    """差し戻されたとき：丸・Artist already in・欄・Track credits をもう一度入れる（入れ直したものの一覧）"""
-    fixed = []
-    off = _unchecked(sess, song)
-    bad = verify(sess, fields)
-    r, _, a = apply_choices(sess, song)
-    guard_artist_no(sess, song, a)
-    fixed += [l for l, _ in off]
-    again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
-    if again:
-        done, _ = fill_fields(sess, "distrokid", again, fresh=False)
-        fixed += done
-    c, _ = fill_credits(sess, song)
-    fixed += c
-    g, _ = fill_genre_boxes(sess, fields)
-    fixed += g
-    if answer_ai_parts(sess, song):
-        fixed.append("AI で作った部分")
-    stabilize(sess, song, fields)
-    return list(dict.fromkeys(fixed))
+def dk_checklist(secs: list[dict], st: dict, c: DK) -> list[str]:
+    """ポップアップに出す、画面の上から順の一覧（✓ 入った／✕ 入っていない／－ この画面に無い）"""
+    mark = {True: "✓", False: "✕", None: "－"}
+    lines = []
+    for i, s in enumerate(secs, 1):
+        tail = "（入っていません。画面で入れてください）" if st[s["key"]] is False else ("（この画面に無い）" if st[s["key"]] is None and s["key"] not in c.notes else "")
+        if s["key"] in c.notes and st[s["key"]] is not True:
+            tail = f"（{c.notes[s['key']]}）"
+        lines.append(f"{mark[st[s['key']]]} {i}. {s['name']}{tail}")
+    return lines
 
 
 def same_page_ready(song: dict) -> bool:
@@ -2414,7 +2581,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     song = _songs.by_id(song_id)
     if song is None:
         sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
-    step(1, 7, "DistroKid の登録画面を開いています")
+    step(0, len(dk_sections(song)) + 2, "DistroKid の登録画面を開いています")
     sess.goto(SITES["distrokid"])
     if not sess.ensure_login("distrokid"):
         print("【結果】まだ終わっていません：DistroKid にログインできていません")
@@ -2439,121 +2606,98 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         ("本名（.env の OWNER_LEGAL_NAME）が空です" if not owner else "本名（.env の OWNER_LEGAL_NAME）がローマ字の「名 姓」になっていません")
     if owner_ng:
         print(f"   ⚠ {owner_ng}。Songwriter と Track credits の Producer を入れられません")
-    # 入れる順番（2026-10-22 の差し戻しから）：
-    #  1 アーティスト名と曲名 → DistroKid が Spotify・Apple・YouTube で同じ名前を探し終えるまで待つ（終わると、その欄を作り直して「Yes」に戻す）
-    #  2 丸（はい／いいえ・Artist already in）→ 3 残りの欄 → 4 Track credits → 5 落ち着いてから読み返し、戻されたものを入れ直す
-    step(2, 7, "アーティスト名と曲名を入れています（DistroKid が同じ名前を探し終えるまで待ちます）")
-    first = [f for f in fields if f["key"] in ("artist", "title")]
-    done, manual = fill_fields(sess, "distrokid", first)
-    sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで探し始める）
-    sess.settle(3000)
-    step(3, 7, "丸（はい／いいえ）・AI で作った部分・Artist already in を選んでいます")
-    r_done, r_miss, a_done = apply_choices(sess, song)
-    guard_artist_no(sess, song, a_done)
-    step(4, 7, "配信日・言語・ジャンル・音源・ジャケット・Songwriter を入れています")
-    d2, m2 = fill_fields(sess, "distrokid", [f for f in fields if f not in first], fresh=False)
-    step(5, 7, "Track credits（Performer・Producer）とジャンルの箱を入れています")
-    c_done, c_manual = fill_credits(sess, song)
-    g_done, g_manual = fill_genre_boxes(sess, fields)   # Primary genre が「打って選ぶ箱」の画面（決定 61）
-    answer_ai_parts(sess, song)
-    guard_genres(sess, fields)
-    done += d2 + r_done + a_done + c_done + g_done
-    manual += m2 + c_manual + g_manual
-    step(6, 7, "読み返して、DistroKid に戻された欄・丸を入れ直しています")
-    r_miss = stabilize(sess, song, fields) or r_miss
-    a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done) or any(f"in {svc}?" in m for m in r_miss)]
-    r_miss = [m for m in r_miss if "Artist already" not in m]
-    bad = verify(sess, fields)
-    if bad:   # 空になった欄（ほかの欄を入れたときに消えたものなど）を、もう一度だけ入れ直す
-        again = [f for f in fields if any(b.startswith(f["label"]) for b in bad)]
-        if again:
-            print("   … 空になった欄を入れ直します：" + "・".join(f["label"] for f in again))
-            fill_fields(sess, "distrokid", again, fresh=False)
-            bad = verify(sess, fields)
-    # 何が入っているかを記録に残す（ダッシュボードのログにも出る。差し戻されたとき、どこで止まったかを確かめるため）
+    # 画面の上から 1 項目ずつ入れて、確かめる（決定 68）
+    c = DK(sess, song, fields)
+    secs = dk_sections(song)
+    n_steps = len(secs) + 2
+    dk_fill(c, secs)
+    step(len(secs) + 1, n_steps, "読み返して、入っていない項目を上から入れ直しています")
+    st = dk_refill(c, secs)
     log_state(sess, "入れ終わったときの画面")
-    # Gon さんに残すのは、宣誓（法的な約束なので本人が読んで押す）と、画面に出たときだけの項目
-    always = ["Important checkboxes（下の 5 つの宣誓）：文を読んで自分でチェック（Suno の Pro で作った曲か、を必ず確かめる。システムは押さない）",
-              "Extras（有料の追加）・Discovery Pack：チェックしない"]
-    if owner_ng:
-        always.insert(0, f"⚠ {owner_ng}：Songwriter（名・姓）と Track credits の Producer に本名をローマ字で入れてください。"
-                         "次からは、ダッシュボードの「仕組みの詰まり」の鍵の設定か、.env に OWNER_LEGAL_NAME=名 姓（ローマ字）を入れると自動で入ります")
-    if a_left:
-        always.insert(0, f"Artist already in 〜?（{'・'.join(a_left)}）：同じ組の前の曲があれば、そのページ（Yes）を選ぶ。無ければ No")
-    if r_miss:
-        always.insert(0, "画面に無かった／選べなかった項目（出ていれば選ぶ）：" + "・".join(r_miss))
-    always.append("AI で作った部分（Which parts … AI-generated?）：" + "・".join({"lyrics": "Lyrics", "music": "Music", "all_audio": "All of the audio",
-                  "part_audio": "Part of the audio"}[k] for k in ai_parts(song)) + " をシステムが選びます。人が歌った・弾いた部分がある曲なら、画面で直してください")
-    always.append("Release date・Primary genre が空のときは入れる（DistroKid が赤い枠を出す欄）")
-    print(f"   ○ {song['artist']}「{song['title']}」：入れた {len(done)}・手で {len(manual)}")
+    try:   # Gon さんが Continue を押したことを、ページの中で覚えておく（登録が済んだかを見分けるため。同じタブなら次のページでも残る）
+        sess.page.evaluate("""() => { document.addEventListener('click', e => {
+            const b = e.target.closest && e.target.closest('#distroDoneButtonWithAPI, .distroDoneButtonWithAPI');
+            if (b && e.isTrusted) { try { sessionStorage.setItem('pdContinue', String(Date.now())); } catch (x) {} } }, true); }""")
+    except Exception:  # noqa: BLE001
+        pass
+    bad = [s_["name"] for s_ in secs if st[s_["key"]] is False]
+    gon = ["▼ ここから Gon さん（システムは押しません）",
+           *([f"⚠ {owner_ng}：Songwriter と Producer に本名をローマ字で入れてください（.env の OWNER_LEGAL_NAME）"] if owner_ng else []),
+           "・Extras（有料の追加）・Discovery Pack：チェックしない",
+           "・宣誓のチェック：文を読んで、当てはまるものだけチェック（Non-standard cApiTaliZatiOn を含む）",
+           "・Continue を押す → 登録のあとの画面に変わると、システムが自動で「登録した」を記録します"]
+    print(f"   ○ {song['artist']}「{song['title']}」：上から {len(secs)} 項目のうち、入った {sum(1 for v in st.values() if v)}・入っていない {len(bad)}")
     later = ([{"id": "stop", "label": f"この曲は後で（次の曲へ：{nxt}）"}, {"id": "quit", "label": "続けての入力をここでやめる"}] if nxt
              else [{"id": "stop", "label": "閉じる（まだ登録しない）"}])
-    sess.show("DistroKid に下書きを入れました",
-              [f"{song['artist']}「{song['title']}」",
-               ("✓ 読み返して確かめました：" if not bad else "入れた：") + ("・".join(done) or "なし"),
-               *(["⚠ 入っていない欄：", *bad] if bad else []),
-               *(["手で入れてください：", *manual] if manual else []), "画面で確かめて選ぶもの：", *always,
-               "内容を確かめて、最後の登録ボタンを押してください（押すのは Gon さんだけ）。",
-               "押し終わったら、配信日を選んで「登録した」を押すと、記録されます。"],
-              [{"id": "registered", "label": "登録した", "primary": True}, *later,
-               {"id": "copy_parts", "label": "画面の部品をコピー（入らない欄があるとき・Claude に貼る用）"}],
-              date_value=date.today().isoformat())
+    buttons = [{"id": "registered", "label": "登録した（自動で記録されないとき）", "primary": False}, *later,
+               {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}]
+    sess.show("DistroKid に入れました（画面の上から順）" if not bad else "DistroKid に入れました（入っていない項目があります）",
+              [f"{song['artist']}「{song['title']}」", *dk_checklist(secs, st, c), *gon], buttons, date_value=date.today().isoformat())
 
-    keep = [f for f in fields if f["key"] in ("genre1", "release")]
+    last = {"release": c.f.get("release", {}).get("value") or date.today().isoformat(), "n": 0}
 
-    def watch_errors():   # Gon さんが Continue を押して差し戻されたら、エラーの文を読んで入れ直す
+    def watch_errors():   # 待っている間：差し戻し・戻された項目・登録が済んだか を見張る
+        last["n"] += 1
+        try:   # 登録が済んだか：Continue を押したあと、登録の画面から別の画面に変わり、差し戻しが無い（決定 68）
+            pushed = sess.page.evaluate("() => { try { return Number(sessionStorage.getItem('pdContinue') || 0); } catch (x) { return 0; } }")
+            on_form = bool(sess.page.locator("input[name=bandname]").count())
+            if not on_form:
+                if pushed and (time.time() * 1000 - pushed) < 30 * 60 * 1000 and not sess.js(VALIDATION_JS, default=""):
+                    sess.msg = {"action": "registered", "date": last["release"], "auto": True}
+                return
+            v = sess.page.evaluate("() => (document.querySelector('input[name=releaseDate]') || {}).value || ''")
+            if v:
+                last["release"] = v
+        except Exception:  # noqa: BLE001
+            return
         txt = sess.js(VALIDATION_JS, default="")
         if not txt:
-            # 待っている間も、DistroKid があとから戻した丸（Artist already in など）・ジャンル・配信日を、黙って入れ直す
             confirm_new_page(sess)   # 見張りが選び直したときの確認の小窓
             answer_ai_parts(sess, song)   # Gon さんが「Edit selections」を押したときなどに出る、AI で作った部分の質問
-            off = _unchecked(sess, song)
-            if off:
-                for item in off:
-                    set_radios(sess, [item])
-                    confirm_new_page(sess, picked=True)
-                print("   … あとから戻された丸を入れ直しました：" + "・".join(l for l, _ in off))
-            lost = [f for f in keep if any(b.startswith(f["label"]) for b in verify(sess, keep))]
-            if lost:
-                fill_fields(sess, "distrokid", lost, fresh=False)
-                print("   … あとから空になった欄を入れ直しました：" + "・".join(f["label"] for f in lost))
+            if last["n"] % 3 == 0:   # 約 6 秒ごとに、上から読み返して、戻された項目を黙って入れ直す
+                before = dk_check(c, secs)
+                if any(v is False for k, v in before.items() if next(x for x in secs if x["key"] == k)["again"]):
+                    after = dk_refill(c, secs, quiet=True, rounds=1)
+                    fixed = [x["name"] for x in secs if before[x["key"]] is False and after[x["key"]]]
+                    if fixed:
+                        print("   … あとから戻された項目を入れ直しました：" + "・".join(n[:30] for n in fixed))
             return
         print("   … DistroKid に差し戻されました：" + " ／ ".join(x.strip() for x in txt.splitlines()[1:6] if x.strip()))
         log_state(sess, "差し戻されたときの画面")
-        try:   # 画面の部品の一覧を自動で残す（Gon さんがコピーしなくても、あとで Claude が読めるように。決定 60）
+        try:   # 画面の部品の一覧を自動で残す（決定 60）
             from datetime import datetime as _dt
             pp = save_parts(sess, "distrokid")
             if pp and pp.exists():
-                keep = pp.with_name(f"distrokid_parts_{song['id']}_{_dt.now():%Y%m%d_%H%M%S}.txt")
-                keep.write_text(pp.read_text(encoding="utf-8"), encoding="utf-8")
-                print(f"   記録：差し戻されたときの画面の部品の一覧を保存しました → {keep}")
+                kp = pp.with_name(f"distrokid_parts_{song['id']}_{_dt.now():%Y%m%d_%H%M%S}.txt")
+                kp.write_text(pp.read_text(encoding="utf-8"), encoding="utf-8")
+                print(f"   記録：差し戻されたときの画面の部品の一覧を保存しました → {kp}")
         except Exception:  # noqa: BLE001
             pass
-        fixed = distrokid_fix(sess, song, fields)
+        before = dk_check(c, secs)
+        st2 = dk_refill(c, secs)
         log_state(sess, "入れ直したあとの画面")
-        left = verify(sess, fields)
-        sess.show("DistroKid に差し戻されたので、入れ直しました",
+        fixed = [x["name"] for x in secs if before[x["key"]] is False and st2[x["key"]]]
+        sess.show("DistroKid に差し戻されたので、上から入れ直しました",
                   ["DistroKid のエラー：", *[x.strip() for x in txt.splitlines()[1:10] if x.strip()],
-                   ("入れ直したもの：" + "・".join(fixed)) if fixed else "入れ直せるものはありませんでした",
-                   *(["⚠ まだ入っていない欄（手で入れてください）：", *left] if left else []),
-                   "宣誓の 5 つのチェックを確かめて、もう一度「Continue」を押してください（押すのは Gon さんだけ）。"],
-                  [{"id": "registered", "label": "登録した", "primary": True}, *later,
-                   {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}], date_value=date.today().isoformat())
-    step(7, 7, "Gon さんの確認待ち（宣誓・Continue・「登録した」）")
+                   ("入れ直したもの：" + "・".join(n[:30] for n in fixed)) if fixed else "入れ直せるものはありませんでした（下の ✕ を画面で入れてください）",
+                   *dk_checklist(secs, st2, c), *gon], buttons, date_value=date.today().isoformat())
+    step(n_steps, n_steps, "Gon さんの確認待ち（宣誓・Continue）")
     m = sess.wait({"action": "stop"}, tick=watch_errors)
     if m.get("action") == "registered":
         day = m.get("date") or date.today().isoformat()
         r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
         print(r.stdout.strip())
-        print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）")
+        print(f"【結果】DistroKid に登録したことを記録しました（配信日 {day}）" + ("。登録のあとの画面に変わったので、自動で記録しました" if m.get("auto") else ""))
         has_lyr = bool(lyrics_for(song))
         lyr_btn = [{"id": "lyrics", "label": "続けて歌詞を出す（DistroKid の歌詞の画面に自動で入れる）", "primary": True}] if has_lyr else []
         if nxt:   # 続けて入れるとき：歌詞を出してから次の曲へ／次の曲へ／ここでやめる
-            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。", f"次の曲：{nxt}"],
+            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。", *(["（登録のあとの画面に変わったので、自動で記録しました）"] if m.get("auto") else []),
+                                     f"次の曲：{nxt}"],
                       lyr_btn + [{"id": "next", "label": f"次の曲へ（{nxt}）", "primary": not has_lyr},
                                  {"id": "quit", "label": "続けての入力をここでやめる"}])
         else:
-            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。"],
+            sess.show("記録しました", [f"DistroKid 登録済み（配信日 {day}）。配信が始まると、ISRC などが自動で入ります。",
+                                     *(["登録のあとの画面に変わったので、自動で記録しました。違っていたら、ダッシュボードの「← 戻る」で戻せます。"] if m.get("auto") else [])],
                       lyr_btn + [{"id": "stop", "label": "閉じる", "primary": not has_lyr}])
         go = sess.wait({"action": "next" if nxt else "stop"})
         if go.get("action") == "lyrics":
@@ -2566,9 +2710,9 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         print("【結果】続けての入力をここでやめました（この曲はまだ登録していません）")
         return 3
     if bad:
-        print("【結果】まだ終わっていません：DistroKid の入っていない欄 → " + "／".join(bad))
+        print("【結果】まだ終わっていません：DistroKid の入っていない項目 → " + "／".join(b[:30] for b in bad))
     else:
-        print("【結果】下書きは全部の欄に入りましたが、「登録した」はまだ押されていません")
+        print("【結果】全部の項目に入りましたが、登録（Continue）はまだです")
     return 2
 
 
