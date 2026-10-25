@@ -86,6 +86,7 @@ def weekly_songs() -> list[dict]:
             "suno_options": b.get("suno_settings") or {}, "scene": b.get("scene"), "scene_base": b.get("scene_base"),
             "episode": b.get("episode") or {},
             "sprint": b.get("sprint"),   # 集中配信の曲（決定 53）：配信日はいちばん早い日
+            "irregular": b.get("irregular"),   # 不定期配信の曲（決定 72）：ダッシュボードの「不定期配信」のタブに並べる
         })
     return out
 

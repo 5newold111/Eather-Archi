@@ -86,7 +86,7 @@ def status_json() -> dict:
                       "status": st.get("status", ""), "status_ja": STATUS_JA.get(st.get("status", ""), st.get("status", "")),
                       "release_date": st.get("released") or st.get("release_date") or (str(s.get("release_at") or "")[:10]),
                       "isrc": st.get("isrc", ""), "url": st.get("url", ""), "folder": str(folder) if folder else "",
-                      "draft": (OUT / "publish" / s["key"] / "DistroKid下書き.md").exists()})
+                      "draft": (OUT / "publish" / s["key"] / "DistroKid下書き.md").exists(), "flow": _flow(s)})
     rows, src = _status.tracker_rows()
     import _timeline
     try:
@@ -94,8 +94,6 @@ def status_json() -> dict:
         weekly = [{"sev": a, "what": b, "who": c, "where": d} for a, b, c, d in todos()]
     except Exception:  # noqa: BLE001  毎週の制作のやることが読めなくても画面は出す
         weekly = []
-    for x in songs:
-        x["flow"] = "debut" if x.get("kind") == "debut" else "regular"   # デビュー曲はデビューの表、毎週の曲は定期配信の表（決定 54）
     try:   # アーティスト写真を各サイトに入れる（配信が始まった組から。決定 38）
         import artist_photo
         photo_todos = [{**t, "flow": "regular" if _timeline.in_regular(t["slug"]) else "debut"} for t in artist_photo.todos()]
@@ -103,13 +101,12 @@ def status_json() -> dict:
         photo_todos = []
     try:   # 登録した曲の歌詞を DistroKid に出す（決定 52）
         import browser_fill
-        lyric_todos = [{"id": x["id"], "artist": x["artist"], "title": x["title"],
-                        "flow": "debut" if x.get("kind") == "debut" else "regular"} for x in browser_fill.lyrics_todo()]
+        lyric_todos = [{"id": x["id"], "artist": x["artist"], "title": x["title"], "flow": _flow(x)} for x in browser_fill.lyrics_todo()]
     except Exception:  # noqa: BLE001
         lyric_todos = []
     tl = _timeline.timeline()
     import _guide
-    for key in ("debut", "regular"):
+    for key in ("debut", "regular", "irregular"):
         for r in tl[key]["rows"]:
             if r.get("id") and not r.get("planned"):   # 間違えて進めたときに戻すボタン（ポップアップの上に出す。決定 38・41）
                 try:
@@ -128,11 +125,25 @@ def status_json() -> dict:
                     ph["guide"] = _guide.explain(r, ph)
                 except Exception as e:  # noqa: BLE001  説明が作れなくても画面は出す
                     ph["guide"] = {"cause": ph.get("detail", ""), "steps": [], "actions": [], "error": str(e)}
-    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl,
+    try:   # 不定期配信：選べる組・曲の案（作曲前）・場面の選択肢（決定 72）
+        import irregular
+        from _common import SCENE_TYPES
+        irr = {"artists": irregular.eligible(), "scenes": [{"key": k, "name": v["name"]} for k, v in SCENE_TYPES.items()],
+               "drafts": [irregular.summary(d) for d in irregular.drafts()
+                          if (d.get("irregular") or {}).get("status") in ("making", "proposed", "failed")],
+               "editable": irregular.EDITABLE, "limits": irregular.LIMITS}
+    except Exception as e:  # noqa: BLE001
+        irr = {"artists": [], "scenes": [], "drafts": [], "error": str(e)}
+    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j.get(k, "") for k in ("id", "label", "state", "started", "progress", "step")} for j in list(JOBS.values())[-8:]]}
+
+
+def _flow(s: dict) -> str:
+    """どのタブに並べるか：デビュー曲はデビュー、不定期の曲は不定期配信、毎週の曲は定期配信（決定 54・72）"""
+    return "debut" if s.get("kind") == "debut" else ("irregular" if s.get("irregular") else "regular")
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +203,18 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         week = str(p.get("week") or "this")
         if week == "this" or re.fullmatch(r"\d{4}-\d{2}-\d{2}", week):
             return [PY, str(S / "run_week.py"), "brief", "--week", week], f"ブリーフを作る（{week}）"
+    if action == "irregular_propose":   # 不定期配信の曲の案を作る・却下して作り直す（決定 72）
+        import irregular
+        from _common import SCENE_TYPES
+        slug = str(p.get("slug") or "")
+        name = next((a["name"] for a in irregular.eligible() if a["slug"] == slug), None)
+        scene = str(p.get("scene") or "")
+        redo = str(p.get("redo") or "")
+        if name and (not scene or scene in SCENE_TYPES) and (not redo or irregular.load_draft(redo)):
+            memo, reason = str(p.get("memo") or "")[:1000], str(p.get("reason") or "")[:1000]
+            return [PY, str(S / "irregular.py"), "propose", slug, *(["--scene", scene] if scene else []),
+                    *(["--memo", memo] if memo else []), *(["--redo", redo] if redo else []), *(["--reason", reason] if reason else [])], \
+                f"曲の案を{'作り直す' if redo else '作る'}（{name}）"
     if action == "fill_suno":
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         if p.get("id") and not song:
@@ -384,6 +407,10 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .badge{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;border:1.5px solid}.badge.done{border-color:var(--good)}.badge.wait{border-color:var(--warn)}.badge.ng{border-color:var(--crit)}.badge.run{border-style:dashed}.badge.plan{border-style:dotted;border-color:var(--muted)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub);white-space:pre-line}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
+.irr-f label{display:block;margin:10px 0 3px;font-size:13px;color:var(--sub)}.irr-f input[type=text],.irr-f textarea,.irr-f select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+.irr-f textarea{min-height:5em;resize:vertical;line-height:1.5}.irr-f textarea.lyr{min-height:16em;font-size:13px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-row>div{flex:1 1 220px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.chips button{font-size:12px;padding:2px 10px}.irr-note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
+.redo{border:1.5px dashed var(--crit);border-radius:10px;padding:8px 12px;margin:14px 0 4px}
 </style></head><body>
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
@@ -394,6 +421,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
  <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
+ <button class="tab" role="tab" id="tab-irregular" aria-controls="pane-irregular">不定期配信<span class="n" id="n-irregular"></span></button>
  <button class="tab" role="tab" id="tab-debut" aria-controls="pane-debut">デビュー<span class="n" id="n-debut"></span></button>
 </div>
 <div class="legend" aria-label="凡例">
@@ -410,6 +438,16 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <h2>今やること（定期配信）</h2><div id="todo-regular"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-regular"></div></div></details>
  <details><summary>曲の一覧</summary><div id="songs-regular"></div></details>
+</section>
+<section id="pane-irregular" role="tabpanel" aria-labelledby="tab-irregular" hidden>
+ <p class="sub">デビュー曲が配信中の組で、毎週の曲とは別に 1 曲を出します。組を選んで「曲の案を作る」を押すと、曲名・イメージ・歌詞などの案ができ、ポップアップで直せます。好みでなければ却下して作り直し、よければ作曲（Suno）へ進めます。配信日はいつもいちばん早い日です。</p>
+ <div class="panel irr-f act-only" id="irr-form"></div>
+ <h2>曲の案（作曲の前）</h2><div id="irr-drafts"></div>
+ <h2>作曲へ進めた曲</h2>
+ <div class="board" id="b-irregular"></div>
+ <h2>今やること（不定期配信）</h2><div id="todo-irregular"></div>
+ <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-irregular"></div></div></details>
+ <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
  <p class="sub">デビュー前の組。デビュー曲が配信されると、自動で「定期配信」に移ります。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
@@ -430,16 +468,19 @@ const E=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt
 const ICON={done:"✓",wait:"●",ng:"！",run:"…",plan:"○"},STATE={done:"済み",wait:"だれかの番",ng:"止まっている・遅れ",run:"自動で進行中",plan:"予定"};
 const DAY=86400000,D=s=>new Date(s+"T00:00:00"),md=d=>`${d.getMonth()+1}/${d.getDate()}`,WD="日月火水木金土";
 let DATA=null,TAB="regular";
-function selectTab(t){TAB=t;for(const k of["regular","debut"]){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
+const TABS=["regular","irregular","debut"];
+const EMPTY={debut:"デビュー前の組はありません。全組が定期配信に移りました。",regular:"定期配信の組はまだありません。デビュー曲が配信されると、ここに並びます（いまは「デビュー」のタブ）。",
+  irregular:"作曲へ進めた不定期の曲はまだありません。上で曲の案を作り、「この案で作曲へ進む」を押すと、ここに並びます。"};
+function selectTab(t){TAB=t;for(const k of TABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
   if(!location.hash.startsWith("#"+t))history.replaceState(null,"","#"+t)}
-document.getElementById("tab-regular").onclick=()=>selectTab("regular");document.getElementById("tab-debut").onclick=()=>selectTab("debut");
-selectTab(location.hash.startsWith("#debut")?"debut":"regular");
+for(const k of TABS)document.getElementById("tab-"+k).onclick=()=>selectTab(k);
+selectTab(TABS.find(k=>location.hash.startsWith("#"+k))||"regular");
 const OPEN={};
 function gantt(key){
   const sec=DATA.timeline[key],el=document.getElementById("g-"+key);
   const small=window.innerWidth<640,from=D(sec.range.from),to=D(sec.range.to),n=Math.round((to-from)/DAY)+1,W=small?22:30,LW=small?150:240,today=D(DATA.timeline.today);
   el.style.gridTemplateColumns=`${LW}px ${n*W}px`;
-  if(!sec.rows.length){el.style.gridTemplateColumns="1fr";el.innerHTML=`<div class="gl" style="position:static"><span class="empty">${key==="debut"?"デビュー前の組はありません。全組が定期配信に移りました。":"定期配信の組はまだありません。デビュー曲が配信されるとここに並びます。"}</span></div>`;return}
+  if(!sec.rows.length){el.style.gridTemplateColumns="1fr";el.innerHTML=`<div class="gl" style="position:static"><span class="empty">${EMPTY[key]}</span></div>`;return}
   const x=d=>Math.round((D(d)-from)/DAY)*W,tx=Math.round((today-from)/DAY)*W+W/2,showToday=today>=from&&today<=to;
   let days="";for(let i=0;i<n;i++){const d=new Date(+from+i*DAY);days+=`<div class="day ${d.getDay()%6===0?"we":""}" style="left:${i*W}px;width:${W}px"></div>`}
   const tline=showToday?`<div class="today" style="left:${tx-1}px"></div>`:"";
@@ -520,7 +561,8 @@ document.addEventListener("click",e=>{const c=e.target.closest("[data-copy]");if
   if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(done);else{const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();done()}});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-p],[data-g2]");if(b)openGuide(b.dataset.p||b.dataset.g2)});
 document.addEventListener("keydown",e=>{const b=e.target.closest&&e.target.closest("[data-p],li[data-g2]");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openGuide(b.dataset.p||b.dataset.g2)}});
-const COLS={regular:[["ブリーフ","ブリーフ"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
+const COLS={irregular:[["ブリーフ","曲の案"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
+  regular:[["ブリーフ","ブリーフ"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
   debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"]]};
 function boardRows(key){const rows=DATA.timeline[key].rows,by={};const order=[];
   rows.forEach((r,ri)=>{if(!by[r.slug]){by[r.slug]=[];order.push(r.slug)}by[r.slug].push(ri)});
@@ -529,7 +571,7 @@ function boardRows(key){const rows=DATA.timeline[key].rows,by={};const order=[];
     if(inflight.length){inflight.forEach((ri,n)=>out.push([ri,n===0]));return}
     const next=idx.find(ri=>rows[ri].planned);out.push([next!==undefined?next:idx[idx.length-1],true])});return out}
 function board(key){const el=document.getElementById("b-"+key),rows=DATA.timeline[key].rows;
-  if(!rows.length){el.innerHTML=`<p class="empty" style="padding:12px">${key==="debut"?"デビュー前の組はありません。全組が定期配信に移りました。":"定期配信の組はまだありません。デビュー曲が配信されると、ここに並びます（いまは「デビュー」のタブ）。"}</p>`;return}
+  if(!rows.length){el.innerHTML=`<p class="empty" style="padding:12px">${EMPTY[key]}</p>`;return}
   const cols=COLS[key];
   let h=`<table><tr><th>アーティスト・曲</th>${cols.map(c=>`<th>${E(c[1])}</th>`).join("")}</tr>`;
   boardRows(key).forEach(([ri,first])=>{const r=rows[ri];
@@ -577,7 +619,7 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
     el.className="job "+j.state;
     el.innerHTML=`<summary>${E(j.label)}　${E(st)}${E(sm)}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
     const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open){dj.className="job "+j.state;dj.textContent=`${j.label}　${j.state==="running"?"実行中…"+PROGL(j):st}${sm||(j.state==="error"?"（画面の下のログを確認）":"")}`}
-    if(j.state!=="running"){load();if(j.state==="done"&&String(j.label).startsWith("戻す")){const dl=document.getElementById("dlg");if(dl.open)dl.close()}break}await new Promise(r=>setTimeout(r,2000))}}
+    if(j.state!=="running"){load().then(()=>{if(/^曲の案を/.test(j.label)&&j.state==="done")openNewestDraft(j.label)});if(j.state==="done"&&String(j.label).startsWith("戻す")){const dl=document.getElementById("dlg");if(dl.open)dl.close()}break}await new Promise(r=>setTimeout(r,2000))}}
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
@@ -587,10 +629,70 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
+// ---- 不定期配信（決定 72）：組を選んで曲の案を作る → ポップアップで直す・却下して作り直す・作曲へ進める
+function irrForm(){const el=document.getElementById("irr-form"),I=DATA.irregular||{},arts=I.artists||[];
+  const sig=JSON.stringify([arts,I.scenes]);if(el.dataset.sig===sig)return;   // 入力中の内容を消さないよう、組の一覧が変わったときだけ作り直す
+  const keep={a:(document.getElementById("irr-artist")||{}).value,s:(document.getElementById("irr-scene")||{}).value,m:(document.getElementById("irr-memo")||{}).value};
+  el.dataset.sig=sig;
+  if(!arts.length){el.innerHTML=`<p class="empty">選べる組がまだありません（デビュー曲が配信中の組だけ選べます。配信を見つけたら、デビューのタブで「配信中にする」を押してください）</p>`;return}
+  el.innerHTML=`<b>新しい曲の案を作る</b>
+   <div class="irr-row"><div><label for="irr-artist">アーティスト</label><select id="irr-artist">${arts.map(a=>`<option value="${E(a.slug)}">${E(a.name)}</option>`).join("")}</select></div>
+   <div><label for="irr-scene">聴かれる場面（任意）</label><select id="irr-scene"><option value="">おまかせ（組の個性から決める）</option>${(I.scenes||[]).map(x=>`<option value="${E(x.key)}">${E(x.name)}</option>`).join("")}</select></div></div>
+   <label for="irr-memo">作りたい曲のメモ（任意。例：雨の夜に帰り道を歩く・別れたあとの静かな朝）</label><textarea id="irr-memo" maxlength="1000" placeholder="空のままなら、システムが組の個性と近況から決めます"></textarea>
+   <div class="acts"><button id="irr-go">曲の案を作る（Claude が書きます・1〜2 分）</button><span class="sub">できたらポップアップが開きます</span></div>`;
+  if(keep.a&&arts.some(a=>a.slug===keep.a))document.getElementById("irr-artist").value=keep.a;if(keep.s)document.getElementById("irr-scene").value=keep.s;if(keep.m)document.getElementById("irr-memo").value=keep.m;
+  document.getElementById("irr-go").onclick=e=>act("irregular_propose",{slug:document.getElementById("irr-artist").value,scene:document.getElementById("irr-scene").value,memo:document.getElementById("irr-memo").value},e.target)}
+function irrDrafts(){const ds=(DATA.irregular||{}).drafts||[],el=document.getElementById("irr-drafts");
+  if(!ds.length){el.innerHTML=`<p class="empty">いま確認を待っている案はありません</p>`;return}
+  el.innerHTML=`<ul class="list">${ds.map(d=>{const head=`<b>${E(d.artist)}</b>　${d.round>1?`${d.round} 案目・`:""}${E(d.scene||"場面おまかせ")}${d.memo?`・メモ「${E(d.memo.slice(0,40))}」`:""}　<span class="sub">${E(d.created_at)}</span><br>`;
+    if(d.status==="making")return `<li class="run"><span class="who">自動</span>${head}… 案を作っています（Claude が書いています）</li>`;
+    if(d.status==="failed")return `<li class="ng"><span class="who">あなた</span>${head}！ 作れませんでした：${E(d.error)}<div class="acts act-only"><button data-irr="redo" data-id="${E(d.id)}" data-slug="${E(d.slug)}">もう一度作る</button><button class="ghost" data-irr="discard" data-id="${E(d.id)}">この案をやめる</button></div></li>`;
+    return `<li class="wait click" data-draft="${E(d.id)}" tabindex="0"><span class="who">あなた</span>${head}● 確認待ち：「<b>${E(d.title)}</b>」${d.theme?`（${E(d.theme)}）`:""} <span class="sub">→ 押すと、中身を見て直せます</span></li>`}).join("")}</ul>`}
+function openNewestDraft(label){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.status==="proposed"&&String(label).includes(x.artist));if(d)openDraft(d.id)}
+function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===id);if(!d)return;const L=(DATA.irregular||{}).limits||{};
+  const f=(k,lab,v,big)=>`<label for="irr-f-${k}">${E(lab)}</label>${big?`<textarea id="irr-f-${k}" class="${k==="lyrics"?"lyr":""}" maxlength="${L[k]||5000}">${E(v)}</textarea>`:`<input type="text" id="irr-f-${k}" maxlength="${L[k]||300}" value="${E(v)}">`}`;
+  const hist=(d.history||[]).length?`<details><summary>却下した案（${d.history.length}）と理由</summary><ul>${d.history.map(h=>`<li>「${E(h.title)}」${h.theme?`（${E(h.theme)}）`:""}${h.reason?` → 理由：${E(h.reason)}`:"（理由なし）"}</li>`).join("")}</ul></details>`:"";
+  document.getElementById("dlg-body").innerHTML=`<p class="sub">${E(d.artist)}・不定期配信の曲の案${d.round>1?`（${d.round} 案目）`:""}・${E(d.scene||"場面おまかせ")}・${E(d.created_at)}</p>
+   <h3 id="dlg-title">「${E(d.title)}」</h3><span class="badge wait">確認待ち・Gon さん</span>${d.edited_at?` <span class="sub">直した日時 ${E(d.edited_at)}</span>`:""}
+   <div id="dlg-job"></div>
+   ${d.memo?`<p class="sub">メモ：${E(d.memo)}</p>`:""}${hist}
+   <div class="irr-f">
+    ${f("title","曲名",d.title)}${(d.candidates||[]).length>1?`<div class="chips act-only">${d.candidates.map(c=>`<button class="ghost" data-pick="${E(c)}">${E(c)}</button>`).join("")}</div>`:""}
+    ${f("theme","曲のテーマ",d.theme)}
+    ${f("story","曲のイメージ（エピソード：いつ・どこで・何を見て・感じたか）",d.story,true)}
+    ${d.when_where||d.realized?`<p class="sub">${d.when_where?`いつ・どこで：${E(d.when_where)}　`:""}${d.realized?`たどり着いた思い（サビの芯）：${E(d.realized)}`:""}</p>`:""}
+    ${f("lyrics",d.instrumental?"歌詞（インストの組なので、声の断片だけ）":"歌詞（Suno に入れる。[Verse] などの印つき）",d.lyrics,true)}
+    ${f("style","Suno のスタイル（英語。ジャンル・テンポ・楽器・声の質感）",d.style,true)}
+    ${f("exclude","入れない要素（英語・任意）",d.exclude)}
+    ${f("cover","ジャケットのイメージ（英語。色・光・構図）",d.cover,true)}
+    ${d.notes?`<label>この曲の狙い（Claude のメモ）</label><div class="irr-note">${E(d.notes)}</div>`:""}
+   </div>
+   <div class="acts act-only"><button data-irr="accept" data-id="${E(d.id)}">✓ この案で作曲へ進む（Suno に自動で入力）</button><button class="ghost" data-irr="save" data-id="${E(d.id)}">直したところを保存する</button></div>
+   <div class="redo act-only"><b>✕ 好みでないので却下して作り直す</b><span class="sub">　この案は残し、次の案では同じ方向をくり返しません</span>
+    <label for="irr-reason" class="sub" style="display:block;margin-top:6px">どこが好みでなかったか（任意。例：もっと明るく・歌詞が説明的すぎる・テンポを遅く）</label>
+    <textarea id="irr-reason" maxlength="1000" style="width:100%;min-height:3em;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"></textarea>
+    <div class="acts"><button data-irr="redo" data-id="${E(d.id)}" data-slug="${E(d.slug)}">却下して作り直す</button><button class="ghost" data-irr="discard" data-id="${E(d.id)}">作り直さずにやめる</button></div></div>`;
+  const dlg=document.getElementById("dlg");if(!dlg.open)dlg.showModal()}
+function irrFields(){const out={};for(const k of Object.keys((DATA.irregular||{}).editable||{})){const e=document.getElementById("irr-f-"+k);if(e)out[k]=e.value}return out}
+async function irrPost(op,id,fields,btn){if(STATIC)return;if(btn)btn.disabled=true;const dj=document.getElementById("dlg-job");
+  try{const r=await fetch("/api/irregular",{method:"POST",headers:{"Content-Type":"application/json","X-Label-Token":TOKEN},body:JSON.stringify({op,id,fields})});
+    const j=await r.json();if(!r.ok){alert(j.error||"できませんでした");return}
+    if(dj){dj.className="job done";dj.textContent=j.message||"済みました"}if(j.job)watch(j.job);load()}finally{if(btn)setTimeout(()=>btn.disabled=false,1500)}}
+document.addEventListener("click",e=>{const pk=e.target.closest("[data-pick]");if(pk){const t=document.getElementById("irr-f-title");if(t)t.value=pk.dataset.pick;return}
+  const li=e.target.closest("li[data-draft]");if(li&&!e.target.closest("button")){openDraft(li.dataset.draft);return}
+  const b=e.target.closest("button[data-irr]");if(!b)return;const op=b.dataset.irr,id=b.dataset.id;
+  if(op==="save")irrPost("save",id,irrFields(),b);
+  if(op==="accept"){if(confirm("この案で作曲へ進みますか？\n直したところも保存して、Suno に自動で入力します（専用のブラウザが開きます。Create は Gon さんが押します）"))irrPost("accept",id,irrFields(),b)}
+  if(op==="discard"){if(confirm("この案をやめますか？（記録は残ります）")){irrPost("discard",id,{},b);const dl=document.getElementById("dlg");if(dl.open)dl.close()}}
+  if(op==="redo"){const reason=(document.getElementById("irr-reason")||{}).value||"";if(!confirm("この案を却下して、新しい案を作りますか？"+(reason?"":"\n（理由は空のままでも作り直せます）")))return;
+    act("irregular_propose",{slug:b.dataset.slug,redo:id,reason},b);const dj=document.getElementById("dlg-job");if(dj){dj.className="job running";dj.textContent="新しい案を作っています…（できたら、このポップアップが新しい案に変わります）"}}});
+document.addEventListener("keydown",e=>{const li=e.target.closest&&e.target.closest("li[data-draft]");if(li&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openDraft(li.dataset.draft)}});
 function render(){
   document.getElementById("upd").textContent=DATA.generated+" 時点";
-  for(const k of["regular","debut"]){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
-    document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
+  for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
+    const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
+    document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
+  irrForm();irrDrafts();
   document.getElementById("system").innerHTML=DATA.system.length?`<ul class="list">${DATA.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code>${(x.acts||[]).map((a,i)=>" "+actHTML(a,i,{})).join("")}</li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
   const t=DATA.tracker,cols=["順番","詰まっていること","担当","次の一歩","状態"];
   document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;
@@ -700,6 +802,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "このページを開き直してから押してください"})
         if urlparse(self.path).path == "/api/upload":
             return self._upload()
+        if urlparse(self.path).path == "/api/irregular":
+            return self._irregular()
         if urlparse(self.path).path != "/api/action":
             return self._json(404, {"error": "見つかりません"})
         try:
@@ -772,6 +876,43 @@ def _upload(self):
 
 
 Handler._upload = _upload
+
+
+def _irregular(self):
+    """POST /api/irregular：不定期配信の曲の案を保存する・作曲へ進める・やめる（決定 72）。
+    作曲へ進めたら、続けて Suno への入力（専用のブラウザ）を始める"""
+    import irregular
+    try:
+        n = min(int(self.headers.get("Content-Length", "0")), 200000)   # 歌詞が入るので、ふつうのボタンより大きく受ける
+        p = json.loads(self.rfile.read(n) or b"{}")
+    except (ValueError, json.JSONDecodeError):
+        return self._json(400, {"error": "内容が読めません"})
+    op, did = str(p.get("op") or ""), str(p.get("id") or "")
+    if op == "save":
+        ok, msg = irregular.save(did, p.get("fields") or {})
+        return self._json(200 if ok else 400, {"message": msg} if ok else {"error": msg})
+    if op == "discard":
+        ok, msg = irregular.discard(did)
+        return self._json(200 if ok else 400, {"message": msg} if ok else {"error": msg})
+    if op == "accept":
+        if p.get("fields"):   # 直した欄があれば、先に保存する
+            ok, msg = irregular.save(did, p["fields"])
+            if not ok:
+                return self._json(400, {"error": msg})
+        song_id, msg = irregular.accept(did)
+        if not song_id:
+            return self._json(400, {"error": msg})
+        found = command_for("fill_suno", {"id": song_id})
+        if not found:
+            return self._json(200, {"message": msg + "。Suno への入力は、表のマスから始めてください", "song_id": song_id})
+        for j in list(JOBS.values()):   # 前のブラウザの入力が残っていれば止めてから始める
+            if j["state"] == "running" and j["label"].startswith("ブラウザで入力"):
+                stop_job(j["id"])
+        return self._json(200, {"message": msg + "。Suno に入力します（専用のブラウザが開きます）", "song_id": song_id, "job": start_job(*found)})
+    return self._json(400, {"error": "その操作はできません"})
+
+
+Handler._irregular = _irregular
 
 
 def tailscale_info() -> tuple[str | None, str | None]:

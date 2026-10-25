@@ -1,11 +1,13 @@
 """
 ダッシュボードのガントチャート用に、工程ごとの開始日・終了日・状態を作る部品（webapp.py・dashboard.py が使う）
 
-2 つの流れ：
+3 つの流れ：
   デビュー   … デビュー曲（debut_kit の Suno の曲）がまだ配信されていない組。
                名前の確認 → 写真・ジャケット → Suno で作曲 → 仕上げ（取り込み・音量・ジャケット）→ DistroKid に登録 → 配信待ち → ◆ デビュー
   定期配信   … デビュー曲が配信された組（デビュー曲の作業セットが無い組も）。毎週（隔週）の 1 曲ごとに
                ブリーフ → Suno で作曲 → 仕上げ → DistroKid に登録 → 配信待ち → ◆ 配信。これから作る週は「予定」として並べる
+  不定期配信 … デビュー曲が配信中の組の、毎週とは別の 1 曲。作曲へ進めた日から
+               曲の案 → Suno で作曲 → 仕上げ → DistroKid に登録 → 配信待ち → ◆ 配信（irregular.py。決定 72）
   デビュー曲が配信されたら（Spotify で確かめたら）、その組の「これから作る週（予定）」は定期配信のほうに並ぶ。
   工程が進んだ曲は表から消さない（オーナーの指示 2026-10-24。決定 54）：
     ・デビューの表は、デビュー曲が配信されたあとも ◆ デビューまで済んだ行として残す
@@ -145,6 +147,7 @@ def regular_rows(weeks_ahead: int = 4) -> list[dict]:
             continue
         songs = sorted([s for s in _songs.weekly_songs() if s["slug"] == slug], key=lambda s: s["week"])
         weeks_with_song = {s["week"] for s in songs}
+        songs = [s for s in songs if not s.get("irregular")]   # 不定期配信の曲は「不定期配信」の表に並べる（決定 72）
         for s in songs:   # 作った曲は、デビュー曲の配信を待たずに、配信が終わったあとも並べる（消さない）
             rows.append(_weekly_row(a, s, _d(s.get("release_at"))))
         if not in_regular(slug):
@@ -189,6 +192,31 @@ def _weekly_row(a: dict, s: dict, rel: date | None, planned_only: bool = False) 
             "planned": planned_only, "blocker": blk}
 
 
+def irregular_rows() -> list[dict]:
+    """不定期配信の曲（作曲へ進めた案）。予定は作曲へ進めた日から：作曲 2 日 → 仕上げ 1 日 → 登録 1 日 → 配信待ち（決定 72）"""
+    rows = []
+    arts = {a.get("slug"): a for a in all_artists()}
+    for s in _songs.weekly_songs():
+        ir = s.get("irregular") or {}
+        a = arts.get(s["slug"])
+        if not ir or a is None:
+            continue
+        st = _songs.state(s)
+        start = _d(ir.get("accepted_at")) or date.today()
+        rel = _d(st.get("released")) or _d(st.get("release_date")) or start + timedelta(days=7)
+        plan = {"brief": (start, start), "suno": (start, start + timedelta(days=1)), "finish": (start + timedelta(days=2), start + timedelta(days=2)),
+                "register": (start + timedelta(days=3), start + timedelta(days=3)), "wait": (start + timedelta(days=4), max(rel - timedelta(days=1), start + timedelta(days=4)))}
+        phases = song_phases(s, plan, rel)
+        cur = next((p for p in phases if p["state"] in ("ng", "wait", "run")), None)
+        title = s.get("title") or "（曲名未定）"
+        rows.append({"slug": s["slug"], "artist": a.get("name", s["slug"]), "label": _label(a), "week": s["week"], "id": s["id"],
+                     "title": s.get("title", ""), "row": a.get("name", s["slug"]), "sub": f"{start.month}/{start.day} 不定期「{title}」",
+                     "phases": phases, "planned": False, "started": start.isoformat(),
+                     "blocker": {"state": cur["state"], "who": cur["who"], "detail": cur["detail"], "name": cur["name"]} if cur else None})
+    rows.sort(key=lambda r: (r["artist"], r["started"]))
+    return rows
+
+
 def _label(a: dict) -> str:
     lab = a.get("label_slug")
     return load_label(lab if lab not in (None, "", "drive") else None).get("name", "Postdog Records")
@@ -199,10 +227,10 @@ def _blk(b: dict | None) -> dict | None:
 
 
 def timeline() -> dict:
-    deb, reg = debut_rows(), regular_rows()
+    deb, reg, irr = debut_rows(), regular_rows(), irregular_rows()
     today = date.today()
-    starts = [_d(p["start"]) for r in deb + reg for p in r["phases"]] or [today]
-    ends = [_d(p["end"]) for r in deb + reg for p in r["phases"]] or [today]
+    starts = [_d(p["start"]) for r in deb + reg + irr for p in r["phases"]] or [today]
+    ends = [_d(p["end"]) for r in deb + reg + irr for p in r["phases"]] or [today]
 
     def rng(rows, back, fwd):
         if not rows:
@@ -213,4 +241,4 @@ def timeline() -> dict:
         e = min(max(e, today + timedelta(days=14)), today + timedelta(days=fwd))
         return {"from": monday_of(s).isoformat(), "to": e.isoformat()}
     return {"today": today.isoformat(), "debut": {"rows": deb, "range": rng(deb, 21, 28)},
-            "regular": {"rows": reg, "range": rng(reg, 14, 42)}, "span": [min(starts).isoformat(), max(ends).isoformat()]}
+            "regular": {"rows": reg, "range": rng(reg, 14, 42)}, "irregular": {"rows": irr, "range": rng(irr, 14, 42)}, "span": [min(starts).isoformat(), max(ends).isoformat()]}

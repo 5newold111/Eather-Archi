@@ -165,6 +165,12 @@ Hard rules (never break):
    heard details (changed into the act's own words), the chorus carries "realized". Keep it quiet and specific, never
    melodramatic; no real names, brands or places that identify real people. Fill "episode" (Japanese, story_en in
    English) - the owner reads it, and it is used for song introductions and social posts.
+14. Owner request (brief has owner_request): the owner asked for this one-off song by hand. Treat
+   owner_request.memo_ja (Japanese, may be empty) as the direction for theme, mood or story, inside the act's fixed
+   constraints. owner_request.rejected_ideas are earlier proposals for this song that the owner turned down, each
+   with the owner's reason (may be empty): never reuse their titles, and do not repeat their theme, story or overall
+   direction; fix exactly what each reason points at. Make the new proposal clearly different from every rejected
+   idea. Say in notes_ja (Japanese) how you followed the memo and what you changed from the rejected ideas.
 
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
