@@ -538,6 +538,78 @@ def cmd_scan(args) -> int:
     return 0
 
 
+def cover_dir(song: dict) -> Path:
+    """毎週の曲（不定期の曲も）のジャケットの候補・選択・仕上がりの置き場所"""
+    return OUT / "visuals" / song["slug"] / "cover" / song["week"]
+
+
+def cover_candidates(song: dict) -> list[dict]:
+    """ジャケットの候補（画像ができているもの）を点の高い順に。{no, file(Path), total, note, ok}"""
+    d = cover_dir(song)
+    p = d / "candidates.json"
+    if song["kind"] == "debut" or not p.exists():
+        return []
+    out = []
+    for c in read_json(p):
+        f = d / c["file"] if c.get("kind") == "cover" and c.get("file") else None
+        if f is not None and f.exists():
+            out.append({"no": c["no"], "file": f, "total": c.get("total"), "ok": c.get("compliance_ok") is not False,
+                        "note": c.get("claude_note") or c.get("comment_ja") or ""})
+    return sorted(out, key=lambda c: (not c["ok"], -(c["total"] or 0)))
+
+
+def cmd_cover(args) -> int:
+    """その曲のジャケットを作る・候補から選ぶ → 3000×3000 に仕上げる → 公開の準備を続ける（決定 73）。
+    毎週の曲・不定期の曲：候補を作る（generate_visuals.py）→ 最初の 5 回は Gon さんが選ぶ（--choose）・6 回目からは自動
+    → 仕上げ（finalize_cover.py）。デビュー曲：作業セットのジャケット（kit_images.py）"""
+    song = _songs.by_id(args.id)
+    if song is None:
+        print(f"【結果】曲 {args.id} が見つかりません")
+        return 1
+    if song["kind"] == "debut":
+        subprocess.run([sys.executable, str(S / "kit_images.py"), "--kit", str(song["kit"]), "--only", song["slug"], "--kind", "cover"])
+    else:
+        d = cover_dir(song)
+        brief = str(song["brief"])
+        lab = ["--label", song["label_slug"]] if song.get("label_slug") not in (None, "", "drive") else []
+        gv = [sys.executable, str(S / "generate_visuals.py"), "--artist", song["slug"], *lab, "--kind", "cover", "--brief", brief]
+        if args.choose:
+            step(f"{song['artist']}「{song['title']}」のジャケットの候補 #{args.choose} を選んだと記録しています")
+            if subprocess.run([*gv, "--choose", f"cover:{args.choose}", "--reason", args.reason or ""]).returncode != 0:
+                print("【結果】選んだ記録ができませんでした（上の記録を見てください）")
+                return 1
+            (d / "cover_final.jpg").unlink(missing_ok=True)   # 選び直したときは仕上げ直す
+        elif args.redo or not cover_candidates(song):
+            if not os.environ.get("OPENAI_API_KEY"):
+                print("【結果】ジャケットを作る OpenAI の鍵がありません（「鍵を入れる」から入れてください）")
+                return 2
+            step(f"{song['artist']}「{song['title']}」のジャケットの候補を作っています（数分。OpenAI の画像の料金がかかります）")
+            if args.redo:   # 作り直す：前の選択と仕上がりは消す（候補の画像は上書き）
+                for f in ("selection_cover.json", "cover_final.jpg"):
+                    (d / f).unlink(missing_ok=True)
+            subprocess.run(gv)
+        if (d / "selection_cover.json").exists() and not (d / "cover_final.jpg").exists():
+            step("選んだジャケットを 3000×3000 に仕上げています")
+            subprocess.run([sys.executable, str(S / "finalize_cover.py"), brief])
+        if not (d / "cover_final.jpg").exists():
+            n = len(cover_candidates(song))
+            print(f"【結果】ジャケットの候補が {n} 枚できました。ポップアップで 1 枚選んでください" if n else
+                  "【結果】ジャケットの候補を作れませんでした（上の記録を見てください）")
+            return 2
+    st = _songs.state(song)
+    if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover"):
+        now = advance(song)
+        store_set(song)
+        if now == "ready":
+            _book()
+            print(f"【結果】ジャケットができて、{song['artist']}「{song['title']}」は DistroKid に登録できます")
+            return 0
+        print(f"【結果】ジャケットはできました。いまの段階：{now}")
+        return 2
+    print("【結果】ジャケットができました")
+    return 0
+
+
 def _book() -> None:
     try:
         import song_book
@@ -1023,12 +1095,17 @@ def main() -> None:
     p = sub.add_parser("artist-page", help="Spotify のアーティストのページを手で記録する（2 曲目からを同じページにまとめる）")
     p.add_argument("slug")
     p.add_argument("page", help="spotify:artist:… か https://open.spotify.com/artist/…")
+    p = sub.add_parser("cover", help="その曲のジャケットを作る・候補から選ぶ → 仕上げて公開の準備を続ける")
+    p.add_argument("id")
+    p.add_argument("--choose", type=int, help="選んだ候補の番号")
+    p.add_argument("--reason", default="", help="選んだ理由（一言。次からの自動選択の好みに使う）")
+    p.add_argument("--redo", action="store_true", help="候補を作り直す")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
           "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
-          "artist-page": cmd_artist_page, "live": cmd_live}.get(args.cmd)
+          "artist-page": cmd_artist_page, "live": cmd_live, "cover": cmd_cover}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

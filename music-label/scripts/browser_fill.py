@@ -1952,11 +1952,24 @@ APPLE_ROWS_JS = r"""() => {
   if (dlg) scope = dlg;   // ＋で小窓が開く作り
   const status = /not yet complete/i.test(block.closest('div, section') ? (scope.innerText || '') : '') ? 'incomplete' : '';
   document.querySelectorAll('[data-pd-crole],[data-pd-cname]').forEach(e => { e.removeAttribute('data-pd-crole'); e.removeAttribute('data-pd-cname'); });
-  const roles = [...scope.querySelectorAll(ROLE)].filter(e => vis(e) && !e.closest('#postdog-overlay'));
-  const names = [...scope.querySelectorAll('input[type=text], input:not([type])')].filter(e => vis(e) && !e.matches('input.dk-searchable-select__input, [role=combobox]'));
+  // 欄を上から順に読む。1 行は「役割の欄（Performer の下）」→「名前の欄（そのさらに下）」（オーナーの説明。決定 74）。
+  // 役割の欄は、選ぶ箱・打って選ぶ箱のほか、ふつうの文字の欄のこともある：欄の説明（placeholder など）で見分け、
+  // 見分けられなければ、上から 2 つずつ（上＝役割・下＝名前）の組にする
+  const hint = e => [e.placeholder, e.getAttribute('aria-label'), e.name, e.id, (e.labels && e.labels[0] ? e.labels[0].innerText : '')].join(' ').toLowerCase();
+  const fields = [...scope.querySelectorAll('input, select, [role=combobox]')].filter(e => vis(e) && !e.closest('#postdog-overlay')
+      && !/^(file|checkbox|radio|hidden|submit|button|date|number)$/i.test(e.type || ''));
+  const isRole = e => e.matches(ROLE) || (/role|select|search|instrument|choose|type to/.test(hint(e)) && !/name/.test(hint(e)));
+  const isName = e => !isRole(e) && /name|credit/.test(hint(e));
+  const pairs = [];
+  for (let k = 0; k < fields.length; k++) {
+    const f = fields[k];
+    if (isName(f)) continue;
+    const nx = fields[k + 1];
+    if (nx && !isRole(nx)) { pairs.push([f, nx]); k++; }
+    else if (isRole(f)) pairs.push([f, null]);
+  }
   const rows = [];
-  roles.forEach((rl, i) => {
-    const nm = names.find(n => rl.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING && !n.hasAttribute('data-pd-cname'));
+  pairs.forEach(([rl, nm], i) => {
     rl.setAttribute('data-pd-crole', String(i));
     if (nm) nm.setAttribute('data-pd-cname', String(i));
     // 行の見出し（Performer・Producer）：役割の箱と名前の欄をどちらも含む、いちばん小さい囲みの文字
@@ -1965,7 +1978,8 @@ APPLE_ROWS_JS = r"""() => {
     const txt = ((row || rl.parentElement).innerText || '').toLowerCase();
     const label = /producer/.test(txt) && !/performer/.test(txt) ? 'producer' : (/performer/.test(txt) && !/producer/.test(txt) ? 'performer' : '');
     const val = rl.tagName === 'SELECT' ? ((rl.selectedOptions[0] || {}).text || '') : (rl.value || '');
-    rows.push({i, label, kind: rl.tagName === 'SELECT' ? 'select' : 'searchable', role: val.trim(), name: nm ? nm.value : null});
+    const kind = rl.tagName === 'SELECT' ? 'select' : (rl.matches('input.dk-searchable-select__input, [role=combobox]') ? 'searchable' : 'text');
+    rows.push({i, label, kind, role: val.trim(), name: nm ? nm.value : null});
   });
   return {rows, status};
 }"""
@@ -1975,6 +1989,19 @@ def _pick_role(sess: Session, box, role: str) -> bool:
     """役割の箱（打って選ぶ箱か、ふつうの選ぶ箱）で role を選び、選べたかを箱の中身で確かめる"""
     cands = ROLE_CANDS.get(role, [role])
     is_select = box.evaluate("e => e.tagName === 'SELECT'")
+    is_plain = box.evaluate("e => e.tagName === 'INPUT' && !e.matches('input.dk-searchable-select__input, [role=combobox]')")
+    if is_plain:   # ふつうの文字の欄：打って、候補が出れば同じ名前の候補を押す。出なければ打った文字のまま（決定 74）
+        box.click()
+        box.fill("")
+        box.type(cands[0], delay=40)
+        sess.page.wait_for_timeout(700)
+        hit = next((o for o in _visible_options(sess) if _role_key(o.inner_text() or "") == _role_key(cands[0])), None)
+        if hit is not None:
+            hit.click()
+            sess.page.wait_for_timeout(400)
+        if not role_is(box.input_value(), role):
+            box.fill(cands[0])
+        return role_is(box.input_value(), role)
     if is_select:
         opts = box.evaluate("e => [...e.options].map(o => o.text.trim())")
         hit = next((o for c in cands for o in opts if _role_key(o) == _role_key(c)), None)
@@ -2000,11 +2027,17 @@ def fill_apple_rows(sess: Session, want: dict[str, tuple[str, str]]) -> tuple[li
         rows = r["rows"]
         free = [k for k in ("performer", "producer") if k not in filled]
         plan = []
-        for row in rows:
+        used: set[int] = set()
+        for row in rows:   # 見出し（Performer・Producer）がある行は見出しどおり。無い行は上から Performer → Producer
             k = row["label"] if row["label"] in free else (free[0] if not row["label"] and free else None)
             if k and k in free:
                 plan.append((row, k))
                 free.remove(k)
+                used.add(row["i"])
+        for row in rows:   # まだ足りない（どの行も見出しが Performer など）：残りの行に入れる。もう入っている行は使わない（決定 74）
+            if free and row["i"] not in used and not (row["role"] and row.get("name") and any(role_is(row["role"], want[x][0]) for x in want)):
+                plan.append((row, free.pop(0)))
+                used.add(row["i"])
         for row, k in plan:
             role, name = want[k]
             box = sess.page.locator(f'[data-pd-crole="{row["i"]}"]').first
@@ -2050,7 +2083,16 @@ def open_apple_credits(sess: Session) -> str:
         return bool(sess.page.locator("input[name=performer-name]:visible").count() and sess.page.locator("input[name=producer-name]:visible").count())
     if ready():
         return "ok"
-    for k in range(2):   # 1 回で Performer と Producer の両方が出る作りと、1 行ずつ出る作りの両方に合わせる
+
+    def rows_now() -> int:   # ＋で出た行（役割の欄＋名前の欄）がもういくつあるか（決定 74）
+        try:
+            return len((sess.page.evaluate(APPLE_ROWS_JS) or {}).get("rows") or [])
+        except Exception:  # noqa: BLE001
+            return 0
+    have = rows_now()
+    if have >= 2:
+        return "ok"   # 行はもうある：＋を押して行を増やさない（入れ直しのたびに行が増えていた）
+    for k in range(2 - have):   # 1 回で Performer と Producer の両方が出る作りと、1 行ずつ出る作りの両方に合わせる
         try:
             r = sess.page.evaluate(PLUS_JS)
         except Exception:  # noqa: BLE001
@@ -2063,7 +2105,7 @@ def open_apple_credits(sess: Session) -> str:
         sess.page.locator('[data-pd-plus="1"]').first.click()
         print(f"   … Apple Music の credits の「{r.get('text') or '＋'}」を押しました（{k + 1} 回目）")
         sess.page.wait_for_timeout(1500)
-        if ready():
+        if ready() or rows_now() >= 2:
             return "ok"
     return "ok" if sess.page.locator("input[name=performer-name]:visible, input[name=producer-name]:visible").count() else "nofields"
 

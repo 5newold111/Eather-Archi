@@ -189,6 +189,12 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
                 folder = sf or folder
             return ["open", str(folder)], f"フォルダを開く（{song['title']}）"
     slug = p.get("slug") if p.get("slug") in _slugs() else None
+    if action == "cover" and p.get("id"):   # その曲のジャケット：作る・候補から選ぶ・作り直す（決定 73）
+        song = _songs.by_id(str(p.get("id")))
+        no = str(p.get("no") or "")
+        if song and (not no or no.isdigit()):
+            return [PY, str(S / "publish.py"), "cover", song["id"], *(["--choose", no] if no else []), *(["--redo"] if p.get("redo") else [])], \
+                f"ジャケット（{song['artist']}「{song['title']}」" + (f"・#{no} を選ぶ）" if no else "・作り直す）" if p.get("redo") else "）")
     if action == "cover" and slug:
         return [PY, str(S / "kit_images.py"), "--only", slug, "--kind", "cover"], f"ジャケットを作る（{slug}）"
     if action == "check_name" and slug:
@@ -528,7 +534,8 @@ const daysSince=s=>Math.max(0,Math.round((D(DATA.timeline.today)-D(s))/DAY));
 let ACTS=[];
 function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
   switch(a.kind){
-   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
+   case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.redo?`data-redo="1"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
+   case "cover_pick":return `<span class="act-only" style="display:inline-block;width:150px;vertical-align:top;font-size:12px"><img src="${E(a.img)}" alt="ジャケットの候補 ${E(a.no)}" loading="lazy" style="width:150px;height:150px;object-fit:cover;border-radius:6px;display:block;margin-bottom:4px;border:1px solid var(--line)"><button data-act="cover" data-id="${id}" data-no="${E(a.no)}">${E(a.label)}</button>${a.note?`<span class="sub" style="display:block">${E(a.note)}</span>`:""}</span>`;
    case "copy":return `<button class="ghost" data-copy="${i}">${E(a.label)}</button>`;
    case "link":return `<a class="btn" href="${E(a.url)}" target="_blank" rel="noopener">${E(a.label)} ↗</a>`;
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
@@ -626,7 +633,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
-  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;
+  if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
 // ---- 不定期配信（決定 72）：組を選んで曲の案を作る → ポップアップで直す・却下して作り直す・作曲へ進める

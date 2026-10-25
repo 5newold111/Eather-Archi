@@ -59,6 +59,16 @@ def song_step(song: dict, name: str) -> dict:
         if song["kind"] == "debut" and not key:
             return _step(name, "ng", YOU, f"{title}ジャケットを作る OpenAI の鍵がありません",
                          "python3 scripts/setup_keys.py --only openai", st.get("imported_at"))
+        if song["kind"] != "debut":   # 毎週の曲・不定期の曲：候補を選ぶのは最初の 5 回 Gon さん（決定 73）
+            import publish
+            d = publish.cover_dir(song)
+            if not (d / "cover_final.jpg").exists() and not (d / "selection_cover.json").exists():
+                if publish.cover_candidates(song):
+                    return _step(name, "wait", YOU, f"{title}ジャケットの候補から 1 枚選ぶ", f"python3 scripts/publish.py cover {song['id']} --choose <番号>",
+                                 st.get("imported_at"))
+                if not key:
+                    return _step(name, "ng", YOU, f"{title}ジャケットを作る OpenAI の鍵がありません",
+                                 "python3 scripts/setup_keys.py --only openai", st.get("imported_at"))
         return _step(name, "run", AUTO, f"{title}ジャケットを作っています", "", st.get("imported_at"))
     if s == "ready":
         since = _d(st.get("ready_at"))

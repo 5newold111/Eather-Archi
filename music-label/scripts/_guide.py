@@ -147,6 +147,31 @@ def _explain(row: dict, phase: dict) -> dict:
 
     if name.startswith("仕上げ"):
         d = phase.get("detail", "")
+        song = _songs.by_id(row["id"]) if row.get("id") else None
+        if song and song["kind"] != "debut" and _songs.state(song).get("status") == "waiting_cover":
+            # 毎週の曲・不定期の曲のジャケット：その曲の候補を作る → 最初の 5 回は Gon さんが 1 枚選ぶ（決定 73）
+            import publish
+            import song_check
+            cands = publish.cover_candidates(song)
+            if cands:
+                return {"cause": "ジャケットの候補ができました。1 枚選ぶと、3000×3000 に仕上げて DistroKid の下書きまで進めます。"
+                                 "（最初の 5 曲は Gon さんが選び、その好みを覚えて 6 曲目から自動で選びます）",
+                        "steps": ["気に入った候補の「これにする」を押す（数十秒で次のフェーズへ）", "どれも好みでなければ「候補を作り直す」"],
+                        "actions": [{"kind": "cover_pick", "id": song["id"], "no": c["no"], "img": song_check.furl(c["file"]),
+                                     "label": f"#{c['no']} これにする" + (f"（{c['total']:.1f} 点）" if isinstance(c.get("total"), (int, float)) else ""),
+                                     "note": c["note"] if c["ok"] else "（禁止ルールに当たる心配あり）" + c["note"]} for c in cands[:6]]
+                                   + [{"kind": "run", "label": "候補を作り直す（OpenAI の画像の料金がかかります）", "action": "cover", "id": song["id"], "redo": "1",
+                                       "confirm": "ジャケットの候補を作り直しますか？（OpenAI の画像の料金がかかります）"}]}
+            if "鍵" in d:
+                return {"cause": "ジャケットを作るための OpenAI の鍵が、Mac に入っていません。",
+                        "steps": ["「鍵を入れる（ターミナルが開きます）」を押し、鍵を貼って Enter", "終わったら「ジャケットを作る」を押す"],
+                        "actions": [{"kind": "link", "label": "OpenAI の鍵のページを開く", "url": OPENAI_KEYS},
+                                    {"kind": "terminal", "label": "鍵を入れる（ターミナルが開きます）", "key": "openai"},
+                                    {"kind": "run", "label": "ジャケットを作る", "action": "cover", "id": song["id"], "primary": True}]}
+            return {"cause": "この曲のジャケットを作っています（数分）。",
+                    "steps": ["待つだけで大丈夫です。進まないときは「ジャケットを作る」を押す"],
+                    "actions": [{"kind": "run", "label": "ジャケットを作る", "action": "cover", "id": song["id"], "primary": True},
+                                {"kind": "run", "label": "もう一度進める", "action": "scan"}]}
         if "ffmpeg" in d:
             return {"cause": "曲の音量を整える道具（ffmpeg）が Mac に入っていないため、ここで止まっています。",
                     "steps": ["「道具を入れる（ターミナルが開きます）」を押す。終わるまで数分待つ", "終わったら「もう一度進める」を押す"],
