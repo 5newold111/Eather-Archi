@@ -266,7 +266,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
 
 
 # ターミナルで始める作業（鍵の入力など、Gon さんが打ち込む必要があるもの）
-TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
+TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthropic": [PY, "scripts/setup_keys.py", "--only", "anthropic"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
             "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
             # ブラウザで自動入力する部品（Playwright）と、Chrome が無いとき用のブラウザ
             # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
@@ -277,7 +277,7 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "spotif
 
 def _fix_buttons(how: str) -> list[dict]:
     """「仕組みの詰まり」の直し方を、ワンクリックのボタンにする"""
-    for key, needle in (("openai", "--only openai"), ("spotify", "--only spotify"), ("owner", "--only owner"),
+    for key, needle in (("openai", "--only openai"), ("anthropic", "--only anthropic"), ("spotify", "--only spotify"), ("owner", "--only owner"),
                         ("ffmpeg", "brew install ffmpeg"), ("playwright", "playwright"), ("schedule", "schedule.py install")):
         if needle in how:
             return [{"kind": "terminal", "key": key, "label": "直す（ターミナルが開きます）"}]
@@ -655,7 +655,7 @@ function irrDrafts(){const ds=(DATA.irregular||{}).drafts||[],el=document.getEle
   if(!ds.length){el.innerHTML=`<p class="empty">いま確認を待っている案はありません</p>`;return}
   el.innerHTML=`<ul class="list">${ds.map(d=>{const head=`<b>${E(d.artist)}</b>　${d.round>1?`${d.round} 案目・`:""}${E(d.scene||"場面おまかせ")}${d.memo?`・メモ「${E(d.memo.slice(0,40))}」`:""}　<span class="sub">${E(d.created_at)}</span><br>`;
     if(d.status==="making")return `<li class="run"><span class="who">自動</span>${head}… 案を作っています（Claude が書いています）</li>`;
-    if(d.status==="failed")return `<li class="ng"><span class="who">あなた</span>${head}！ 作れませんでした：${E(d.error)}<div class="acts act-only"><button data-irr="redo" data-id="${E(d.id)}" data-slug="${E(d.slug)}">もう一度作る</button><button class="ghost" data-irr="discard" data-id="${E(d.id)}">この案をやめる</button></div></li>`;
+    if(d.status==="failed")return `<li class="ng"><span class="who">あなた</span>${head}！ 作れませんでした：${E(d.error)}<div class="acts act-only">${/ANTHROPIC/.test(d.error||"")?`<a class="btn" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Claude の鍵のページを開く ↗</a><button data-act="terminal" data-key="anthropic">鍵を入れる（ターミナルが開きます）</button>`:""}<button data-irr="redo" data-id="${E(d.id)}" data-slug="${E(d.slug)}">もう一度作る</button><button class="ghost" data-irr="discard" data-id="${E(d.id)}">この案をやめる</button></div></li>`;
     return `<li class="wait click" data-draft="${E(d.id)}" tabindex="0"><span class="who">あなた</span>${head}● 確認待ち：「<b>${E(d.title)}</b>」${d.theme?`（${E(d.theme)}）`:""} <span class="sub">→ 押すと、中身を見て直せます</span></li>`}).join("")}</ul>`}
 function openNewestDraft(label){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.status==="proposed"&&String(label).includes(x.artist));if(d)openDraft(d.id)}
 function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===id);if(!d)return;const L=(DATA.irregular||{}).limits||{};

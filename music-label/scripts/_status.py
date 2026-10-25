@@ -171,6 +171,9 @@ def system_blockers() -> list[tuple[str, str, str]]:
         out.append(("ng", "音量を整える道具（ffmpeg）が入っていません", "brew install ffmpeg"))
     if not os.environ.get("OPENAI_API_KEY"):
         out.append(("ng", "画像（写真・ジャケット）を作る OpenAI の鍵がありません", "python3 scripts/setup_keys.py --only openai"))
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        out.append(("ng", "曲の案（曲名・イメージ・歌詞・Suno のスタイル）を書く Claude の鍵がありません（不定期配信・毎週のブリーフに要ります）",
+                    "python3 scripts/setup_keys.py --only anthropic"))
     # Spotify の鍵が無くても、配信の確認は Apple Music・Deezer・song.link で自動で進む（決定 57）。鍵は入れなくてよい
     from _guide import _has_playwright
     if not _has_playwright():
