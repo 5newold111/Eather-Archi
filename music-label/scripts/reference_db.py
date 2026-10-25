@@ -350,6 +350,163 @@ def _missing(sheet: dict) -> list[str]:
     return out
 
 
+# ---------------------------------------------------------------------------
+# 音源から測れない項目（声・楽器・歌詞のテーマ・世界観）を、Claude に Web で調べてもらって足す（決定 85）
+YEN_PER_SONG = (20, 50)   # 1 曲あたりの料金の目安（Web 検索と、その結果を読む分）
+ENRICH_SYSTEM = """You fill in a music reference sheet for a songwriting team. You get one song (title, artist, and what a machine measured from
+the audio: tempo, key, length). Use web search to identify THIS recording, then describe its attributes from public information
+(reviews, credits, interviews, official pages, lyric-meaning articles). Rules:
+- Describe attributes only. Never quote lyric lines, never write melodies. The theme is one plain sentence in your own words.
+- If you cannot identify the song with reasonable confidence, set found=false and leave fields empty or "unknown". Do not guess.
+- Write descriptive text (theme, sub_themes, mood, setting, timbre, delivery, formation, background) in Japanese. Instrument names may be English.
+- Keep it short. Search at most a few times."""
+_U = ["unknown"]
+ENRICH_SCHEMA = {"type": "object", "additionalProperties": False,
+                 "required": ["found", "identified_as", "confidence", "vocal", "instruments", "genre_tags", "lyrics", "worldview",
+                              "note_placement", "release_year", "sources"],
+                 "properties": {
+                     "found": {"type": "boolean"}, "identified_as": {"type": "string"},
+                     "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+                     "vocal": {"type": "object", "additionalProperties": False, "required": ["sex", "range", "timbre", "delivery_style"],
+                               "properties": {"sex": {"type": "string", "enum": ["female", "male", "mixed", "none", *_U]},
+                                              "range": {"type": "string", "enum": ["low", "mid", "high", *_U]},
+                                              "timbre": {"type": "array", "items": {"type": "string"}}, "delivery_style": {"type": "string"}}},
+                     "instruments": {"type": "object", "additionalProperties": False, "required": ["list", "formation_feel"],
+                                     "properties": {"list": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["name", "role"],
+                                                    "properties": {"name": {"type": "string"},
+                                                                   "role": {"type": "string", "enum": ["lead", "accompaniment", "rhythm", "color"]}}}},
+                                                    "formation_feel": {"type": "string"}}},
+                     "genre_tags": {"type": "array", "items": {"type": "string"}},
+                     "lyrics": {"type": "object", "additionalProperties": False, "required": ["theme", "sub_themes", "language"],
+                                "properties": {"theme": {"type": "string"}, "sub_themes": {"type": "array", "items": {"type": "string"}},
+                                               "language": {"type": "string"}}},
+                     "worldview": {"type": "object", "additionalProperties": False, "required": ["mood", "place", "season", "time_of_day", "eras", "artist_background"],
+                                   "properties": {k: {"type": "string"} for k in ("mood", "place", "season", "time_of_day", "artist_background")}
+                                   | {"eras": {"type": "array", "items": {"type": "string"}}}},
+                     "note_placement": {"type": "string"},
+                     "release_year": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+                     "sources": {"type": "array", "items": {"type": "string"}}}}
+
+
+def enrich_pending() -> list[Path]:
+    """まだ Claude に調べてもらっていない、既存楽曲の解析シート（曲名・アーティストが読めているもの）"""
+    out = []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        ref = d.get("reference") or {}
+        if not d.get("_enriched") and ref.get("artist_name") not in (None, "", "?") and ref.get("title"):
+            out.append(p)
+    return out
+
+
+def _merge_enrich(d: dict, e: dict) -> None:
+    ref = d.setdefault("reference", {})
+    v = e.get("vocal") or {}
+    voc = d.setdefault("vocal", {})
+    if v.get("sex") not in (None, "", "unknown"):
+        voc["sex"] = v["sex"]
+    if v.get("range") not in (None, "", "unknown"):
+        voc["range"] = v["range"]
+    if v.get("timbre"):
+        voc["timbre"] = v["timbre"]
+    if v.get("delivery_style"):
+        voc.setdefault("delivery", {})["style"] = v["delivery_style"]
+    ins = e.get("instruments") or {}
+    if ins.get("list"):
+        d.setdefault("instruments", {})["list"] = ins["list"]
+    if ins.get("formation_feel"):
+        d.setdefault("instruments", {})["formation_feel"] = ins["formation_feel"]
+    if e.get("genre_tags") and not ref.get("tags"):
+        ref["tags"] = e["genre_tags"]
+    ly = e.get("lyrics") or {}
+    if ly.get("theme"):
+        d.setdefault("lyrics", {})["theme"] = ly["theme"]
+    if ly.get("sub_themes"):
+        d.setdefault("lyrics", {})["sub_themes"] = ly["sub_themes"]
+    if ly.get("language") and ly["language"] != "unknown":
+        ref["language"] = ly["language"]
+    w = e.get("worldview") or {}
+    wv = d.setdefault("worldview", {})
+    st = {k: w[k] for k in ("place", "season", "time_of_day") if w.get(k) and w[k] != "unknown"}
+    if st:
+        wv["setting"] = st
+    if w.get("eras"):
+        wv.setdefault("era_mix", {})["eras"] = w["eras"]
+    if w.get("mood"):
+        wv["mood"] = w["mood"]
+    if w.get("artist_background"):
+        wv["artist_background"] = w["artist_background"]
+    if e.get("note_placement"):
+        d.setdefault("performance", {})["note_placement"] = e["note_placement"]
+    if e.get("release_year") and not ref.get("release_year"):
+        ref["release_year"] = e["release_year"]
+    if e.get("sources"):
+        d.setdefault("visual_web", {"sources": []}).setdefault("sources", []).extend(
+            {"kind": "other", "url": u, "fetched_at": datetime.now().date().isoformat()} for u in e["sources"][:8])
+
+
+def audio_enrich(limit: int = 50) -> int:
+    """既存楽曲の解析シートの、音源から測れない項目を Claude に調べてもらって足す（1 回に limit 曲まで）"""
+    import _claude
+    pend = enrich_pending()
+    if not pend:
+        print("【結果】調べる曲はありません（全部調べ済みか、曲名・アーティストが読めていない曲だけです）")
+        return 0
+    if not _claude.available():
+        print("【結果】Claude の鍵（.env の ANTHROPIC_API_KEY）がありません")
+        return 2
+    run = pend[:limit] if limit > 0 else pend
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲を調べます（料金の目安：1 曲 {YEN_PER_SONG[0]}〜{YEN_PER_SONG[1]} 円）")
+    anthropic = _claude._errors()
+    client = anthropic.Anthropic()
+    tools = [{"type": "web_search_20260209", "name": "web_search", "max_uses": 4},
+             {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 2}]
+    ok = found = 0
+    for i, p in enumerate(run, 1):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ref, m = d.get("reference") or {}, d.get("_measure") or {}
+        print(f"【進み具合】{i}/{len(run)} 曲目：{ref.get('artist_name')}「{ref.get('title')}」を調べています", flush=True)
+        user = json.dumps({"title": ref.get("title"), "artist": ref.get("artist_name"), "year": ref.get("release_year"),
+                           "genre_tags": ref.get("tags"), "measured": {"bpm": (d.get("groove") or {}).get("bpm"), "key": m.get("key"),
+                                                                       "duration_sec": m.get("duration_sec")}}, ensure_ascii=False)
+        try:
+            msg = _claude._stream(client, max_tokens=16000,
+                                  system=[{"type": "text", "text": ENRICH_SYSTEM, "cache_control": {"type": "ephemeral"}}],
+                                  messages=[{"role": "user", "content": "Fill the sheet for this song:\n" + user}], tools=tools,
+                                  output_config={"effort": "medium", "format": {"type": "json_schema", "schema": _claude.api_schema(ENRICH_SCHEMA)}})
+            if msg.stop_reason in ("refusal", "max_tokens", "pause_turn"):
+                raise ValueError(f"答えを受け取れませんでした（{msg.stop_reason}）")
+            e = json.loads("".join(b.text for b in msg.content if b.type == "text"))
+        except anthropic.RateLimitError:
+            print("   ✕ 回数制限か残高不足（429）。console.anthropic.com の Billing を確かめてください。ここで止めます")
+            break
+        except Exception as ex:  # noqa: BLE001  1 曲うまくいかなくても次へ
+            print(f"   ✕ 調べられませんでした（{type(ex).__name__}: {str(ex)[:160]}）")
+            continue
+        ok += 1
+        if e.get("found"):
+            found += 1
+            _merge_enrich(d, e)
+            d["analyzed_by"] = str(d.get("analyzed_by", "auto")) + " + claude（Web で調べた）"
+            print(f"   ○ {e.get('identified_as', '')}（確かさ {e.get('confidence')}）：声 {(e.get('vocal') or {}).get('sex')}・"
+                  f"楽器 {len((e.get('instruments') or {}).get('list') or [])} 種・テーマ「{((e.get('lyrics') or {}).get('theme') or '')[:30]}」")
+        else:
+            print("   － 見つかりませんでした（曲名・アーティストを確かめてください）")
+        d["_enriched"] = {"at": datetime.now().isoformat(timespec="seconds"), "found": bool(e.get("found")),
+                          "confidence": e.get("confidence"), "identified_as": e.get("identified_as", "")}
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    if ok:   # 足した内容で、参考曲を登録し直す
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)
+    left = len(pend) - len(run)
+    print(f"【結果】{ok} 曲を調べ、{found} 曲の声・楽器・テーマ・世界観を足して、参考曲に登録し直しました"
+          + (f"。まだ調べていない曲が {left} 曲あります（もう一度押すと続きを調べます）" if left > 0 else ""))
+    return 0
+
+
 CATEGORY = [("iCloud", "iCloud にだけある"), (".m4p", "コピー防止つき（.m4p）"), ("DRM", "コピー防止つき（DRM）"), ("解析しない形式", "解析しない形式"),
             ("ファイルを読めません", "ファイルを読めない"), ("中身が空", "中身が空"), ("音声ファイルとして読めません", "音声ファイルとして読めない"),
             ("音声が入っていません", "音声が入っていない"), ("短すぎ", "短すぎる（10 秒未満）"), ("メモリ", "メモリが足りない"),
@@ -400,7 +557,8 @@ def audio_report() -> int:
                 cnt[m] = cnt.get(m, 0) + 1
         lines += [f"## 解析はできたが、足りない項目がある曲（{len(partial)} 曲）", "",
                   "項目ごとの曲数：" + "・".join(f"{k} {v} 曲" for k, v in sorted(cnt.items(), key=lambda x: -x[1])), "",
-                  "（声の性別・楽器・歌詞のテーマ・世界観は、音源からは測れないので、どの曲も空です。ここには数えていません）", ""]
+                  "（声の性別・楽器・歌詞のテーマ・世界観は、音源からは測れません。ダッシュボードの「足りない項目を Claude に調べてもらう」で足せます。"
+                  f"まだ調べていない曲 {len(enrich_pending())} 曲）", ""]
         lines += [f"- {rel}：{'・'.join(miss)}" for rel, miss in partial[:300]]
         lines.append("")
     AUDIO_REPORT.parent.mkdir(parents=True, exist_ok=True)
@@ -925,7 +1083,11 @@ def main() -> None:
     ap.add_argument("--watch", action="store_true",
                     help="自動の見張り用：「既存楽曲」に新しく入った曲だけ解析し、あったときだけ参考曲に登録して Mac に知らせる（決定 78）")
     ap.add_argument("--audio-report", action="store_true", help="「既存楽曲」の解析できていない曲と、その理由・直し方を一覧にする（決定 83）")
+    ap.add_argument("--audio-enrich", type=int, metavar="N", nargs="?", const=50,
+                    help="音源から測れない項目（声・楽器・テーマ・世界観）を Claude に Web で調べてもらう（1 回に N 曲まで。既定 50。決定 85）")
     args = ap.parse_args()
+    if args.audio_enrich is not None:
+        sys.exit(audio_enrich(args.audio_enrich))
     if args.audio_report:
         sys.exit(audio_report())
     if args.watch:
