@@ -1750,10 +1750,86 @@ def fill_genre_boxes(sess: Session, fields: list[dict]) -> tuple[list[str], list
     return done, manual
 
 
+# Apple Music の「Additional requirements」：Performer と Producer の credits の欄は、「＋」を押すまで出ない画面がある（決定 66）
+PLUS_JS = r"""() => {
+  const vis = e => e && e.offsetParent !== null;
+  const rx = /apple music requires at least one performer and producer|add credits for each song/i;
+  const t = [...document.querySelectorAll('body *')].filter(e => vis(e) && !e.closest('#postdog-overlay')
+      && rx.test(e.textContent || '') && e.children.length < 30);
+  if (!t.length) return {found: false};
+  let box = t.reduce((a, b) => (a.textContent.length <= b.textContent.length ? a : b));
+  const bad = /remove|delete|close|trash|minus|cancel|edit/i;   // 消す・閉じるの印は押さない
+  const label = b => [(b.getAttribute('aria-label') || ''), (b.title || ''), (typeof b.className === 'string' ? b.className : '')].join(' ');
+  const isPlus = b => { const s = (b.innerText || b.value || '').trim();
+    if (bad.test(label(b)) || bad.test(s)) return false;
+    return s === '+' || s === '＋' || /^[+＋]\s*\w*/.test(s) || /^add( a)? credit/i.test(s) || /\b(add|plus)\b/i.test(label(b)); };
+  for (let i = 0; i < 6 && box; i++, box = box.parentElement) {
+    const btns = [...box.querySelectorAll('button, [role=button], a, span, i, div')].filter(b => vis(b) && b !== box && isPlus(b));
+    const pick = btns.find(b => b.matches('button, [role=button], a')) || btns[0];
+    if (pick) {
+      document.querySelectorAll('[data-pd-plus]').forEach(e => e.removeAttribute('data-pd-plus'));
+      pick.setAttribute('data-pd-plus', '1');
+      return {found: true, plus: true, text: (pick.innerText || pick.getAttribute('aria-label') || '').trim().slice(0, 40)};
+    }
+  }
+  return {found: true, plus: false};
+}"""
+
+# credits の欄が小窓（ダイアログ）の中にあれば、その中の保存のボタンを押す（ページの Continue は押さない）
+CREDITS_SAVE_JS = r"""() => {
+  const vis = e => e && e.offsetParent !== null;
+  const inp = [...document.querySelectorAll('input[name=performer-name], input[name=producer-name]')].find(vis);
+  const dlg = inp && inp.closest('[role=dialog], [aria-modal=true], .swal2-popup, .modal, [class*=modal], [class*=Modal], [class*=dialog]');
+  if (!dlg) return '';
+  const own = b => (b.innerText || b.value || '').replace(/\s+/g, ' ').trim();
+  const btn = [...dlg.querySelectorAll('button, [role=button], input[type=button], input[type=submit]')].filter(vis)
+    .find(b => b.id !== 'distroDoneButtonWithAPI' && /^(save|save credits|done|apply|confirm|ok|add|add credits|update)$/i.test(own(b)));
+  if (!btn) return '';
+  btn.click();
+  return own(btn);
+}"""
+
+
+def open_apple_credits(sess: Session) -> str:
+    """Apple Music の credits の欄が「＋」の後ろに隠れていれば、＋を押して出す。
+    ""：その欄が無い画面／"ok"：欄が出た／"noplus"：＋が見つからない／"nofields"：押しても欄が出ない"""
+    def ready() -> bool:
+        # 見えている欄だけを数える（閉じた小窓の中に、隠れた欄が前からあることがある）
+        return bool(sess.page.locator("input[name=performer-name]:visible").count() and sess.page.locator("input[name=producer-name]:visible").count())
+    if ready():
+        return "ok"
+    for k in range(2):   # 1 回で Performer と Producer の両方が出る作りと、1 行ずつ出る作りの両方に合わせる
+        try:
+            r = sess.page.evaluate(PLUS_JS)
+        except Exception:  # noqa: BLE001
+            return ""
+        if not r.get("found"):
+            return ""
+        if not r.get("plus"):
+            print("   … Apple Music の credits の欄の「＋」が見つかりませんでした")
+            return "noplus"
+        sess.page.locator('[data-pd-plus="1"]').first.click()
+        print(f"   … Apple Music の credits の「{r.get('text') or '＋'}」を押しました（{k + 1} 回目）")
+        sess.page.wait_for_timeout(1500)
+        if ready():
+            return "ok"
+    return "ok" if sess.page.locator("input[name=performer-name]:visible, input[name=producer-name]:visible").count() else "nofields"
+
+
 def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
     """Track credits（Apple の決まり：Performer と Producer を 1 人ずつ以上）。Performer＝組の名前、Producer＝本名"""
     import publish
     from _common import load_artist
+    opened = open_apple_credits(sess)   # 「＋」の後ろに隠れている credits の欄を出す（決定 66）
+    if opened in ("noplus", "nofields"):
+        try:   # 本物の画面に合わせて直すため、画面の部品の一覧を残す
+            p = save_parts(sess, "distrokid")
+            if p and p.exists():
+                keep = p.with_name(f"distrokid_parts_{song['id']}_credits.txt")
+                keep.write_text(p.read_text(encoding="utf-8"), encoding="utf-8")
+                print(f"   記録：Apple Music の credits の欄の画面の部品の一覧を保存しました → {keep}")
+        except Exception:  # noqa: BLE001
+            pass
     art = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
     owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
     # Performer：インストの組は本名（演奏した人）、それ以外はアーティスト名。Producer：全組とも本名（.env の OWNER_LEGAL_NAME）。決定 44
@@ -1762,7 +1838,9 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
             ("Producer", "Producer", "input[name=producer-name]", owner)]
     done, manual = [], []
     for i, (who, role, name_css, name) in enumerate(rows):
-        name_loc = sess.page.locator(name_css)
+        name_loc = sess.page.locator(name_css + ":visible")
+        if not name_loc.count():
+            name_loc = sess.page.locator(name_css)
         if not name_loc.count():
             continue   # この画面には Track credits の欄が無い
         ok = True
@@ -1785,6 +1863,17 @@ def fill_credits(sess: Session, song: dict) -> tuple[list[str], list[str]]:
             done.append(f"Track credits の {who}（{role}）")
         else:
             manual.append(f"Track credits の {who}：役割 {role}／名前 {name or '（.env の OWNER_LEGAL_NAME が空）'}")
+    if opened in ("noplus", "nofields") and not done:
+        manual.append("Apple Music の credits（Additional requirements）：「＋」を押して Performer と Producer を入れてください"
+                      "（欄の作りが読めませんでした。画面の部品の一覧を保存したので、Claude に見せると次から自動にできます）")
+    if done and len(done) == len(rows):
+        try:   # 小窓の中の credits なら、その小窓の保存を押す（ページの Continue は押さない）
+            saved = sess.page.evaluate(CREDITS_SAVE_JS)
+            if saved:
+                print(f"   … Apple Music の credits の小窓の「{saved}」を押しました")
+                sess.page.wait_for_timeout(1000)
+        except Exception:  # noqa: BLE001
+            pass
     return done, manual
 
 

@@ -837,3 +837,13 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - Suno（4）：開く → 欄を入れる → 読み返す → Gon さんの Create 待ち
   - 歌詞（4）：開く → 歌詞の欄を探す → 歌詞を入れる → Gon さんの Submit 待ち
 - 表示する場所：ポップアップの上部（決定 64 の枠の中。曲数と工程を 1 行ずつ）と、画面の下の仕事の一覧
+
+## 66. Apple Music の「Additional requirements」の credits を「＋」から入れる（2026-10-25。オーナーの指示）
+
+- DistroKid の登録画面の Apple Music の欄（「Apple Music requires at least one performer and producer credit for each song. Add credits for each song on this release」）では、Performer と Producer の credits の欄は「＋」を押すまで出ない。これまでの仕組みは欄がはじめから画面にある前提で、欄が無いと飛ばしていた
+- 直したこと：
+  - その文の近くの「＋」（文字が「+」、または add・plus の名前のボタン）を押して欄を出し、Performer（歌のある組はアーティスト名＋Singing & vocals、HOLLOWPLAN は本名＋Performer）と Producer（本名＋Producer）を入れる。1 回で両方が出る作りと、1 行ずつ出る作りの両方に合わせて、2 回まで押す
+  - 欄が小窓の中にあれば、入れ終わったあとに小窓の「Save」などを押す（ページの Continue は押さない）
+  - 消す・閉じる・取り消す・編集の印（remove・delete・close・cancel・edit など）は押さない
+  - 欄は見えているものだけを数える（閉じた小窓の中に、隠れた欄が前からあることがある）
+  - 「＋」が見つからない・押しても欄が出ないときは、画面の部品の一覧を `out/browser/distrokid_parts_<曲 ID>_credits.txt` に残し、Gon さんに手で入れてもらう案内を出す
