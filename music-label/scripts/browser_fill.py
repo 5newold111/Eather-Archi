@@ -2024,6 +2024,8 @@ def fill_apple_rows(sess: Session, want: dict[str, tuple[str, str]]) -> tuple[li
                 print(f"   － Apple Music の credits：{label} の役割「{role}」か名前が入りませんでした（いま：{row['role'] or '空'}）")
         if not free or len(filled) == 2:
             break
+        if len(rows) >= 2:   # 行はもうある（入らなかっただけ）：＋を押して行を増やさない
+            break
         try:   # 足りない行がある：＋をもう一度押して、新しい行を出す
             pr = sess.page.evaluate(PLUS_JS)
         except Exception:  # noqa: BLE001
