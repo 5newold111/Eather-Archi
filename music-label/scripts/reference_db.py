@@ -126,7 +126,7 @@ def field_of(header: str) -> str | None:
 # ---------------------------------------------------------------------------
 # 「既存楽曲」の音源を解析して、参考曲の解析シートにする（オーナーの指示 2026-10-25。決定 76）
 AUDIO_DIR_HINTS = ["既存楽曲"]
-AUDIO_TAKE = {".wav", ".mp3", ".m4a"}
+AUDIO_TAKE = {".wav", ".mp3", ".m4a", ".aac", ".flac", ".aif", ".aiff", ".ogg", ".opus"}   # WAV・MP3・M4A など（決定 83 で FLAC・AIFF なども）
 AUDIO_CACHE = DIGEST_DIR / "audio"          # 解析した結果（実名つき。Mac の中だけ）
 AUDIO_INDEX = DIGEST_DIR / "audio_index.json"
 
@@ -237,9 +237,11 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
         print(f"【進み具合】{i}/{len(run)} 曲目：{artist}「{title}」を解析しています（{f.name}）", flush=True)
         try:
             m = _measure(analyze_track, f)
+            if m["duration_sec"] < 10:   # 効果音・切り抜きは参考曲に向かない
+                raise ValueError(f"短すぎます（{m['duration_sec']} 秒）")
         except Exception as e:  # noqa: BLE001  1 曲読めなくても次へ
             print(f"   ✕ 解析できませんでした（{type(e).__name__}: {str(e)[:120]}）")
-            index[rid] = {"sig": sig, "file": str(f), "error": str(e)[:200]}
+            index[rid] = {"sig": sig, "file": str(f), "error": str(e).replace(str(f), f.name)[:300]}
             continue
         t = _tags(f)
         args = argparse.Namespace(title=title, artist=artist, language="en", source="manual", acquired_from=str(f.name),
@@ -263,6 +265,117 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
     if left > 0:
         print(f"   まだ解析していない曲が {left} 曲あります（次の回に続けます。全部いま解析するときは --audio-limit 0）")
     return out
+
+
+# ---------------------------------------------------------------------------
+# 解析できていない曲を調べる（決定 83）
+AUDIO_REPORT = DIGEST_DIR / "audio_report.md"
+
+
+def _probe(f: Path) -> tuple[dict, str]:
+    """ffprobe で中身を見る：(情報, エラーの文)"""
+    import shutil
+    import subprocess
+    if not shutil.which("ffprobe"):
+        return {}, "ffprobe が無い"
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration,bit_rate,format_name:stream=codec_type,codec_name,codec_tag_string,sample_rate,channels",
+                            "-of", "json", str(f)], capture_output=True, text=True, timeout=60)
+    except Exception as e:  # noqa: BLE001
+        return {}, str(e)
+    try:
+        return json.loads(r.stdout or "{}"), (r.stderr or "").strip()
+    except ValueError:
+        return {}, (r.stderr or "").strip()
+
+
+def diagnose(f: Path, err: str = "") -> tuple[str, str]:
+    """解析できない理由と直し方（日本語）"""
+    name, ext = f.name, f.suffix.lower()
+    if name.endswith(".icloud") or (name.startswith(".") and ".icloud" in name):
+        return "iCloud にだけあり、この Mac（SSD）にファイルの中身がありません", "Finder でそのファイルを開いて、ダウンロードしてから置き直す"
+    if ext == ".m4p":
+        return "Apple Music などで買った・保存した、コピー防止つきの曲（.m4p）です", "解析できません。CD や DRM の無い購入（iTunes Store の .m4a など）の音源に置き換える"
+    if ext not in AUDIO_TAKE:
+        return f"解析しない形式（{ext or '拡張子なし'}）です", "WAV・MP3・M4A・FLAC・AIFF などに書き出して置き直す"
+    try:
+        size = f.stat().st_size
+    except OSError as e:
+        return f"ファイルを読めません（{e}）", "SSD をつなぎ直す・ファイルのアクセス権を確かめる"
+    if size == 0:
+        return "ファイルの中身が空（0 バイト）です", "コピーし直す（コピーが途中で止まった可能性）"
+    info, perr = _probe(f)
+    streams = info.get("streams") or []
+    audio = [x for x in streams if x.get("codec_type") == "audio"]
+    low = (perr + " " + err).lower()
+    if "drm" in low or "protected" in low or any(str(x.get("codec_tag_string", "")).lower() in ("drms", "drmi") for x in audio):
+        return "コピー防止（DRM）つきの曲です", "解析できません。DRM の無い音源に置き換える"
+    if not info and perr:
+        return f"音声ファイルとして読めません（{perr.splitlines()[-1].replace(str(f), f.name)[:120]}）", "壊れているか、別の形式に名前だけ変えたファイル。元の音源から書き出し直す"
+    if streams and not audio:
+        return "音声が入っていません（映像だけ・画像だけなど）", "音声のファイルを置く"
+    dur = float((info.get("format") or {}).get("duration") or 0)
+    if 0 < dur < 10:
+        return f"短すぎます（{dur:.1f} 秒）", "10 秒以上の曲にする（効果音・切り抜きは参考曲に向きません）"
+    if err:
+        if "短すぎ" in err:
+            return err, "10 秒以上の曲にする（効果音・切り抜きは参考曲に向きません）"
+        if "memory" in low or "killed" in low:
+            return "長すぎる・大きすぎて、解析の途中でメモリが足りなくなりました", "もう一度動かす。続くときは、その曲だけ MP3 などに書き出して置き直す"
+        if "librosa" in low or "no module" in low or "numpy" in low or "soundfile" in low:
+            return f"解析の部品が足りません（{err[:120]}）", "ターミナルで  python3 -m pip install -r requirements.txt  を実行してから、もう一度動かす"
+        if "audioread" in low or "nobackenderror" in low or "format not recognised" in low or "ffmpeg" in low:
+            return f"この形式を読む道具がありません（{err[:120]}）", "ターミナルで  brew install ffmpeg  を実行してから、もう一度動かす"
+        return f"解析中にエラーが出ました（{err[:160]}）", "もう一度動かす。続くときは、その曲を WAV か MP3 に書き出して置き直す"
+    return "まだ解析していません（次の回に解析します）", "そのまま待つか、ダッシュボードの「既存楽曲を解析する」を押す"
+
+
+CATEGORY = [("iCloud", "iCloud にだけある"), (".m4p", "コピー防止つき（.m4p）"), ("DRM", "コピー防止つき（DRM）"), ("解析しない形式", "解析しない形式"),
+            ("ファイルを読めません", "ファイルを読めない"), ("中身が空", "中身が空"), ("音声ファイルとして読めません", "音声ファイルとして読めない"),
+            ("音声が入っていません", "音声が入っていない"), ("短すぎ", "短すぎる（10 秒未満）"), ("メモリ", "メモリが足りない"),
+            ("部品が足りません", "解析の部品が足りない"), ("読む道具", "形式を読む道具が無い"), ("解析中にエラー", "解析中のエラー"), ("まだ解析していません", "まだ解析していない")]
+
+
+def _category(why: str) -> str:
+    return next((c for k, c in CATEGORY if k in why), why[:30])
+
+
+def audio_report() -> int:
+    """「既存楽曲」の全部のファイルを見て、解析できていない曲と理由・直し方を一覧にする（out/reference_db/audio_report.md）"""
+    import hashlib as _h
+    dirs = audio_dirs()
+    if not dirs:
+        print("【結果】「既存楽曲」のフォルダが見つかりません（SSD をつないでから、もう一度動かしてください）")
+        return 2
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    done, bad = 0, []
+    for top in dirs:
+        for f in sorted(p for p in top.rglob("*") if p.is_file() and p.name != ".DS_Store" and not p.name.startswith("._")):
+            st = f.stat()
+            rid = "aud-" + _h.sha1(f"{f.relative_to(top)}|{st.st_size}".encode()).hexdigest()[:12]
+            ent = index.get(rid) or {}
+            if f.suffix.lower() in AUDIO_TAKE and (AUDIO_CACHE / f"{rid}.json").exists() and not ent.get("error"):
+                done += 1
+                continue
+            if f.suffix.lower() in TEXT_EXT | TABLE_EXT | {".jpg", ".jpeg", ".png", ".pdf", ".json"}:
+                continue   # 曲ではないもの（メモ・画像・表）は数えない
+            why, fix = diagnose(f, ent.get("error", "").replace(str(f), f.name))
+            bad.append((f.relative_to(top), _category(why), why, fix))
+    lines = [f"# 既存楽曲：解析できていない曲（{datetime.now():%Y-%m-%d %H:%M}）", "",
+             f"- 解析できた曲：{done} 曲", f"- 解析できていない曲：{len(bad)} 曲", ""]
+    groups: dict[str, list] = {}
+    for rel, cat, why, fix in bad:
+        groups.setdefault(cat, []).append((rel, why, fix))
+    for g, items in sorted(groups.items(), key=lambda x: -len(x[1])):
+        lines += [f"## {g}（{len(items)} 曲）", "", f"理由：{items[0][1]}", f"直し方：{items[0][2]}", ""]
+        lines += [f"- {rel}" + (f"　…{why}" if why != items[0][1] else "") for rel, why, _ in items[:200]]
+        lines.append("")
+    AUDIO_REPORT.parent.mkdir(parents=True, exist_ok=True)
+    AUDIO_REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+    print(f"【結果】解析できた曲 {done}・できていない曲 {len(bad)}" + (
+        "（理由ごとの一覧：" + "・".join(f"{g} {len(v)} 曲" for g, v in groups.items()) + "）" if bad else "") + f"。くわしくは {AUDIO_REPORT}")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -778,7 +891,10 @@ def main() -> None:
     ap.add_argument("--audio-limit", type=int, default=20, help="「既存楽曲」の音源を 1 回に何曲まで解析するか（0＝全部）")
     ap.add_argument("--watch", action="store_true",
                     help="自動の見張り用：「既存楽曲」に新しく入った曲だけ解析し、あったときだけ参考曲に登録して Mac に知らせる（決定 78）")
+    ap.add_argument("--audio-report", action="store_true", help="「既存楽曲」の解析できていない曲と、その理由・直し方を一覧にする（決定 83）")
     args = ap.parse_args()
+    if args.audio_report:
+        sys.exit(audio_report())
     if args.watch:
         args.quiet, args.audio_limit = True, 0
     if args.artists:

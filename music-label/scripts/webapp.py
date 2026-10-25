@@ -161,6 +161,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
     if action == "rerun_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 定期実行をいま動かし直す（決定 81）
         return [PY, str(S / "schedule.py"), "run", p["job"]], f"定期実行をもう一度（{p['job']}）"
+    if action == "ref_audio_report":   # 解析できていない曲を調べる（決定 83）
+        return [PY, str(S / "reference_db.py"), "--audio-report"], "解析できていない曲を調べる（既存楽曲）"
     if action == "sync":
         return [PY, str(S / "archive_sync.py")], "保管（ローカルと SSD）"
     if action == "dashboard":
@@ -430,7 +432,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
