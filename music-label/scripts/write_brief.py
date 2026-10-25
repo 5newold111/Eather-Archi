@@ -39,8 +39,8 @@ load_dotenv(ROOT / ".env")
 
 SLOT_SECTION = {   # 枠 → 解析シートのどの欄だけを渡すか（1 曲 1 枠：他の欄は渡さない）
     "lyrics": ["lyrics"], "worldview": ["worldview"], "instruments": ["instruments"], "performance": ["performance"],
-    "structure": ["structure"], "harmony": ["harmony"], "groove": ["groove"], "phrase": ["phrases"],
-    "vocal_main": ["vocal"], "vocal_sub1": ["vocal"], "vocal_sub2": ["vocal"],
+    "structure": ["structure"], "harmony": ["harmony"], "groove": ["groove"], "phrase": ["phrases", "melody"],
+    "vocal_main": ["vocal", "melody"], "vocal_sub1": ["vocal"], "vocal_sub2": ["vocal"],   # melody：旋律の特徴（決定 90）
 }
 
 # Claude に返してもらう JSON の形（構造化出力）
@@ -172,6 +172,15 @@ Hard rules (never break):
    direction; fix exactly what each reason points at. Make the new proposal clearly different from every rejected
    idea. Say in notes_ja (Japanese) how you followed the memo and what you changed from the rejected ideas.
 
+15. Melody statistics (a slot excerpt has "melody"): these are measured from a reference recording's sung melody - range and
+   span, the most-used register ("core"), stepwise vs leap ratios, largest leap, repeated-note ratio, notes per bar, off-beat
+   (syncopation) ratio, pickup ratio, phrase length in bars, how long phrase endings are held, per-section contour and where the
+   peak lands, and the hook's rhythm skeleton (x = note onset on a 16th grid, no pitches) with notes per phrase. Reflect them
+   concretely, adapted to THIS act's voice range: (a) suno_style_prompt gets melodic descriptors (e.g. "narrow stepwise verses",
+   "chorus leaps up a sixth to its peak", "syncopated off-beat phrasing", "pickup notes into each line", "long held line endings");
+   (b) vocal_instruction says where the peak sits and how endings are held; (c) the lyrics follow the rhythm: lines of the chorus
+   carry about notes_per_phrase syllables, verses follow notes_per_bar density, and pickups become short lead-in words. Never write
+   pitch sequences. Rule 5 still applies to what is kept from a phrase.
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
 - "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the
@@ -223,6 +232,11 @@ def slot_excerpts(brief: dict, refs_dir: Path | None) -> dict[str, dict]:
                 data = json.loads(json.dumps(sheet.get(sec, {})))
                 if sec == "lyrics" and isinstance(data, dict) and "key_words" in data:
                     data["key_words"] = [{"category": k.get("category")} for k in data["key_words"]]   # 語そのものは渡さない
+                if sec == "melody" and isinstance(data, dict):   # 旋律の特徴だけ（MIDI の場所・処理の記録は渡さない。決定 90）
+                    for k in ("midi_file", "detail", "separation", "bpm_used"):
+                        data.pop(k, None)
+                    if not data.get("usable"):
+                        continue
                 if sec == "lyrics" and isinstance(data, dict):   # 聞き取った歌詞の文そのものは渡さない（形だけ。決定 86）
                     data.pop("transcript", None)
                     data.pop("web_check", None)

@@ -522,6 +522,78 @@ def audio_lyrics(limit: int = 0, quiet: bool = False) -> int:
 
 
 # ---------------------------------------------------------------------------
+# メロディーを起こして MIDI（GarageBand で開ける）に残し、旋律の特徴を解析シートに入れる（決定 90）
+def melody_pending() -> list[tuple[Path, Path]]:
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    out = []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        f = Path((index.get(p.stem) or {}).get("file", ""))
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if f.is_file() and not d.get("melody"):
+            out.append((p, f))
+    return out
+
+
+def audio_melody(limit: int = 0, quiet: bool = False) -> int:
+    """既存楽曲のメロディーを起こす（1 回に limit 曲まで。0 なら全部）"""
+    import melody
+    pend = melody_pending()
+    if not pend:
+        if not quiet:
+            print("【結果】メロディーを起こす曲はありません（全部済んだか、SSD がつながっていません）")
+        return 0
+    run = pend[:limit] if limit > 0 else pend
+    how = "Demucs で歌を取り出して" if melody.demucs_ready() else "librosa で歌を取り出して（Demucs を入れると正確になります）"
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲のメロディーを起こします（Mac の中で・{how}。1 曲 2〜5 分。料金はかかりません）")
+    ok = 0
+    for i, (p, f) in enumerate(run, 1):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ref = d.get("reference") or {}
+        name = f"{ref.get('artist_name') or '?'} - {ref.get('title') or f.stem}"
+        print(f"【進み具合】{i}/{len(run)} 曲目：{name} のメロディーを起こしています", flush=True)
+        try:
+            feat, mid = melody.transcribe_melody(f, d, name)
+        except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
+            print(f"   ✕ 起こせませんでした（{type(e).__name__}: {str(e)[:160]}）")
+            continue
+        d["melody"] = feat
+        hook = feat.get("hook") or {}
+        if hook.get("rhythm_skeleton") and not [x for x in d.get("phrases") or [] if not x.get("auto")]:
+            d["phrases"] = [{"name": f"サビの頭（自動・{hook.get('section')}）", "rhythm_skeleton": sk, "contour": hook["contour"][j],
+                             "start_degree": hook["start_degree"][j], "bars": round(len(sk.replace("|", "")) / 16, 1), "auto": True}
+                            for j, sk in enumerate(hook["rhythm_skeleton"])]
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        ok += 1
+        if feat.get("usable"):
+            rg, mo, rh = feat["range"], feat["motion"], feat["rhythm"]
+            print(f"   ○ 音域 {rg['low']}〜{rg['high']}（{rg['span_semitones']} 半音）・順次 {int(mo['stepwise_ratio'] * 100)}%・"
+                  f"跳躍 {int(mo['leap_ratio'] * 100)}%・裏拍 {int(rh['offbeat_ratio'] * 100)}%・1 小節 {rh['notes_per_bar']} 音")
+        else:
+            print(f"   － {feat.get('note')}")
+        if mid:   # SSD にも、既存楽曲の隣のフォルダに MIDI を残す（GarageBand で開ける）
+            try:
+                tops = audio_dirs()
+                top = next((t for t in tops if f.is_relative_to(t)), None)
+                if top is not None:
+                    dst = top.parent / f"{top.name}_メロディー（MIDI）" / mid.name
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    import shutil
+                    shutil.copy2(mid, dst)
+            except OSError:
+                pass
+    if ok:
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
+    left = len(pend) - len(run)
+    print(f"【結果】{ok} 曲のメロディーを起こしました（MIDI：{melody.MELODY_DIR} と、SSD の「既存楽曲_メロディー（MIDI）」。GarageBand で開けます）"
+          + (f"。まだ {left} 曲あります" if left > 0 else ""))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # 音源から測れない項目（声・楽器・歌詞のテーマ・世界観）を、Claude に Web で調べてもらって足す（決定 85）
 YEN_PER_SONG = (20, 50)   # 1 曲あたりの料金の目安（Web 検索と、その結果を読む分）
 ENRICH_SYSTEM = """You fill in a music reference sheet for a songwriting team. You get one song (title, artist, and what a machine measured from
@@ -1282,11 +1354,15 @@ def main() -> None:
     ap.add_argument("--audio-report", action="store_true", help="「既存楽曲」の解析できていない曲と、その理由・直し方を一覧にする（決定 83）")
     ap.add_argument("--audio-lyrics", type=int, metavar="N", nargs="?", const=0,
                     help="既存楽曲の歌詞を Mac の中で聞き取って、解析シートに入れる（N 曲まで。省くと全部。無料。決定 86）")
+    ap.add_argument("--audio-melody", type=int, metavar="N", nargs="?", const=0,
+                    help="既存楽曲のメロディーを起こして MIDI に残し、旋律の特徴を解析シートに入れる（N 曲まで。省くと全部。無料。決定 90）")
     ap.add_argument("--audio-enrich", type=int, metavar="N", nargs="?", const=50,
                     help="音源から測れない項目（声・楽器・テーマ・世界観）を Claude に Web で調べてもらう（1 回に N 曲まで。既定 50。決定 85）")
     args = ap.parse_args()
     if args.audio_lyrics is not None:
         sys.exit(audio_lyrics(args.audio_lyrics))
+    if args.audio_melody is not None:
+        sys.exit(audio_melody(args.audio_melody))
     if args.audio_enrich is not None:
         sys.exit(audio_enrich(args.audio_enrich))
     if args.audio_report:
@@ -1305,6 +1381,8 @@ def main() -> None:
     if args.watch and not NEW_AUDIO:
         if lyrics_pending():   # 歌詞の聞き取りがまだの曲・歌詞のテキストを置いた曲：1 回に 5 曲ずつ、自動で入れる（決定 86・87）
             audio_lyrics(5, quiet=True)
+        if melody_pending():   # メロディーがまだの曲：1 回に 3 曲ずつ、自動で起こす（決定 90）
+            audio_melody(3, quiet=True)
         return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}
