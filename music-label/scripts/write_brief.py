@@ -361,13 +361,13 @@ def ordinary(term: str) -> bool:
 
 def real_name_hits(artist: dict, text: str) -> list[str]:
     """文の中の、実在の名前（Suno が断る・まねの心配）。オーナーの指示（決定 82）：
-    1 語のふつうの言葉（Time・Hope など）は止めない（造語は止める）。曲名はふつうの言葉だけなら止めない。
-    2 語以上のアーティスト名（ふつうの言葉の組み合わせでも）は止める。日本語は、アーティスト名だけ止める（曲名は止めない）。
+    ふつうの言葉だけでできた名前は、1 語でも 2 語以上でも止めない（Time・LAST ONE など）。造語・人名（辞書にふつうの言葉として無いもの）を含めば止める。
+    日本語は、アーティスト名だけ止める（曲名は止めない）。
     言葉の途中には当てない（[Intro] の intro は名前として数えない）。止めるのは固有名詞（人・グループの名前）だけ、が目安"""
     hits = []
     for t, is_artist in _real_terms(artist):
-        if ordinary(t) and (len(t.split()) == 1 or not is_artist):
-            continue
+        if ordinary(t):
+            continue   # ふつうの言葉だけ（1 語でも 2 語以上でも）は止めない。オーナーの指示（決定 82）
         if not is_artist and not t.isascii():
             continue   # 日本語の曲名（さよなら・夜明け など）は、ふつうの言葉と見分けにくいので止めない。日本語のアーティスト名は止める
         if re.search(r"(?<![A-Za-z0-9])" + re.escape(t) + r"(?![A-Za-z0-9])", text, re.I):
