@@ -139,7 +139,9 @@ def status_json() -> dict:
         n_en = len(reference_db.enrich_pending())
         ref_enrich = {"pending": n_en, "yen": [n_en * reference_db.YEN_PER_SONG[0], n_en * reference_db.YEN_PER_SONG[1]],
                       "lyrics": len(reference_db.lyrics_pending()), "whisper": reference_db.whisper_ready(),
-                      "melody": len(reference_db.melody_pending()), "demucs": __import__("melody").demucs_ready()}
+                      "melody": len(reference_db.melody_pending()), "demucs": __import__("melody").demucs_ready(),
+                      "infl": reference_db.influence_pending(),   # 影響を受けたアーティストの曲で、まだ済んでいない数（決定 91）
+                      "infl_picked": sum(len(v.get("picks", [])) for v in __import__("influences").load().values() if (v or {}).get("applied"))}
     except Exception:  # noqa: BLE001
         ref_enrich = {"pending": 0, "yen": [0, 0], "lyrics": 0, "whisper": True}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich,
@@ -177,6 +179,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "reference_db.py"), "--audio-lyrics", "30"], "既存楽曲の歌詞を聞き取る"
     if action == "ref_enrich":   # 音源から測れない項目を Claude に Web で調べてもらう（決定 85。料金がかかるので押す前に確認）
         return [PY, str(S / "reference_db.py"), "--audio-enrich", "50"], "参考曲の足りない項目を Claude に調べてもらう"
+    if action == "influences":   # SSDDB の中から、組が影響を受けたアーティストを選んで「影響」に足し、その曲を先に解析する（決定 91）
+        return [PY, str(S / "influences.py"), "--apply"], "影響を受けたアーティストを選ぶ（SSDDB から）"
+    if action == "influences_analyze":   # 影響を受けたアーティストの曲の歌詞・メロディーを先に起こす（無料）
+        return [PY, str(S / "influences.py"), "--analyze"], "影響を受けたアーティストの曲を解析する"
     if action == "ref_audio_report":   # 解析できていない曲を調べる（決定 83）
         return [PY, str(S / "reference_db.py"), "--audio-report"], "解析できていない曲を調べる（既存楽曲）"
     if action == "sync":
@@ -454,7 +460,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
@@ -740,6 +746,10 @@ function render(){
    bm.hidden=!re1.melody;bd.hidden=!re1.melody||!!re1.demucs;
    if(re1.melody){bm.textContent=`メロディーを起こす（${re1.melody} 曲・無料）`;
     bm.dataset.confirm=`既存楽曲 ${re1.melody} 曲のうち ${Math.min(re1.melody,15)} 曲のメロディーを、Mac の中で起こして MIDI（GarageBand で開けます）に残します（1 曲 2〜5 分・料金はかかりません）。始めますか？`}}
+  {const re2=DATA.ref_enrich||{},n=re2.infl||{},b=document.getElementById("ref-infl-an"),m=(n.lyrics||0)+(n.melody||0);   // 影響を受けたアーティスト（決定 91）
+   if(re2.infl_picked)document.getElementById("ref-infl").textContent=`影響を受けたアーティストを選び直す（SSDDB から・今 ${re2.infl_picked} 組）`;
+   b.hidden=!m;if(m){b.textContent=`影響を受けたアーティストの曲を解析する（歌詞 ${n.lyrics||0}・メロディー ${n.melody||0} 曲・無料）`;
+    b.dataset.confirm=`影響を受けたアーティストの曲の歌詞（${n.lyrics||0} 曲）とメロディー（${n.melody||0} 曲）を、Mac の中で先に起こします（1 曲 2〜5 分・料金はかかりません）。始めますか？`}}
   {const b=document.getElementById("ref-enrich"),re=DATA.ref_enrich||{pending:0,yen:[0,0]};b.hidden=!re.pending;   // 参考曲の足りない項目（決定 85）
    if(re.pending){const n=Math.min(re.pending,50),lo=Math.round(re.yen[0]*n/re.pending),hi=Math.round(re.yen[1]*n/re.pending);
     b.textContent=`足りない項目を Claude に調べてもらう（${re.pending} 曲）`;

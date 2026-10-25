@@ -473,8 +473,8 @@ def lyrics_pending() -> list[tuple[Path, Path]]:
         lf = lyrics_file(f) if f.is_file() else None
         newer = lf is not None and meta.get("model") != f"file:{lf.name}"   # 歌詞のテキストをあとから置いた
         if f.is_file() and (not meta or newer):
-            out.append((p, f))
-    return out
+            out.append((p, f, d))
+    return [(p, f) for p, f, _ in (out[i] for i in _influence_first([d for _, _, d in out]))]   # 影響を受けたアーティストの曲を先に（決定 91）
 
 
 def audio_lyrics(limit: int = 0, quiet: bool = False) -> int:
@@ -533,8 +533,8 @@ def melody_pending() -> list[tuple[Path, Path]]:
         except (OSError, ValueError):
             continue
         if f.is_file() and not d.get("melody"):
-            out.append((p, f))
-    return out
+            out.append((p, f, d))
+    return [(p, f) for p, f, _ in (out[i] for i in _influence_first([d for _, _, d in out]))]   # 影響を受けたアーティストの曲を先に
 
 
 def audio_melody(limit: int = 0, quiet: bool = False) -> int:
@@ -653,8 +653,8 @@ def enrich_pending() -> list[Path]:
         ly = d.get("lyrics") or {}
         unclear = (ly.get("transcript_meta") or {}).get("clarity") == "unclear" and not ly.get("web_check")
         if (not d.get("_enriched") or unclear) and ref.get("artist_name") not in (None, "", "?") and ref.get("title"):
-            out.append(p)   # まだ調べていない曲と、歌詞の聞き取りがあやしい曲（決定 86）
-    return out
+            out.append((p, d))   # まだ調べていない曲と、歌詞の聞き取りがあやしい曲（決定 86）
+    return [out[i][0] for i in _influence_first([d for _, d in out])]   # 影響を受けたアーティストの曲を先に
 
 
 def _merge_enrich(d: dict, e: dict) -> None:
@@ -1226,6 +1226,53 @@ def _vocal_fit(sex, artist: dict) -> float | None:
     return 1.0 if sex == want else 0.0
 
 
+INFLUENCES = DIGEST_DIR / "influences.json"   # influences.py が SSDDB から選んだ影響（決定 91）
+_INFL: dict = {"mtime": None, "data": {}}
+
+
+def akey(name: object) -> str:
+    """アーティスト名を比べる形（The の有無・記号の違いを同じとみる）"""
+    return re.sub(r"^the ", "", re.sub(r"[^\w ]+", " ", norm(name)).strip()).strip()
+
+
+def influence_names(artist: dict) -> set[str]:
+    """組が影響を受けたアーティスト（設定書の「影響」＋ SSDDB から選んだもの）。比べる形で返す"""
+    try:
+        mt = INFLUENCES.stat().st_mtime if INFLUENCES.exists() else None
+        if mt != _INFL["mtime"]:
+            _INFL.update(mtime=mt, data=json.loads(INFLUENCES.read_text(encoding="utf-8")) if mt else {})
+    except (OSError, ValueError):
+        _INFL.update(mtime=None, data={})
+    names = {akey(i.get("name")) for i in (artist.get("persona") or {}).get("influences", [])}
+    got = _INFL["data"].get(artist.get("slug")) or {}
+    if got.get("applied"):   # 「見るだけ」で選んだ結果は効かせない（管理表に足したときだけ）
+        names |= {akey(p.get("artist")) for p in got.get("picks", [])}
+    return names - {""}
+
+
+def influenced_by(s: dict, artist: dict) -> bool:
+    """その組が影響を受けたアーティストの曲か"""
+    n = akey((s.get("reference") or {}).get("artist_name"))
+    return bool(n) and n in influence_names(artist)
+
+
+def _influence_first(sheets: list[dict]) -> list[int]:
+    """どれかの組が影響を受けたアーティストの曲を先にする並び順（歌詞・メロディー・Web の調べ物）"""
+    from _common import all_artists
+    keys = set().union(set(), *(influence_names(a) for a in all_artists()))
+    flag = [akey((s.get("reference") or {}).get("artist_name")) in keys for s in sheets]
+    return sorted(range(len(sheets)), key=lambda i: (not flag[i], i))
+
+
+def influence_pending() -> dict[str, int]:
+    """影響を受けたアーティストの曲のうち、まだ済んでいない数（歌詞・メロディー・Web の調べ物）"""
+    from _common import all_artists
+    keys = set().union(set(), *(influence_names(a) for a in all_artists()))
+    hit = lambda p: akey((json.loads(p.read_text(encoding="utf-8")).get("reference") or {}).get("artist_name")) in keys
+    return {"lyrics": sum(1 for p, _ in lyrics_pending() if hit(p)), "melody": sum(1 for p, _ in melody_pending() if hit(p)),
+            "enrich": sum(1 for p in enrich_pending() if hit(p))}
+
+
 def assigned_to(s: dict, artist: dict) -> bool:
     """オーナーがデータベースに組の名前を書いた曲（「使う組」の欄・メモなど）"""
     names = {norm(artist.get("name")), norm(artist.get("slug")), norm(str(artist.get("slug", "")).replace("_", " "))} - {""}
@@ -1252,10 +1299,15 @@ def affinity(s: dict, artist: dict, aw: set[str] | None = None) -> tuple[float, 
         why.append("言葉：" + "・".join(sorted(singles)[:6]))
     if bpm:
         why.append("テンポが近い")
-    if assigned_to(s, artist):
+    own = assigned_to(s, artist)
+    infl = not own and influenced_by(s, artist)
+    if own:
         score += 1.0
         why.insert(0, "オーナーがこの組に指定")
-    if tag < 0.34 and not assigned_to(s, artist):
+    elif infl:
+        score += 1.0            # 影響を受けたアーティストの曲も、いちばん優先する（決定 91）
+        why.insert(0, "影響を受けたアーティストの曲")
+    if tag < 0.34 and not own and not infl:
         score = min(score, 0.3)  # 言葉が 1 つも本当に重ならない曲は、テンポと声が合っても近いとみない
     return round(score, 3), why
 
@@ -1286,7 +1338,7 @@ def build_artist_digests(quiet: bool = False) -> list[str]:
     ARTIST_DIR.mkdir(parents=True, exist_ok=True)
     md = [f"# 参考データベース：組ごとの近い参考曲（{datetime.now():%Y-%m-%d %H:%M}・データベース {len(sheets)} 曲）", "",
           "近さ＝ジャンル・タグ・楽器の言葉の重なり（6 割）・テンポ（2.5 割）・声の性別（1.5 割）。"
-          "データベースの「使う組」の欄やメモに組の名前を書いた曲は、いちばん優先します。", ""]
+          "データベースの「使う組」の欄やメモに組の名前を書いた曲と、組が影響を受けたアーティストの曲は、いちばん優先します。", ""]
     lines = []
     for a in all_artists():
         aw = artist_words(a)
@@ -1298,7 +1350,8 @@ def build_artist_digests(quiet: bool = False) -> list[str]:
         bpms = sorted(b for _, s in pick if isinstance(b := (s.get("groove") or {}).get("bpm"), (int, float)))
         d = {
             "slug": a["slug"], "name": a.get("name"), "updated": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "close_count": len(close), "owner_assigned": sum(1 for sc, _, _ in close if sc > 1),
+            "close_count": len(close), "owner_assigned": sum(1 for sc, _, s in close if sc > 1 and not influenced_by(s, a)),
+            "influence_songs": sum(1 for _, _, s in close if influenced_by(s, a)),
             "close": {s["id"]: sc for sc, _, s in close},   # select_references.py が選ぶ重みに使う（id だけ。実名は入れない）
             "top_tags": [t for t, _ in tags.most_common(15)],
             "bpm": {"min": bpms[0], "median": bpms[len(bpms) // 2], "max": bpms[-1]} if bpms else None,
@@ -1310,7 +1363,8 @@ def build_artist_digests(quiet: bool = False) -> list[str]:
         }
         (ARTIST_DIR / f"{a['slug']}.json").write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
         md += [f"## {a.get('name')}（{a['slug']}）：近い参考曲 {len(close)} 曲"
-               + (f"（うちオーナーの指定 {d['owner_assigned']} 曲）" if d["owner_assigned"] else ""), ""]
+               + (f"（うちオーナーの指定 {d['owner_assigned']} 曲）" if d["owner_assigned"] else "")
+               + (f"（うち影響を受けたアーティストの曲 {d['influence_songs']} 曲）" if d["influence_songs"] else ""), ""]
         md += [f"- {s['reference'].get('title')}／{s['reference'].get('artist_name')}　近さ {sc:.2f}　{'・'.join(why)}" for sc, why, s in close] or ["- —（近い曲がありません。データベースに足すと次の制作から効きます）"]
         if d["style_hints"]:
             md += ["", f"Suno のスタイル欄の後ろに足す言葉：{'、'.join(d['style_hints'])}"]
