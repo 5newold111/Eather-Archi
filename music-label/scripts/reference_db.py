@@ -408,7 +408,7 @@ def _put_lyrics(d: dict, tr: dict) -> None:
         if tr["vocal_sec"] < 5 and not (d.get("vocal") or {}).get("sex"):
             d.setdefault("vocal", {})["sex"] = "none"
         return
-    ly["transcript"] = tr["text"]   # オーナーの指示：言い回しまで分析シートに載せる（新しい歌詞を書く Claude には渡さない。決定 86）
+    ly["transcript"] = tr["text"]   # オーナーの指示：原文のまま、言い回しまで分析シートに載せる（新しい歌詞を書く Claude には渡さない。決定 86）
     ly.pop("instrumental_guess", None)
     title = (d.get("reference") or {}).get("title", "")
     ls = analyze_track.lyrics_structure(tr["text"], title)
@@ -430,6 +430,35 @@ def _put_lyrics(d: dict, tr: dict) -> None:
         d.setdefault("reference", {})["language"] = tr["language"]
 
 
+def lyrics_file(f: Path) -> Path | None:
+    """曲と同じ名前の歌詞のテキスト（Slow Tide.mp3 → Slow Tide.txt / .lrc）。あれば、聞き取りの代わりに原文のまま使う（決定 87）"""
+    for ext in (".txt", ".lrc", ".TXT"):
+        p = f.with_suffix(ext)
+        if p.is_file():
+            return p
+    return None
+
+
+def _read_lyrics_file(p: Path) -> dict:
+    """歌詞のテキストを、原文のまま読む（.lrc の時刻 [00:12.34] だけは外す）"""
+    raw = p.read_bytes()
+    for enc in ("utf-8-sig", "utf-16", "cp932"):
+        try:
+            text = raw.decode(enc)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        text = raw.decode("utf-8", errors="replace")
+    if p.suffix.lower() == ".lrc":
+        text = "\n".join(re.sub(r"^(\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\])+", "", ln).strip() for ln in text.splitlines()
+                         if not re.match(r"^\[(ar|ti|al|by|offset|length|re|ve):", ln.strip(), re.I))
+    text = re.sub(r"\n{3,}", "\n\n", text.replace("\r\n", "\n")).strip()
+    lang = "ja" if re.search(r"[\u3040-\u30ff\u4e00-\u9fff]", text) else "en"
+    return {"text": text, "language": lang, "language_probability": 1.0, "avg_logprob": 0.0, "no_speech": 0.0, "compression": 0.0,
+            "vocal_sec": 999.0, "clarity": "given" if text else "none", "model": f"file:{p.name}", "at": datetime.now().isoformat(timespec="seconds")}
+
+
 def lyrics_pending() -> list[tuple[Path, Path]]:
     """まだ歌詞を聞き取っていない曲：(解析シート, 音源ファイル)"""
     index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
@@ -440,7 +469,10 @@ def lyrics_pending() -> list[tuple[Path, Path]]:
             d = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if not (d.get("lyrics") or {}).get("transcript_meta") and f.is_file():
+        meta = (d.get("lyrics") or {}).get("transcript_meta") or {}
+        lf = lyrics_file(f) if f.is_file() else None
+        newer = lf is not None and meta.get("model") != f"file:{lf.name}"   # 歌詞のテキストをあとから置いた
+        if f.is_file() and (not meta or newer):
             out.append((p, f))
     return out
 
@@ -452,7 +484,11 @@ def audio_lyrics(limit: int = 0, quiet: bool = False) -> int:
         if not quiet:
             print("【結果】聞き取る曲はありません（全部聞き取り済みか、SSD がつながっていません）")
         return 0
-    if not whisper_ready():
+    if not whisper_ready():   # 聞き取りの部品が無い：歌詞のテキストがある曲だけ入れる
+        pend = [x for x in pend if lyrics_file(x[1])]
+    if not pend:
+        if quiet:
+            return 2
         print("【結果】歌を聞き取る部品（faster-whisper）が入っていません。ターミナルで  python3 -m pip install faster-whisper  を実行してください"
               "（最初の 1 回だけ、聞き取りのモデル 約 500 MB をダウンロードします）")
         return 2
@@ -463,15 +499,16 @@ def audio_lyrics(limit: int = 0, quiet: bool = False) -> int:
         d = json.loads(p.read_text(encoding="utf-8"))
         ref = d.get("reference") or {}
         print(f"【進み具合】{i}/{len(run)} 曲目：{ref.get('artist_name')}「{ref.get('title')}」の歌詞を聞き取っています", flush=True)
+        lf = lyrics_file(f)
         try:
-            tr = transcribe(f)
+            tr = _read_lyrics_file(lf) if lf else transcribe(f)
         except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
             print(f"   ✕ 聞き取れませんでした（{type(e).__name__}: {str(e)[:160]}）")
             continue
         _put_lyrics(d, tr)
         p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
-        n[tr["clarity"]] += 1
-        print("   " + {"clear": "○ はっきり聞き取れました", "unclear": "△ 聞き取りがあやしい（Claude に Web で確かめてもらう対象にしました）",
+        n[tr["clarity"] if tr["clarity"] != "given" else "clear"] += 1
+        print("   " + {"given": f"○ 歌詞のテキスト（{lf.name if lf else ''}）を原文のまま入れました", "clear": "○ はっきり聞き取れました", "unclear": "△ 聞き取りがあやしい（Claude に Web で確かめてもらう対象にしました）",
                       "none": "－ 歌がほとんどありません（インストか、歌が少ない曲）"}[tr["clarity"]]
               + f"（{tr['language']}・{len([x for x in tr['text'].splitlines() if x.strip()])} 行）")
     if sum(n.values()):
@@ -1266,7 +1303,7 @@ def main() -> None:
     paths, where = candidates()
     audio = [] if args.show else analyze_audio(args.audio_limit, quiet=args.quiet)
     if args.watch and not NEW_AUDIO:
-        if whisper_ready() and lyrics_pending():   # 歌詞の聞き取りがまだの曲：1 回に 5 曲ずつ、自動で聞き取る（決定 86）
+        if lyrics_pending():   # 歌詞の聞き取りがまだの曲・歌詞のテキストを置いた曲：1 回に 5 曲ずつ、自動で入れる（決定 86・87）
             audio_lyrics(5, quiet=True)
         return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
