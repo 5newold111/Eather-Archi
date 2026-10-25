@@ -132,7 +132,7 @@ def status_json() -> dict:
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
-            "jobs": [{k: j[k] for k in ("id", "label", "state", "started")} for j in list(JOBS.values())[-8:]]}
+            "jobs": [{k: j.get(k, "") for k in ("id", "label", "state", "started", "progress", "step")} for j in list(JOBS.values())[-8:]]}
 
 
 # ---------------------------------------------------------------------------
@@ -285,17 +285,27 @@ def start_job(cmd: list[str], label: str) -> str:
     def run():
         try:
             load_dotenv(override=True)   # あとで直した .env（本名・鍵など）を、ダッシュボードを動かしたままでも使う
-            p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                 env={**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
+            # 出力を 1 行ずつ読む：途中の様子（何曲中の何曲目・いまの工程）をダッシュボードにすぐ出すため（決定 65）
+            p = subprocess.Popen(cmd, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1,
+                                 env={**os.environ, "PYTHONUNBUFFERED": "1",
+                                      "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"})
             PROCS[jid] = p
-            try:
-                out, err = p.communicate(timeout=3600)
-            except subprocess.TimeoutExpired:
-                p.kill()
-                out, err = p.communicate()
+            killer = threading.Timer(3600, p.kill)   # 1 時間で止める（これまでと同じ）
+            killer.start()
+            lines: list[str] = []
+            for ln in p.stdout:
+                ln = ln.rstrip("\n")
+                lines.append(ln)
+                if ln.startswith("【進み具合】"):   # 「何曲中の何曲目」：2/5 曲目：HOLLOWPLAN「…」
+                    job["progress"], job["step"] = ln[len("【進み具合】"):], ""
+                elif ln.startswith("【工程】"):     # その曲の中の工程：3/7：丸を選んでいます
+                    job["step"] = ln[len("【工程】"):]
+                job["out"] = "\n".join(lines)[-20000:]
+            p.wait()
+            killer.cancel()
             PROCS.pop(jid, None)
-            r = subprocess.CompletedProcess(cmd, p.returncode, out or "", err or "")
-            job["out"] = (r.stdout + r.stderr)[-20000:]
+            r = subprocess.CompletedProcess(cmd, p.returncode, "\n".join(lines), "")
+            job["out"] = r.stdout[-20000:]
             if job.get("stopped"):   # 入り直すために止めた
                 job["state"], job["summary"] = "incomplete", "止めました（もう一度入力するため）"
                 return
@@ -373,7 +383,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .x{position:absolute;right:10px;top:8px;background:transparent;color:var(--sub);font-size:22px;padding:2px 10px}
 .badge{display:inline-block;font-size:12px;border-radius:999px;padding:2px 10px;border:1.5px solid}.badge.done{border-color:var(--good)}.badge.wait{border-color:var(--warn)}.badge.ng{border-color:var(--crit)}.badge.run{border-style:dashed}.badge.plan{border-style:dotted;border-color:var(--muted)}
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
-#dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub)}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
+#dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub);white-space:pre-line}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 </style></head><body>
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
@@ -503,7 +513,7 @@ function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].r
   const badge=document.querySelector("#dlg-body .badge");const dj=document.createElement("div");dj.id="dlg-job";
   (badge?badge.parentNode.insertBefore(dj,badge.nextElementSibling&&badge.nextElementSibling.nextElementSibling||null):document.getElementById("dlg-body").prepend(dj));
   const rj=(DATA.jobs||[]).filter(j=>j.state==="running").reverse().find(j=>String(j.label).includes(r.artist))||(DATA.jobs||[]).filter(j=>j.state==="running").pop();
-  if(rj){dj.className="job running";dj.textContent=`${rj.label}　実行中…`;if(!watching[rj.id])watch(rj.id)}
+  if(rj){dj.className="job running";dj.textContent=`${rj.label}　実行中…${PROGL(rj)}`;if(!watching[rj.id])watch(rj.id)}
   const dlg=document.getElementById("dlg");if(!dlg.open)dlg.showModal()}
 document.addEventListener("click",e=>{const c=e.target.closest("[data-copy]");if(!c)return;const t=(ACTS[+c.dataset.copy]||{}).text||"";
   const done=()=>{const o=c.textContent;c.textContent="コピーしました";setTimeout(()=>c.textContent=o,1600)};
@@ -556,14 +566,17 @@ async function act(action,params={},btn){if(STATIC)return;if(btn)btn.disabled=tr
   try{const r=await fetch("/api/action",{method:"POST",headers:{"Content-Type":"application/json","X-Label-Token":TOKEN},body:JSON.stringify({action,...params})});
     const j=await r.json();if(!r.ok){alert(j.error||"実行できませんでした");return}if(j.job)watch(j.job)}finally{if(btn)setTimeout(()=>btn.disabled=false,1500)}}
 const watching={};
+// 実行中の仕事の進み具合（決定 65）：「2/5 曲目：…」と、その曲の中の「工程 3/7：…」
+const PROG=j=>j.progress?`（${j.progress}${j.step?`・工程 ${j.step}`:""}）`:(j.step?`（工程 ${j.step}）`:"");
+const PROGL=j=>(j.progress?`\n▶ ${j.progress}`:"")+(j.step?`\n　工程 ${j.step}`:"");   // ポップアップ用：1 行ずつ
 async function watch(id){watching[id]=true;const box=document.getElementById("jobs");
   for(;;){const r=await fetch("/api/jobs/"+id);const j=await r.json();let el=document.getElementById("job-"+id);
     if(!el){el=document.createElement("details");el.id="job-"+id;el.open=true;box.prepend(el)}
-    const st={running:"実行中…",done:"終わりました ✓",incomplete:"⚠ まだ終わっていません",error:"✕ エラーがありました"}[j.state]||j.state;
+    const st=({running:"実行中…",done:"終わりました ✓",incomplete:"⚠ まだ終わっていません",error:"✕ エラーがありました"}[j.state]||j.state)+(j.state==="running"?PROG(j):"");
     const sm=j.summary?`：${j.summary}`:"";
     el.className="job "+j.state;
     el.innerHTML=`<summary>${E(j.label)}　${E(st)}${E(sm)}（${E(j.started)}）</summary><pre>${E(j.out||"")}</pre>`;
-    const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open){dj.className="job "+j.state;dj.textContent=`${j.label}　${st}${sm||(j.state==="error"?"（画面の下のログを確認）":"")}`}
+    const dj=document.getElementById("dlg-job");if(dj&&document.getElementById("dlg").open){dj.className="job "+j.state;dj.textContent=`${j.label}　${j.state==="running"?"実行中…"+PROGL(j):st}${sm||(j.state==="error"?"（画面の下のログを確認）":"")}`}
     if(j.state!=="running"){load();if(j.state==="done"&&String(j.label).startsWith("戻す")){const dl=document.getElementById("dlg");if(dl.open)dl.close()}break}await new Promise(r=>setTimeout(r,2000))}}
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;

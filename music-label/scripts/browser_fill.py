@@ -1316,6 +1316,16 @@ def wait_for_form(sess: Session, name: str, how: str) -> bool:
     return True
 
 
+def progress(i: int, n: int, song: dict, extra: str = "") -> None:
+    """ダッシュボードに「何曲中の何曲目」を出す（webapp.py が【進み具合】の行を読む。決定 65）"""
+    print(f"【進み具合】{i}/{n} 曲目：{song['artist']}「{song['title']}」" + (f"（{extra}）" if extra else ""), flush=True)
+
+
+def step(k: int, n: int, text: str) -> None:
+    """ダッシュボードに、その曲の中のいまの工程を出す（【工程】の行）"""
+    print(f"【工程】{k}/{n}：{text}", flush=True)
+
+
 def run_suno(sess: Session, ids: list[str]) -> int:
     """全部の曲で、作曲画面のすべての欄に入ったことを確かめられたら 0、そうでなければ 2"""
     import publish
@@ -1330,6 +1340,8 @@ def run_suno(sess: Session, ids: list[str]) -> int:
     songs = songs[:1]
     ok_songs, problems, unsure_all = [], [], []
     for n, song in enumerate(songs, 1):
+        progress(n, len(songs), song, f"作曲待ちはほかに {len(later)} 曲" if later else "")
+        step(1, 4, "Suno の作曲画面を開いています")
         sess.goto(SITES["suno"])
         if not sess.ensure_login("suno"):
             problems.append("Suno にログインできていません")
@@ -1343,7 +1355,9 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         if challenge_shown(sess):
             raise Challenge()
         fields = suno_fields(song)
+        step(2, 4, "曲名・スタイル・歌詞などの欄を入れています")
         done, manual = fill_fields(sess, "suno", fields)
+        step(3, 4, "入れた欄を読み返しています")
         bad = verify(sess, fields)
         if not on_page(sess, "suno"):
             bad.insert(0, f"Suno の作曲画面ではありません（いまの画面：{sess.page.url}）")
@@ -1389,6 +1403,7 @@ def run_suno(sess: Session, ids: list[str]) -> int:
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）",
                   *([f"次の曲（あと {len(later)} 曲）は、Create のあと少し時間をあけて、ダッシュボードでもう一度「Suno に入力する」を押してください"] if later else []),
                   "ロボット確認が何度も出て通らないとき：この専用の Chrome は使わず、ふだんの Chrome か Safari で http://localhost:8765/phone/{id} を開き、「写す」ボタンで Suno に貼ってください（ふだんのブラウザは確認が出にくい）".format(id=song["id"])]
+        step(4, 4, "Gon さんの確認待ち（Create を押す）")
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
             sess.js("(t) => { window.__postdogLog = t; }", "\n".join(getattr(sess, "log", []) or []))   # コピーのボタンにも記録を入れる
@@ -2033,6 +2048,7 @@ def run_distrokid_all(sess: Session) -> int:
     for i, x in enumerate(songs):
         nxt = songs[i + 1] if i + 1 < len(songs) else None
         print(f"\n▶ {i + 1}/{len(songs)} 曲目：{x['artist']}「{x['title']}」（{x['id']}）")
+        progress(i + 1, len(songs), x)
         code = run_distrokid(sess, x["id"], f"{nxt['artist']}「{nxt['title']}」" if nxt else "")
         if _songs.state(x).get("status") == "registered":
             done.append(x)
@@ -2093,11 +2109,13 @@ def run_lyrics(sess: Session, song_id: str, nxt: str = "") -> int:
     if not text:
         print(f"【結果】{song['artist']}「{song['title']}」は歌詞がありません（インスト）")
         return 0
+    step(1, 4, "DistroKid の歌詞の画面を開いています")
     sess.goto(SITES["distrokid_lyrics"])
     if not sess.ensure_login("distrokid"):
         print("【結果】まだ終わっていません：DistroKid にログインできていません")
         return 2
     sess.settle(2000)
+    step(2, 4, "この曲の歌詞の欄を探しています")
     for _ in range(3):
         if _open_song_lyrics(sess, song):
             break
@@ -2112,6 +2130,7 @@ def run_lyrics(sess: Session, song_id: str, nxt: str = "") -> int:
     f = {"key": "lyrics", "label": "歌詞（Lyrics）", "type": "text", "value": text, "largest_textarea": True,
          "hints": ["Lyrics", "Paste your lyrics", "Enter lyrics", "Type lyrics", "歌詞"], "avoid": r"search|title|name|email|artist",
          "tip": "DistroKid の歌詞を入れる大きな欄をクリックしてください"}
+    step(3, 4, "歌詞を入れています")
     done, manual = fill_fields(sess, "distrokid_lyrics", [f])
     bad = verify(sess, [f]) if done else ["歌詞（Lyrics）"]
     notes = []
@@ -2131,6 +2150,7 @@ def run_lyrics(sess: Session, song_id: str, nxt: str = "") -> int:
                "押したら「出した」を押すと記録されます。"],
               [{"id": "submitted", "label": "出した", "primary": True}, *later,
                {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}])
+    step(4, 4, "Gon さんの確認待ち（Submit と「出した」を押す）")
     m = sess.wait({"action": "stop"})
     if m.get("action") == "submitted":
         st = _songs.state(song)
@@ -2153,6 +2173,7 @@ def run_lyrics_all(sess: Session) -> int:
     for i, x in enumerate(songs):
         nxt = songs[i + 1] if i + 1 < len(songs) else None
         print(f"\n▶ {i + 1}/{len(songs)} 曲目：{x['artist']}「{x['title']}」（{x['id']}）")
+        progress(i + 1, len(songs), x)
         if run_lyrics(sess, x["id"], f"{nxt['artist']}「{nxt['title']}」" if nxt else "") == 3:
             break
     rest = lyrics_todo()
@@ -2200,6 +2221,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     song = _songs.by_id(song_id)
     if song is None:
         sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
+    step(1, 7, "DistroKid の登録画面を開いています")
     sess.goto(SITES["distrokid"])
     if not sess.ensure_login("distrokid"):
         print("【結果】まだ終わっていません：DistroKid にログインできていません")
@@ -2227,19 +2249,24 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     # 入れる順番（2026-10-22 の差し戻しから）：
     #  1 アーティスト名と曲名 → DistroKid が Spotify・Apple・YouTube で同じ名前を探し終えるまで待つ（終わると、その欄を作り直して「Yes」に戻す）
     #  2 丸（はい／いいえ・Artist already in）→ 3 残りの欄 → 4 Track credits → 5 落ち着いてから読み返し、戻されたものを入れ直す
+    step(2, 7, "アーティスト名と曲名を入れています（DistroKid が同じ名前を探し終えるまで待ちます）")
     first = [f for f in fields if f["key"] in ("artist", "title")]
     done, manual = fill_fields(sess, "distrokid", first)
     sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで探し始める）
     sess.settle(3000)
+    step(3, 7, "丸（はい／いいえ）・AI で作った部分・Artist already in を選んでいます")
     r_done, r_miss, a_done = apply_choices(sess, song)
     guard_artist_no(sess, song, a_done)
+    step(4, 7, "配信日・言語・ジャンル・音源・ジャケット・Songwriter を入れています")
     d2, m2 = fill_fields(sess, "distrokid", [f for f in fields if f not in first], fresh=False)
+    step(5, 7, "Track credits（Performer・Producer）とジャンルの箱を入れています")
     c_done, c_manual = fill_credits(sess, song)
     g_done, g_manual = fill_genre_boxes(sess, fields)   # Primary genre が「打って選ぶ箱」の画面（決定 61）
     answer_ai_parts(sess, song)
     guard_genres(sess, fields)
     done += d2 + r_done + a_done + c_done + g_done
     manual += m2 + c_manual + g_manual
+    step(6, 7, "読み返して、DistroKid に戻された欄・丸を入れ直しています")
     r_miss = stabilize(sess, song, fields) or r_miss
     a_left = [svc for n, svc in ARTIST_ID_RADIOS if not any(svc in d for d in a_done) or any(f"in {svc}?" in m for m in r_miss)]
     r_miss = [m for m in r_miss if "Artist already" not in m]
@@ -2319,6 +2346,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
                    "宣誓の 5 つのチェックを確かめて、もう一度「Continue」を押してください（押すのは Gon さんだけ）。"],
                   [{"id": "registered", "label": "登録した", "primary": True}, *later,
                    {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"}], date_value=date.today().isoformat())
+    step(7, 7, "Gon さんの確認待ち（宣誓・Continue・「登録した」）")
     m = sess.wait({"action": "stop"}, tick=watch_errors)
     if m.get("action") == "registered":
         day = m.get("date") or date.today().isoformat()
@@ -2511,8 +2539,12 @@ def main() -> None:
             if a.what == "suno":
                 code = run_suno(sess, a.args)
             elif a.what == "distrokid":
+                if a.args[0] != "all" and _songs.by_id(a.args[0]):
+                    progress(1, 1, _songs.by_id(a.args[0]))
                 code = run_distrokid_all(sess) if a.args[0] == "all" else run_distrokid(sess, a.args[0])
             elif a.what == "lyrics":   # 歌詞を DistroKid の歌詞の画面に入れる（曲 ID か all。決定 52）
+                if a.args and a.args[0] != "all" and _songs.by_id(a.args[0]):
+                    progress(1, 1, _songs.by_id(a.args[0]))
                 code = run_lyrics_all(sess) if not a.args or a.args[0] == "all" else run_lyrics(sess, a.args[0])
             elif a.what == "photo":
                 code = run_photo(sess, a.args[0], a.args[1])
