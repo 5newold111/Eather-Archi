@@ -157,6 +157,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "publish.py"), "scan"], "曲の取り込み"
     if action == "track":
         return [PY, str(S / "publish.py"), "track"], "配信の確認"
+    if action == "ref_audio":   # SSD の「既存楽曲」の音源を全部解析して、参考曲に登録する（決定 76）
+        return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
     if action == "sync":
         return [PY, str(S / "archive_sync.py")], "保管（ローカルと SSD）"
     if action == "dashboard":
@@ -422,7 +424,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">

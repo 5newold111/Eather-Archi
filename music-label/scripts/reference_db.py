@@ -14,7 +14,11 @@ SSD に置いた「データベース」（参考曲・資料）を読み、楽�
       曲名・アーティスト・BPM・キー・ジャンル・タグ（雰囲気）・テーマ・ボーカル・楽器・構成・言語・年・メモ を読み取る。
       読み取れなかった欄も「その他」として残す
   ・文章（.md・.txt）… 制作メモとして傾向の要約に入れる
-  ・音源（.mp3・.wav など）… 数だけ数える（analyze_track.py で解析シートにできる）
+  ・音源（.mp3・.wav など）… データベースの中のものは数だけ数える
+  ・SSD の「既存楽曲」フォルダの音源（WAV・MP3・M4A）… 1 曲ずつ機械で解析して、参考曲の解析シートにする（決定 76）
+      BPM・キー・長さ・セクション・エネルギーの起伏・サビの入り（analyze_track.py の計測）。曲名・アーティストは
+      ファイルの情報（タグ）か、ファイル名「アーティスト - 曲名」・フォルダ名から。1 回に --audio-limit 曲まで（既定 20。続きは次の回）。
+      解析した曲は覚えておき、2 回目からは新しく入れた曲だけ解析する。場所は .env の REFERENCE_AUDIO でも指定できる
   ・Numbers（.numbers）は読めないので、Numbers で「書き出す → Excel」してから置く
 
 出すもの（Mac の中。SSD が無いときも、前回取り込んだものを使い続ける）：
@@ -31,6 +35,7 @@ SSD に置いた「データベース」（参考曲・資料）を読み、楽�
   python3 scripts/reference_db.py                       # 取り込む（run_week.py のブリーフ作りの前にも自動で動く）
   python3 scripts/reference_db.py --setup "/Volumes/SP DS72/データベース"   # 場所を .env に書く
   python3 scripts/reference_db.py --artists             # 組ごとの近い参考曲だけ作り直す（SSD が無くても前回の取り込みから）
+  python3 scripts/reference_db.py --audio-limit 0       # 「既存楽曲」の音源を全部解析する（1 曲 10〜30 秒）
 """
 from __future__ import annotations
 
@@ -116,6 +121,119 @@ def field_of(header: str) -> str | None:
         if any(norm(w) in h for w in words[f] if len(norm(w)) >= 2 or f in ("title", "key", "year")):
             return f
     return None
+
+
+# ---------------------------------------------------------------------------
+# 「既存楽曲」の音源を解析して、参考曲の解析シートにする（オーナーの指示 2026-10-25。決定 76）
+AUDIO_DIR_HINTS = ["既存楽曲"]
+AUDIO_TAKE = {".wav", ".mp3", ".m4a"}
+AUDIO_CACHE = DIGEST_DIR / "audio"          # 解析した結果（実名つき。Mac の中だけ）
+AUDIO_INDEX = DIGEST_DIR / "audio_index.json"
+
+
+def audio_dirs() -> list[Path]:
+    """「既存楽曲」のフォルダ（.env の REFERENCE_AUDIO か、SSD の一番上・Postdog Records の中から 3 段まで）"""
+    env = os.environ.get("REFERENCE_AUDIO", "").strip()
+    if env:
+        return [p for p in (Path(x.strip()).expanduser() for x in env.split(";") if x.strip()) if p.is_dir()]
+    base, _ = archive.root()
+    if base is None:
+        return []
+    found: list[Path] = []
+    for top in (base.parent, base):
+        for c in _walk(top, 3):
+            if c.is_dir() and any(norm(h) in norm(c.name) for h in AUDIO_DIR_HINTS) and not any(c.is_relative_to(f) for f in found):
+                found.append(c)
+    return found
+
+
+def _tags(f: Path) -> dict:
+    """ファイルに書かれた曲の情報（曲名・アーティスト・ジャンル・年）。ffprobe で読む"""
+    import subprocess
+    try:
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format_tags", "-of", "json", str(f)],
+                           capture_output=True, text=True, timeout=30)
+        t = {k.lower(): v for k, v in (json.loads(r.stdout or "{}").get("format", {}).get("tags") or {}).items()}
+    except Exception:  # noqa: BLE001
+        return {}
+    return {"title": t.get("title", ""), "artist": t.get("artist") or t.get("album_artist", ""), "genre": t.get("genre", ""),
+            "year": (re.match(r"\d{4}", t.get("date", "") or "") or [None])[0]}
+
+
+def _who(f: Path, top: Path) -> tuple[str, str]:
+    """曲名とアーティスト：タグ → ファイル名「アーティスト - 曲名」→ フォルダ名（既存楽曲/<アーティスト>/…）"""
+    t = _tags(f)
+    title, artist = t.get("title", "").strip(), t.get("artist", "").strip()
+    stem = re.sub(r"^\d{1,3}[\s._-]+", "", f.stem).strip()   # 先頭のトラック番号
+    if not title or not artist:
+        m = re.match(r"(.+?)\s+[-–—]\s+(.+)", stem)
+        if m:
+            artist, title = artist or m.group(1).strip(), title or m.group(2).strip()
+    if not artist:
+        rel = f.parent.relative_to(top).parts if f.parent != top else ()
+        artist = rel[0] if rel else "?"
+    return title or stem, artist
+
+
+def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict]]:
+    """「既存楽曲」の音源を解析する（新しい曲だけ。1 回に limit 曲まで。0 なら全部）。解析済みの全曲の (ファイル, シート) を返す"""
+    dirs = audio_dirs()
+    if not dirs:
+        if not quiet:
+            print("－ 「既存楽曲」のフォルダが見つかりません（SSD をつなぐか、.env の REFERENCE_AUDIO で場所を指定してください）")
+        return []
+    import hashlib as _h
+    AUDIO_CACHE.mkdir(parents=True, exist_ok=True)
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    files = [(top, f) for top in dirs for f in files_in(top) if f.suffix.lower() in AUDIO_TAKE]
+    todo, out, seen = [], [], set()
+    for top, f in files:
+        st = f.stat()
+        rid = "aud-" + _h.sha1(f"{f.relative_to(top)}|{st.st_size}".encode()).hexdigest()[:12]
+        seen.add(rid)
+        cache = AUDIO_CACHE / f"{rid}.json"
+        if cache.exists() and index.get(rid, {}).get("sig") == f"{st.st_size}|{int(st.st_mtime)}":
+            out.append((f, json.loads(cache.read_text(encoding="utf-8"))))
+        else:
+            todo.append((top, f, rid, cache, f"{st.st_size}|{int(st.st_mtime)}"))
+    print(f"▶ 既存楽曲：{len(files)} 曲（解析済み {len(out)}・まだ {len(todo)}）" + "".join(f"\n   ・{d}" for d in dirs))
+    if todo:
+        try:
+            import analyze_track
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 解析の部品を読めませんでした（{e}）。ターミナルで  python3 -m pip install -r requirements.txt  を 1 回実行してください")
+            todo = []
+    run = todo if limit <= 0 else todo[:limit]
+    for i, (top, f, rid, cache, sig) in enumerate(run, 1):
+        title, artist = _who(f, top)
+        print(f"【進み具合】{i}/{len(run)} 曲目：{artist}「{title}」を解析しています（{f.name}）", flush=True)
+        try:
+            m = analyze_track.measure(f)
+        except Exception as e:  # noqa: BLE001  1 曲読めなくても次へ
+            print(f"   ✕ 解析できませんでした（{type(e).__name__}: {str(e)[:120]}）")
+            index[rid] = {"sig": sig, "file": str(f), "error": str(e)[:200]}
+            continue
+        t = _tags(f)
+        args = argparse.Namespace(title=title, artist=artist, language="en", source="manual", acquired_from=str(f.name),
+                                  tags=[x.strip() for x in re.split(r"[;/,]", t.get("genre", "")) if x.strip()],
+                                  year=int(t["year"]) if t.get("year") else None, web=[])
+        sheet = analyze_track.skeleton(args, m, None)
+        sheet["id"] = PREFIX + rid
+        sheet["reference"]["source"] = "database"
+        sheet["reference"]["from"] = "既存楽曲（音源の解析）"
+        sheet["analyzed_by"] = "auto（既存楽曲の音源）"
+        cache.write_text(json.dumps(sheet, ensure_ascii=False, indent=1), encoding="utf-8")
+        index[rid] = {"sig": sig, "file": str(f), "at": datetime.now().isoformat(timespec="seconds")}
+        out.append((f, sheet))
+        print(f"   ○ {m['bpm']} BPM・{m['key']}・{m['duration_sec']} 秒・セクション {len(m['sections'])}")
+    for rid in [k for k in index if k not in seen]:   # 既存楽曲から消えた曲は取り下げる
+        (AUDIO_CACHE / f"{rid}.json").unlink(missing_ok=True)
+        index.pop(rid)
+    AUDIO_INDEX.write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    left = len(todo) - len(run)
+    if left > 0:
+        print(f"   まだ解析していない曲が {left} 曲あります（次の回に続けます。全部いま解析するときは --audio-limit 0）")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -626,6 +744,7 @@ def main() -> None:
     ap.add_argument("--setup", metavar="PATH", help="データベースの場所を .env に書く")
     ap.add_argument("--quiet", action="store_true", help="SSD が無いときは何も言わない（自動実行用）")
     ap.add_argument("--artists", action="store_true", help="組ごとの近い参考曲だけ作り直す")
+    ap.add_argument("--audio-limit", type=int, default=20, help="「既存楽曲」の音源を 1 回に何曲まで解析するか（0＝全部）")
     args = ap.parse_args()
     if args.artists:
         if not build_artist_digests():
@@ -635,6 +754,13 @@ def main() -> None:
         setup(args.setup)
         return
     paths, where = candidates()
+    audio = [] if args.show else analyze_audio(args.audio_limit, quiet=args.quiet)
+    if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
+        res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}
+        n, d = write_outputs(res, "SSD の既存楽曲", [])
+        print(f"   取り込み：参考曲 {n} 曲（既存楽曲の解析。out/references/{PREFIX}aud-*.json）")
+        build_artist_digests()
+        return
     if not paths:
         cached = len(list(REF_DIR.glob(f"{PREFIX}*.json"))) if REF_DIR.exists() else 0
         if not args.quiet or cached == 0:
@@ -650,6 +776,7 @@ def main() -> None:
     for p in paths:
         print(f"   ・{p}")
     res = scan(paths)
+    res["analysis"] += audio   # 既存楽曲の音源の解析も、参考曲として一緒に取り込む（決定 76）
     if args.show:
         print(summary(res, where, paths))
         return

@@ -186,7 +186,7 @@ def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: 
     N = 4
     _progress(1, N, "SSD の参考データベースを読んでいます（SSD が無ければ前回の取り込みを使う）")
     if (S / "reference_db.py").exists():
-        subprocess.run([PY, str(S / "reference_db.py"), "--quiet"])
+        subprocess.run([PY, str(S / "reference_db.py"), "--quiet", "--audio-limit", "5"])   # 既存楽曲の新しい曲は 5 曲まで（全部はダッシュボードのボタンで）
     if _refs_count() < 11:
         return fail(f"参考曲の解析シートが {_refs_count()} 件しかありません（11 件以上必要）。SSD をつないでから、もう一度作ってください")
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):

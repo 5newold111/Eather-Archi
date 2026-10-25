@@ -497,6 +497,18 @@ DESC_JS = """e => [e.getAttribute('placeholder'), e.getAttribute('aria-label'), 
                    e.labels ? [...e.labels].map(l => l.innerText).join(' ') : ''].join(' ')"""
 
 
+# サイト全体の部品（表示の言語の切り替え・クッキーの案内など）。曲の欄と取り違えて触らない（決定 75）
+SITE_CHROME_JS = r"""e => /^language selected/i.test(e.getAttribute('aria-label') || '')
+    || !!e.closest('footer, [class*="osano" i], [id*="osano" i], [class*="language-select" i], [class*="lang-switch" i]')"""
+
+
+def _site_chrome(c) -> bool:
+    try:
+        return bool(c.evaluate(SITE_CHROME_JS))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _pick(loc, avoid, field_only: bool = False):
     """候補のうち、見えていて、避けたい欄（例：スタイルを探すときの「除外するスタイル」）ではない最初のもの。
     field_only：文字を書ける部品（入力欄・書き込み欄）だけ"""
@@ -507,7 +519,7 @@ def _pick(loc, avoid, field_only: bool = False):
     for i in range(n):
         c = loc.nth(i)
         try:
-            if not c.is_visible():
+            if not c.is_visible() or _site_chrome(c):
                 continue
             if avoid and re.search(avoid, c.evaluate(DESC_JS) or "", re.I):
                 continue
@@ -522,7 +534,7 @@ def _pick(loc, avoid, field_only: bool = False):
 def find(sess: Session, site: str, f: dict):
     page = sess.page
     sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
-    if sel and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)):
+    if sel and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)) and not _site_chrome(page.locator(sel).first):
         return page.locator(sel).first
     if f.get("css"):   # 本物の画面の部品の一覧でわかった欄の名前（DistroKid。2026-10-22）
         loc = page.locator(f["css"])
@@ -547,7 +559,7 @@ def find(sess: Session, site: str, f: dict):
         return None
     for h in f.get("below", []):   # 名前の無い欄：見出しのすぐ下のもの
         sel = sess.js(BELOW_JS, [h, "select,[role=combobox]" if f["type"] == "select" else FIELD_SEL, 160])
-        if sel and _visible(page.locator(sel)):
+        if sel and _visible(page.locator(sel)) and not _site_chrome(page.locator(sel).first):
             return page.locator(sel).first
     for h in f.get("hints", []):
         rx = re.compile(re.escape(h), re.I)
@@ -571,7 +583,7 @@ def find(sess: Session, site: str, f: dict):
     if f["type"] == "select":   # 見た目は別の部品で、本物の選ぶ箱が隠れている作り
         for h in f.get("below", []) + f.get("hints", []):
             sel = sess.js(HIDDEN_SELECT_JS, [h])
-            if sel:
+            if sel and not _site_chrome(page.locator(sel).first):
                 return page.locator(sel).first
     if f.get("largest_textarea"):
         sel = sess.js("""() => { let best = null, size = 0;
@@ -1457,7 +1469,8 @@ def distrokid_fields(song: dict) -> list[dict]:
          "hints": ["Song title", "Track title", "Title"]},
         {"key": "release", "label": "Release date", "type": "date", "value": rel, "css": "input[name=releaseDate]", "hints": ["Release date"],
          "teach": False, "show": f["Release date"]},
-        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "css": "select[name=language]",
+        # 曲の言語は、登録画面の欄（name=language）だけ。サイトの表示の言語の切り替え（aria-label「Language selected: …」）は触らない（決定 75）
+        {"key": "language", "label": "Language", "type": "select", "value": f["Language"], "css": "select[name=language]", "css_only": True,
          "hints": ["Language"], "below": ["Language"]},
         {"key": "genre1", "label": "Primary genre", "type": "select", "value": f["Primary genre"], "alts": genre1_alts, "css": "select[name=genre1]", "css_only": True, "hints": ["Primary genre", "Genre"],
          "below": ["Primary genre", "Genre"], "tip": "ページを下にスクロールすると「Primary genre」の選ぶ箱があります。その箱そのものをクリックしてください。"},
@@ -2896,6 +2909,14 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     c = DK(sess, song, fields)
     secs = dk_sections(song)
     n_steps = len(secs) + 2
+    try:   # DistroKid の表示の言語（画面のいちばん下の Language）。英語でないと、英語の見出しで探す欄が見つからないことがある（決定 75）
+        ui_lang = sess.page.evaluate("""() => { const e = [...document.querySelectorAll('[aria-label]')].find(x => /^language selected/i.test(x.getAttribute('aria-label')));
+            return e ? e.getAttribute('aria-label').replace(/^language selected:\\s*/i, '').trim() : ''; }""")
+    except Exception:  # noqa: BLE001
+        ui_lang = ""
+    if ui_lang and not re.match(r"english", ui_lang, re.I):
+        print(f"   ⚠ DistroKid の表示が「{ui_lang}」になっています。画面のいちばん下の Language を English にすると、自動入力が確実です"
+              "（システムはこの切り替えを触りません）")
     dk_fill(c, secs)
     step(len(secs) + 1, n_steps, "読み返して、入っていない項目を上から入れ直しています")
     st = dk_refill(c, secs)
