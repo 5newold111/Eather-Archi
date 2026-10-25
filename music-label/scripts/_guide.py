@@ -175,6 +175,17 @@ def _explain(row: dict, phase: dict) -> dict:
                 {"kind": "folder", "label": "公開セットのフォルダを開く", "id": row.get("id")},
                 {"kind": "run", "label": "DistroKid にログイン（初回だけ）", "action": "browser_login", "site": "distrokid"},
                 {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
+        try:   # システムが残した画面の写し（入れ終わったとき・差し戻されたとき・入れ直したあと。決定 69）
+            import song_check
+            from _common import OUT as _OUT
+            for when, ja in (("filled", "入れ終わったとき"), ("rejected", "差し戻されたとき"), ("refilled", "入れ直したあと")):
+                shot = _OUT / "browser" / "screens" / f"{row.get('id')}_{when}.png"
+                if shot.exists():
+                    import datetime as _dt
+                    at = _dt.datetime.fromtimestamp(shot.stat().st_mtime).strftime("%m/%d %H:%M")
+                    acts.insert(2, {"kind": "link", "label": f"DistroKid の画面の写し（{ja}・{at}）を見る", "url": song_check.furl(shot)})
+        except Exception:  # noqa: BLE001
+            pass
         try:   # 登録を待つ曲がほかにもあれば、続けて入れるボタン（決定 51）
             n_wait = sum(1 for x in _songs.all_songs() if _songs.state(x).get("status") == "ready")
         except Exception:  # noqa: BLE001

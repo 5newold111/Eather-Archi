@@ -2563,6 +2563,22 @@ STATE_JS = r"""() => { const vis = x => x.offsetParent !== null;
             modal: ((document.querySelector('.swal2-popup.swal2-show') || {}).innerText || '').replace(/\s+/g, ' ').slice(0, 120)}; }"""
 
 
+SCREENS = OUT / "browser" / "screens"
+
+
+def shoot(sess: Session, song: dict, when: str) -> Path | None:
+    """ページ全体の画面の写しを残す（ダッシュボードのポップアップから見られる。決定 69）。
+    when：filled（入れ終わったとき）・rejected（差し戻されたとき）・refilled（入れ直したあと）"""
+    try:
+        SCREENS.mkdir(parents=True, exist_ok=True)
+        p = SCREENS / f"{song['id']}_{when}.png"
+        sess.page.screenshot(path=str(p), full_page=True)
+        print(f"   記録：画面の写し（{ {'filled': '入れ終わったとき', 'rejected': '差し戻されたとき', 'refilled': '入れ直したあと'}.get(when, when) }）→ {p}")
+        return p
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def log_state(sess: Session, when: str) -> None:
     """画面の状態をログに 1 行で残す（本名は「（あり）」とだけ書く）"""
     try:
@@ -2614,6 +2630,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     step(len(secs) + 1, n_steps, "読み返して、入っていない項目を上から入れ直しています")
     st = dk_refill(c, secs)
     log_state(sess, "入れ終わったときの画面")
+    shoot(sess, song, "filled")
     try:   # Gon さんが Continue を押したことを、ページの中で覚えておく（登録が済んだかを見分けるため。同じタブなら次のページでも残る）
         sess.page.evaluate("""() => { document.addEventListener('click', e => {
             const b = e.target.closest && e.target.closest('#distroDoneButtonWithAPI, .distroDoneButtonWithAPI');
@@ -2664,6 +2681,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
             return
         print("   … DistroKid に差し戻されました：" + " ／ ".join(x.strip() for x in txt.splitlines()[1:6] if x.strip()))
         log_state(sess, "差し戻されたときの画面")
+        shoot(sess, song, "rejected")
         try:   # 画面の部品の一覧を自動で残す（決定 60）
             from datetime import datetime as _dt
             pp = save_parts(sess, "distrokid")
@@ -2676,6 +2694,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         before = dk_check(c, secs)
         st2 = dk_refill(c, secs)
         log_state(sess, "入れ直したあとの画面")
+        shoot(sess, song, "refilled")
         fixed = [x["name"] for x in secs if before[x["key"]] is False and st2[x["key"]]]
         sess.show("DistroKid に差し戻されたので、上から入れ直しました",
                   ["DistroKid のエラー：", *[x.strip() for x in txt.splitlines()[1:10] if x.strip()],
