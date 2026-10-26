@@ -44,7 +44,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -1350,7 +1350,69 @@ def step(k: int, n: int, text: str) -> None:
     print(f"【工程】{k}/{n}：{text}", flush=True)
 
 
-def run_suno(sess: Session, ids: list[str]) -> int:
+SUNO_BATCH_NG = OUT / "browser" / "suno_batch_ng.json"     # まとめて入力で、タブ同士の中身が書き換わった記録（決定 98）
+SUNO_BATCH_COUNT = OUT / "browser" / "suno_batch_count.txt"
+SUNO_BATCH_MAX = 3
+
+
+def suno_batch_finish(sess: Session, tabs: list[dict], later: list, ok_songs: list, problems: list) -> tuple[list, list]:
+    """まとめて入力の後始末：全部のタブを読み返す。書き換わっていたら、最初の曲だけに戻して入れ直す（決定 98）"""
+    step(4, 4, f"{len(tabs)} つのタブを読み返しています（タブ同士で中身が書き換わっていないか）")
+    moved = []
+    for t in tabs:
+        sess.page = t["page"]
+        sess.filled = t["filled"]
+        if t["bad"]:
+            continue
+        again = verify(sess, t["fields"])
+        if again:
+            moved.append(f"{t['name']}：{'／'.join(again[:3])}")
+    if moved:   # Suno が入力中の内容をタブで共有している：最初の曲だけ残して入れ直し、次からは 1 曲ずつ
+        SUNO_BATCH_NG.parent.mkdir(parents=True, exist_ok=True)
+        SUNO_BATCH_NG.write_text(json.dumps({"at": datetime.now().isoformat(timespec="seconds"), "moved": moved}, ensure_ascii=False, indent=1),
+                                 encoding="utf-8")
+        print("   ⚠ タブ同士で中身が書き換わりました：" + "／".join(moved) + "。最初の曲だけ入れ直し、次からは 1 曲ずつにします")
+        for t in tabs[1:]:
+            try:
+                t["page"].close()
+            except Exception:  # noqa: BLE001
+                pass
+        first = tabs[0]
+        sess.page = first["page"]
+        sess.goto(SITES["suno"])
+        fill_fields(sess, "suno", first["fields"])
+        bad = verify(sess, first["fields"])
+        lines = [first["lines"][0], "⚠ まとめて入力ができませんでした（Suno がタブ同士で入力中の内容を共有しています）。この曲だけ入れ直しました",
+                 *(["⚠ 入っていない欄：", *bad] if bad else ["✓ 全部の欄に入っていることを確かめました"]),
+                 "内容を確かめて「Create」を押してください（押すのは Gon さんだけ）。次の曲は、少し時間をあけてダッシュボードでもう一度"]
+        sess.keep_overlay = True
+        sess.show("Suno に入力しました（1 曲だけ）" if not bad else "Suno への入力が足りません", lines, [{"id": "dismiss", "label": "この案内を消す"}])
+        return ([first["name"]] if not bad else []), ([f"{first['name']}の{x}" for x in bad] + ["まとめて入力はできませんでした（1 曲だけ入れました）"])
+    try:
+        cnt = int(SUNO_BATCH_COUNT.read_text().strip() or 0) + 1 if SUNO_BATCH_COUNT.exists() else 1
+    except ValueError:
+        cnt = 1
+    SUNO_BATCH_COUNT.parent.mkdir(parents=True, exist_ok=True)
+    SUNO_BATCH_COUNT.write_text(str(cnt))
+    for i, t in enumerate(tabs, 1):   # 各タブに、その曲の案内を出す
+        sess.page = t["page"]
+        head = [f"タブ {i}／{len(tabs)}：{t['name']}"]
+        if cnt <= 2:
+            head.append("★ まとめて入力の初めのうちは、このタブの曲名・歌詞・スタイルが、この曲のものか目で確かめてから Create を押してください")
+        tail = ["各タブで「Create」を押す（押すのは Gon さんだけ）。タブとタブの間は 10〜20 秒ほどあける（続けて押すとロボット確認が出やすい）"]
+        if i == len(tabs) and later:
+            tail.append(f"次の曲（あと {len(later)} 曲）は、作曲が終わってからダッシュボードでもう一度")
+        sess.keep_overlay = True
+        sess.show("Suno に入力しました（まとめて入力）" if not t["bad"] else "Suno への入力が足りません", head + [x for x in t["lines"][1:] if not x.startswith("次の曲")] + tail,
+                  [{"id": "dismiss", "label": "この案内を消す"}])
+    try:
+        tabs[0]["page"].bring_to_front()
+    except Exception:  # noqa: BLE001
+        pass
+    return ok_songs, problems
+
+
+def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
     """全部の曲で、作曲画面のすべての欄に入ったことを確かめられたら 0、そうでなければ 2"""
     import publish
     songs = [_songs.by_id(i) for i in ids] if ids else publish.suno_todo()
@@ -1358,14 +1420,24 @@ def run_suno(sess: Session, ids: list[str]) -> int:
     if not songs:
         print("【結果】Suno で作る番の曲はありません")
         return 0
-    # 1 回の入力は 1 曲だけ。入れ終わったらすぐにシステムが Chrome から離れ、つながっていない状態で Gon さんが Create を押す。
+    # ふだんは 1 回の入力で 1 曲だけ。入れ終わったらすぐにシステムが Chrome から離れ、つながっていない状態で Gon さんが Create を押す。
     # つながったまま Create を押すと、ロボット確認が「自動操作の気配」を見つけて、何度出しても通らなくなる（2026-10-22）
-    later = songs[1:]
-    songs = songs[:1]
+    # まとめて入力（決定 98）：曲ごとにタブを分けて最大 3 曲入れ、最後に全部のタブを読み返してから離れる。Create はやはり Gon さんが各タブで押す
+    batch = max(1, min(SUNO_BATCH_MAX, batch))
+    if batch > 1 and SUNO_BATCH_NG.exists():
+        print("   ⚠ 前のまとめて入力で、タブ同士の中身が書き換わりました（Suno が入力中の内容をタブで共有しているため）。1 曲ずつにします"
+              f"（直ったか試すときは {SUNO_BATCH_NG.name} を消す）")
+        batch = 1
+    later = songs[batch:]
+    songs = songs[:batch]
+    tabs: list[dict] = []
     ok_songs, problems, unsure_all = [], [], []
     for n, song in enumerate(songs, 1):
         progress(n, len(songs), song, f"作曲待ちはほかに {len(later)} 曲" if later else "")
-        step(1, 4, "Suno の作曲画面を開いています")
+        if n > 1:   # まとめて入力：曲ごとに新しいタブ
+            sess.page = sess.ctx.new_page()
+            sess.unsure, sess.log = [], []
+        step(1, 4, "Suno の作曲画面を開いています" + (f"（タブ {n}/{len(songs)}）" if len(songs) > 1 else ""))
         sess.goto(SITES["suno"])
         if not sess.ensure_login("suno"):
             problems.append("Suno にログインできていません")
@@ -1427,6 +1499,10 @@ def run_suno(sess: Session, ids: list[str]) -> int:
                   "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）",
                   *([f"次の曲（あと {len(later)} 曲）は、Create のあと少し時間をあけて、ダッシュボードでもう一度「Suno に入力する」を押してください"] if later else []),
                   "ロボット確認が何度も出て通らないとき：この専用の Chrome は使わず、ふだんの Chrome か Safari で http://localhost:8765/phone/{id} を開き、「写す」ボタンで Suno に貼ってください（ふだんのブラウザは確認が出にくい）".format(id=song["id"])]
+        if len(songs) > 1:   # まとめて入力：案内は最後に、全部のタブを読み返してから出す
+            tabs.append({"page": sess.page, "fields": fields, "name": name, "lines": lines, "bad": bad, "song": song,
+                         "filled": dict(getattr(sess, "filled", {}) or {})})   # そのタブで入れた欄の箱（読み返しに使う）
+            continue
         step(4, 4, "Gon さんの確認待ち（Create を押す）")
         if n == len(songs):   # 最後の曲：案内を残したまま終わる（Create は Gon さんが押す）
             sess.keep_overlay = True
@@ -1442,10 +1518,14 @@ def run_suno(sess: Session, ids: list[str]) -> int:
         m = sess.wait({"action": "next"})
         if m.get("action") in ("stop", "closed"):
             break
+    if tabs:
+        ok_songs, problems = suno_batch_finish(sess, tabs, later, ok_songs, problems)
+        songs = [t["song"] for t in tabs] if len(tabs) == len(ok_songs) else songs[:len(ok_songs)]
     if not problems and len(ok_songs) == len(songs):
         extra = f"（ただし {'／'.join(unsure_all)}）" if unsure_all else ""
         rest = f"。次の曲（あと {len(later)} 曲）は、少し時間をあけてもう一度押してください" if later else ""
-        print(f"【結果】Suno の作曲画面に入力し、全部の欄に入っていることを確かめました{extra}。システムは Chrome から離れました。開いている Chrome で「作成」（Create）を押してください{rest}")
+        where = f"開いている {len(songs)} つのタブで、10〜20 秒ずつあけて「作成」（Create）を押してください" if len(songs) > 1 else "開いている Chrome で「作成」（Create）を押してください"
+        print(f"【結果】Suno の作曲画面に入力し、全部の欄に入っていることを確かめました{extra}。システムは Chrome から離れました。{where}{rest}")
         return 0
     msg = "／".join(problems[:4]) or f"{len(songs)} 曲のうち {len(ok_songs)} 曲で止めました"
     print(f"【結果】まだ終わっていません：{msg}")
@@ -3151,6 +3231,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Suno と DistroKid の入力を、システムが専用のブラウザで行う（押すのは Gon さん）")
     ap.add_argument("what", choices=["suno", "distrokid", "lyrics", "photo", "login", "forget", "reset", "parts"])
     ap.add_argument("args", nargs="*", help="suno：曲 ID（省くと全曲）／distrokid：曲 ID／login・forget：suno か distrokid")
+    ap.add_argument("--batch", type=int, default=1, help="suno：まとめて入力する曲数（タブを分けて最大 3。決定 98）")
     a = ap.parse_args()
     if a.what == "forget":
         d = learned()
@@ -3209,7 +3290,7 @@ def main() -> None:
                 sys.exit(2)
         try:
             if a.what == "suno":
-                code = run_suno(sess, a.args)
+                code = run_suno(sess, a.args, a.batch)
             elif a.what == "distrokid":
                 if a.args[0] != "all" and _songs.by_id(a.args[0]):
                     progress(1, 1, _songs.by_id(a.args[0]))

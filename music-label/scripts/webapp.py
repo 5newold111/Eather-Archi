@@ -292,6 +292,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "fill_suno_batch":   # タブを分けて 3 曲までまとめて入力（決定 98）
+        return [PY, str(S / "browser_fill.py"), "suno", "--batch", "3"], "ブラウザで入力（Suno：まとめて 3 曲まで）"
     if action == "fill_lyrics":   # 登録した曲の歌詞を DistroKid の歌詞の画面に入れる（決定 52）
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         return [PY, str(S / "browser_fill.py"), "lyrics", song["id"] if song else "all"], \
@@ -496,7 +498,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
- <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
+ <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="fill_suno_batch" class="ghost" data-confirm="作曲待ちの曲を、タブを分けて 3 曲までまとめて Suno に入力します。&#10;入れ終わったらシステムは Chrome から離れるので、各タブで Gon さんが Create を押してください（タブの間は 10〜20 秒あける）。&#10;タブ同士で中身が書き換わったら、自動で 1 曲だけに戻します。始めますか？">まとめて Suno に入力する（3 曲まで）</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
  <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button>
 </div>
 <div id="jobs"></div>
