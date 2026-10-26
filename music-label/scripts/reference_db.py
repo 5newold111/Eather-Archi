@@ -45,6 +45,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sqlite3
 import sys
 import unicodedata
@@ -142,9 +143,121 @@ def audio_dirs() -> list[Path]:
     found: list[Path] = []
     for top in (base.parent, base):
         for c in _walk(top, 3):
-            if c.is_dir() and any(norm(h) in norm(c.name) for h in AUDIO_DIR_HINTS) and not any(c.is_relative_to(f) for f in found):
+            if c.is_dir() and any(norm(h) in norm(c.name) for h in AUDIO_DIR_HINTS) and not any(c.is_relative_to(f) for f in found) \
+                    and not any(x in c.name for x in DERIVED_DIRS):   # 解析シート・MIDI の置き場は「既存楽曲」ではない
                 found.append(c)
     return found
+
+
+DERIVED_DIRS = ("_解析シート", "_メロディー")
+
+
+def sheet_dir(top: Path) -> Path:
+    """SSD の解析シートの置き場（既存楽曲のフォルダの隣：<既存楽曲>_解析シート。決定 102）"""
+    return top.parent / f"{top.name}_解析シート"
+
+
+def _rid(top: Path, f: Path) -> str:
+    import hashlib as _h
+    return "aud-" + _h.sha1(f"{f.relative_to(top)}|{f.stat().st_size}".encode()).hexdigest()[:12]
+
+
+def ssd_sheet_dirs(dirs: list[Path]) -> list[Path]:
+    """SSD の中の解析シートのフォルダ（決まった置き場と、名前に「解析シート」を含むフォルダ）"""
+    out = [d for d in (sheet_dir(t) for t in dirs) if d.is_dir()]
+    base, _ = archive.root()
+    for top in ((base.parent, base) if base else ()):
+        for c in _walk(top, 3):
+            if c.is_dir() and "解析シート" in c.name and c not in out and any(c.glob("aud-*.json")):
+                out.append(c)
+    return out
+
+
+def export_sheets(quiet: bool = False) -> int:
+    """Mac の解析シート（既存楽曲の分）を SSD の <既存楽曲>_解析シート に写し、一覧の Excel も作る。写した数"""
+    dirs = audio_dirs()
+    if not dirs or not AUDIO_CACHE.exists():
+        return 0
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    n, rows = 0, []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")):
+        f = Path((index.get(p.stem) or {}).get("file", ""))
+        top = next((t for t in dirs if str(f).startswith(str(t))), dirs[0])
+        dst = sheet_dir(top) / p.name
+        try:
+            d0 = json.loads(p.read_text(encoding="utf-8"))
+            mk = (d0.get("_measure") or {}).get("key")
+            if mk and not (d0.get("harmony") or {}).get("key"):   # 前に作ったシート：測ったキーを和声の枠にも入れる
+                d0.setdefault("harmony", {})["key"] = mk
+                p.write_text(json.dumps(d0, ensure_ascii=False, indent=1), encoding="utf-8")
+            if not dst.exists() or dst.stat().st_mtime < p.stat().st_mtime:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(p, dst)
+                n += 1
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        r, ly, mel = d.get("reference") or {}, d.get("lyrics") or {}, d.get("melody") or {}
+        rows.append([r.get("artist_name"), r.get("title"), f.name, (d.get("groove") or {}).get("bpm"), (d.get("harmony") or {}).get("key"),
+                     (d.get("vocal") or {}).get("sex"), "・".join(i.get("name", "") for i in (d.get("instruments") or {}).get("list", [])[:5]),
+                     ly.get("theme"), (ly.get("transcript_meta") or {}).get("clarity"), "○" if mel.get("usable") else "", "○" if d.get("_enriched") else "",
+                     p.name])
+    try:   # 一覧（オーナーが見る用。1 行 1 曲）
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "解析シートの一覧"
+        ws.append(["アーティスト", "曲名", "ファイル", "BPM", "キー", "声", "楽器", "歌詞のテーマ", "歌詞の聞き取り", "メロディー", "Web で調べた", "解析シート"])
+        for row in rows:
+            ws.append(row)
+        for col, w in zip("ABCDEFGHIJKL", (22, 30, 34, 7, 10, 8, 30, 40, 12, 10, 12, 22)):
+            ws.column_dimensions[col].width = w
+        for top in dirs:
+            if sheet_dir(top).is_dir():
+                wb.save(sheet_dir(top) / "解析シートの一覧.xlsx")
+    except Exception as e:  # noqa: BLE001
+        if not quiet:
+            print(f"   － 一覧の Excel を作れませんでした（{e}）")
+    if n and not quiet:
+        print(f"   SSD の解析シートを {n} 件新しくしました：" + "・".join(str(sheet_dir(t)) for t in dirs))
+    return n
+
+
+def ensure_sheets() -> int:
+    """SSD に解析シートがあるか探し、あれば Mac に読み込む。無い曲は既存楽曲を全部解析して作り、SSD に保存する（決定 102）"""
+    dirs = audio_dirs()
+    if not dirs:
+        print("【結果】「既存楽曲」のフォルダが見つかりません。SSD（DS72）をつないでから、もう一度押してください")
+        return 2
+    print("▶ 既存楽曲のフォルダ：" + "・".join(str(d) for d in dirs))
+    found = ssd_sheet_dirs(dirs)
+    have = {p.name: p for d in found for p in d.glob("aud-*.json")}
+    print("【進み具合】1/3：SSD の解析シートを探しています → " + (f"{len(have)} 件（{'・'.join(str(d) for d in found)}）" if have else "見つかりませんでした"))
+    AUDIO_CACHE.mkdir(parents=True, exist_ok=True)
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    files = [(top, f) for top in dirs for f in files_in(top) if f.suffix.lower() in AUDIO_TAKE]
+    restored = 0
+    for top, f in files:   # SSD にあって Mac に無い解析シートを読み込む（解析し直さない）
+        rid = _rid(top, f)
+        src = have.get(f"{rid}.json")
+        if src and not (AUDIO_CACHE / f"{rid}.json").exists():
+            shutil.copy2(src, AUDIO_CACHE / f"{rid}.json")
+            st = f.stat()
+            index[rid] = {"sig": f"{st.st_size}|{int(st.st_mtime)}", "file": str(f), "at": datetime.now().isoformat(timespec="seconds"), "restored": True}
+            restored += 1
+    AUDIO_INDEX.write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    if restored:
+        print(f"   SSD の解析シートを {restored} 曲ぶん Mac に読み込みました（解析し直しません）")
+    todo = sum(1 for top, f in files if not (AUDIO_CACHE / f"{_rid(top, f)}.json").exists())
+    print(f"【進み具合】2/3：既存楽曲 {len(files)} 曲のうち、解析シートが無い {todo} 曲を解析します（1 曲 10〜30 秒・料金なし）", flush=True)
+    import subprocess
+    subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"])   # 全部解析して、参考曲に登録する（いつもの流れ）
+    print("【進み具合】3/3：解析シートを SSD に保存しています", flush=True)
+    export_sheets()
+    done = sum(1 for top, f in files if (AUDIO_CACHE / f"{_rid(top, f)}.json").exists())
+    print(f"【結果】既存楽曲 {len(files)} 曲のうち {done} 曲の解析シートがあります（SSD：" + "・".join(str(sheet_dir(t)) for t in dirs) + "）"
+          + (f"。解析できなかった {len(files) - done} 曲は「解析できていない曲を調べる」で理由がわかります" if done < len(files) else ""))
+    return 0
 
 
 def _tags(f: Path) -> dict:
@@ -218,7 +331,12 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
             continue
         cache = AUDIO_CACHE / f"{rid}.json"
         if cache.exists() and index.get(rid, {}).get("sig") == f"{st.st_size}|{int(st.st_mtime)}":
-            out.append((f, json.loads(cache.read_text(encoding="utf-8"))))
+            d = json.loads(cache.read_text(encoding="utf-8"))
+            mk = (d.get("_measure") or {}).get("key")
+            if mk and not (d.get("harmony") or {}).get("key"):   # 前に作ったシート：測ったキーを和声の枠にも（決定 102）
+                d.setdefault("harmony", {})["key"] = mk
+                cache.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+            out.append((f, d))
         else:
             todo.append((top, f, rid, cache, f"{st.st_size}|{int(st.st_mtime)}"))
     if quiet and not todo:   # 自動の見張り：新しい曲が無ければ何も言わない
@@ -252,6 +370,8 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
         sheet["reference"]["source"] = "database"
         sheet["reference"]["from"] = "既存楽曲（音源の解析）"
         sheet["analyzed_by"] = "auto（既存楽曲の音源）"
+        if m.get("key"):   # キーは和声の枠にも入れる（曲づくりの harmony の枠で Claude に渡る。決定 102）
+            sheet.setdefault("harmony", {}).setdefault("key", m["key"])
         cache.write_text(json.dumps(sheet, ensure_ascii=False, indent=1), encoding="utf-8")
         index[rid] = {"sig": sig, "file": str(f), "at": datetime.now().isoformat(timespec="seconds")}
         out.append((f, sheet))
@@ -264,6 +384,10 @@ def analyze_audio(limit: int = 20, quiet: bool = False) -> list[tuple[Path, dict
     left = len(todo) - len(run)
     if left > 0:
         print(f"   まだ解析していない曲が {left} 曲あります（次の回に続けます。全部いま解析するときは --audio-limit 0）")
+    try:   # 解析シートを SSD にも残す（決定 102）
+        export_sheets(quiet=quiet)
+    except OSError as e:
+        print(f"   － SSD に解析シートを保存できませんでした（{e}）")
     return out
 
 
@@ -1419,6 +1543,12 @@ def health() -> int:
             continue
     print(f"\n■ 既存楽曲（SSD の音源）：{len(files) if dirs else '—'} 曲 → 解析済み {len(index)} 曲"
           + (f" {ok(len(index) >= len(files))}" if dirs else ""))
+    sd = ssd_sheet_dirs(dirs) if dirs else []
+    n_ssd = sum(1 for d in sd for _ in d.glob("aud-*.json"))
+    if dirs:
+        print(f"   {ok(n_ssd >= len(index) and n_ssd > 0)} SSD の解析シート：{n_ssd} 件" + (f"（{'・'.join(str(d) for d in sd)}）" if sd else "（まだ SSD にありません）"))
+        if n_ssd < len(files):
+            warn.append("SSD に解析シートがそろっていない：「解析シートを SSD に作る（無い曲は全部解析）」を押す")
     if dirs and len(index) < len(files):
         warn.append(f"既存楽曲 {len(files) - len(index)} 曲がまだ解析されていない：「既存楽曲を解析する」→ 残れば「解析できていない曲を調べる」")
     if cache:
@@ -1426,7 +1556,7 @@ def health() -> int:
         def rate(pred):
             return sum(1 for d in cache if pred(d))
         rows = [("テンポ（BPM）", rate(lambda d: isinstance((d.get("groove") or {}).get("bpm"), (int, float)))),
-                ("キー", rate(lambda d: (d.get("harmony") or {}).get("key"))),
+                ("キー", rate(lambda d: (d.get("harmony") or {}).get("key") or (d.get("_measure") or {}).get("key"))),
                 ("曲名とアーティスト名", rate(lambda d: (d.get("reference") or {}).get("artist_name") not in (None, "", "?") and (d.get("reference") or {}).get("title"))),
                 ("声の性別", rate(lambda d: (d.get("vocal") or {}).get("sex"))),
                 ("楽器", rate(lambda d: (d.get("instruments") or {}).get("list"))),
@@ -1500,6 +1630,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="SSD のデータベースを読み、楽曲制作の参考にする")
     ap.add_argument("--show", action="store_true", help="見つかったデータベースの中身と読み方を表示するだけ（取り込まない）")
     ap.add_argument("--health", action="store_true", help="参考曲の取り込みの健康診断（読むだけ・無料。決定 101）")
+    ap.add_argument("--ensure-sheets", action="store_true", help="SSD の解析シートを探し、無い曲は既存楽曲を全部解析して作り、SSD に保存する（決定 102）")
     ap.add_argument("--setup", metavar="PATH", help="データベースの場所を .env に書く")
     ap.add_argument("--quiet", action="store_true", help="SSD が無いときは何も言わない（自動実行用）")
     ap.add_argument("--artists", action="store_true", help="組ごとの近い参考曲だけ作り直す")
@@ -1516,6 +1647,8 @@ def main() -> None:
     args = ap.parse_args()
     if args.health:
         sys.exit(health())
+    if args.ensure_sheets:
+        sys.exit(ensure_sheets())
     if args.audio_lyrics is not None:
         sys.exit(audio_lyrics(args.audio_lyrics))
     if args.audio_melody is not None:
