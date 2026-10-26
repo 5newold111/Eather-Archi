@@ -28,9 +28,10 @@
 | 参考データベース | SSD の「データベース」などの名前のフォルダ（Excel・CSV・SQLite・解析シート）と、「既存楽曲」の WAV・MP3・M4A（1 曲ずつ解析して解析シートに。入れると自動で解析・登録。決定 76・78）。`python3 scripts/reference_db.py --show` で読み方を確認。毎週のブリーフ作りの最初に自動で取り込み、傾向は `out/reference_db/digest.md` |
 | 影響を受けたアーティスト | SSDDB の中から組ごとに 3 組まで選んで管理表の「影響」に足し、その曲を参考曲のいちばん優先にして、歌詞・メロディーも先に起こす。ダッシュボードの「影響を受けたアーティストを選ぶ（SSDDB から）」か `python3 scripts/influences.py --apply`（決定 91） |
 | 毎日配信・SNS の毎日の投稿 | 期間を決めて 5 組の持ち回りで毎日 1 曲（`scripts/daily.py`）。SNS は 1 日 1〜3 本を 3 日先まで自動で用意（`post_social.py daily`）。背景は `out/social_bg/<組>/` の Blender の映像（ゆったり動かし、拍に合わせて切り替える）。新曲の日は CapCut 用の素材も作り、`capcut/完成.mp4` を置くとそれを投稿。ダッシュボードの「不定期・毎日配信」のタブから（決定 94・95） |
+| 方向性を探る | 毎曲の癖は細かく決めず（探索中は「たまに」）、曲ごとに 7 つの軸（テンポ・熱量・ジャンル・編成・構成・気分・歌い方）をくじで変えて試す。伸びた値ほどくじが厚くなり、固まったら `python3 scripts/explore.py focus <組>`（決定 96） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜95） |
+| 決めたこと | `docs/12_decisions.md`（1〜96） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |

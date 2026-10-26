@@ -161,7 +161,8 @@ def banned_terms(artist: dict) -> list[str]:
 
 def design(song: dict) -> dict:
     """曲 1 つの設計図。{軸: 値…, 'checks': [(軸, 状態 ok/warn/info, 説明)], 'map': [(軸, 値, イメージのどこから)]}"""
-    artist = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
+    import explore
+    artist = explore.relax(load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {})   # 探索中は毎曲の癖を足さない（決定 96）
     sound = artist.get("sound") or {}
     opt = _songs.suno_options(song)
     checks, mapping = [], []

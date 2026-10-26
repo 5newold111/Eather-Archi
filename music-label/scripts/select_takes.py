@@ -347,7 +347,8 @@ def main() -> None:
     if not files:
         sys.exit(f"[案内] {folder} に音源がありません。Suno のテイク（mp3 / wav）を置いてください")
 
-    artist = load_artist(brief["artist_slug"], brief.get("label_slug"))
+    import explore
+    artist = explore.relax(load_artist(brief["artist_slug"], brief.get("label_slug")))   # 探索中は毎曲の癖で採点しない（決定 96）
     label = load_label(brief.get("label_slug"))
     spec = length_spec(artist, label)
     spec.update({k: v for k, v in (brief.get("scene") or {}).items()   # その曲の聴かれる場面の決まり（決定 30）

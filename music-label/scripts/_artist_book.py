@@ -218,7 +218,7 @@ HELP = {
     ("choices", "slots"): "lyrics・worldview・instruments・performance・structure・harmony・groove・phrase・vocal から 1〜3 個",
     ("choices", "acquired"): "正規に購入して手元にあれば ○。解析すると、この組の曲づくりで優先される",
     ("music", "dna"): "曲の特徴を表す短い英語のタグ（例 morning, synth, uplift）。参考曲選びに使う",
-    ("music", "tic1"): "毎曲必ず入れる歌い方の癖。Suno のタグで書ける具体さで（例：サビ前に裏声の ooh を 1 本）",
+    ("music", "tic1"): "歌い方の癖（任意。空でよい）。方向性を探っているあいだは毎曲には入れず、たまに使う。組を固めたら毎曲に入る（決定 96）。Suno のタグで書ける具体さで（例：サビ前に裏声の ooh を 1 本）",
     ("music", "lyric_mode"): "核を固定＝サビなどをこちらで決め、残りを Suno に／全部書く／お題だけ＝歌詞を Suno に任せる／歌なし",
     ("music", "partners"): "相性のよい組の ID（例 hollowplan）",
     ("music", "collab_style"): "リミックス役の組は、ここに remix の語を入れる（5 週に 1 回のリミックスの担当になる）",

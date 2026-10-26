@@ -193,6 +193,14 @@ Hard rules (never break):
    - Standard spelling: "trying to", "going to", "want to", "got to", "kind of", "because", "running" - never "tryna",
      "gonna", "wanna", "gotta", "kinda", "cuz", "runnin'". Never censor a word with asterisks.
    suno_lyric_prompt must ask Suno's lyric writer for the same format (the system also appends these rules to it).
+17. Exploring direction (brief has "explore"): the label does not yet know what grows for this act, so each song tries a
+   different direction. explore.axes gives THIS song's tempo, energy, genre lean, arrangement, structure, mood and vocal
+   approach - follow every axis clearly in suno_style_prompt, vocal_instruction and the lyrics' shape, even when it goes beyond
+   the act's usual composition_habits, signature techniques, melodic tendency, BPM range or genres. When explore.mode is
+   "explore", those profile items are only leanings, and tics are optional ("sometimes": use one only if it fits). What never
+   changes: the act's voice (sex, range, timbre - the Suno persona), name, persona and life, scene rules, and the forbidden list.
+   When explore.mode is "focus", the profile is fixed again and the axes are the proven direction. Say in notes_ja (Japanese)
+   how each axis shows in this song. If the brief has owner_request, the owner's memo wins over the axes where they conflict.
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
 - "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the
@@ -482,8 +490,10 @@ def validate(result: dict, artist: dict, brief: dict) -> list[str]:
         problems.append("core_fixed なのに核（サビ）が空")
     if mode != "topic_only" and tics and "[" not in result["suno_lyrics"]:
         problems.append("歌詞にセクション／歌い方タグが無い（毎曲の癖が入っていない可能性）")
-    if not all(result["self_check"].values()):
-        problems.append(f"Claude の自己チェックで未達: {[k for k, v in result['self_check'].items() if not v]}")
+    loose = (brief.get("explore") or {}).get("mode") == "explore"   # 探索中：毎曲の癖は必須ではない（決定 96）
+    unmet = [k for k, v in result["self_check"].items() if not v and not (loose and k == "tics_included")]
+    if unmet:
+        problems.append(f"Claude の自己チェックで未達: {unmet}")
     return problems
 
 
@@ -555,7 +565,10 @@ def main() -> None:
             print("       （実際の参考曲 DB があるときは --demo の代わりに --references <解析シートのフォルダ>）")
             continue
         brief = load_json(bp)
-        artist = load_artist(brief["artist_slug"], brief.get("label_slug", "drive"))
+        import explore
+        artist = explore.relax(load_artist(brief["artist_slug"], brief.get("label_slug", "drive")))   # 探索中の組は毎曲の癖を「たまに」に（決定 96）
+        if not brief.get("explore"):   # 方向性の無い古いブリーフにも、くじで方向性を付ける
+            brief["explore"] = explore.pick(artist)
         print(f"\n--- {bp.name}（{artist['name']}）---")
         # 歌詞モードの決定：手動指定 > 『たまに』の自動選択（週と組で決まる乱数）> 設定書の既定
         import random as _random

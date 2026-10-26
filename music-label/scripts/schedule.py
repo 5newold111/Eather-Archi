@@ -64,7 +64,8 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
                 [["artist_book.py", "pull", "--if-exists"], ["run_week.py", "brief", "--week", "this"],
                  ["daily.py", "make", "--if-active"]]),   # 毎日配信の 21 日先までの曲（決定 94）
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
-    "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"]]),
+    "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"],
+                                          ["explore.py", "report"]]),   # 方向性の伸びを学んで、次の曲のくじに返す（決定 96）
     "backup":  ("外付け SSD への保管と R2 への予備保管", [["archive_sync.py"], ["backup_r2.py"]]),
     "monthly": ("新しい組と来月の近況の提案（管理表へ）・曲数の確認・Instagram の鍵の延長・四半期の EP 計画",
                 [["artist_book.py", "pull", "--if-exists"], ["expand_label.py", "check", "--apply"],
