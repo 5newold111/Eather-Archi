@@ -542,7 +542,7 @@ const EMPTY={debut:"デビュー前の組はありません。全組が定期配
 function dailyBox(){const el=document.getElementById("daily-box"),D=DATA.daily||{};   // 毎日配信（決定 94）
   if(!D.active){el.innerHTML=`<b>毎日配信（5 組の持ち回り）</b><p class="sub">レーベル全体で毎日 1 曲（1 組あたり週 1〜2 曲）。配信日は決まった日の 17:00 ET。始める日は ${E(D.earliest||"")} から 30 日（曲づくり・登録・Spotify への推薦が間に合うよう 2 週間あけます）。</p>`
     +`<button data-act="daily_start" data-confirm="毎日配信を ${E(D.earliest||"")} から 30 日、デビュー曲が配信中の組の持ち回りで始めます。\nこの期間に配信日が入るふだんの毎週の制作は止め、毎日配信の曲が代わりになります。\n曲は 21 日先までを先に作ります（毎週火曜の定期実行でも続きを作ります）。\n始めますか？">毎日配信を始める</button>`+sns;return}
-  const so=D.social||{},sns=`<hr><b>SNS の毎日の投稿：${so.on?`オン（1 日 ${so.per_day} 本）`:"オフ"}</b><p class="sub">配信日の曲は 17:00 ET、ほかは配信中の曲から選んで 12:00・20:00 ET に、YouTube ショート・インスタ・TikTok へ。説明文は「この曲が生まれた日」（曲のエピソード）。背景の映像は ${E(so.bg_dir||"")} の組ごとのフォルダに Blender の書き出しを入れると使います（無ければジャケット）。</p>`
+  const so=D.social||{},sns=`<hr><b>SNS の毎日の投稿：${so.on?`オン（1 日 ${so.per_day} 本）`:"オフ"}</b><p class="sub">配信日の曲は 17:00 ET、ほかは配信中の曲から選んで 12:00・20:00 ET に、YouTube ショート・インスタ・TikTok へ。説明文は「この曲が生まれた日」（曲のエピソード）。背景の映像は ${E(so.bg_dir||"")} の組ごとのフォルダに Blender の書き出しを入れると使います（無ければジャケット）。背景はゆったり動き、映像が 2 本以上あれば拍に合わせて切り替えます。新曲の日の投稿には CapCut 用の素材（capcut フォルダ）も作り、そこに「完成.mp4」を置くと、その動画を投稿します。</p>`
     +(so.on?`<button data-act="social_daily_plan">投稿の案を作る（3 日先まで）</button> <button class="ghost" data-act="social_daily_off" data-confirm="SNS の毎日の投稿を止めます（作った案は投稿しません）。止めますか？">SNS の毎日の投稿を止める</button>`
       :`<button data-act="social_daily_on" data-per_day="2" data-confirm="SNS の毎日の投稿を始めます（1 日 2 本）。3 日先までの投稿の案（縦動画・説明文）を作り、投稿時刻を過ぎると定期実行が投稿します。\n鍵（YouTube・インスタ・TikTok）が無いサービスは飛ばします。始めますか？">SNS の毎日の投稿を始める（1 日 2 本）</button>`);
   const nx=D.next?`次は ${E(D.next.date)}（${E(D.next.slug)}）`:"";

@@ -37,7 +37,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -153,6 +152,23 @@ def background_for(slug: str, song_folder: str | None, artist: dict, n: int = 0)
     return roomtour_loop(slug, artist)
 
 
+def backgrounds_for(slug: str, song_folder: str | None, artist: dict, n: int = 0, k: int = 6) -> list[Path]:
+    """拍に合わせてつなぐ映像（決定 95）：その曲専用 → その組 → レーベル共通の順に集め、投稿ごとに並びを回して k 本まで"""
+    root = bg_root()
+    vids: list[Path] = []
+    for d in ([root / slug / song_folder] if song_folder else []) + [root / slug, root / "_label"]:
+        vids += [v for v in _videos(d) if v not in vids]
+    if not vids:
+        loop = roomtour_loop(slug, artist)
+        return [loop] if loop else []
+    own = len(_videos(root / slug / song_folder)) if song_folder else 0
+    head, rest = vids[:own], vids[own:]
+    if rest:
+        r = n % len(rest)
+        rest = rest[r:] + rest[:r]
+    return (head + rest)[:k]
+
+
 def bg_folders(artists: list[dict]) -> None:
     """背景の映像を置くフォルダを作っておく（Gon さんが Blender の書き出しを入れるだけでよいように）"""
     root = bg_root()
@@ -167,36 +183,11 @@ def bg_folders(artists: list[dict]) -> None:
                           "形式：mp4・mov・m4v・webm\n", encoding="utf-8")
 
 
-def make_clip(master: Path, cover: Path, start: float, title: str, artist: str, dst: Path, bg_video: Path | None = None) -> None:
-    if not shutil.which("ffmpeg"):
-        sys.exit("[エラー] ffmpeg が見つかりません（Mac：brew install ffmpeg）")
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    font = find_font()
-    t, a = esc_drawtext(title), esc_drawtext(artist)
-    if bg_video:
-        # Blender のルームツアーを背景に、左下にジャケットと曲名
-        vf = ("[2:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=30[bg];"
-              "[1:v]scale=360:360[fg];[bg][fg]overlay=64:H-h-300")
-        if font:
-            vf += (f",drawtext=fontfile='{font}':text='{t}':fontcolor=white:fontsize=56:x=64:y=h-250:shadowcolor=black@0.4:shadowx=2:shadowy=2"
-                   f",drawtext=fontfile='{font}':text='{a}':fontcolor=white@0.85:fontsize=40:x=64:y=h-180:shadowcolor=black@0.4:shadowx=2:shadowy=2")
-    else:
-        vf = ("[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=40,eq=brightness=-0.08[bg];"
-              "[1:v]scale=960:960[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2-80")
-        if font:
-            vf += (f",drawtext=fontfile='{font}':text='{t}':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=h/2+480"
-                   f",drawtext=fontfile='{font}':text='{a}':fontcolor=white@0.8:fontsize=44:x=(w-text_w)/2:y=h/2+570")
-    vf += ",format=yuv420p[v]"
-    af = f"afade=t=in:st=0:d=1,afade=t=out:st={CLIP_SEC - 2}:d=2"
-    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.2f}", "-t", str(CLIP_SEC), "-i", str(master),
-           "-loop", "1", "-framerate", "30", "-t", str(CLIP_SEC), "-i", str(cover),
-           *(["-stream_loop", "-1", "-t", str(CLIP_SEC), "-i", str(bg_video)] if bg_video else []),
-           "-filter_complex", vf, "-map", "[v]", "-map", "0:a", "-af", af,
-           "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-r", "30",
-           "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-shortest", "-movflags", "+faststart", str(dst)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        sys.exit("[エラー] 動画の書き出しに失敗しました:\n" + r.stderr[-800:])
+def make_clip(master: Path, cover: Path, start: float, title: str, artist: str, dst: Path, bg_video=None,
+              bpm: float | None = None, seed: int = 0) -> dict:
+    """縦動画（social_video.py。決定 95）：背景をゆったり動かし、映像が複数あれば拍に合わせて切り替える"""
+    import social_video
+    return social_video.make_clip(master, cover, start, title, artist, dst, bg_video, bpm, seed)
 
 
 def chorus_start(week: str, slug: str, duration_guess: float = 180) -> float:
@@ -385,15 +376,18 @@ def cmd_plan(week: str) -> None:
         folder = OUT / "social" / week / slug
         video = folder / "clip_vertical.mp4"
         start = chorus_start(week, slug)
-        loop = background_for(slug, None, artist)   # Gon さんの Blender の映像 → ルームツアー（決定 94）
-        sources = [master, cover, mp] + ([loop] if loop else [])
+        bgs = backgrounds_for(slug, None, artist)   # Gon さんの Blender の映像 → ルームツアー（決定 94・95）
+        sources = [master, cover, mp] + bgs
         if video.exists() and video.stat().st_mtime > max(f.stat().st_mtime for f in sources):
             print(f"   － {artist['name']}：縦動画は最新なので作り直しません")
         else:
             step(f"{artist['name']}：縦動画（サビ {start:.0f} 秒地点から {CLIP_SEC} 秒）を書き出しています")
-            if loop:
-                print(f"     （背景に Blender の映像を使います：{loop.name}）")
-            make_clip(master, cover, start, m["title"], artist["name"], video, loop)
+            if bgs:
+                print(f"     （背景に Blender の映像を使います：{'・'.join(x.name for x in bgs)}）")
+            bp0 = OUT / "briefs" / f"{week}_{slug}.json"
+            info = make_clip(master, cover, start, m["title"], artist["name"], video, bgs,
+                             (read_json(bp0).get("bpm") if bp0.exists() else None))
+            write_json(folder / "video_info.json", info)
         feat = load_artist(m["featured_artist_slug"])["name"] if m.get("featured_artist_slug") else None
         bp = OUT / "briefs" / f"{week}_{slug}.json"
         story = ((read_json(bp).get("episode") or {}).get("story_en") or "") if bp.exists() else ""
@@ -409,6 +403,9 @@ def cmd_plan(week: str) -> None:
                           "week": week, "artist_slug": slug, "label_slug": m.get("label_slug"),
                           "status": prev.get("status", "pending"), "result": prev.get("result")})
         write_json(folder / "plan.json", {"artist": artist["name"], "title": m["title"], "posts": posts})
+        if (folder / "video_info.json").exists() and not (folder / "capcut").exists():   # 新曲の日の目玉：CapCut 用の素材（決定 95）
+            import social_video
+            social_video.capcut_kit(folder, master, start, cover, bgs, read_json(folder / "video_info.json"), cap["instagram"])
         (folder / "captions.md").write_text(
             f"# {artist['name']} — {m['title']}\n\n投稿時刻（UTC）: {m['release_at_utc']}\n\n" +
             "\n\n".join(f"## {k}\n\n```\n{v}\n```" for k, v in cap.items()) + "\n", encoding="utf-8")
@@ -446,11 +443,20 @@ def cmd_post(week: str, dry: bool, only: set[str] | None = None, private: bool =
             if p["platform"] != "youtube" and when > now:
                 print(f"   … {plan['artist']} / {p['platform']}：投稿時刻 {p['scheduled_at']} を待っています")
                 continue
+            import social_video
+            final = social_video.capcut_final(Path(p["video"]))
+            send = dict(p)
+            if final:   # Gon さんが CapCut で作った動画（capcut/完成.mp4）を使う（決定 95）
+                send.update(video=str(final), store_key=str(p.get("store_key") or f"{p['week']}/{p['artist_slug']}/clip_vertical.mp4").replace("clip_vertical.mp4", "capcut.mp4"))
+            elif (Path(p["video"]).parent / "capcut").exists() and (when - now).total_seconds() > 2 * 3600 and not trial:
+                # CapCut の素材がある目玉の投稿：YouTube も、完成.mp4 を待って投稿時刻の 2 時間前まで上げない
+                print(f"   … {plan['artist']} / {p['platform']}：CapCut の動画（capcut/完成.mp4）を待っています（無ければ投稿時刻の 2 時間前に自動の動画で）")
+                continue
             if dry:
-                print(f"   [ドライラン] {plan['artist']} / {p['platform']} に投稿します：{p['caption'][:60].replace(chr(10), ' ')}…")
+                print(f"   [ドライラン] {plan['artist']} / {p['platform']} に投稿します{'（CapCut の動画）' if final else ''}：{p['caption'][:60].replace(chr(10), ' ')}…")
                 continue
             try:
-                res = POSTERS[p["platform"]]({**p, "force_private": private or bool(plan.get("trial"))},
+                res = POSTERS[p["platform"]]({**send, "force_private": private or bool(plan.get("trial"))},
                                              p["artist_slug"], p.get("label_slug") or "drive")
             except Exception as e:  # noqa: BLE001
                 res = {"error": str(e)}
@@ -587,12 +593,18 @@ def cmd_daily(days: int | None, on: bool, off: bool, per_day: int | None, if_on:
             cap = captions(artist, s["title"], None, story_en, kind)
             for v in cap.values():
                 scrub_check(v, artist)
-            bg = background_for(s["slug"], _songs.folder_name(s), artist, n)
+            bgs = backgrounds_for(s["slug"], _songs.folder_name(s), artist, n)
             start = clip_start_for(x, n)
             step(f"{day} {hour}:00 ET｜{artist['name']}「{s['title']}」（{ {'release': '配信日', 'born': 'この曲が生まれた日', 'listen': '配信中の曲'}[kind]}・"
-                 f"{start:.0f} 秒地点から・背景 {bg.name if bg else 'ジャケット'}）")
+                 f"{start:.0f} 秒地点から・背景 {('Blender の映像 ' + str(len(bgs)) + ' 本') if bgs else 'ジャケット'}）")
             if not dry:
-                make_clip(x["audio"], x["cover"], start, s["title"], artist["name"], video, bg)
+                seed = n + int(day.replace("-", "")) % 7
+                info = make_clip(x["audio"], x["cover"], start, s["title"], artist["name"], video, bgs, s.get("bpm"), seed)
+                write_json(folder / "video_info.json", info)
+                if kind == "release":   # 新曲の日の目玉は CapCut で作り込めるように、素材をまとめる（決定 95）
+                    import social_video
+                    kit = social_video.capcut_kit(folder, x["audio"], start, x["cover"], bgs, info, cap["instagram"])
+                    print(f"     CapCut 用の素材：{kit}（完成.mp4 を置くと、それを投稿します）")
                 posts = [{"platform": plat, "scheduled_at": _at_et(day, hour), "video": str(video), "caption": cap[plat],
                           "youtube_title": cap["youtube_title"], "tags": hashtags(artist), "week": s["week"],
                           "artist_slug": s["slug"], "label_slug": s.get("label_slug"), "kind": kind,
