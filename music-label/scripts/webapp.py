@@ -45,7 +45,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import OUT, ROOT, all_artists, load_dotenv  # noqa: E402
+from _common import OUT, ROOT, all_artists, load_dotenv, protect_env  # noqa: E402
 
 load_dotenv()
 import _songs  # noqa: E402
@@ -808,16 +808,28 @@ def render_page(static_data: dict | None = None) -> str:
     return PAGE.replace("__TOKEN__", "" if static_data else TOKEN).replace("__STATIC__", data)
 
 
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "LabelDashboard"
     lan_key: str | None = None
+    extra_hosts: set[str] = set()   # Tailscale の名前・住所など（main で入れる）
 
     def log_message(self, fmt, *args):   # アクセスの記録は出さない
         pass
 
+    def _host_ok(self) -> bool:
+        """宛先の名前（Host）が自分のときだけ受け付ける。悪いサイトが自分のドメインを 127.0.0.1 に向け直し、
+        ブラウザ経由でこのダッシュボードを読んだり押したりする手口（DNS リバインディング）を防ぐ"""
+        host = (self.headers.get("Host") or "").strip().lower()
+        name = host.rsplit(":", 1)[0] if not host.endswith("]") else host
+        return name in LOOPBACK_HOSTS or name in self.extra_hosts or name.endswith(".ts.net")
+
     def _allowed(self) -> bool:
         if not self.lan_key:
-            return True
+            # 合鍵なし（この Mac の中だけ）のときは、宛先の名前で守る
+            return self._host_ok()
         q = parse_qs(urlparse(self.path).query)
         c = cookies.SimpleCookie(self.headers.get("Cookie", ""))
         ok = secrets.compare_digest((q.get("key") or [""])[0], self.lan_key) or \
@@ -1055,6 +1067,7 @@ def lan_key() -> str:
     env = ROOT / ".env"
     lines = env.read_text(encoding="utf-8").splitlines() if env.exists() else []
     env.write_text("\n".join([*lines, f"WEBAPP_KEY={key}"]).rstrip("\n") + "\n", encoding="utf-8")
+    protect_env(env)
     return key
 
 
@@ -1075,6 +1088,7 @@ def main() -> None:
         print(f"   スマホなど（同じ Wi-Fi）：http://{lan_address()}:{a.port}/?key={Handler.lan_key}")
         print("   （この URL は合鍵つき。ほかの人に教えない。1 回開けば、その機器では次から合鍵なしで開けます）")
     ts_ip, ts_name = tailscale_info()
+    Handler.extra_hosts = {h.lower() for h in (ts_ip, ts_name) if h}
     if ts_name:
         print(f"   外出先のスマホ（Tailscale）：https://{ts_name}/phone　← Mac で一度だけ  tailscale serve --bg {a.port}  を実行しておく")
         if a.lan and ts_ip:

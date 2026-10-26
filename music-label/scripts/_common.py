@@ -32,9 +32,21 @@ def dotenv_values(path: Path = ROOT / ".env") -> dict[str, str]:
     return out
 
 
+def protect_env(path: Path = ROOT / ".env") -> None:
+    """鍵の入った .env を、この Mac の自分だけが読める権限（600）にそろえる。
+    cp で作った .env や、スクリプトが新しく作った .env はほかの利用者にも読める権限（644）になるため。
+    一度 600 にすれば、あとで書き直しても権限は保たれる"""
+    try:
+        if path.exists() and path.stat().st_mode & 0o077:
+            path.chmod(0o600)
+    except OSError:
+        pass
+
+
 def load_dotenv(path: Path = ROOT / ".env", override: bool = False) -> None:
     """music-label/.env があれば読み込んで環境変数にする（ふだんは既に設定済みのものは上書きしない。
     override=True：ファイルの今の値で上書きする。動かしたままのダッシュボードが、あとで直した .env を使うため）"""
+    protect_env(path)
     for k, v in dotenv_values(path).items():
         if override:
             os.environ[k] = v
