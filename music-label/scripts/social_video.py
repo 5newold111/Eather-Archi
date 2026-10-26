@@ -236,12 +236,15 @@ def capcut_kit(folder: Path, master: Path, start: float, cover: Path, bgs: list[
     srt = []
     for i, m in enumerate(marks, 1):
         star = round(m, 3) in cuts or any(abs(m - c) < 0.05 for c in cuts)
-        srt.append(f"{i}\n{_srt_time(m)} --> {_srt_time(min(m + 0.5, CLIP_SEC))}\n{'▼ 切り替え' if star else '｜'} {i} 小節目\n")
+        unit = "小節目" if grid.get("bpm") else "番目（6 秒ごと）"
+        srt.append(f"{i}\n{_srt_time(m)} --> {_srt_time(min(m + 0.5, CLIP_SEC))}\n{'▼ 切り替え' if star else '｜'} {i} {unit}\n")
     (kit / "拍の目印.srt").write_text("\n".join(srt), encoding="utf-8")
     lines = [
         "CapCut で作るときの素材（新曲の日の目玉の投稿）", "",
-        f"テンポ：{grid.get('bpm') or '不明'} BPM（{grid.get('how', '')}）・1 小節 {bar:.2f} 秒・最初の拍 {grid.get('first_beat', 0):.2f} 秒",
-        f"おすすめの切り替え（{info.get('bars') or '—'} 小節ごと）：" + ("、".join(f"{c:.2f} 秒" for c in info.get("cuts") or []) or "なし（1 カット）"), "",
+        (f"テンポ：{grid.get('bpm')} BPM（{grid.get('how', '')}）・1 小節 {bar:.2f} 秒・最初の拍 {grid.get('first_beat', 0):.2f} 秒"
+         if grid.get("bpm") else "テンポ：分かりませんでした（目印は 6 秒ごと。曲を聴いて、拍に合わせて少しずらしてください）"),
+        (f"おすすめの切り替え（{info.get('bars')} 小節ごと）：" if grid.get("bpm") else "おすすめの切り替え：")
+        + ("、".join(f"{c:.2f} 秒" for c in info.get("cuts") or []) or "なし（1 カット）"), "",
         "手順",
         "  1 CapCut で新しいプロジェクト（9:16）を作り、「音_サビ30秒.wav」を入れる",
         "  2 「拍の目印.srt」を字幕として読み込む（テキスト → 字幕の読み込み）。▼ の位置で映像を切り替えると拍に合う",
