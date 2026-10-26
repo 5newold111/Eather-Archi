@@ -129,7 +129,9 @@ def _explain(row: dict, phase: dict) -> dict:
                 "actions": [{"kind": "run", "label": "ブリーフを作る", "action": "brief", "week": row.get("week"), "primary": True}]}
 
     if name == "Suno で作曲":
+        import take_check
         acts = [{"kind": "run", "primary": True, "label": "Suno に入力する（ブラウザが開きます）", "action": "fill_suno", "id": row.get("id")},
+                {"kind": "retake", "id": row.get("id"), "reasons": list(take_check.MANUAL)},   # 2 曲とも良くないとき（決定 100）
                 {"kind": "run", "label": "曲を取り込む", "action": "scan"},
                 {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"},
                 {"kind": "run", "label": "Suno の画面の部品を記録する（うまく入らない欄があるとき・Claude に見せる用）", "action": "browser_parts", "site": "suno"},

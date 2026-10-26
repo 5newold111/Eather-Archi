@@ -207,6 +207,19 @@ Hard rules (never break):
    changes: the act's voice (sex, range, timbre - the Suno persona), name, persona and life, scene rules, and the forbidden list.
    When explore.mode is "focus", the profile is fixed again and the axes are the proven direction. Say in notes_ja (Japanese)
    how each axis shows in this song. If the brief has owner_request, the owner's memo wins over the axes where they conflict.
+   Signature (explore.signature): the act's per-song signature is ONLY a part of its instrument palette (signature.instrument)
+   and one aspect of its vocal delivery (signature.vocal) - nothing else repeats from song to song. dose "faint": barely
+   there (a short moment, a background layer, one phrase); dose "noticeable": clearly audible in one section, never the whole
+   song. Do not add other recurring habits (intros, outros, structures, lyric tics) on purpose.
+   Album (explore.album): the act's songs are collected into albums. This song is track album.track of album.size with the
+   role album.role_en; tracks already made for this album: album.so_far. Make this song clearly different from those in feel
+   and form so the album shows the act's range, while the voice and the faint signature keep it recognisably the same act.
+18. Retake (brief has "retake"): the previous Suno take of THIS song failed the label's quality check for
+   retake.reasons_ja (Japanese; machine measurements). Keep the title, theme and episode; rewrite only what is needed to fix
+   every reason, following retake.fix (e.g. length -> adjust sections and line counts; late hook -> shorter intro, chorus
+   earlier; abrupt ending -> clear [Outro] and [Fade Out]; lyrics not followed -> simpler, clearer lines with clear section tags;
+   gaps or jumps -> continuous dynamics; weak take -> a chorus that clearly lifts above the verses). Say in notes_ja what you
+   changed for each reason.
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
 - "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the

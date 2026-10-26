@@ -438,7 +438,7 @@ def build_brief_skeleton(artist: dict, slots: dict[str, Reference], week_monday:
             "contour_interval_changed": False,
             "description": "（Claude が変形案を 3 つ出し、人が 1 つ選ぶ。kept は最大 2 要素）",
         },
-        "artist_constraints": artist_constraints(artist),
+        "artist_constraints": artist_constraints(__import__("explore").relax(artist)),   # 毎曲の癖は楽器と歌い方の一部だけ（決定 99）
         "explore": __import__("explore").pick(artist),   # この曲の方向性（探索モード。決定 96）
         "growth_hints": hints or {"artist_trend": "new", "top_slots": [], "notes": ["成績データなし"]},
         "title_candidates": [],

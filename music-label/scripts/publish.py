@@ -525,6 +525,9 @@ def cmd_scan(args) -> int:
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     for song, f in picked.values():
         take_in(song, f)   # ファイルの名前を <曲名>_<アーティスト名>_<生成日> にそろえ、登録簿にも足す
+    import take_check   # 作曲の時点の質の確認：足りなければ案を自動で直して作曲待ちに戻す（決定 100）
+    for key in [k for k, (song, _f) in picked.items() if take_check.gate(song) == "retake"]:
+        picked.pop(key)
     if picked and not getattr(args, "no_open", False):
         try:
             import song_check
@@ -536,7 +539,7 @@ def cmd_scan(args) -> int:
     ready = []
     for song in songs:
         st = _songs.state(song)
-        if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover") or song["key"] in picked:
+        if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover") or (song["key"] in picked and st.get("status")):
             now = advance(song)
             store_set(song)   # 音源ができた時点で、公開セットのフォルダにも入れておく（SSD が無くても Mac に残る）
             if now == "ready":

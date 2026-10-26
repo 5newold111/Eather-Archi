@@ -14,18 +14,25 @@
   ・固める：ある軸で 1 つの値が 6 割以上・3 曲以上なら「固まりつつある」、75% 以上・5 曲以上なら「ほぼ固まった」と知らせる。
     固める組は focus にすると、毎曲の癖が毎曲に戻り、いちばん伸びた値を 85% で選ぶ（15% は探り続ける）
   ・成績：collect_metrics.py の out/metrics/metrics.csv。配信から 14 日以上たった曲の、最初の 28 日の再生（14〜27 日は 28 日に換算）
+  ・その組らしさ（決定 99）：毎曲の癖は「楽器の構成の一部」と「歌い方の一部」だけ。それも「たまに感じる」くらい
+      - 曲ごとに、楽器の色（管理表の「楽器の色」）から 1 つ・得意な歌い方から 1 つを選び、7 割の曲はかすかに、3 割の曲ははっきり（固めた組は 7 割はっきり）
+      - 作曲の癖（イントロ・アウトロ・構成・転調・フレーズの終わり方・歌詞の癖・毎曲必ず）は、毎曲には入れない（Claude に渡さない）
+  ・アルバム（決定 99）：数曲で 1 枚のアルバムにまとめる前提で、組ごとに 8 曲ずつを 1 枚とみて、1 枚の中に多彩な曲がそろうようにする
+      - 曲ごとに「アルバムの中の役」を決める（リード曲・グルーヴ・バラード・アップテンポ・ジャンルを越える実験・音を絞った曲・夜の曲・締めくくり）。
+        1 曲目はリード曲、8 曲目は締めくくり、間は残っている役から。役に合わせて軸のいくつかを決め、残りの軸もアルバムの中で同じ値が重ならないようにする
 
 使い方：
   python3 scripts/explore.py report            # 成績から学んで、組ごとの探り具合を表示（定期実行の「成長分析」でも動く）
   python3 scripts/explore.py focus tidewool    # この組を固める（毎曲の癖を戻し、伸びた方向性を主に）
   python3 scripts/explore.py explore tidewool  # 探索に戻す
   python3 scripts/explore.py pick tidewool     # 次の曲の方向性のくじを試しに引く
+  python3 scripts/explore.py album tidewool    # いまのアルバムの曲と、残っている役
 """
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
-import json
 import math
 import random
 import sys
@@ -70,6 +77,21 @@ AXES: dict[str, dict[str, tuple[str, str]]] = {
 }
 AXIS_JA = {"tempo": "テンポ", "energy": "熱量", "genre": "ジャンル", "arrangement": "編成", "structure": "構成", "mood": "気分", "vocal": "歌い方"}
 
+# アルバムの中の役：(Claude への英語, 日本語, 役で決まる軸)
+ROLES: dict[str, tuple[str, str, dict[str, str]]] = {
+    "lead": ("lead single: immediate and catchy, the album's calling card", "リード曲（すぐ耳に残る看板の曲）", {"structure": "hook_first"}),
+    "groove": ("mid-tempo groove track that sits in the pocket", "ミドルテンポのグルーヴ", {"tempo": "usual", "energy": "mid"}),
+    "ballad": ("ballad: slow and intimate", "バラード", {"tempo": "slower", "energy": "quiet", "vocal": "close"}),
+    "upbeat": ("upbeat, energetic track", "アップテンポ", {"tempo": "faster", "energy": "high"}),
+    "crossover": ("genre crossover experiment that still sounds like the act", "ジャンルを越える実験曲", {"genre": "contrast"}),
+    "stripped": ("stripped-back track with a sparse arrangement", "音を絞った曲", {"arrangement": "sparse"}),
+    "night": ("dark, late-night mood piece", "夜・暗いムードの曲", {"mood": "dark"}),
+    "closer": ("album closer: a slow build to a warm, bittersweet ending", "アルバムの締めくくり", {"structure": "slow_build", "mood": "bittersweet"}),
+}
+ALBUM_SIZE = 8
+NOTICEABLE = {"explore": 0.3, "focus": 0.7}   # その組らしさを「はっきり」出す曲の割合
+HABITS_OFF = ("lyrics_tic", "always", "intro", "outro", "structure", "modulation", "phrase_endings")   # 毎曲には入れない作曲の癖
+
 
 def settings() -> dict:
     try:
@@ -84,14 +106,46 @@ def mode(artist: dict) -> str:
 
 
 def relax(artist: dict) -> dict:
-    """探索モードの組は、毎曲の癖を「たまに」扱いにした写しを返す（必ず入れる・足す・採点する、をしない）"""
-    if mode(artist) != "explore":
-        return artist
-    a = json.loads(json.dumps(artist))
-    for t in ((a.get("vocal") or {}).get("signature_techniques") or {}).get("tics", []) or []:
-        if t.get("frequency") == "every_song":
-            t["frequency"] = "sometimes"
+    """毎曲の癖を絞った写しを返す（決定 96・99）：作曲の癖（イントロ・構成・歌詞の癖など）は毎曲には入れない。
+    探索中は、歌い方の癖（tics）も「たまに」扱い（必ず入れる・足す・採点する、をしない）"""
+    a = copy.deepcopy(artist)
+    ch = a.get("composition_habits") or {}
+    for k in HABITS_OFF:
+        ch.pop(k, None)
+    if mode(artist) == "explore":
+        for t in ((a.get("vocal") or {}).get("signature_techniques") or {}).get("tics", []) or []:
+            if t.get("frequency") == "every_song":
+                t["frequency"] = "sometimes"
     return a
+
+
+def album_state(slug: str, size: int | None = None) -> dict:
+    """いまのアルバム：{no, track（次の曲は何曲目か）, size, used（役）, axes（使った軸の値）, titles}"""
+    size = size or int(settings().get("album_size") or ALBUM_SIZE)
+    briefs = OUT / "briefs"
+    done = []
+    for p in sorted(briefs.glob(f"*_{slug}.json"), key=lambda x: x.stat().st_mtime) if briefs.exists() else []:
+        try:
+            b = read_json(p)
+        except (OSError, ValueError):
+            continue
+        al = (b.get("explore") or {}).get("album")
+        if al:
+            done.append((al, (b.get("explore") or {}).get("axes") or {}, (b.get("title_candidates") or [""])[0]))
+    no = (len(done) // size) + 1
+    cur = [d for d in done if d[0].get("no") == no]
+    return {"no": no, "track": len(cur) + 1, "size": size, "used": [d[0].get("role") for d in cur],
+            "axes": [d[1] for d in cur], "titles": [d[2] for d in cur]}
+
+
+def signature(artist: dict, m: str, rng: random.Random) -> dict:
+    """その組らしさ（決定 99）：楽器の色から 1 つ・歌い方から 1 つ。かすか（7 割）か、はっきり（3 割）"""
+    pal = [x for x in ((artist.get("sound") or {}).get("palette") or []) if x]
+    sig = (artist.get("vocal") or {}).get("signature_techniques") or {}
+    voc = [x for x in [sig.get("primary")] + list(sig.get("secondary") or []) if x]
+    dose = "noticeable" if rng.random() < NOTICEABLE.get(m, 0.3) else "faint"
+    return {"dose": dose, "dose_ja": "はっきり" if dose == "noticeable" else "かすかに",
+            "instrument": rng.choice(pal) if pal else "", "vocal": rng.choice(voc) if voc else ""}
 
 
 def learned() -> dict:
@@ -151,17 +205,44 @@ def recent_axes(slug: str, n: int = 3) -> list[dict]:
 
 
 def pick(artist: dict, rng: random.Random | None = None) -> dict:
-    """次の曲の方向性をくじで選ぶ。ブリーフの explore に入る"""
+    """次の曲の方向性をくじで選ぶ。ブリーフの explore に入る（アルバムの中の役・その組らしさも）"""
     rng = rng or random.Random()
     slug = artist.get("slug", "")
     m = mode(artist)
+    al = album_state(slug)
+    left = [r for r in ROLES if r not in al["used"]] or list(ROLES)
+    if al["track"] == 1 and "lead" in left:
+        role = "lead"
+    elif al["track"] >= al["size"] and "closer" in left:
+        role = "closer"
+    else:
+        mid = [r for r in left if r not in ("lead", "closer")] or left
+        role = rng.choice(mid)
+    fixed = ROLES[role][2]
     pr = probs(slug, recent_axes(slug), focus=(m == "focus"))
     axes = {}
     for ax, p in pr.items():
-        v = rng.choices(list(p), weights=list(p.values()))[0]
+        if ax in fixed:
+            v = fixed[ax]
+        else:   # アルバムの中で同じ値が重ならないように（使った回数だけ出にくく）
+            w = {k: x * (0.5 ** sum(1 for a in al["axes"] if (a.get(ax) or {}).get("value") == k)) for k, x in p.items()}
+            v = rng.choices(list(w), weights=list(w.values()))[0]
         en, ja = AXES[ax][v]
-        axes[ax] = {"value": v, "en": en, "ja": ja, "p": p[v]}
-    return {"mode": m, "axes": axes, "picked_at": date.today().isoformat()}
+        axes[ax] = {"value": v, "en": en, "ja": ja, "p": p[v], "by_role": ax in fixed}
+    return {"mode": m, "axes": axes, "picked_at": date.today().isoformat(),
+            "album": {"no": al["no"], "track": al["track"], "size": al["size"], "role": role, "role_en": ROLES[role][0], "role_ja": ROLES[role][1],
+                      "so_far": [ROLES[r][1] for r in al["used"] if r in ROLES]},
+            "signature": signature(artist, m, rng)}
+
+
+def show_album(slug: str) -> None:
+    a = load_artist(slug, missing_ok=True) or {}
+    al = album_state(slug)
+    print(f"■ {a.get('name', slug)}：アルバム {al['no']} 枚目（{al['track'] - 1}/{al['size']} 曲）")
+    for r, t in zip(al["used"], al["titles"]):
+        print(f"   ○ {ROLES.get(r, ('', r))[1]}　{t or '（曲名未定）'}")
+    left = [ROLES[r][1] for r in ROLES if r not in al["used"]]
+    print("   残っている役：" + ("・".join(left) if left else "なし（次の曲から次のアルバム）"))
 
 
 # ---------------------------------------------------------------------------
@@ -268,6 +349,10 @@ def report() -> None:
         for n in notes:
             print(f"   ★ {n}")
             lines.append(f"- ★ {n}")
+        al = album_state(slug)
+        alin = f"アルバム {al['no']} 枚目：{al['track'] - 1}/{al['size']} 曲（" + ("・".join(ROLES[r][1] for r in al["used"] if r in ROLES) or "まだなし") + "）"
+        print(f"   {alin}")
+        lines.append(f"- {alin}")
         if notes and m == "explore" and sum("ほぼ固まった" in n for n in notes) >= 3:
             msg = f"3 つ以上の軸がほぼ固まりました。固めるなら  python3 scripts/explore.py focus {slug}"
             print(f"   → {msg}")
@@ -290,7 +375,7 @@ def set_mode(slug: str, m: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="方向性を探る・固める")
-    ap.add_argument("cmd", choices=["report", "learn", "focus", "explore", "pick"])
+    ap.add_argument("cmd", choices=["report", "learn", "focus", "explore", "pick", "album"])
     ap.add_argument("slug", nargs="?")
     a = ap.parse_args()
     if a.cmd == "report":
@@ -298,6 +383,9 @@ def main() -> None:
     elif a.cmd == "learn":
         d = learn()
         print(f"【結果】方向性の伸びを学びました（成績のある曲 {d['songs']} 曲）")
+    elif a.cmd == "album":
+        for x in ([load_artist(a.slug)] if a.slug else all_artists()):
+            show_album(x["slug"])
     elif a.cmd in ("focus", "explore"):
         if not a.slug:
             sys.exit("[エラー] 組の slug を指定してください")
@@ -307,9 +395,11 @@ def main() -> None:
         if not art:
             sys.exit("[エラー] 組の slug を指定してください")
         e = pick(art)
-        print(f"■ {art.get('name')}（{'固める' if e['mode'] == 'focus' else '探索中'}）の次の曲の方向性")
+        al, sg = e["album"], e["signature"]
+        print(f"■ {art.get('name')}（{'固める' if e['mode'] == 'focus' else '探索中'}）の次の曲：アルバム {al['no']} 枚目の {al['track']} 曲目「{al['role_ja']}」")
         for ax, x in e["axes"].items():
-            print(f"   {AXIS_JA[ax]}：{x['ja']}（{int(x['p'] * 100)}%）")
+            print(f"   {AXIS_JA[ax]}：{x['ja']}" + ("（役で決まり）" if x["by_role"] else f"（{int(x['p'] * 100)}%）"))
+        print(f"   その組らしさ（{sg['dose_ja']}）：楽器 {sg['instrument'] or '—'}・歌い方 {sg['vocal'] or '—'}")
 
 
 if __name__ == "__main__":

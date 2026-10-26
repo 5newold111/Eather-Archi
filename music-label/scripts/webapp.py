@@ -292,6 +292,13 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "suno_retake":   # Suno で聴いて 2 曲とも良くない：理由のとおりに入力を直す（決定 100）
+        import take_check
+        song = _songs.by_id(str(p.get("id", "")))
+        why = [w for w in str(p.get("why") or "").split(",") if w in take_check.MANUAL]
+        if song and why:
+            return [PY, str(S / "take_check.py"), song["id"], "--redo", ",".join(why)], f"Suno の入力を直す（{song['artist']}「{song['title']}」）"
+        return None
     if action == "fill_suno_batch":   # タブを分けて 3 曲までまとめて入力（決定 98）
         return [PY, str(S / "browser_fill.py"), "suno", "--batch", "3"], "ブラウザで入力（Suno：まとめて 3 曲まで）"
     if action == "fill_lyrics":   # 登録した曲の歌詞を DistroKid の歌詞の画面に入れる（決定 52）
@@ -631,6 +638,7 @@ function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
    case "artist_folder":return `<button class="ghost act-only" data-act="open_artist" data-slug="${slug}">${E(a.label)}</button>`;
    case "mark_live":return `<span class="act-only" style="display:block"><input type="text" id="lt-${id}" placeholder="Spotify の曲の住所（https://open.spotify.com/track/…・なくても可）" style="min-width:22em;margin:2px 0"><br><input type="text" id="la-${id}" placeholder="Spotify のアーティストの住所（https://open.spotify.com/artist/…）" style="min-width:22em;margin:2px 0"><br><button data-act="mark_live" data-id="${id}">${E(a.label)}</button></span>`;
    case "artist_page":return `<span class="act-only"><input type="text" id="ap-${slug}" placeholder="spotify:artist:… か https://open.spotify.com/artist/…" style="min-width:18em"> <button data-act="artist_page" data-slug="${slug}">${E(a.label)}</button></span>`;
+   case "retake":return `<span class="act-only rt" style="display:block;margin:6px 0"><b>Suno で聴いて 2 曲とも良くないとき</b>：まず同じ入力のまま Create をもう一度（料金 0 円・Claude も使わない）。それでもだめなら、理由を選んで直す（1 回目は機械の直しで 0 円、2 回目は Claude の小さな書き直しで数円）<br>${(a.reasons||[]).map(x=>`<label style="display:inline-block;margin:2px 8px 2px 0;font-weight:400"><input type="checkbox" value="${E(x)}" style="width:auto"> ${E(x)}</label>`).join("")}<br><button class="ghost" data-act="suno_retake" data-id="${id}">理由のとおりに直す（このあと「Suno に入力する」）</button></span>`;
    case "registered":return `<span class="act-only"><input type="date" id="d-${id}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${id}">${E(a.label)}</button></span>`;
   }return""}
 function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].rows[+ri],p=r.phases[+pi],g=p.guide||{cause:p.detail,steps:[],actions:[]};
@@ -720,6 +728,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
   if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
+  if(b.dataset.act==="suno_retake"){p.why=[...b.closest(".rt").querySelectorAll("input:checked")].map(x=>x.value).join(",");if(!p.why){alert("良くなかったところを 1 つ以上選んでください");return}}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
