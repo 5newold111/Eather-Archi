@@ -375,6 +375,13 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
         n = (production_monday - first_production).days // 7
         if n % 2:
             return False, "隔週の休みの週"
+    try:   # 毎日配信の期間に配信日が入る週は、daily.py が作る（決定 94）
+        import daily
+        rel = release_at_utc(production_monday, *release_schedule(artist, load_label(artist.get("label_slug")))).date()
+        if daily.in_rotation(artist.get("slug", ""), rel):
+            return False, "毎日配信の期間（その組の曲は daily.py が日ごとに作る）"
+    except ImportError:
+        pass
     return True, "制作する週"
 
 

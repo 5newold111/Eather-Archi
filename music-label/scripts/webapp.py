@@ -144,7 +144,17 @@ def status_json() -> dict:
                       "infl_picked": sum(len(v.get("picks", [])) for v in __import__("influences").load().values() if (v or {}).get("applied"))}
     except Exception:  # noqa: BLE001
         ref_enrich = {"pending": 0, "yen": [0, 0], "lyrics": 0, "whisper": True}
+    try:   # 毎日配信（5 組の持ち回り。決定 94）と SNS の毎日の投稿
+        import daily
+        import post_social
+        dly = daily.summary()
+        ss = post_social.daily_settings()
+        dly["social"] = {"on": bool(ss.get("on")), "per_day": ss.get("per_day"), "bg_dir": str(post_social.bg_root()),
+                         "planned": len(list(post_social.DAILY_DIR.rglob("plan.json"))) if post_social.DAILY_DIR.exists() else 0}
+    except Exception as e:  # noqa: BLE001
+        dly = {"active": False, "error": str(e)}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich,
+            "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
@@ -153,7 +163,7 @@ def status_json() -> dict:
 
 def _flow(s: dict) -> str:
     """どのタブに並べるか：デビュー曲はデビュー、不定期の曲は不定期配信、毎週の曲は定期配信（決定 54・72）"""
-    return "debut" if s.get("kind") == "debut" else ("irregular" if s.get("irregular") else "regular")
+    return "debut" if s.get("kind") == "debut" else ("irregular" if s.get("irregular") or s.get("daily") else "regular")
 
 
 # ---------------------------------------------------------------------------
@@ -237,6 +247,19 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         week = str(p.get("week") or "this")
         if week == "this" or re.fullmatch(r"\d{4}-\d{2}-\d{2}", week):
             return [PY, str(S / "run_week.py"), "brief", "--week", week], f"ブリーフを作る（{week}）"
+    if action == "daily_start":   # 毎日配信を始める（既定：2 週間後の月曜から 30 日・配信中の組の持ち回り。決定 94）
+        return [PY, str(S / "daily.py"), "start"], "毎日配信を始める（5 組の持ち回り）"
+    if action == "daily_make":   # 毎日配信の 21 日先までの曲を作る
+        return [PY, str(S / "daily.py"), "make"], "毎日配信の曲を作る（21 日先まで）"
+    if action == "social_daily_on":   # SNS の毎日の投稿を始めて、3 日先までの案を作る（決定 94）
+        n = str(p.get("per_day") or 2) if str(p.get("per_day") or 2) in ("1", "2", "3") else "2"
+        return [PY, str(S / "post_social.py"), "daily", "--on", "--per-day", n], f"SNS の毎日の投稿を始める（1 日 {n} 本）"
+    if action == "social_daily_off":
+        return [PY, str(S / "post_social.py"), "daily", "--off"], "SNS の毎日の投稿を止める"
+    if action == "social_daily_plan":
+        return [PY, str(S / "post_social.py"), "daily", "--days", "3"], "SNS の投稿の案を作る（3 日先まで）"
+    if action == "daily_stop":
+        return [PY, str(S / "daily.py"), "stop"], "毎日配信を止める"
     if action == "irregular_propose":   # 不定期配信の曲の案を作る・却下して作り直す（決定 72）
         import irregular
         from _common import SCENE_TYPES
@@ -465,7 +488,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
  <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
- <button class="tab" role="tab" id="tab-irregular" aria-controls="pane-irregular">不定期配信<span class="n" id="n-irregular"></span></button>
+ <button class="tab" role="tab" id="tab-irregular" aria-controls="pane-irregular">不定期・毎日配信<span class="n" id="n-irregular"></span></button>
  <button class="tab" role="tab" id="tab-debut" aria-controls="pane-debut">デビュー<span class="n" id="n-debut"></span></button>
 </div>
 <div class="legend" aria-label="凡例">
@@ -484,7 +507,8 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-regular"></div></details>
 </section>
 <section id="pane-irregular" role="tabpanel" aria-labelledby="tab-irregular" hidden>
- <p class="sub">デビュー曲が配信中の組で、毎週の曲とは別に 1 曲を出します。組を選んで「曲の案を作る」を押すと、曲名・イメージ・歌詞などの案ができ、ポップアップで直せます。好みでなければ却下して作り直し、よければ作曲（Suno）へ進めます。配信日はいつもいちばん早い日です。</p>
+ <p class="sub">毎日配信：期間を決めて、5 組の持ち回りでレーベル全体で毎日 1 曲を出します（配信日は決まった日）。不定期配信：デビュー曲が配信中の組で、毎週の曲とは別に 1 曲を出します。組を選んで「曲の案を作る」を押すと、曲名・イメージ・歌詞などの案ができ、ポップアップで直せます。好みでなければ却下して作り直し、よければ作曲（Suno）へ進めます。不定期の曲の配信日はいつもいちばん早い日です。</p>
+ <div class="panel act-only" id="daily-box"></div>
  <div class="panel irr-f act-only" id="irr-form"></div>
  <h2>曲の案（作曲の前）</h2><div id="irr-drafts"></div>
  <h2>作曲へ進めた曲</h2>
@@ -514,7 +538,17 @@ const DAY=86400000,D=s=>new Date(s+"T00:00:00"),md=d=>`${d.getMonth()+1}/${d.get
 let DATA=null,TAB="regular";
 const TABS=["regular","irregular","debut"];
 const EMPTY={debut:"デビュー前の組はありません。全組が定期配信に移りました。",regular:"定期配信の組はまだありません。デビュー曲が配信されると、ここに並びます（いまは「デビュー」のタブ）。",
-  irregular:"作曲へ進めた不定期の曲はまだありません。上で曲の案を作り、「この案で作曲へ進む」を押すと、ここに並びます。"};
+  irregular:"作曲へ進めた不定期の曲・毎日配信の曲はまだありません。上で曲の案を作り「この案で作曲へ進む」を押すか、毎日配信を始めると、ここに並びます。"};
+function dailyBox(){const el=document.getElementById("daily-box"),D=DATA.daily||{};   // 毎日配信（決定 94）
+  if(!D.active){el.innerHTML=`<b>毎日配信（5 組の持ち回り）</b><p class="sub">レーベル全体で毎日 1 曲（1 組あたり週 1〜2 曲）。配信日は決まった日の 17:00 ET。始める日は ${E(D.earliest||"")} から 30 日（曲づくり・登録・Spotify への推薦が間に合うよう 2 週間あけます）。</p>`
+    +`<button data-act="daily_start" data-confirm="毎日配信を ${E(D.earliest||"")} から 30 日、デビュー曲が配信中の組の持ち回りで始めます。\nこの期間に配信日が入るふだんの毎週の制作は止め、毎日配信の曲が代わりになります。\n曲は 21 日先までを先に作ります（毎週火曜の定期実行でも続きを作ります）。\n始めますか？">毎日配信を始める</button>`+sns;return}
+  const so=D.social||{},sns=`<hr><b>SNS の毎日の投稿：${so.on?`オン（1 日 ${so.per_day} 本）`:"オフ"}</b><p class="sub">配信日の曲は 17:00 ET、ほかは配信中の曲から選んで 12:00・20:00 ET に、YouTube ショート・インスタ・TikTok へ。説明文は「この曲が生まれた日」（曲のエピソード）。背景の映像は ${E(so.bg_dir||"")} の組ごとのフォルダに Blender の書き出しを入れると使います（無ければジャケット）。</p>`
+    +(so.on?`<button data-act="social_daily_plan">投稿の案を作る（3 日先まで）</button> <button class="ghost" data-act="social_daily_off" data-confirm="SNS の毎日の投稿を止めます（作った案は投稿しません）。止めますか？">SNS の毎日の投稿を止める</button>`
+      :`<button data-act="social_daily_on" data-per_day="2" data-confirm="SNS の毎日の投稿を始めます（1 日 2 本）。3 日先までの投稿の案（縦動画・説明文）を作り、投稿時刻を過ぎると定期実行が投稿します。\n鍵（YouTube・インスタ・TikTok）が無いサービスは飛ばします。始めますか？">SNS の毎日の投稿を始める（1 日 2 本）</button>`);
+  const nx=D.next?`次は ${E(D.next.date)}（${E(D.next.slug)}）`:"";
+  el.innerHTML=`<b>毎日配信：${E(D.start)}〜${E(D.end)}（${D.days} 日）</b><p class="sub">曲がある日 ${D.filled}/${D.days}。持ち回り：${(D.order||[]).map(E).join(" → ")}。${nx}</p>`
+    +`<button data-act="daily_make" data-confirm="21 日先までの、曲がまだ無い日の曲を作ります（参考曲の割り当て → Claude が書く。1 曲 約 30 円）。始めますか？">毎日配信の曲を作る（21 日先まで）</button> `
+    +`<button class="ghost" data-act="daily_stop" data-confirm="毎日配信を止めて、ふだんの毎週の制作に戻します（作った曲と配信日はそのまま）。止めますか？">毎日配信を止める</button>`+sns}
 function selectTab(t){TAB=t;for(const k of TABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
   if(!location.hash.startsWith("#"+t))history.replaceState(null,"","#"+t)}
 for(const k of TABS)document.getElementById("tab-"+k).onclick=()=>selectTab(k);
@@ -737,7 +771,7 @@ function render(){
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  irrForm();irrDrafts();
+  irrForm();irrDrafts();dailyBox();
   {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）
    bl.hidden=!(re0.lyrics&&re0.whisper);bw.hidden=!(re0.lyrics&&!re0.whisper);
    if(re0.lyrics){bl.textContent=`歌詞を聞き取る（${re0.lyrics} 曲・無料）`;bw.textContent=`歌詞を聞き取る部品を入れる（${re0.lyrics} 曲が待っています・ターミナルが開きます）`;

@@ -87,6 +87,7 @@ def weekly_songs() -> list[dict]:
             "episode": b.get("episode") or {},
             "sprint": b.get("sprint"),   # 集中配信の曲（決定 53）：配信日はいちばん早い日
             "irregular": b.get("irregular"),   # 不定期配信の曲（決定 72）：ダッシュボードの「不定期配信」のタブに並べる
+            "daily": b.get("daily"),   # 毎日配信の曲（決定 94）：配信日は daily.date に固定。「不定期・毎日配信」のタブに並べる
         })
     return out
 

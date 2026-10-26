@@ -56,10 +56,13 @@ PATH_ENV = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"   # 
 
 # 仕事の中身：(説明, 実行するコマンドの並び)
 JOBS: dict[str, tuple[str, list[list[str]]]] = {
-    "post":    ("SNS 投稿（配信時刻を過ぎたもの）と管理画面の更新", [["post_social.py", "post", "--week", "all"], ["dashboard.py"]]),
+    "post":    ("SNS 投稿（配信時刻を過ぎたもの）と管理画面の更新",
+                [["post_social.py", "daily", "--if-on"],   # 毎日の投稿の案（3 日先まで。作ってあれば何もしない。決定 94）
+                 ["post_social.py", "post", "--week", "all"], ["dashboard.py"]]),
     "trends":  ("今週の話題曲・トレンド言語", [["fetch_trends.py", "--week", "this"]]),
     "brief":   ("アーティスト管理表の読み込み → 今週のブリーフ（全組）",
-                [["artist_book.py", "pull", "--if-exists"], ["run_week.py", "brief", "--week", "this"]]),
+                [["artist_book.py", "pull", "--if-exists"], ["run_week.py", "brief", "--week", "this"],
+                 ["daily.py", "make", "--if-active"]]),   # 毎日配信の 21 日先までの曲（決定 94）
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
     "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"]]),
     "backup":  ("外付け SSD への保管と R2 への予備保管", [["archive_sync.py"], ["backup_r2.py"]]),

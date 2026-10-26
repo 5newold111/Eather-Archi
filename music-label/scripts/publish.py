@@ -416,7 +416,10 @@ def draft_fields(song: dict) -> dict:
         sf, _ = archive.artist_folder(song["artist"], "music", _songs.folder_name(song))
         if sf is not None and (sf / audio).exists():
             folder = sf
-    if song["kind"] == "debut" or not song.get("release_at") or song.get("sprint"):   # 集中配信の曲も、いちばん早い日（決定 53）
+    fixed = str((song.get("daily") or {}).get("date") or "")
+    if fixed and fixed > date.today().isoformat():   # 毎日配信の曲：決まった配信日（決定 94）
+        when = fixed
+    elif song["kind"] == "debut" or not song.get("release_at") or song.get("sprint") or fixed:   # 集中配信の曲・日を過ぎた毎日配信の曲も、いちばん早い日（決定 53）
         when = "いちばん早い日（登録する日。DistroKid の画面で選べる最短の日付）"
     else:
         when = str(song["release_at"])[:10]
@@ -650,7 +653,7 @@ def cmd_registered(args) -> int:
     st.update({"status": "registered", "registered_at": date.today().isoformat(), "release_date": day.isoformat()})
     _songs.save_state(song, st)
     print(f"○ {song['artist']}「{song['title']}」を DistroKid 登録済みにしました（配信日 {day}）")
-    if song.get("sprint") and song.get("brief"):   # 集中配信の曲：ブリーフの配信日時も、登録した配信日にそろえる（SNS の投稿の時刻など。決定 53）
+    if (song.get("sprint") or song.get("daily")) and song.get("brief"):   # 集中・毎日配信の曲：ブリーフの配信日時も、登録した配信日にそろえる（SNS の投稿の時刻など。決定 53・94）
         import sprint
         b = read_json(song["brief"])
         b["release_at"] = sprint.release_at_asap(day)

@@ -293,7 +293,7 @@ def sprint_weeks() -> list[date]:
     """集中配信（sprint.py）で作った曲のうち、まだ DistroKid に登録していない曲がある制作週"""
     import _songs
     ws = {date.fromisoformat(s["week"]) for s in _songs.weekly_songs()
-          if s.get("sprint") and _songs.state(s).get("status") not in ("registered", "live")}
+          if (s.get("sprint") or s.get("daily")) and _songs.state(s).get("status") not in ("registered", "live")}
     return sorted(ws)
 
 

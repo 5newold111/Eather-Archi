@@ -147,7 +147,7 @@ def regular_rows(weeks_ahead: int = 4) -> list[dict]:
             continue
         songs = sorted([s for s in _songs.weekly_songs() if s["slug"] == slug], key=lambda s: s["week"])
         weeks_with_song = {s["week"] for s in songs}
-        songs = [s for s in songs if not s.get("irregular")]   # 不定期配信の曲は「不定期配信」の表に並べる（決定 72）
+        songs = [s for s in songs if not s.get("irregular") and not s.get("daily")]   # 不定期・毎日配信の曲は別の表に並べる（決定 72・94）
         for s in songs:   # 作った曲は、デビュー曲の配信を待たずに、配信が終わったあとも並べる（消さない）
             rows.append(_weekly_row(a, s, _d(s.get("release_at"))))
         if not in_regular(slug):
@@ -198,19 +198,23 @@ def irregular_rows() -> list[dict]:
     arts = {a.get("slug"): a for a in all_artists()}
     for s in _songs.weekly_songs():
         ir = s.get("irregular") or {}
+        dl = s.get("daily") or {}   # 毎日配信の曲（決定 94）も同じ表に、決まった配信日で並べる
         a = arts.get(s["slug"])
-        if not ir or a is None:
+        if not (ir or dl) or a is None:
             continue
         st = _songs.state(s)
-        start = _d(ir.get("accepted_at")) or date.today()
-        rel = _d(st.get("released")) or _d(st.get("release_date")) or start + timedelta(days=7)
+        start = _d(ir.get("accepted_at")) or _d(dl.get("marked_at")) or date.today()
+        rel = _d(st.get("released")) or _d(st.get("release_date")) or _d(dl.get("date")) or start + timedelta(days=7)
+        if dl and not ir:   # 決まった配信日から逆算：登録は配信の 7 日前まで（Spotify への推薦のため）
+            start = min(start, rel - timedelta(days=10))
         plan = {"brief": (start, start), "suno": (start, start + timedelta(days=1)), "finish": (start + timedelta(days=2), start + timedelta(days=2)),
                 "register": (start + timedelta(days=3), start + timedelta(days=3)), "wait": (start + timedelta(days=4), max(rel - timedelta(days=1), start + timedelta(days=4)))}
         phases = song_phases(s, plan, rel)
         cur = next((p for p in phases if p["state"] in ("ng", "wait", "run")), None)
         title = s.get("title") or "（曲名未定）"
         rows.append({"slug": s["slug"], "artist": a.get("name", s["slug"]), "label": _label(a), "week": s["week"], "id": s["id"],
-                     "title": s.get("title", ""), "row": a.get("name", s["slug"]), "sub": f"{start.month}/{start.day} 不定期「{title}」",
+                     "title": s.get("title", ""), "row": a.get("name", s["slug"]),
+                     "sub": (f"{rel.month}/{rel.day} 毎日配信「{title}」" if dl and not ir else f"{start.month}/{start.day} 不定期「{title}」"),
                      "phases": phases, "planned": False, "started": start.isoformat(),
                      "blocker": {"state": cur["state"], "who": cur["who"], "detail": cur["detail"], "name": cur["name"]} if cur else None})
     rows.sort(key=lambda r: (r["artist"], r["started"]))
