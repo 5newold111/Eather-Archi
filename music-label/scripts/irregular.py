@@ -131,7 +131,8 @@ def summary(d: dict) -> dict:
             "theme": ep.get("theme", ""), "story": ep.get("story_ja", ""), "when_where": ep.get("when_where", ""),
             "realized": ep.get("realized", ""), "lyrics": d.get("suno_lyrics", ""), "style": d.get("suno_style_prompt", ""),
             "exclude": d.get("suno_exclude", "") or "", "cover": d.get("cover_prompt_seed", ""), "notes": d.get("notes_ja", ""),
-            "bpm": d.get("bpm"), "history": ir.get("history", [])}
+            "bpm": d.get("bpm"), "history": ir.get("history", []),
+            "collab": (d.get("featured_guest") or {}).get("name", ""), "collab_score": ((d.get("featured_guest") or {}).get("fit") or {}).get("score")}
 
 
 def _refs_count() -> int:
@@ -142,7 +143,7 @@ def _progress(k: int, n: int, text: str) -> None:
     print(f"【工程】{k}/{n}：{text}", flush=True)
 
 
-def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: str = "") -> int:
+def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: str = "", collab: str = "") -> int:
     """曲の案を 1 つ作る（redo を渡すと、その案を却下して作り直す）"""
     import os
     if slug not in {a["slug"] for a in eligible()}:
@@ -162,17 +163,21 @@ def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: 
                         "reason": reason.strip(), "rejected_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
         scene = scene or oi.get("scene", "")
         memo = memo or oi.get("memo", "")
+        collab = collab or oi.get("collab", "")   # 作り直しても、コラボの相手はそのまま
         if oi.get("status") in ("proposed", "failed"):
             oi.update({"status": "rejected", "reason": reason.strip(), "rejected_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
             _write(_draft_path(redo), old)
     if scene and scene not in SCENE_TYPES:
         scene = ""
+    if collab and (collab == slug or collab not in {a["slug"] for a in eligible()}):
+        print(f"【注意】コラボの相手 {collab} は選べないので、コラボなしで作ります（デビュー曲が配信中の組だけ）")
+        collab = ""
     stamp = datetime.now().strftime("%Y%m%d%H%M%S")
     draft_id = f"{slug}-{stamp}"
     dp = _draft_path(draft_id)
     week = free_week(slug)
     meta = {"id": draft_id, "status": "making", "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "scene": scene,
-            "memo": memo.strip(), "round": len(history) + 1, "history": history}
+            "memo": memo.strip(), "round": len(history) + 1, "history": history, "collab": collab}
     _write(dp, {"artist_slug": slug, "label_slug": a.get("label_slug"), "week_start": week.isoformat(), "irregular": meta})
     print(f"【進み具合】{a.get('name', slug)} の曲の案（{meta['round']} 案目）")
 
@@ -210,6 +215,10 @@ def propose(slug: str, scene: str = "", memo: str = "", redo: str = "", reason: 
     skel["owner_request"] = {"kind": "one-off release (irregular)", "memo_ja": meta["memo"],
                              "scene_choice": scene or "auto",
                              "rejected_ideas": [{k: h.get(k, "") for k in ("title", "theme", "story", "style", "reason")} for h in history]}
+    if collab:   # コラボ：相手の強みを 3〜5 割、曲の構成を崩さずに取り込む（write_brief.py の決まり 10。決定 97）
+        import collab_fit
+        skel["featured_artist_slug"] = collab
+        skel["featured_guest"] = collab_fit.guest_for(slug, collab)
     _write(dp, skel)
 
     _progress(3, N, "Claude が曲名・イメージ・歌詞・Suno のスタイルを書いています（1〜2 分）")
@@ -335,6 +344,7 @@ def main() -> None:
     ap.add_argument("--memo", default="", help="作りたい曲のメモ（任意）")
     ap.add_argument("--redo", default="", help="却下して作り直す前の案 ID")
     ap.add_argument("--reason", default="", help="好みでなかったところ（任意）")
+    ap.add_argument("--collab", default="", help="コラボの相手（slug。任意。決定 97）")
     a = ap.parse_args()
     if a.cmd == "artists":
         for x in eligible():
@@ -346,7 +356,7 @@ def main() -> None:
             print(f"{s['id']}\t{s['status_ja']}\t{s['artist']}\t「{s['title']}」\t{s['created_at']}")
         return
     if a.cmd == "propose":
-        sys.exit(propose(a.arg, a.scene, a.memo[:1000], a.redo, a.reason[:1000]))
+        sys.exit(propose(a.arg, a.scene, a.memo[:1000], a.redo, a.reason[:1000], a.collab))
     fn = accept if a.cmd == "accept" else discard
     ok, msg = fn(a.arg)
     print(f"【結果】{msg}")

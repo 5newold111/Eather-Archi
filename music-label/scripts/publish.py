@@ -407,6 +407,16 @@ def _credit_role(artist: dict) -> str:
     return "Singing & vocals"
 
 
+def featured_name(song: dict) -> str:
+    """客演の組の名前（ブリーフの featured_artist_slug。決定 97）。無ければ「なし」"""
+    try:
+        b = read_json(song["brief"]) if song.get("brief") else {}
+    except (OSError, ValueError):
+        b = {}
+    g = b.get("featured_artist_slug")
+    return ((load_artist(g, missing_ok=True) or {}).get("name") or g) if g else "なし"
+
+
 def draft_fields(song: dict) -> dict:
     a = load_artist(song["slug"], song.get("label_slug")) or {}
     from _common import load_label
@@ -434,7 +444,7 @@ def draft_fields(song: dict) -> dict:
         "Artist / Band name": song["artist"],
         "Spotify のアーティスト": ((a.get("distribution") or {}).get("spotify_uri") or (artist_links(song["slug"]).get("spotify") or {}).get("id")
                                   or "初回は「新しいアーティスト」"),
-        "Featured artist": "なし", "Song title": song["title"], "Release date": when,
+        "Featured artist": featured_name(song), "Song title": song["title"], "Release date": when,
         "Language": lang, "Instrumental": "はい" if song.get("instrumental") else "いいえ",
         "Primary genre": genres[0] if genres else "", "Secondary genre": genres[1] if len(genres) > 1 else "",
         "Explicit lyrics": "No（Clean）", "AI の申告": "はい（歌詞・ボーカル・演奏・作曲のうち、使ったものすべて）",

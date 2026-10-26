@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
@@ -212,7 +213,11 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
                        ("background", "background"), ("positioning", "position"), ("gesture", "gesture"))}},
         "distribution": {**{k: v for k, v in (old.get("distribution") or {}).items() if k != "bio_en"},
                          "bio_en": act.get("bio_en", "")},
-        "collab": {"preferred_partners": music.get("partners", []), "collab_style": music.get("collab_style", "")},
+        "collab": {"preferred_partners": music.get("partners", []), "collab_style": music.get("collab_style", ""),
+                   # コラボの相性（collab_fit.py が書いた「コラボの相性」タブ。採用の行だけ。決定 97）
+                   "fit": sorted(({"partner": r.get("partner_id"), "score": r.get("score"), "why": r.get("why", ""),
+                                   "partner_brings": r.get("partner_brings", ""), "how": r.get("how", ""), "caution": r.get("caution", "")}
+                                  for r in group(data, aid, "collabs") if r.get("partner_id")), key=lambda f: -(f.get("score") or 0))},
         "profile": {"hometown": main.get("birthplace", ""), "height_cm": [m.get("height") for m in members],
                     "weight_kg": [m.get("weight") for m in members],
                     "likes": sum((m.get("likes", []) for m in members), []),
@@ -283,6 +288,8 @@ def cmd_pull(a) -> None:
     if gone:
         print(f"   － 管理表で採用されていない組の設定書はそのまま残しています：{', '.join(gone)}")
     step(f"読み込みの記録：{snap.relative_to(ROOT)}")
+    if not a.dry_run and acts:   # 組が足されたら、まだ吟味していない組み合わせのコラボの相性を書く（決定 97）
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "collab_fit.py"), "--if-new"])
 
 
 # ---------------------------------------------------------------------------

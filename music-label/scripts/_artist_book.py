@@ -135,6 +135,11 @@ TABS: dict[str, tuple[str, list[tuple[str, str, str]]]] = {
         ("taste", "写真の質感", "text"), ("composition", "構図", "text"), ("location", "撮影場所", "text"),
         ("brightness", "明るさ", "text"), ("contrast", "コントラスト", "text"), ("temperature", "色温度", "text"),
         ("background", "背景", "text"), ("position", "立ち位置", "text"), ("gesture", "しぐさ", "text")]),
+    "collabs": ("コラボの相性", [   # 組と組の相性（collab_fit.py が組を足すたびに書く。決定 97）
+        ("act_id", "アーティストID", "text"), ("status", "状態", "text"), ("partner_id", "相手のID", "text"),
+        ("score", "相性（1〜5）", "int"), ("why", "相性の理由", "text"),
+        ("partner_brings", "相手から取り込める強み（この組の曲に客演するとき）", "text"),
+        ("how", "組み方の案（この組の曲で）", "text"), ("caution", "気をつけること", "text"), ("updated", "更新日", "text")]),
     "changes": ("変更の提案", [
         ("act_id", "アーティストID", "text"), ("status", "状態", "text"), ("date", "日付", "text"),
         ("tab", "タブ", "text"), ("field", "項目", "text"), ("current", "今の値", "text"),
@@ -200,6 +205,9 @@ CHOICES: dict[tuple[str, str], list[str]] = {
 
 # 見出しに付ける説明（Google スプレッドシートでは「メモ」として、セルに触れると出る）
 HELP = {
+    ("collabs", "score"): "5＝とても合う・1＝合わない。組を足すたびに Claude が吟味して書く。直してよい（直した値が使われる）",
+    ("collabs", "partner_brings"): "相手の組がこの組の曲に客演するとき、旋律・編成・歌い方に 3〜5 割ほど取り込む強み",
+    ("collabs", "status"): "採用（または空）の行だけ、ダッシュボードのコラボの相手の一覧に出る。外すなら却下",
     ("acts", "id"): "英小文字と _ だけ（例 nao_easterly）。ほかのタブの行とつなぐ目印。あとから変えない",
     ("acts", "scene"): "この組の曲が聴かれる場面。毎週の曲づくりの前提になる。主な場面を先頭に書く（ライブハウス／パーティ・クラブ／ひとりで聴く／ドライブ。"
                        "例「ライブハウス：土曜の小箱（近い場面：パーティ・クラブ）」）。先頭の場面で曲の長さ・ブレイクの可否が決まる（決定 29）",
@@ -238,7 +246,7 @@ GROUPS = {   # タブの色分け：(見出しの色, 帯の色, 項目欄の色
 }
 TAB_GROUP = {"acts": "person", "members": "person", "timeline": "person", "debut": "person", "marks": "person",
              "influences": "person", "seeds": "song", "lyrics": "song", "updates": "song", "choices": "song",
-             "music": "song", "visual": "look", "changes": "ops"}
+             "music": "song", "visual": "look", "collabs": "song", "changes": "ops"}
 STATUS_STYLE = {"提案": ("FFF1C2", "7A5A00"), "採用": ("D9EFDE", "1E6B3A"), "保留": ("E8ECEF", "52626E"),
                 "却下": ("F7D9D9", "A12B2B"), "反映済み": ("DCE6F6", "1F4E99")}
 ACT_COLORS = ["F3DDB0", "CAD5EE", "CFE6D4", "D6E0E6", "E4D7EF", "F5D2C6", "DCE9C9", "F0E4BC", "CDE4EC", "EAD4DF"]
@@ -275,6 +283,7 @@ TAB_HELP = {
     "choices": "この組が選びそうな実在の参考曲。入手・解析の印",
     "music": "1 列 = 1 組。声・歌い方・癖・音・曲の形・歌詞の決まり",
     "visual": "1 列 = 1 組。部屋・光・色・顔を見せない方法・ロゴ・写真",
+    "collabs": "組と組のコラボの相性。組を足すたびに機械が吟味して書く。1 行 = この組の曲に相手が客演するとき",
     "changes": "方針転換などで機械が出す変更の案",
 }
 
@@ -407,6 +416,9 @@ class XlsxBook:
     def append(self, tab: str, rows: list[dict]) -> None:
         from openpyxl import load_workbook
         wb = load_workbook(self.path)
+        if TABS[tab][0] not in wb.sheetnames:   # 新しく足したタブ（コラボの相性など）が無い管理表：デザインごと作り直してから足す
+            write_designed(self.path, read_workbook(wb))
+            wb = load_workbook(self.path)
         ws = wb[TABS[tab][0]]
         items, lay = parse_grid(tab, grid_of(ws))
         acts = act_colors(wb)

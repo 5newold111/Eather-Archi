@@ -132,6 +132,11 @@ def status_json() -> dict:
                "drafts": [irregular.summary(d) for d in irregular.drafts()
                           if (d.get("irregular") or {}).get("status") in ("making", "proposed", "failed")],
                "editable": irregular.EDITABLE, "limits": irregular.LIMITS}
+        import collab_fit   # コラボの相手（相性の高い順。デビュー曲が配信中の組だけ選べる。決定 97）
+        live = {x["slug"] for x in irr["artists"]}
+        irr["collab"] = {x["slug"]: [{"slug": f["slug"], "name": f["name"], "score": f.get("score"), "why": f.get("why", ""),
+                                      "brings": f.get("partner_brings", ""), "ok": f["slug"] in live}
+                                     for f in collab_fit.partners_of(x["slug"])] for x in irr["artists"]}
     except Exception as e:  # noqa: BLE001
         irr = {"artists": [], "scenes": [], "drafts": [], "error": str(e)}
     try:   # 既存楽曲で、まだ Claude に調べてもらっていない曲の数と料金の目安（決定 85）
@@ -193,6 +198,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "influences.py"), "--apply"], "影響を受けたアーティストを選ぶ（SSDDB から）"
     if action == "influences_analyze":   # 影響を受けたアーティストの曲の歌詞・メロディーを先に起こす（無料）
         return [PY, str(S / "influences.py"), "--analyze"], "影響を受けたアーティストの曲を解析する"
+    if action == "collab_fit":   # まだ吟味していない組み合わせのコラボの相性（決定 97）
+        return [PY, str(S / "collab_fit.py")], "コラボの相性を吟味する"
     if action == "explore_report":   # 曲ごとの方向性の伸びと、くじの確率（決定 96）
         return [PY, str(S / "explore.py"), "report"], "方向性の探り具合"
     if action == "ref_audio_report":   # 解析できていない曲を調べる（決定 83）
@@ -269,11 +276,16 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         name = next((a["name"] for a in irregular.eligible() if a["slug"] == slug), None)
         scene = str(p.get("scene") or "")
         redo = str(p.get("redo") or "")
+        collab = str(p.get("collab") or "")
+        live = {a["slug"] for a in irregular.eligible()}
+        if collab and (collab not in live or collab == slug):
+            collab = ""
         if name and (not scene or scene in SCENE_TYPES) and (not redo or irregular.load_draft(redo)):
             memo, reason = str(p.get("memo") or "")[:1000], str(p.get("reason") or "")[:1000]
             return [PY, str(S / "irregular.py"), "propose", slug, *(["--scene", scene] if scene else []),
-                    *(["--memo", memo] if memo else []), *(["--redo", redo] if redo else []), *(["--reason", reason] if reason else [])], \
-                f"曲の案を{'作り直す' if redo else '作る'}（{name}）"
+                    *(["--memo", memo] if memo else []), *(["--redo", redo] if redo else []), *(["--reason", reason] if reason else []),
+                    *(["--collab", collab] if collab else [])], \
+                f"曲の案を{'作り直す' if redo else '作る'}（{name}{'・コラボ' if collab else ''}）"
     if action == "fill_suno":
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         if p.get("id") and not song:
@@ -477,7 +489,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub);white-space:pre-line}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 .irr-f label{display:block;margin:10px 0 3px;font-size:13px;color:var(--sub)}.irr-f input[type=text],.irr-f textarea,.irr-f select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
-.irr-f textarea{min-height:5em;resize:vertical;line-height:1.5}.irr-f textarea.lyr{min-height:16em;font-size:13px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-row>div{flex:1 1 220px}
+.irr-f textarea{min-height:5em;resize:vertical;line-height:1.5}.irr-f textarea.lyr{min-height:16em;font-size:13px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-f label.chk{display:flex;gap:8px;align-items:center;margin:10px 0 2px;font-weight:600}.irr-f label.chk input{width:auto;margin:0}.irr-row>div{flex:1 1 220px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.chips button{font-size:12px;padding:2px 10px}.irr-note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
 .redo{border:1.5px dashed var(--crit);border-radius:10px;padding:8px 12px;margin:14px 0 4px}
 </style></head><body>
@@ -485,7 +497,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
@@ -542,11 +554,11 @@ const TABS=["regular","irregular","debut"];
 const EMPTY={debut:"デビュー前の組はありません。全組が定期配信に移りました。",regular:"定期配信の組はまだありません。デビュー曲が配信されると、ここに並びます（いまは「デビュー」のタブ）。",
   irregular:"作曲へ進めた不定期の曲・毎日配信の曲はまだありません。上で曲の案を作り「この案で作曲へ進む」を押すか、毎日配信を始めると、ここに並びます。"};
 function dailyBox(){const el=document.getElementById("daily-box"),D=DATA.daily||{};   // 毎日配信（決定 94）
-  if(!D.active){el.innerHTML=`<b>毎日配信（5 組の持ち回り）</b><p class="sub">レーベル全体で毎日 1 曲（1 組あたり週 1〜2 曲）。配信日は決まった日の 17:00 ET。始める日は ${E(D.earliest||"")} から 30 日（曲づくり・登録・Spotify への推薦が間に合うよう 2 週間あけます）。</p>`
-    +`<button data-act="daily_start" data-confirm="毎日配信を ${E(D.earliest||"")} から 30 日、デビュー曲が配信中の組の持ち回りで始めます。\nこの期間に配信日が入るふだんの毎週の制作は止め、毎日配信の曲が代わりになります。\n曲は 21 日先までを先に作ります（毎週火曜の定期実行でも続きを作ります）。\n始めますか？">毎日配信を始める</button>`+sns;return}
   const so=D.social||{},sns=`<hr><b>SNS の毎日の投稿：${so.on?`オン（1 日 ${so.per_day} 本）`:"オフ"}</b><p class="sub">配信日の曲は 17:00 ET、ほかは配信中の曲から選んで 12:00・20:00 ET に、YouTube ショート・インスタ・TikTok へ。説明文は「この曲が生まれた日」（曲のエピソード）。背景の映像は ${E(so.bg_dir||"")} の組ごとのフォルダに Blender の書き出しを入れると使います（無ければジャケット）。背景はゆったり動き、映像が 2 本以上あれば拍に合わせて切り替えます。新曲の日の投稿には CapCut 用の素材（capcut フォルダ）も作り、そこに「完成.mp4」を置くと、その動画を投稿します。</p>`
     +(so.on?`<button data-act="social_daily_plan">投稿の案を作る（3 日先まで）</button> <button class="ghost" data-act="social_daily_off" data-confirm="SNS の毎日の投稿を止めます（作った案は投稿しません）。止めますか？">SNS の毎日の投稿を止める</button>`
       :`<button data-act="social_daily_on" data-per_day="2" data-confirm="SNS の毎日の投稿を始めます（1 日 2 本）。3 日先までの投稿の案（縦動画・説明文）を作り、投稿時刻を過ぎると定期実行が投稿します。\n鍵（YouTube・インスタ・TikTok）が無いサービスは飛ばします。始めますか？">SNS の毎日の投稿を始める（1 日 2 本）</button>`);
+  if(!D.active){el.innerHTML=`<b>毎日配信（5 組の持ち回り）</b><p class="sub">レーベル全体で毎日 1 曲（1 組あたり週 1〜2 曲）。配信日は決まった日の 17:00 ET。始める日は ${E(D.earliest||"")} から 30 日（曲づくり・登録・Spotify への推薦が間に合うよう 2 週間あけます）。</p>`
+    +`<button data-act="daily_start" data-confirm="毎日配信を ${E(D.earliest||"")} から 30 日、デビュー曲が配信中の組の持ち回りで始めます。\nこの期間に配信日が入るふだんの毎週の制作は止め、毎日配信の曲が代わりになります。\n曲は 21 日先までを先に作ります（毎週火曜の定期実行でも続きを作ります）。\n始めますか？">毎日配信を始める</button>`+sns;return}
   const nx=D.next?`次は ${E(D.next.date)}（${E(D.next.slug)}）`:"";
   el.innerHTML=`<b>毎日配信：${E(D.start)}〜${E(D.end)}（${D.days} 日）</b><p class="sub">曲がある日 ${D.filled}/${D.days}。持ち回り：${(D.order||[]).map(E).join(" → ")}。${nx}</p>`
     +`<button data-act="daily_make" data-confirm="21 日先までの、曲がまだ無い日の曲を作ります（参考曲の割り当て → Claude が書く。1 曲 約 30 円）。始めますか？">毎日配信の曲を作る（21 日先まで）</button> `
@@ -712,17 +724,27 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   act(b.dataset.act,p,b)});
 // ---- 不定期配信（決定 72）：組を選んで曲の案を作る → ポップアップで直す・却下して作り直す・作曲へ進める
 function irrForm(){const el=document.getElementById("irr-form"),I=DATA.irregular||{},arts=I.artists||[];
-  const sig=JSON.stringify([arts,I.scenes]);if(el.dataset.sig===sig)return;   // 入力中の内容を消さないよう、組の一覧が変わったときだけ作り直す
-  const keep={a:(document.getElementById("irr-artist")||{}).value,s:(document.getElementById("irr-scene")||{}).value,m:(document.getElementById("irr-memo")||{}).value};
+  const sig=JSON.stringify([arts,I.scenes,I.collab]);if(el.dataset.sig===sig)return;   // 入力中の内容を消さないよう、組の一覧が変わったときだけ作り直す
+  const keep={a:(document.getElementById("irr-artist")||{}).value,s:(document.getElementById("irr-scene")||{}).value,m:(document.getElementById("irr-memo")||{}).value,
+    c:(document.getElementById("irr-collab-on")||{}).checked,cs:(document.getElementById("irr-collab")||{}).value};
   el.dataset.sig=sig;
   if(!arts.length){el.innerHTML=`<p class="empty">選べる組がまだありません（デビュー曲が配信中の組だけ選べます。配信を見つけたら、デビューのタブで「配信中にする」を押してください）</p>`;return}
   el.innerHTML=`<b>新しい曲の案を作る</b>
    <div class="irr-row"><div><label for="irr-artist">アーティスト</label><select id="irr-artist">${arts.map(a=>`<option value="${E(a.slug)}">${E(a.name)}</option>`).join("")}</select></div>
    <div><label for="irr-scene">聴かれる場面（任意）</label><select id="irr-scene"><option value="">おまかせ（組の個性から決める）</option>${(I.scenes||[]).map(x=>`<option value="${E(x.key)}">${E(x.name)}</option>`).join("")}</select></div></div>
+   <label class="chk"><input type="checkbox" id="irr-collab-on"> コラボする（相性のよい組が客演。相手の強みを 3〜5 割、曲の構成を崩さずに取り込む）</label>
+   <div id="irr-collab-box" hidden><label for="irr-collab">コラボの相手（相性の高い順）</label><select id="irr-collab"></select><p class="sub" id="irr-collab-why"></p></div>
    <label for="irr-memo">作りたい曲のメモ（任意。例：雨の夜に帰り道を歩く・別れたあとの静かな朝）</label><textarea id="irr-memo" maxlength="1000" placeholder="空のままなら、システムが組の個性と近況から決めます"></textarea>
    <div class="acts"><button id="irr-go">曲の案を作る（Claude が書きます・1〜2 分）</button><span class="sub">できたらポップアップが開きます</span></div>`;
   if(keep.a&&arts.some(a=>a.slug===keep.a))document.getElementById("irr-artist").value=keep.a;if(keep.s)document.getElementById("irr-scene").value=keep.s;if(keep.m)document.getElementById("irr-memo").value=keep.m;
-  document.getElementById("irr-go").onclick=e=>act("irregular_propose",{slug:document.getElementById("irr-artist").value,scene:document.getElementById("irr-scene").value,memo:document.getElementById("irr-memo").value},e.target)}
+  const cOn=document.getElementById("irr-collab-on"),cBox=document.getElementById("irr-collab-box"),cSel=document.getElementById("irr-collab"),cWhy=document.getElementById("irr-collab-why"),aSel=document.getElementById("irr-artist");
+  const fillCollab=()=>{const ps=((I.collab||{})[aSel.value]||[]);   // コラボの相手（決定 97）
+    cSel.innerHTML=ps.length?ps.map(p=>`<option value="${E(p.slug)}" ${p.ok?"":"disabled"}>${E(p.name)}　相性 ${"★".repeat(p.score||0)}${"☆".repeat(5-(p.score||0))}${p.ok?"":"（デビュー前）"}</option>`).join(""):`<option value="">（相性をまだ吟味していません。管理表を読み込むと吟味します）</option>`;
+    const first=ps.find(p=>p.ok);if(first)cSel.value=first.slug;showWhy()};
+  const showWhy=()=>{const p=((I.collab||{})[aSel.value]||[]).find(x=>x.slug===cSel.value);cWhy.textContent=p?`${p.why}${p.brings?"　取り込む強み："+p.brings:""}`:""};
+  cOn.onchange=()=>{cBox.hidden=!cOn.checked;if(cOn.checked)fillCollab()};aSel.addEventListener("change",()=>{if(cOn.checked)fillCollab()});cSel.onchange=showWhy;
+  if(keep.c){cOn.checked=true;cBox.hidden=false;fillCollab();if(keep.cs&&[...cSel.options].some(o=>o.value===keep.cs&&!o.disabled)){cSel.value=keep.cs;showWhy()}}
+  document.getElementById("irr-go").onclick=e=>act("irregular_propose",{slug:aSel.value,scene:document.getElementById("irr-scene").value,memo:document.getElementById("irr-memo").value,collab:cOn.checked?cSel.value:""},e.target)}
 function irrDrafts(){const ds=(DATA.irregular||{}).drafts||[],el=document.getElementById("irr-drafts");
   if(!ds.length){el.innerHTML=`<p class="empty">いま確認を待っている案はありません</p>`;return}
   el.innerHTML=`<ul class="list">${ds.map(d=>{const head=`<b>${E(d.artist)}</b>　${d.round>1?`${d.round} 案目・`:""}${E(d.scene||"場面おまかせ")}${d.memo?`・メモ「${E(d.memo.slice(0,40))}」`:""}　<span class="sub">${E(d.created_at)}</span><br>`;
@@ -733,7 +755,7 @@ function openNewestDraft(label){const d=((DATA.irregular||{}).drafts||[]).find(x
 function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===id);if(!d)return;const L=(DATA.irregular||{}).limits||{};
   const f=(k,lab,v,big)=>`<label for="irr-f-${k}">${E(lab)}</label>${big?`<textarea id="irr-f-${k}" class="${k==="lyrics"?"lyr":""}" maxlength="${L[k]||5000}">${E(v)}</textarea>`:`<input type="text" id="irr-f-${k}" maxlength="${L[k]||300}" value="${E(v)}">`}`;
   const hist=(d.history||[]).length?`<details><summary>却下した案（${d.history.length}）と理由</summary><ul>${d.history.map(h=>`<li>「${E(h.title)}」${h.theme?`（${E(h.theme)}）`:""}${h.reason?` → 理由：${E(h.reason)}`:"（理由なし）"}</li>`).join("")}</ul></details>`:"";
-  document.getElementById("dlg-body").innerHTML=`<p class="sub">${E(d.artist)}・不定期配信の曲の案${d.round>1?`（${d.round} 案目）`:""}・${E(d.scene||"場面おまかせ")}・${E(d.created_at)}</p>
+  document.getElementById("dlg-body").innerHTML=`<p class="sub">${E(d.artist)}・不定期配信の曲の案${d.round>1?`（${d.round} 案目）`:""}・${E(d.scene||"場面おまかせ")}・${E(d.created_at)}${d.collab?`・コラボ：${E(d.collab)}（相性 ${"★".repeat(d.collab_score||0)}）`:""}</p>
    <h3 id="dlg-title">「${E(d.title)}」</h3><span class="badge wait">確認待ち・Gon さん</span>${d.edited_at?` <span class="sub">直した日時 ${E(d.edited_at)}</span>`:""}
    <div id="dlg-job"></div>
    ${d.memo?`<p class="sub">メモ：${E(d.memo)}</p>`:""}${hist}

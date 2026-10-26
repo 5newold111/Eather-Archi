@@ -2887,6 +2887,16 @@ def log_state(sess: Session, when: str) -> None:
         print(f"   記録：画面を読めませんでした（{e}）")
 
 
+def draft_fields_featured(song: dict) -> str:
+    """コラボの曲の客演の組の名前（無ければ空。決定 97）"""
+    try:
+        import publish
+        name = publish.featured_name(song)
+    except Exception:  # noqa: BLE001
+        return ""
+    return "" if name == "なし" else name
+
+
 def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     """1 曲を DistroKid に入れる。0：登録した／2：まだ登録しない／3：続けての入力をここでやめる（nxt があるとき：次の曲の名前）"""
     song = _songs.by_id(song_id)
@@ -2912,6 +2922,8 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
             print("【結果】まだ終わっていません：Spotify のアーティストのページがわかるまで待ちます")
             return 3 if nxt else 2
     fields, draft = distrokid_fields(song)
+    if draft_fields_featured(song):
+        print(f"   ・コラボの曲：featured artist（客演）に「{draft_fields_featured(song)}」を Gon さんが足してください（自動では入れません）")
     owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
     owner_ng = "" if re.fullmatch(r"[A-Za-z][A-Za-z.'\-]*( [A-Za-z][A-Za-z.'\-]*)+", owner) else \
         ("本名（.env の OWNER_LEGAL_NAME）が空です" if not owner else "本名（.env の OWNER_LEGAL_NAME）がローマ字の「名 姓」になっていません")
@@ -2943,6 +2955,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     bad = [s_["name"] for s_ in secs if st[s_["key"]] is False]
     gon = ["▼ ここから Gon さん（システムは押しません）",
            *([f"⚠ {owner_ng}：Songwriter と Producer に本名をローマ字で入れてください（.env の OWNER_LEGAL_NAME）"] if owner_ng else []),
+           *([f"・コラボの曲です：曲の欄の featured artist（客演）に「{feat}」を足してください（曲名には feat. を書かない。決定 97）"] if (feat := draft_fields_featured(song)) else []),
            "・Extras（有料の追加）・Discovery Pack：チェックしない",
            "・宣誓のチェック：文を読んで、当てはまるものだけチェック（Non-standard cApiTaliZatiOn を含む）",
            "・Continue を押す → 登録のあとの画面に変わると、システムが自動で「登録した」を記録します"]

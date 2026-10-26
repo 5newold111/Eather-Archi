@@ -146,6 +146,12 @@ Hard rules (never break):
    voice with featured_guest.guest_description (verbatim adjectives) inside suno_style_prompt and give the guest a
    clearly marked part in the lyrics (e.g. "[Verse 2 - guest vocal]" or call-and-response in the bridge) following
    featured_guest.collab_style. The guest's own name never appears in the lyrics or the style prompt.
+   Blend (featured_guest.blend / strengths / fit, chosen by the owner): the host act's song stays the spine - its structure,
+   key centre, hook and main melody line are not broken. Bring in the guest's strengths at about featured_guest.blend.ratio
+   (30-50%) of the song's character: let the melody borrow the guest's melodic tendencies (contour, leaps, phrasing, where
+   peaks land) in the guest's sections and in harmony/answer lines, and colour the arrangement and rhythm with the guest's
+   sound (fit.partner_brings, strengths.sound), following fit.how and avoiding fit.caution. Describe the blend concretely in
+   suno_style_prompt and vocal_instruction, and say in notes_ja (Japanese) what was taken from the guest and roughly how much.
 11. Remix (brief has remix_of): this is the remixer's reconstruction of the label's own earlier song. Reuse the
    original's hook/chorus words from remix_of.core (it is our own song, so this is allowed) but rebuild everything else
    in this artist's sound (tempo, groove, instruments, structure). The first title candidate must be exactly
