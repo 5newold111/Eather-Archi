@@ -12,10 +12,11 @@ Suno の歌詞には、曲の作りの札（[Verse]・[Chorus]）や、音の指
   ・行の終わりの . , ; : 、 。 … ― は消す（! ? と引用の記号は残す）
   ・行の頭を大文字にする（英語などのアルファベット）
   ・1〜10 の数字は英語の言葉で書く（one … ten。時刻「2:40」や「401」号線などはそのまま）
-  ・tryna → trying to（DistroKid の決まりの例）。歌い手の名前・SNS の住所・URL の行は消す
+  ・標準の綴りにする（tryna → trying to・gonna → going to・runnin' → running など。決定 93）。歌い手の名前・SNS の住所・URL の行は消す
+  ・札なしの「Chorus 2x」「Verse 1:」も消し、中身の書いていないサビ（[Chorus] だけ）は前のサビを書き出す。1 行に 2 文あれば分ける（決定 93）
   ・前後の空白・続いた空白を整える
 直したあとも気をつけること（自動では直さない。確かめる一覧に出す）：
-  ・1 行が長い（13 語を超える）／伏せ字（f**k など）／くだけた綴り（gonna・wanna など。聞こえるとおりならそのままでよい）
+  ・1 行が長い（13 語を超える）／伏せ字（f**k など。音で伏せていなければ伏せずに書く）／ya・ain't などのくだけた言い方
   ・Suno が歌詞と違う言葉で歌っていることがある。配信サイトは「聞こえるとおり」を求めるので、1 回聞いて違うところを直す
 
 使い方：
@@ -31,7 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-NUM = {"1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten"}
+from _lyric_rules import cap as _cap, end_punct, numbers as _numbers, split_sentences, standard_spelling, unshout as _unshout  # noqa: E402
+
 # ( ) の中がこれだけなら、歌っている言葉ではなく指示
 DIRECTION = re.compile(r"^\s*(x\s*\d+|×\s*\d+|\d+\s*x|repeat.*|rpt.*|whisper(ed|ing)?|spoken|speaking|shout(ed|ing)?|sung|singing|"
                        r"laugh(s|ing)?|sigh(s|ing)?|breath(es|ing)?|inhale|exhale|instrumental|inst\.?|interlude|fade( out| in)?|"
@@ -39,11 +41,14 @@ DIRECTION = re.compile(r"^\s*(x\s*\d+|×\s*\d+|\d+\s*x|repeat.*|rpt.*|whisper(ed
                        r"male|female|both|all|choir|crowd|guitar( solo)?|solo|beat drop|drop|silence|pause|"
                        r"intro|outro|verse.*|chorus.*|pre-?chorus|post-?chorus|bridge|hook|refrain)(\s+(break|solo|part|section|only|fades?( out| in)?|ends?|continues?))?\s*$", re.I)
 REPEAT_TAIL = re.compile(r"\s*[\(\[]?\s*(?:repeat\s*)?(?:[x×]\s*(\d)|(\d)\s*[x×])\s*[\)\]]?\s*$|\s*[\(\[]\s*repeat\s*[\)\]]\s*$", re.I)
-TAG_REPEAT = re.compile(r"[x×]\s*(\d)|(\d)\s*[x×]\b|repeat\s*(\d)", re.I)
-END_PUNCT = re.compile(r"[\s.,;:、。…\-–—]+$")
-SLANG_FIX = {r"\btryna\b": "trying to", r"\bTryna\b": "Trying to"}
-SLANG_NOTE = re.compile(r"\b(gonna|wanna|gotta|kinda|lemme|gimme|ya|cuz|imma|ain't)\b", re.I)
-JUNK_LINE = re.compile(r"https?://|www\.|@\w|^\s*(vocals?|vocalist|singer|lyrics|written|produced|feat\.?)\s*[:：]", re.I)
+TAG_REPEAT = re.compile(r"[x×]\s*(\d)|(\d)\s*[x×]\b|repeat\s*(\d)|(\d)\s*times", re.I)
+SECTION = re.compile(r"(pre-?chorus|post-?chorus|final chorus|chorus|verse|bridge|hook|refrain|intro|outro|interlude|breakdown|drop)", re.I)
+# 札（[ ]）なしで書かれた構成の行：「Chorus」「Chorus 2x」「(Chorus)」「Verse 1:」「Repeat chorus」など（歌詞ではない余分な文字）
+SECTION_LINE = re.compile(r"^[\(\[]?\s*(?:repeat\s+)?(?:the\s+)?(pre-?chorus|post-?chorus|final chorus|chorus|verse(?:\s*\d+)?|bridge|hook|refrain|intro|outro|interlude)"
+                          r"(?:\s*(?:[x×]\s*\d|\d\s*[x×]|\d\s*times|repeat))?\s*[\)\]]?\s*[:：]?\s*$", re.I)
+REPEATABLE = {"chorus", "final chorus", "hook", "refrain", "pre-chorus", "post-chorus"}
+SLANG_NOTE = re.compile(r"\b(ya|y'all|ain't)\b", re.I)
+JUNK_LINE = re.compile(r"https?://|www\.|@\w|#\w|^\s*(vocals?|vocalist|singer|lyrics|written|produced|feat\.?)\s*[:：]", re.I)
 
 
 def _clean_parens(line: str) -> str:
@@ -53,62 +58,50 @@ def _clean_parens(line: str) -> str:
     return re.sub(r"\(([^()]*)\)", keep, line)
 
 
-PROPER = {w.lower(): w for w in "Monday Tuesday Wednesday Thursday Friday Saturday Sunday January February March April May June July "
-          "August September October November December God".split()}
-
-
-def _unshout(line: str, names: set[str]) -> str:
-    """全部大文字の行を、ふつうの書き方（頭だけ大文字・I と曜日・月・名前は大文字）にする（DistroKid の決まり 4）"""
-    low = line.lower()
-    low = re.sub(r"\bi\b", "I", low)
-    for w in re.findall(r"[a-z][a-z']*", low):
-        fix = PROPER.get(w) or next((n for n in names if n.lower() == w), None)
-        if fix:
-            low = re.sub(rf"\b{re.escape(w)}\b", fix, low)
-    return _cap(low)
-
-
-def _cap(line: str) -> str:
-    """行の頭（( の中で始まるときはその中の頭）のアルファベットを大文字に"""
-    m = re.match(r"^([\s(\"'¿¡]*)([a-z])", line)
-    return line if not m else line[:m.end(1)] + m.group(2).upper() + line[m.end(2):]
-
-
-def _numbers(line: str) -> str:
-    # 「2:40」「401」「1st」は触らない。単独の 1〜10 だけ言葉に
-    def word(m):
-        w = NUM[m.group(0)]
-        return w.capitalize() if m.start() == 0 else w
-    return re.sub(r"(?<![\w:.,/-])(10|[1-9])(?![\w:.,/%-])", word, line)
+def _section_of(tags: list[str]) -> tuple[str | None, int]:
+    """札から（段落の種類, 繰り返す回数）"""
+    name, k = None, 1
+    for t in tags:
+        m = SECTION.search(t)
+        if m and name is None:
+            name = m.group(1).lower().replace("prechorus", "pre-chorus").replace("postchorus", "post-chorus")
+        r = TAG_REPEAT.search(t)
+        if r:
+            k = int(next(g for g in r.groups() if g))
+    return name, k
 
 
 def to_store(text: str, latin: bool = True, names: set[str] | None = None) -> tuple[str, list[str]]:
-    """Suno の歌詞 → 配信サイトに載せる歌詞。(歌詞, 直したことの一覧)。names：歌い手・メンバーの名前（行の頭の「名前:」を消す）"""
+    """Suno の歌詞 → 配信サイトに載せる歌詞（決定 52・93）。(歌詞, 直したことの一覧)。names：歌い手・メンバーの名前（行の頭の「名前:」を消す）"""
     names = {n for n in (names or set()) if n}
     who = re.compile(r"^(" + "|".join(sorted((re.escape(n) for n in names), key=len, reverse=True)) + r")\s*[:：]\s*", re.I) if names else None
     changes: list[str] = []
-    sections: list[list[str]] = [[]]
-    repeat_next = 1
+    sections: list[dict] = [{"name": None, "times": 1, "lines": []}]
     n_tags = 0
+
+    def new_section(name, times):
+        if sections[-1]["lines"] or sections[-1]["name"]:
+            sections.append({"name": name, "times": times, "lines": []})
+        else:
+            sections[-1].update(name=name, times=times)
+
     for raw in (text or "").replace("\r", "").split("\n"):
         line = raw.strip()
         tags = re.findall(r"\[([^\]]*)\]", line)
         rest = re.sub(r"\[[^\]]*\]", "", line).strip()
-        if tags and not rest:   # 札だけの行：ここで段落を分ける（[Chorus x2] は次の段落を 2 回）
+        if tags and not rest:   # 札だけの行：ここで段落を分ける（[Chorus x2] は段落を 2 回）
             n_tags += len(tags)
-            if sections[-1]:
-                sections.append([])
-            m = next((TAG_REPEAT.search(t) for t in tags if TAG_REPEAT.search(t)), None)
-            k = int(next(g for g in m.groups() if g)) if m else 1
-            if k > 1:
-                repeat_next = k
-                sections[-1].append(f"\0repeat{repeat_next}")
+            new_section(*_section_of(tags))
+            continue
+        if rest and SECTION_LINE.match(rest):   # 札なしの「Chorus 2x」「Verse 1:」：余分な文字なので消し、段落を分ける
+            changes.append(f"構成の文字を消した：{rest[:30]}")
+            new_section(*_section_of([rest]))
             continue
         if tags:
             changes.append(f"行の中の指示を消した：[{'] ['.join(tags)}]")
         if not rest:   # 空の行：段落の区切り
-            if sections[-1]:
-                sections.append([])
+            if sections[-1]["lines"]:
+                new_section(None, 1)
             continue
         if JUNK_LINE.search(rest):
             changes.append(f"歌詞ではない行を消した：{rest[:40]}")
@@ -127,30 +120,36 @@ def to_store(text: str, latin: bool = True, names: set[str] | None = None) -> tu
         rest = _clean_parens(rest)
         if rest != before:
             changes.append(f"( ) の指示を消した：{before[:50]}")
-        for pat, rep in SLANG_FIX.items():
-            rest = re.sub(pat, rep, rest)
-        rest = re.sub(r"\s{2,}", " ", rest).strip()
-        rest = END_PUNCT.sub("", rest) if not rest.endswith(("!", "?", '"', "'", ")", "」", "』")) else rest
-        if latin:
-            letters = re.sub(r"[^A-Za-z]", "", rest)
-            if len(letters) >= 4 and letters.isupper():
-                changes.append(f"全部大文字の行をふつうの書き方にした：{rest[:40]}")
-                rest = _unshout(rest, names)
-            rest = _numbers(_cap(rest))
-        if not rest or not re.search(r"\w", rest):
-            continue
-        sections[-1].extend([rest] * n)
-    # [Chorus x2] の段落を書き出す
+        rest, fixed = standard_spelling(re.sub(r"\s{2,}", " ", rest).strip())
+        if fixed:
+            changes.append(f"標準の綴りにした（{'・'.join(dict.fromkeys(fixed))}）：{rest[:40]}")
+        pieces = split_sentences(rest)
+        if len(pieces) > 1:
+            changes.append(f"1 行 1 文に分けた：{rest[:40]}")
+        for piece in pieces:
+            piece = end_punct(piece).strip()
+            if re.match(r"^[\s(\"'¿¡]*[A-Za-z]", piece):
+                shout = _unshout(piece, names)
+                if shout != piece:
+                    changes.append(f"全部大文字の行をふつうの書き方にした：{piece[:40]}")
+                piece = _cap(shout)
+            piece = _numbers(piece)
+            if piece and re.search(r"\w", piece):
+                sections[-1]["lines"].extend([piece] * n)
+    # 札だけで中身の無いサビ（[Chorus] だけ・Chorus 2x だけ）は、前の同じ段落を書き出す。[Chorus x2] は段落を書き出す
     out: list[list[str]] = []
+    seen: dict[str, list[str]] = {}
     for sec in sections:
-        if not sec:
-            continue
-        times = 1
-        if sec[0].startswith("\0repeat"):
-            times = int(sec[0][7:])
-            sec = sec[1:]
-            changes.append(f"段落の繰り返しを書き出した（{times} 回）：{sec[0][:40] if sec else ''}")
-        out.extend([sec] * times if sec else [])
+        lines, name = sec["lines"], sec["name"]
+        if not lines and name in REPEATABLE and seen.get(name):
+            lines = seen[name]
+            changes.append(f"書いていなかった繰り返しの段落（{name}）を書き出した")
+        if lines and name:
+            seen.setdefault(name, lines)
+        if lines:
+            if sec["times"] > 1:
+                changes.append(f"段落の繰り返しを書き出した（{sec['times']} 回）：{lines[0][:40]}")
+            out.extend([lines] * sec["times"])
     if n_tags:
         changes.insert(0, f"曲の作りの札・音の指示（[Verse]・[Chorus]・[…の音] など）を {n_tags} 個消し、そこで段落を分けた")
     return "\n\n".join("\n".join(s) for s in out).strip(), list(dict.fromkeys(changes))
@@ -165,7 +164,7 @@ def check(store: str) -> list[str]:
         if re.search(r"\w\*+\w|\w#+\w", ln):
             notes.append(f"伏せ字がある（音で伏せていなければ、伏せずに書く）：{ln[:50]}")
         if SLANG_NOTE.search(ln):
-            notes.append(f"くだけた綴り（聞こえるとおりならそのままでよい）：{ln[:50]}")
+            notes.append(f"くだけた言い方（標準の綴りにできるなら直す）：{ln[:50]}")
         if re.search(r"[\[\]{}*]", ln):
             notes.append(f"記号が残っている：{ln[:50]}")
     if not store.strip():
@@ -197,8 +196,7 @@ def for_song(song: dict) -> dict:
     """{store: 載せる歌詞, changes: 直したこと, notes: 確かめること}。インスト・歌詞なしは store が空"""
     if song.get("instrumental") or not str(song.get("lyrics") or "").strip():
         return {"store": "", "changes": [], "notes": []}
-    from _common import no_line_end_punct
-    store, changes = to_store(no_line_end_punct(song["lyrics"]), is_latin(song), singer_names(song))   # 行末の句読点は入れない（決定 92）
+    store, changes = to_store(song["lyrics"], is_latin(song), singer_names(song))
     return {"store": store, "changes": changes,
             "notes": check(store) + ["Suno が歌詞と違う言葉で歌っているところがあれば直す（配信サイトは聞こえるとおりの歌詞を求めます）"]}
 

@@ -181,10 +181,18 @@ Hard rules (never break):
    (b) vocal_instruction says where the peak sits and how endings are held; (c) the lyrics follow the rhythm: lines of the chorus
    carry about notes_per_phrase syllables, verses follow notes_per_bar density, and pickups become short lead-in words. Never write
    pitch sequences. Rule 5 still applies to what is kept from a phrase.
-16. Line endings (owner's rule): never end a lyric line with punctuation - no commas, periods, semicolons or colons
-   (no 、 or 。 in Japanese). End each line on the word itself; let the line break do the pause. "?" and "!" may stay only
-   when they change the meaning. This applies to suno_lyrics, every core line, and suno_lyric_prompt must tell Suno's
-   lyric writer the same ("do not end any line with a comma or period").
+16. Lyric format (owner's rules, from the DistroKid / Apple Music lyric guidelines) for suno_lyrics and every core line:
+   - Lyrics only: no singer's name or speaker label ("Isla:"), no notes, no links. Section and performance tags in [ ]
+     stay (they are for Suno and are removed automatically for the stores); never write a section name as plain text.
+   - Write out every repeated line and every repeated chorus in full each time; never "Chorus 2x", "[Chorus x2]", "(x2)", "repeat".
+   - Begin each line with a capital letter in normal sentence case (never all caps or all lowercase; "I" is capitalized).
+   - No punctuation at the end of a line except "!" or "?" (no commas, periods, ellipses, semicolons, colons; no 、 or 。).
+   - One sentence per line; no overly long lines (about 12 words at most). No leading or trailing spaces.
+   - Blank lines only between sections, never inside a section.
+   - Numbers one to ten as words ("two", not "2"; in Japanese 二, not 2).
+   - Standard spelling: "trying to", "going to", "want to", "got to", "kind of", "because", "running" - never "tryna",
+     "gonna", "wanna", "gotta", "kinda", "cuz", "runnin'". Never censor a word with asterisks.
+   suno_lyric_prompt must ask Suno's lyric writer for the same format (the system also appends these rules to it).
 Lyrics modes (artist profile -> lyrics.mode):
 - "full": you write every line of suno_lyrics.
 - "core_fixed" (default): you decide and FIX the song's core - the chorus (full text), the hook line, where the
@@ -209,23 +217,20 @@ Lyrics modes (artist profile -> lyrics.mode):
 Return only the JSON object described by the schema."""
 
 
-NO_END_PUNCT_NOTE = "Do not end any line with a comma, period, semicolon or colon - end each line on the word itself."
-
-
 def line_end_rule(result: dict) -> None:
-    """歌詞の行末に句読点を付けない（オーナーの指示。決定 92）：歌詞・核の行から消し、Suno の歌詞づくりへの指示にも書き足す"""
-    from _common import no_line_end_punct
-    result["suno_lyrics"] = no_line_end_punct(result.get("suno_lyrics", ""))
+    """歌詞の書き方の決まり（決定 92・93）：歌詞・核の行を整え、Suno の歌詞づくりへの指示にも決まりを書き足す"""
+    from _lyric_rules import RULES_EN, tidy, tidy_line
+    result["suno_lyrics"] = tidy(result.get("suno_lyrics", ""))
     core = result.get("core") or {}
     for k in ("chorus_lines", "bridge_lines"):
         if isinstance(core.get(k), list):
-            core[k] = [no_line_end_punct(x) for x in core[k]]
+            core[k] = [tidy_line(x) for x in core[k]]
     for k in ("hook_line", "trend_language_line"):
         if isinstance(core.get(k), str):
-            core[k] = no_line_end_punct(core[k])
+            core[k] = tidy_line(core[k])
     lp = str(result.get("suno_lyric_prompt") or "").strip()
-    if lp and "end any line with" not in lp.lower():
-        result["suno_lyric_prompt"] = lp + " " + NO_END_PUNCT_NOTE
+    if lp and "lyric format rules" not in lp.lower():
+        result["suno_lyric_prompt"] = lp + " " + RULES_EN
 
 
 def load_json(p: Path) -> dict:
