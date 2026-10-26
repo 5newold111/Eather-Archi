@@ -1385,6 +1385,106 @@ def artist_digest(slug: str) -> dict:
         return {}
 
 
+def health() -> int:
+    """参考曲の取り込みの健康診断（読むだけ・無料。決定 101）：SSD・解析シート・既存楽曲の解析・組ごとの近い曲・ブリーフでの使われ方"""
+    from _common import all_artists
+    warn: list[str] = []
+    ok = lambda b: "○" if b else "△"  # noqa: E731
+    print("▶ 参考曲の取り込みの健康診断（読むだけ・料金はかかりません）")
+    # 1 SSD とデータベース
+    paths, where = candidates()
+    dirs = audio_dirs()
+    print(f"\n■ SSD とデータベース\n   {ok(bool(paths))} データベース：{where if paths else where}"
+          + (f"（{len(paths)} か所）" if paths else ""))
+    print(f"   {ok(bool(dirs))} 既存楽曲のフォルダ：" + ("・".join(str(d) for d in dirs) if dirs else "見つかりません（SSD がつながっていないか、名前に「既存楽曲」を含むフォルダが無い）"))
+    if not paths and not dirs:
+        warn.append("SSD がつながっていない：つないでから、もう一度この診断を")
+    # 2 解析シート（作曲で使う参考曲）
+    sheets = [p for p in REF_DIR.glob("*.json") if not p.name.endswith(".measure.json")] if REF_DIR.exists() else []
+    aud = [p for p in sheets if p.name.startswith(f"{PREFIX}aud-")]
+    dbs = [p for p in sheets if p.name.startswith(PREFIX) and p not in aud]
+    other = [p for p in sheets if not p.name.startswith(PREFIX)]
+    print(f"\n■ 参考曲の解析シート（out/references）：{len(sheets)} 件 {ok(len(sheets) >= 11)}（作曲には 11 件以上が必要）\n"
+          f"   既存楽曲の音源から {len(aud)}・データベース（Excel など）から {len(dbs)}・手で作ったもの {len(other)}")
+    if len(sheets) < 11:
+        warn.append(f"解析シートが {len(sheets)} 件（11 件以上必要）：SSD をつないで「既存楽曲を解析する」を押す")
+    # 3 既存楽曲の解析の進み具合
+    files = [f for d in dirs for f in d.rglob("*") if f.is_file() and f.suffix.lower() in AUDIO_TAKE and not f.name.startswith(".")] if dirs else []
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    cache = []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        try:
+            cache.append(json.loads(p.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            continue
+    print(f"\n■ 既存楽曲（SSD の音源）：{len(files) if dirs else '—'} 曲 → 解析済み {len(index)} 曲"
+          + (f" {ok(len(index) >= len(files))}" if dirs else ""))
+    if dirs and len(index) < len(files):
+        warn.append(f"既存楽曲 {len(files) - len(index)} 曲がまだ解析されていない：「既存楽曲を解析する」→ 残れば「解析できていない曲を調べる」")
+    if cache:
+        n = len(cache)
+        def rate(pred):
+            return sum(1 for d in cache if pred(d))
+        rows = [("テンポ（BPM）", rate(lambda d: isinstance((d.get("groove") or {}).get("bpm"), (int, float)))),
+                ("キー", rate(lambda d: (d.get("harmony") or {}).get("key"))),
+                ("曲名とアーティスト名", rate(lambda d: (d.get("reference") or {}).get("artist_name") not in (None, "", "?") and (d.get("reference") or {}).get("title"))),
+                ("声の性別", rate(lambda d: (d.get("vocal") or {}).get("sex"))),
+                ("楽器", rate(lambda d: (d.get("instruments") or {}).get("list"))),
+                ("歌詞（聞き取り・原文）", rate(lambda d: ((d.get("lyrics") or {}).get("transcript_meta") or {}).get("clarity") in ("clear", "given", "none"))),
+                ("歌詞のテーマ", rate(lambda d: (d.get("lyrics") or {}).get("theme"))),
+                ("メロディー（旋律の特徴）", rate(lambda d: (d.get("melody") or {}).get("usable"))),
+                ("Web で調べた項目", rate(lambda d: d.get("_enriched")))]
+        print(f"   解析シートに入っている項目（{n} 曲のうち）：")
+        for label, c in rows:
+            print(f"     {ok(c >= n * 0.8)} {label}：{c} 曲（{int(c * 100 / n)}%）")
+        pend = {"歌詞の聞き取り": len(lyrics_pending()), "メロディー": len(melody_pending()), "Web の調べ物": len(enrich_pending())}
+        print("   まだの曲：" + "・".join(f"{k} {v} 曲" for k, v in pend.items()) + ("" if whisper_ready() else "（歌を聞き取る部品 faster-whisper が入っていません）"))
+        if rows[2][1] < n * 0.8:
+            warn.append("曲名・アーティスト名が読めていない曲が多い：ファイル名を「アーティスト - 曲名」にするか、曲の情報（タグ）を入れる")
+        if pend["歌詞の聞き取り"] or pend["メロディー"]:
+            warn.append("歌詞・メロディーがまだの曲がある：ダッシュボードの「歌詞を聞き取る」「メロディーを起こす」（無料）。見張りでも少しずつ進みます")
+        if pend["Web の調べ物"] and rows[5][1] < n * 0.5:
+            warn.append("声・楽器・テーマが空の曲が多い：「足りない項目を Claude に調べてもらう」（1 曲 20〜50 円）")
+    # 4 組ごとの近い参考曲
+    print("\n■ 組ごとの近い参考曲（作曲でいちばん優先される曲）")
+    for a in all_artists():
+        dg = artist_digest(a["slug"])
+        c = dg.get("close_count", 0)
+        print(f"   {ok(c >= 5)} {a.get('name')}：{c} 曲" + (f"（影響を受けたアーティストの曲 {dg.get('influence_songs')}）" if dg.get("influence_songs") else "")
+              + (f"（オーナーの指定 {dg.get('owner_assigned')}）" if dg.get("owner_assigned") else ""))
+        if c < 5:
+            warn.append(f"{a.get('name')} に近い参考曲が {c} 曲：その組に近い曲を既存楽曲に足すか、「影響を受けたアーティストを選ぶ」")
+    # 5 ブリーフで実際に使えているか（直近 10 曲）
+    briefs = sorted((p for p in (OUT / "briefs").glob("*.json") if "." not in p.stem), key=lambda x: x.stat().st_mtime)[-10:] if (OUT / "briefs").exists() else []
+    tot = hit = 0
+    for bp in briefs:
+        try:
+            b = json.loads(bp.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for s in (b.get("slots") or {}).values():
+            tot += 1
+            hit += bool(s.get("reference_id") and (REF_DIR / f"{s['reference_id']}.json").exists())
+    if tot:
+        print(f"\n■ 直近 {len(briefs)} 曲の曲づくりで使った参考曲：{tot} 枠のうち解析シートがある {hit} 枠 {ok(hit >= tot * 0.9)}"
+              f"（{int(hit * 100 / tot)}%。無い枠は曲名だけが Claude に渡る）")
+        if hit < tot * 0.9:
+            warn.append("曲づくりで解析シートの無い参考曲が使われている：SSD をつないで参考データベースを読み直す（ブリーフ作りの最初に自動で読みます）")
+    # 6 見張り（refs）の最後の記録
+    log = OUT / "logs" / "refs.log"
+    if log.exists():
+        tail = log.read_text(encoding="utf-8", errors="replace").splitlines()[-40:]
+        bad = [x for x in tail if "Traceback" in x or "エラー" in x or "失敗" in x]
+        print(f"\n■ 自動の見張り（既存楽曲に曲を入れると解析）：最後の動き {datetime.fromtimestamp(log.stat().st_mtime):%Y-%m-%d %H:%M}"
+              + (f" △ エラーの記録あり：{bad[-1][:120]}" if bad else " ○"))
+        if bad:
+            warn.append("見張りの記録にエラーがある：out/logs/refs.log の最後を Claude に見せてください")
+    print("\n【結果】" + ("参考曲はうまく取り込めています" if not warn else f"気になるところが {len(warn)} つあります"))
+    for w in warn:
+        print(f"   ・{w}")
+    return 0
+
+
 def setup(path: str) -> None:
     p = Path(path).expanduser()
     if not p.exists():
@@ -1399,6 +1499,7 @@ def setup(path: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="SSD のデータベースを読み、楽曲制作の参考にする")
     ap.add_argument("--show", action="store_true", help="見つかったデータベースの中身と読み方を表示するだけ（取り込まない）")
+    ap.add_argument("--health", action="store_true", help="参考曲の取り込みの健康診断（読むだけ・無料。決定 101）")
     ap.add_argument("--setup", metavar="PATH", help="データベースの場所を .env に書く")
     ap.add_argument("--quiet", action="store_true", help="SSD が無いときは何も言わない（自動実行用）")
     ap.add_argument("--artists", action="store_true", help="組ごとの近い参考曲だけ作り直す")
@@ -1413,6 +1514,8 @@ def main() -> None:
     ap.add_argument("--audio-enrich", type=int, metavar="N", nargs="?", const=50,
                     help="音源から測れない項目（声・楽器・テーマ・世界観）を Claude に Web で調べてもらう（1 回に N 曲まで。既定 50。決定 85）")
     args = ap.parse_args()
+    if args.health:
+        sys.exit(health())
     if args.audio_lyrics is not None:
         sys.exit(audio_lyrics(args.audio_lyrics))
     if args.audio_melody is not None:
