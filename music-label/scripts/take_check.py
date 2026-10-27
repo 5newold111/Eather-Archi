@@ -15,6 +15,7 @@
     ダッシュボードの「2 曲とも良くない（直して入れ直す）」で理由を選ぶ → 上と同じ順の直し方 → もう一度 Suno に入力
   ・デビュー曲は対象外。取り込んだテイクは out/takes/<曲>/retake_<回>/ に残す
   ・Suno のダウンロードを 1 本ずつ使う（Premier は月 60 本）。止めるときは .env に AUTO_RETAKE=0
+  ・Suno のダウンロード枠に合わせているあいだ（suno_quota.py。決定 105）は、自動で作り直さずに「聴いて判断して」と知らせる
 
 使い方：
   python3 scripts/take_check.py <曲 ID>          # 測るだけ（作り直さない）
@@ -216,6 +217,16 @@ def gate(song: dict) -> str:
         print(f"   ✓ {name}：作曲の質の確認に通りました（{res['score']} 点）")
         return "ok"
     why = "・".join(res["hard_fail"])
+    try:   # Suno のダウンロード枠を使うあいだは自動で作り直さない（作り直すとダウンロードを 1 曲分使う。決定 105）
+        import suno_quota
+        quota = suno_quota.on()
+    except ImportError:
+        quota = False
+    if quota:
+        print(f"   ⚠ {name}：測ると {why}（{res['score']} 点）。Suno のダウンロード枠を使うあいだは自動で作り直しません。聴いて、進めるか決めてください"
+              "（作り直すときは「前の工程に戻す」→ 理由を選んで直す。ダウンロードを 1 曲分使います）")
+        notify("聴いて判断してください", f"{name}：{why}。作り直すとダウンロードを 1 曲分使います")
+        return "keep"
     if retake(song, res):
         print(f"   ↻ {name}：質が足りないので（{why}・{res['score']} 点）、曲の案を直して作曲待ちに戻しました。Suno でもう一度作ってください")
         notify("作曲をやり直します", f"{name}：{why}。案を直したので、Suno でもう一度作ってください")
@@ -241,7 +252,7 @@ def main() -> None:
         if not ok:
             print(f"【結果】この曲はもう {MAX_RETAKES} 回直しました。曲の案から作り直すか（不定期配信の「却下して作り直す」）、このまま聴いて選んでください")
             sys.exit(2)
-        print(f"【結果】{song['artist']}「{song['title']}」の入力を直しました：{how}。もう一度「Suno に写して貼る」で入れてください")
+        print(f"【結果】{song['artist']}「{song['title']}」の入力を直しました：{how}。もう一度「Suno に入力する」を押してください")
         return
     if a.apply:
         print(f"【結果】{gate(song)}")

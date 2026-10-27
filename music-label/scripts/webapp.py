@@ -6,7 +6,7 @@
   ・アーティストごとの進み具合と詰まり（担当・何日止まっているか・次の一歩）。30 秒ごとに自動で新しくなる
   ・仕組みの詰まり（鍵・ffmpeg・SSD・定期実行）と、管理表の「詰まっているところ」
   ・曲の一覧（公開の段階・ISRC・公開セットのフォルダ）
-  ・ボタン：Suno に写して貼る（/paste。ふだんのブラウザで 1 欄ずつ写す。決定 104）／DistroKid に入力する（専用のブラウザが開き、欄を自動で埋める。Create と最後の登録ボタンは押さない。browser_fill.py）／
+  ・ボタン：Suno に入力する（決定 106。予備：/paste でふだんのブラウザに写して貼る。決定 104）／DistroKid に入力する（専用のブラウザが開き、欄を自動で埋める。Create と最後の登録ボタンは押さない。browser_fill.py）／
     曲を取り込む／配信を確かめる／SSD に保管する／写真とジャケットを作る／DistroKid に登録したことを記録する／
     公開セットのフォルダを Finder で開く／鍵や部品の設定をターミナルで始める
 動きの中身は今までのコマンド（publish.py・archive_sync.py・kit_images.py・browser_fill.py）と同じ。ボタンはそれを代わりに実行するだけ。
@@ -115,7 +115,7 @@ def status_json() -> dict:
                     r["back"] = _guide.back_actions(song)
                     # もう一度入力する（前の入力が残っていても止めて入り直す。決定 47）
                     stt = _songs.state(song).get("status", "") if song else "live"
-                    r["redo"] = ([{"kind": "link", "label": "Suno にもう一度写して貼る", "url": f"/paste/{r['id']}"}]
+                    r["redo"] = ([{"kind": "run", "label": "Suno にもう一度入力する（ブラウザが開きます）", "action": "fill_suno", "id": r["id"]}]
                                  if stt == "" else []) + \
                         ([{"kind": "run", "label": "DistroKid にもう一度入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": r["id"]}]
                          if stt in ("ready", "registered") else [])
@@ -162,7 +162,12 @@ def status_json() -> dict:
                          "planned": len(list(post_social.DAILY_DIR.rglob("plan.json"))) if post_social.DAILY_DIR.exists() else 0}
     except Exception as e:  # noqa: BLE001
         dly = {"active": False, "error": str(e)}
-    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich,
+    try:   # Suno のダウンロード枠（Pro は月 20 曲。決定 105）
+        import suno_quota
+        quota = suno_quota.status()
+    except Exception as e:  # noqa: BLE001
+        quota = {"on": False, "error": str(e)}
+    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -302,6 +307,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "quota_left" and str(p.get("left", "")).isdigit():   # Suno の画面の「残り」を入れる（決定 105）
+        return [PY, str(S / "suno_quota.py"), "left", str(int(p["left"]))], "Suno のダウンロードの残りを入れる"
+    if action == "quota_plan":   # 作曲待ちの曲を枠に割り当て、配信日を後ろにずらす
+        return [PY, str(S / "suno_quota.py"), "plan"], "予定を Suno のダウンロード枠に合わせる"
     if action == "suno_retake":   # Suno で聴いて 2 曲とも良くない：理由のとおりに入力を直す（決定 100）
         import take_check
         song = _songs.by_id(str(p.get("id", "")))
@@ -516,12 +525,13 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.chips button{font-size:12px;padding:2px 10px}.irr-note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
 .redo{border:1.5px dashed var(--crit);border-radius:10px;padding:8px 12px;margin:14px 0 4px}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/paste" class="act-only">Suno に写して貼る</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
- <a class="btn" href="/paste" target="_blank" rel="noopener">作曲待ちの曲を Suno に写して貼る ↗</a><button data-act="fill_suno" class="ghost" data-confirm="専用の Chrome に自動で入れます。Suno のロボット確認が何度も出やすくなります。ふだんは「Suno に写して貼る」を使ってください。続けますか？">予備：専用の Chrome に自動で入れる</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
+ <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
  <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button>
 </div>
+<div class="tools act-only" id="quota" hidden></div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
  <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
@@ -652,7 +662,7 @@ function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
    case "artist_folder":return `<button class="ghost act-only" data-act="open_artist" data-slug="${slug}">${E(a.label)}</button>`;
    case "mark_live":return `<span class="act-only" style="display:block"><input type="text" id="lt-${id}" placeholder="Spotify の曲の住所（https://open.spotify.com/track/…・なくても可）" style="min-width:22em;margin:2px 0"><br><input type="text" id="la-${id}" placeholder="Spotify のアーティストの住所（https://open.spotify.com/artist/…）" style="min-width:22em;margin:2px 0"><br><button data-act="mark_live" data-id="${id}">${E(a.label)}</button></span>`;
    case "artist_page":return `<span class="act-only"><input type="text" id="ap-${slug}" placeholder="spotify:artist:… か https://open.spotify.com/artist/…" style="min-width:18em"> <button data-act="artist_page" data-slug="${slug}">${E(a.label)}</button></span>`;
-   case "retake":return `<span class="act-only rt" style="display:block;margin:6px 0"><b>Suno で聴いて 2 曲とも良くないとき</b>：まず同じ入力のまま Create をもう一度（料金 0 円・Claude も使わない）。それでもだめなら、理由を選んで直す（1 回目は機械の直しで 0 円、2 回目は Claude の小さな書き直しで数円）<br>${(a.reasons||[]).map(x=>`<label style="display:inline-block;margin:2px 8px 2px 0;font-weight:400"><input type="checkbox" value="${E(x)}" style="width:auto"> ${E(x)}</label>`).join("")}<br><button class="ghost" data-act="suno_retake" data-id="${id}">理由のとおりに直す（このあと「Suno に写して貼る」）</button></span>`;
+   case "retake":return `<span class="act-only rt" style="display:block;margin:6px 0"><b>Suno で聴いて 2 曲とも良くないとき</b>：まず同じ入力のまま Create をもう一度（料金 0 円・Claude も使わない）。それでもだめなら、理由を選んで直す（1 回目は機械の直しで 0 円、2 回目は Claude の小さな書き直しで数円）<br>${(a.reasons||[]).map(x=>`<label style="display:inline-block;margin:2px 8px 2px 0;font-weight:400"><input type="checkbox" value="${E(x)}" style="width:auto"> ${E(x)}</label>`).join("")}<br><button class="ghost" data-act="suno_retake" data-id="${id}">理由のとおりに直す（このあと「Suno に入力する」）</button></span>`;
    case "registered":return `<span class="act-only"><input type="date" id="d-${id}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${id}">${E(a.label)}</button></span>`;
   }return""}
 function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].rows[+ri],p=r.phases[+pi],g=p.guide||{cause:p.detail,steps:[],actions:[]};
@@ -742,11 +752,21 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
   if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
+  if(b.dataset.act==="quota_left"){p.left=(document.getElementById("quota-left")||{}).value||"";if(!/^\d+$/.test(p.left)){alert("Suno の画面の残りの曲数を数字で入れてください");return}}
   if(b.dataset.act==="suno_retake"){p.why=[...b.closest(".rt").querySelectorAll("input:checked")].map(x=>x.value).join(",");if(!p.why){alert("良くなかったところを 1 つ以上選んでください");return}}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
+// ---- Suno のダウンロード枠（決定 105）
+function quotaBox(){const el=document.getElementById("quota"),q=DATA.quota||{};el.hidden=!q.on;if(!q.on)return;
+  if(el.contains(document.activeElement))return;   // 入力中は作り直さない
+  const md=s=>{const d=new Date(s+"T00:00:00");return `${d.getMonth()+1}/${d.getDate()}`};
+  const nxt=Object.entries(q.by_cycle||{}).map(([c,n])=>`${md(c)}〜 ${n} 曲`).join("・");
+  el.innerHTML=`<span><b>Suno のダウンロード</b>：今月の残り <b>${q.left}</b>／${q.limit} 曲（予備 ${q.reserve}）・次のリセット ${md(q.reset)}${q.manual?"（Gon さんが入れた数から）":""}`
+   +`${q.waiting?`・作曲待ち ${q.waiting} 曲（${E(nxt)}）`:""}${q.moved?`・配信日をずらした曲 ${q.moved}`:""}</span>`
+   +` <input type="number" id="quota-left" min="0" max="${q.limit}" placeholder="Suno の残り" style="width:7em"> <button class="ghost" data-act="quota_left">Suno の画面の残りを入れる</button>`
+   +` <button class="ghost" data-act="quota_plan" data-confirm="作曲待ちの曲を、ダウンロードできる月に割り当てます。ダウンロードできる日から 7 日あかない曲は、配信日を後ろの配信曜日にずらします（元の日は残します）。進めますか？">予定を枠に合わせる</button>`}
 // ---- 不定期配信（決定 72）：組を選んで曲の案を作る → ポップアップで直す・却下して作り直す・作曲へ進める
 function irrForm(){const el=document.getElementById("irr-form"),I=DATA.irregular||{},arts=I.artists||[];
   const sig=JSON.stringify([arts,I.scenes,I.collab]);if(el.dataset.sig===sig)return;   // 入力中の内容を消さないよう、組の一覧が変わったときだけ作り直す
@@ -795,7 +815,7 @@ function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===
     ${f("cover","ジャケットのイメージ（英語。色・光・構図）",d.cover,true)}
     ${d.notes?`<label>この曲の狙い（Claude のメモ）</label><div class="irr-note">${E(d.notes)}</div>`:""}
    </div>
-   <div class="acts act-only"><button data-irr="accept" data-id="${E(d.id)}">✓ この案で作曲へ進む（Suno に写して貼る）</button><button class="ghost" data-irr="save" data-id="${E(d.id)}">直したところを保存する</button></div>
+   <div class="acts act-only"><button data-irr="accept" data-id="${E(d.id)}">✓ この案で作曲へ進む（Suno に自動で入力）</button><button class="ghost" data-irr="save" data-id="${E(d.id)}">直したところを保存する</button></div>
    <div class="redo act-only"><b>✕ 好みでないので却下して作り直す</b><span class="sub">　この案は残し、次の案では同じ方向をくり返しません</span>
     <label for="irr-reason" class="sub" style="display:block;margin-top:6px">どこが好みでなかったか（任意。例：もっと明るく・歌詞が説明的すぎる・テンポを遅く）</label>
     <textarea id="irr-reason" maxlength="1000" style="width:100%;min-height:3em;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"></textarea>
@@ -810,7 +830,7 @@ document.addEventListener("click",e=>{const pk=e.target.closest("[data-pick]");i
   const li=e.target.closest("li[data-draft]");if(li&&!e.target.closest("button")){openDraft(li.dataset.draft);return}
   const b=e.target.closest("button[data-irr]");if(!b)return;const op=b.dataset.irr,id=b.dataset.id;
   if(op==="save")irrPost("save",id,irrFields(),b);
-  if(op==="accept"){if(confirm("この案で作曲へ進みますか？\n直したところも保存して、Suno に写して貼るページを出します（Create は Gon さんが押します）"))irrPost("accept",id,irrFields(),b)}
+  if(op==="accept"){if(confirm("この案で作曲へ進みますか？\n直したところも保存して、Suno に自動で入力します（専用のブラウザが開きます。Create は Gon さんが押します）"))irrPost("accept",id,irrFields(),b)}
   if(op==="discard"){if(confirm("この案をやめますか？（記録は残ります）")){irrPost("discard",id,{},b);const dl=document.getElementById("dlg");if(dl.open)dl.close()}}
   if(op==="redo"){const reason=(document.getElementById("irr-reason")||{}).value||"";if(!confirm("この案を却下して、新しい案を作りますか？"+(reason?"":"\n（理由は空のままでも作り直せます）")))return;
     act("irregular_propose",{slug:b.dataset.slug,redo:id,reason},b);const dj=document.getElementById("dlg-job");if(dj){dj.className="job running";dj.textContent="新しい案を作っています…（できたら、このポップアップが新しい案に変わります）"}}});
@@ -820,7 +840,7 @@ function render(){
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  irrForm();irrDrafts();dailyBox();
+  irrForm();irrDrafts();dailyBox();quotaBox();
   {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）
    bl.hidden=!(re0.lyrics&&re0.whisper);bw.hidden=!(re0.lyrics&&!re0.whisper);
    if(re0.lyrics){bl.textContent=`歌詞を聞き取る（${re0.lyrics} 曲・無料）`;bw.textContent=`歌詞を聞き取る部品を入れる（${re0.lyrics} 曲が待っています・ターミナルが開きます）`;
@@ -1053,8 +1073,13 @@ def _irregular(self):
         song_id, msg = irregular.accept(did)
         if not song_id:
             return self._json(400, {"error": msg})
-        # 専用の Chrome への自動入力はしない（ロボット確認が何度も出る原因。決定 104）。ふだんのブラウザで写して貼る
-        return self._json(200, {"message": msg + "。下の「Suno に写して貼る」から入れてください", "song_id": song_id, "open": f"/paste/{song_id}"})
+        found = command_for("fill_suno", {"id": song_id})   # Suno に自動で入れる（決定 106）
+        if not found:
+            return self._json(200, {"message": msg + "。Suno への入力は、表のマスから始めてください", "song_id": song_id})
+        for j in list(JOBS.values()):   # 前のブラウザの入力が残っていれば止めてから始める
+            if j["state"] == "running" and j["label"].startswith("ブラウザで入力"):
+                stop_job(j["id"])
+        return self._json(200, {"message": msg + "。Suno に入力します（専用のブラウザが開きます）", "song_id": song_id, "job": start_job(*found)})
     return self._json(400, {"error": "その操作はできません"})
 
 

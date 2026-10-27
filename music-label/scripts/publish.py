@@ -3,8 +3,9 @@
 公開の流れ：Suno で「いいね」してダウンロードした曲を、DistroKid の登録ボタンを押すだけの状態まで自動で進める
 
 オーナーがやること（Suno と DistroKid は規約上、機械が勝手に操作しない。docs/12_decisions.md の 17）：
-  1. Suno の入力欄（曲名・スタイル・歌詞）は、ダッシュボードの「Suno に写して貼る」（/paste）で、ふだんのブラウザに 1 欄ずつ写す（決定 104）。
-     専用のブラウザへの自動入力（browser_fill.py suno。決定 22）はロボット確認が何度も出るので予備。「Create」を押すのはオーナーだけ。
+  1. Suno の入力欄（曲名・スタイル・歌詞）は仕組みが入れる：ダッシュボードの「Suno に入力する」（browser_fill.py suno。決定 22・106）で
+     専用のブラウザが開き、欄を埋めて止まる。内容を確かめて「Create」を押すのはオーナーだけ。
+     ロボット確認が続くときの予備：ダッシュボードの「写して貼る」（/paste。ふだんのブラウザに 1 欄ずつ写す。決定 104）
      自分で貼るときは、`publish.py suno` のページのコピーボタンから
   2. できたテイクを聴き、気に入った方に「いいね」して、その 1 本をダウンロードして
      SSD の「Postdog Records/楽曲情報」に入れる（Suno のアプリの保存先をここにする。SSD が無いときは「ダウンロード/SUNO楽曲」）。
@@ -246,6 +247,11 @@ def take_in(song: dict, f: Path) -> None:
     st = _songs.state(song)
     st.update({"status": "imported", "take": dst.name, "source": str(f), "imported_at": sel["decision"]["at"], "generated_on": day})
     _songs.save_state(song, st)
+    try:   # Suno のダウンロード 1 曲として数える（同じファイルは数えない。決定 105）
+        import suno_quota
+        suno_quota.log_download(song, dst)
+    except Exception:  # noqa: BLE001
+        pass
     print(f"   ○ {song['artist']}「{song['title']}」のテイクとして取り込みました：{f.name}" + (f"（前の {prev} から差し替え）" if prev and prev != dst.name else ""))
 
 
@@ -831,10 +837,10 @@ def suno_page() -> tuple[str, int]:
     E = html.escape
     cards = []
     if todo:
-        cards.append('<section><h2>写して貼る（おすすめ）</h2>'
-                     '<p>ダッシュボード（http://localhost:8765）の<a href="/paste">「Suno に写して貼る」</a>を開くと、1 曲ずつ Suno の欄の順に、'
-                     '大きなボタンを押す → ふだんのブラウザの Suno に貼る、をくり返すだけで入ります。「Create」を押すのは Gon さんだけ。</p>'
-                     '<p>専用のブラウザへの自動入力（<code>python3 scripts/browser_fill.py suno</code>）は予備です（ロボット確認が何度も出やすい）。</p></section>')
+        cards.append('<section><h2>自動で入力する（おすすめ）</h2>'
+                     '<p>ダッシュボード（http://localhost:8765）の「作曲待ちの曲を Suno に入力する」を押すと、専用のブラウザが開き、'
+                     '下の内容が 1 曲ずつ Suno の欄に自動で入ります。内容を確かめて「Create」を押してください（押すのは Gon さんだけ）。</p>'
+                     '<p>ロボット確認が続くときは、<a href="/paste">写して貼る</a>ページ（ふだんのブラウザで 1 欄ずつ）を使ってください。</p></section>')
     import suno_design
     for i, s in enumerate(todo):
         d = suno_design.design(s)   # 曲のイメージを Suno の全部の軸に写した設計図

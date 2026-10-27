@@ -108,6 +108,9 @@ def scene_for(slug: str, k: int) -> str:
 # ---------------------------------------------------------------------------
 def cmd_start(start: str | None, days: int, order: str | None, force: bool) -> int:
     import irregular
+    import suno_quota
+    if suno_quota.on() and int(suno_quota.settings()["limit"]) < 40:   # 毎日配信は Suno のダウンロード枠（Pro は月 20 曲）に入らない（決定 105）
+        sys.exit("[停止] Suno のダウンロード枠に合わせているあいだは、毎日配信は使えません（Premier にしたら  python3 scripts/suno_quota.py set --limit 60 --plan-name Premier）")
     live = [a["slug"] for a in irregular.eligible()]
     want = [x.strip() for x in order.split(",")] if order else live
     bad = [x for x in want if x not in live]

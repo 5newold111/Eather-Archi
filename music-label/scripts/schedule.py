@@ -61,8 +61,8 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
                  ["post_social.py", "post", "--week", "all"], ["dashboard.py"]]),
     "trends":  ("今週の話題曲・トレンド言語", [["fetch_trends.py", "--week", "this"]]),
     "brief":   ("アーティスト管理表の読み込み → 今週のブリーフ（全組）",
-                [["artist_book.py", "pull", "--if-exists"], ["run_week.py", "brief", "--week", "this"],
-                 ["daily.py", "make", "--if-active"]]),   # 毎日配信の 21 日先までの曲（決定 94）
+                [["artist_book.py", "pull", "--if-exists"], ["suno_quota.py", "plan", "--quiet"], ["run_week.py", "brief", "--week", "this"],
+                 ["daily.py", "make", "--if-active"], ["suno_quota.py", "plan", "--quiet"]]),   # Suno のダウンロード枠に合わせる（決定 105）   # 毎日配信の 21 日先までの曲（決定 94）
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
     "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"],
                                           ["explore.py", "report"]]),   # 方向性の伸びを学んで、次の曲のくじに返す（決定 96）
@@ -71,7 +71,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
                 [["artist_book.py", "pull", "--if-exists"], ["expand_label.py", "check", "--apply"],
                  ["artist_book.py", "propose-update", "--all", "--if-exists"],
                  ["post_social.py", "refresh-ig"], ["plan_quarterly.py", "--if-quarter-start"], ["refresh_photos.py", "--due"]]),
-    "intake":  ("Suno の曲の取り込み → 音量・ジャケット・DistroKid の下書き・公開セット", [["publish.py", "scan", "--quiet"]]),
+    "intake":  ("Suno の曲の取り込み → 音量・ジャケット・DistroKid の下書き・公開セット", [["publish.py", "scan", "--quiet"], ["suno_quota.py", "plan", "--quiet"]]),
     "release": ("配信の確認と ISRC・UPC・配信 URL の記録", [["publish.py", "track", "--quiet"]]),
     "ssd":     ("SSD をつないだとき：楽曲のデータを SSD へ移す・保管・取り込み", [["archive_sync.py", "--on-mount"], ["publish.py", "scan", "--quiet"]]),
     "refs":    ("既存楽曲に入った曲の解析 → 参考曲に登録", [["reference_db.py", "--watch"]]),

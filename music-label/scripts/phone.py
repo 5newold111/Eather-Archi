@@ -10,9 +10,9 @@
   4 登録の記録       … 最後の登録ボタンを押したら「登録した」を押す
 Create と DistroKid の最後の登録ボタンは、今までどおり Gon さんが押す（システムは押さない）。
 
-/paste と /paste/<曲 ID>（Mac のふだんのブラウザ用。決定 104）：Suno の入力の標準。
-  専用の Chrome での自動入力は、ロボット確認が何度も出る原因になるので「予備」に下げた。ふだんのブラウザで Suno を開き、
-  このページを横に並べて、下の「次を写す」を押す → Suno に貼る、をくり返す。押すたびに次の欄が光る（数字やオン・オフは「設定した」）
+/paste と /paste/<曲 ID>（Mac のふだんのブラウザ用。決定 104）：Suno の入力の予備（標準は専用の Chrome への自動入力。決定 106）。
+  ロボット確認が何度も出て通らないときに、ふだんのブラウザで Suno を開き、このページを横に並べて、
+  下の「次を写す」を押す → Suno に貼る、をくり返す。押すたびに次の欄が光る（数字やオン・オフは「設定した」）
 """
 from __future__ import annotations
 
@@ -210,7 +210,20 @@ def paste_page(song_id: str | None, token: str) -> str:
         head = (f'<div class="pnav">{" ".join(nav)} {pick}</div><h1>{E(song["artist"])}「{E(song["title"])}」</h1>'
                 f'<p class="sub">{E(song["id"])}' + (f"・作曲待ち {len(todo)} 曲の {i + 1} 曲目" if i >= 0 else "")
                 + ("・この曲はもう取り込み済みです" if st else "") + "</p>")
-        body = (EXTRA + PASTE_EXTRA.replace("<script>", f'<script data-song="{E(song["id"])}">', 1) + head + paste_section(song))
+        qn = ""
+        try:   # Suno のダウンロード枠（決定 105）：残りが無いときは、作曲といいねまで進めておく
+            import suno_quota
+            q = suno_quota.status()
+            if q["on"]:
+                pl = ((read_json(suno_quota.PLAN) if suno_quota.PLAN.exists() else {}).get("songs") or {}).get(song["id"]) or {}
+                when = pl.get("download_from")
+                qn = (f'<p class="note">Suno のダウンロード：今月の残り <b>{q["left"]}</b>／{q["limit"]} 曲・次のリセット {E(q["reset"])}。'
+                      + (f'この曲のダウンロードは <b>{E(when)}</b> から（それまでは Create して「いいね」まで）。' if when and when > date.today().isoformat() else "")
+                      + (f'配信日は <b>{E(pl["moved"]["to"])}</b> にずらしました。' if pl.get("moved") else "")
+                      + "ダウンロードは気に入った 1 本だけ、WAV で。</p>")
+        except Exception:  # noqa: BLE001
+            pass
+        body = (EXTRA + PASTE_EXTRA.replace("<script>", f'<script data-song="{E(song["id"])}">', 1) + head + qn + paste_section(song))
     return song_check.PAGE.replace("<title>公開の準備</title>", "<title>Suno に写して貼る</title>").replace(
         "__BODY__", body).replace("__TOKEN__", token).replace("__AUTO__", "false")
 
@@ -264,11 +277,9 @@ def record_section(song: dict, token: str) -> str:
 
 def mac_section(song: dict) -> str:
     import song_check
-    return ('<section><h2>Mac の画面を遠隔で見ているとき</h2><p class="note">画面共有で Mac を操作しているときは、Mac のふだんのブラウザで '
-            '<a href="/paste/' + quote(song["id"]) + '">Suno に写して貼る</a> ページを使います。専用の Chrome への自動入力は予備です'
-            '（ロボット確認が何度も出やすい）。</p>'
-            + song_check._btn({"action": "fill_suno", "id": song["id"], "label": "予備：Mac の専用の Chrome で Suno に自動で入れる",
-                               "confirm": "専用の Chrome に自動で入れます。Suno のロボット確認が何度も出やすくなります。ふだんは「Suno に写して貼る」を使ってください。続けますか？"})
+    return ('<section><h2>Mac の画面を遠隔で見ているとき</h2><p class="note">画面共有で Mac を操作しているときは、Mac の専用の Chrome に自動で入れられます。'
+            'ロボット確認が続くときは、ふだんのブラウザで <a href="/paste/' + quote(song["id"]) + '">写して貼る</a>（予備）。</p>'
+            + song_check._btn({"action": "fill_suno", "id": song["id"], "label": "Mac の Chrome で Suno に入力する"})
             + song_check._btn({"action": "fill_distrokid", "id": song["id"], "label": "Mac の Chrome で DistroKid に入力する"})
             + '</section>')
 

@@ -382,6 +382,13 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
             return False, "毎日配信の期間（その組の曲は daily.py が日ごとに作る）"
     except ImportError:
         pass
+    try:   # Suno のダウンロード枠（Pro は月 20 曲）を超える週は作らない（決定 105）
+        import suno_quota
+        ok, why = suno_quota.allow_production(artist, production_monday)
+        if not ok:
+            return False, why
+    except ImportError:
+        pass
     return True, "制作する週"
 
 
