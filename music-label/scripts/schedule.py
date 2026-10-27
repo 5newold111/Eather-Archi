@@ -22,6 +22,8 @@
                             配信が始まった曲はローカル保存から片付けて、Mac に知らせる（archive_sync.py --on-mount → publish.py scan）
     refs     既存楽曲に曲が入ったとき・SSD をつないだとき・30 分ごと  SSD の「既存楽曲」に新しく入った WAV・MP3・M4A だけを解析して、
                             参考曲の解析シートに登録し、Mac に知らせる（reference_db.py --watch。決定 78）
+    update   10 分ごと      push された更新を取り込んで反映する（git pull → 定期実行の登録し直し → ダッシュボードも新しい版に。
+                            動いている仕事があれば待つ。self_update.py。決定 108）
     webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
 
 使い方
@@ -75,6 +77,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "release": ("配信の確認と ISRC・UPC・配信 URL の記録", [["publish.py", "track", "--quiet"]]),
     "ssd":     ("SSD をつないだとき：楽曲のデータを SSD へ移す・保管・取り込み", [["archive_sync.py", "--on-mount"], ["publish.py", "scan", "--quiet"]]),
     "refs":    ("既存楽曲に入った曲の解析 → 参考曲に登録", [["reference_db.py", "--watch"]]),
+    "update":  ("push された更新を取り込んで反映（決定 108）", [["self_update.py"]]),
 }
 
 
@@ -107,12 +110,14 @@ def calendar(job: str) -> dict:
         import reference_db
         dirs = [str(d) for d in reference_db.audio_dirs()]
         return {**({"WatchPaths": dirs} if dirs else {}), "StartOnMount": True, "StartInterval": 1800}
+    if job == "update":   # 10 分ごとに GitHub の更新を確かめる（決定 108）
+        return {"StartInterval": 600}
     raise KeyError(job)
 
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
-        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *"}
+        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）

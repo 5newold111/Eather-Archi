@@ -46,7 +46,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import OUT, ROOT, all_artists, load_dotenv  # noqa: E402
+from _common import OUT, ROOT, all_artists, load_dotenv, read_json  # noqa: E402
 
 load_dotenv()
 import _songs  # noqa: E402
@@ -56,6 +56,10 @@ S = Path(__file__).resolve().parent
 PY = sys.executable
 TOKEN = secrets.token_urlsafe(24)          # ボタン用の合言葉（起動のたびに変わる）
 JOBS: dict[str, dict] = {}
+try:   # いま動いている版（更新を取り込むと、ダッシュボードは新しい版で立ち上がり直す。画面は版が変わったら読み直す。決定 108）
+    VERSION = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, timeout=10).stdout.strip()
+except Exception:  # noqa: BLE001
+    VERSION = ""
 LOCK = threading.Lock()
 STATUS_JA = {"": "Suno で作曲", "imported": "取り込み済み", "waiting_ffmpeg": "音量調整待ち", "waiting_cover": "ジャケット待ち",
              "ready": "登録の準備ができた", "registered": "DistroKid 登録済み", "live": "配信中"}
@@ -167,7 +171,12 @@ def status_json() -> dict:
         quota = suno_quota.status()
     except Exception as e:  # noqa: BLE001
         quota = {"on": False, "error": str(e)}
-    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota,
+    try:   # 最後に自動で反映した更新（決定 108）
+        upd = read_json(OUT / "update" / "last.json") if (OUT / "update" / "last.json").exists() else {}
+    except Exception:  # noqa: BLE001
+        upd = {}
+    return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
+            "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -307,6 +316,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return None
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
+    if action == "self_update":   # 今すぐ更新を確かめて反映する。定期実行の「更新」の仕事として動かす（ダッシュボードの中で動かすと、立ち上げ直しで自分が止まるため）
+        if sys.platform == "darwin":
+            return ["launchctl", "kickstart", f"gui/{os.getuid()}/jp.etherarchi.label.update"], "システムの更新を確かめる（数分。反映すると画面が読み直されます）"
+        return [PY, str(S / "self_update.py")], "システムの更新を確かめる"
     if action == "quota_left" and str(p.get("left", "")).isdigit():   # Suno の画面の「残り」を入れる（決定 105）
         return [PY, str(S / "suno_quota.py"), "left", str(int(p["left"]))], "Suno のダウンロードの残りを入れる"
     if action == "quota_plan":   # 作曲待ちの曲を枠に割り当て、配信日を後ろにずらす
@@ -572,6 +585,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-debut"></div></details>
 </section>
 <h2>仕組みの詰まり</h2><div id="system"></div>
+<p class="sub act-only" id="upd-info"></p>
 <details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
 </main>
 <div id="tip" role="tooltip"></div>
@@ -842,6 +856,10 @@ function render(){
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
   irrForm();irrDrafts();dailyBox();quotaBox();
+  {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
+   el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
+     +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")
+     +` <button class="ghost" data-act="self_update">今すぐ更新を確かめる</button>`}
   {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）
    bl.hidden=!(re0.lyrics&&re0.whisper);bw.hidden=!(re0.lyrics&&!re0.whisper);
    if(re0.lyrics){bl.textContent=`歌詞を聞き取る（${re0.lyrics} 曲・無料）`;bw.textContent=`歌詞を聞き取る部品を入れる（${re0.lyrics} 曲が待っています・ターミナルが開きます）`;
@@ -866,7 +884,11 @@ function render(){
 }
 let opened=false;
 function deepLink(){if(opened)return;opened=true;const m=location.hash.match(/open=([a-z]+:\d+:\d+)/);if(m)try{openGuide(m[1])}catch(e){}}
-async function load(){if(STATIC){DATA=STATIC;render();deepLink();return}const r=await fetch("/api/status");DATA=await r.json();
+let VER0=null;   // 最初に読んだ版。新しい版になったら（自動で更新を反映したら）読み直す（決定 108）
+async function load(){if(STATIC){DATA=STATIC;render();deepLink();return}let r;try{r=await fetch("/api/status")}catch(_){return}if(!r.ok)return;DATA=await r.json();
+  if(VER0===null)VER0=DATA.version||"";
+  else if(DATA.version&&DATA.version!==VER0){const busy=document.getElementById("dlg").open||["INPUT","TEXTAREA","SELECT"].includes((document.activeElement||{}).tagName);
+    if(!busy){location.reload();return}}
   render();deepLink()}
 let rz;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>DATA&&render(),200)});
 load();if(!STATIC)setInterval(load,30000);
@@ -959,6 +981,8 @@ class Handler(BaseHTTPRequestHandler):
             if (parse_qs(urlparse(self.path).query).get("dl") or [""])[0] == "1":   # スマホに保存する（DistroKid で選ぶため）
                 extra["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(f.name)}"
             return self._send(200, f.read_bytes(), ctype, extra=extra)
+        if path == "/api/busy":   # 自動の更新（self_update.py）が、動いている仕事を待つために見る（決定 108）
+            return self._json(200, {"running": [j["label"] for j in JOBS.values() if j["state"] == "running"], "version": VERSION})
         if path == "/api/status":
             try:
                 return self._json(200, status_json())
