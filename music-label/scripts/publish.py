@@ -321,6 +321,13 @@ def advance(song: dict) -> str:
         cover = _songs.cover_source(song)
     if cover is None and song["kind"] != "debut":
         cover = ensure_weekly_cover(song)   # 毎週の曲・不定期の曲：取り込んで進めるたびに作る（曜日・週を問わない。決定 112）
+    if cover is not None:   # ジャケットには必ずアーティスト名と曲名を入れる（入っていなければ入れる。入れられなければ先に進めない。決定 116）
+        ok_text, why = ensure_cover_text(song, cover)
+        if not ok_text:
+            st["status"] = "waiting_cover"
+            _songs.save_state(song, st)
+            print(f"   － ジャケットに文字を入れられませんでした：{why}")
+            return st["status"]
     if cover is None:
         st["status"] = "waiting_cover"
         _songs.save_state(song, st)
@@ -345,6 +352,23 @@ def publish_folder(song: dict) -> tuple[Path, str, str]:
     return folder, f"{_songs.audio_stem(song)}.wav", cover_name
 
 
+def ensure_cover_text(song: dict, cover: Path) -> tuple[bool, str]:
+    """ジャケットにアーティスト名と曲名が入っているか。入っていなければ入れる（デビュー曲も。決定 116）。(入っているか, 理由)"""
+    if not song.get("title") or not song.get("artist"):
+        return False, "曲名かアーティスト名がまだ決まっていません（管理表か曲の案で決めてください）"
+    try:
+        import cover_text
+        if cover_text.text_matches(Path(cover), song["artist"], song["title"]):
+            return True, ""
+        r = cover_text.apply(Path(cover), song["artist"], song["title"], song["slug"])
+    except Exception as e:  # noqa: BLE001
+        return False, f"{type(e).__name__}: {str(e)[:160]}"
+    if r.get("ok"):
+        print(f"   ○ ジャケットに文字を入れました：{'・'.join(r.get('shown', []))}（{r.get('font')}・{r.get('place')}）")
+        return True, ""
+    return False, r.get("reason", "")
+
+
 def _cover_text_note(song: dict) -> str:
     """ジャケットに入れた文字が、登録する曲名・アーティスト名と同じか（決定 36。違うとストアで差し戻される）"""
     src = _songs.cover_source(song)
@@ -356,7 +380,7 @@ def _cover_text_note(song: dict) -> str:
     except Exception:  # noqa: BLE001
         return "（確かめられませんでした）"
     if m is None:
-        return "文字なし"
+        return "⚠ 文字なし（次の取り込みで自動で入れます）"
     return "曲名・アーティスト名と同じ（OK）" if m else "⚠ 曲名かアーティスト名が変わっています。ジャケットを仕上げ直してください（finalize_cover.py）"
 
 
