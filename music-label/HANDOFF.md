@@ -33,6 +33,7 @@
 | Suno のまとめて入力 | ダッシュボードからは外しています（ロボット確認が出やすいため。決定 104・106）。入力は 1 曲ずつ自動で |
 | Suno のダウンロード枠 | Pro は月 20 曲（毎月 4 日にリセット）。作曲待ちを月の枠に割り当て、間に合わない配信日は後ろにずらし、枠を超える週は制作を休む（`suno_quota.py`。ダッシュボードの上に残りを表示。決定 105） |
 | 歌詞の日本語訳 | 作詞のたびに日本語訳（1 行ずつの対訳）を作る。曲の案のポップアップ・公開の準備のページ・公開セットの「歌詞_日本語訳.txt」・楽曲管理シートの「歌詞の日本語訳」に載せる。Suno・DistroKid には入れない（`lyrics_ja.py`。決定 107） |
+| 止まったときのやり直し | 週 1・月 1 の仕事は、失敗した手順だけを毎日 12:05 にやり直す（`schedule.py retry-failed`）。ジャケットの自動づくりも失敗したら 1 日 1 回（決定 113） |
 | 更新の反映 | 自動（10 分ごと。動いている仕事があれば待つ）。git pull → 定期実行の登録し直し → ダッシュボードも自動で読み直す。ぶつかるときは止めて知らせる（`self_update.py`。決定 108）。最初の 1 回だけ手で `git pull` → `schedule.py install` |
 | 設定書の送信 | Mac で書き直された設定書（templates/artists）は、本名・Mac の場所・鍵・書きかけを確かめてから自動で GitHub に送る（`[auto]` の記録。`self_update.py`。決定 109） |
 | Suno のモデル | 自動入力のときに画面のモデルを読み、v6 系でなければ案内で知らせる（切り替えはしない）。曲ごとに記録して楽曲管理シートの「Suno のモデル」へ（決定 110） |
@@ -41,7 +42,7 @@
 | 楽曲分析を API なしで | 声・楽器・ジャンル・ムードは曲を聞いて Mac の中で判定、テーマ・世界観は Claude Code（月額プラン）で Web を調べる。ダッシュボードの「足りない項目を埋める（無料）」（`audio_tags.py`・`reference_db.py --free`。決定 103） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜112） |
+| 決めたこと | `docs/12_decisions.md`（1〜113） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |

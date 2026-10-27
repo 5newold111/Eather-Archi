@@ -576,7 +576,7 @@ def cover_dir(song: dict) -> Path:
     return OUT / "visuals" / song["slug"] / "cover" / song["week"]
 
 
-COVER_RETRY_HOURS = 6   # 候補づくりに失敗したとき、次に自動で試すまでの時間（10 分ごとに料金のかかる作り直しをしないため）
+COVER_RETRY_HOURS = 24   # 候補づくりに失敗したとき、次に自動で試すまでの時間（1 日 1 回。10 分ごとに料金のかかる作り直しをしないため。決定 113）
 
 
 def ensure_weekly_cover(song: dict) -> Path | None:

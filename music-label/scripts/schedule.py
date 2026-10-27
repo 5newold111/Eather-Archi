@@ -22,6 +22,7 @@
                             配信が始まった曲はローカル保存から片付けて、Mac に知らせる（archive_sync.py --on-mount → publish.py scan）
     refs     既存楽曲に曲が入ったとき・SSD をつないだとき・30 分ごと  SSD の「既存楽曲」に新しく入った WAV・MP3・M4A だけを解析して、
                             参考曲の解析シートに登録し、Mac に知らせる（reference_db.py --watch。決定 78）
+    retry    毎日 12:05     止まった週 1・月 1 の仕事（trends・brief・auto・growth・monthly）の、失敗した手順だけをやり直す（決定 113）
     update   10 分ごと      push された更新を取り込んで反映する（git pull → 定期実行の登録し直し → ダッシュボードも新しい版に。
                             動いている仕事があれば待つ。self_update.py。決定 108）
     webapp   いつも          ダッシュボードのウェブアプリ（http://localhost:8765）。Mac の起動中は動かしたままにする（webapp.py）
@@ -78,7 +79,10 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "ssd":     ("SSD をつないだとき：楽曲のデータを SSD へ移す・保管・取り込み", [["archive_sync.py", "--on-mount"], ["publish.py", "scan", "--quiet"]]),
     "refs":    ("既存楽曲に入った曲の解析 → 参考曲に登録", [["reference_db.py", "--watch"]]),
     "update":  ("push された更新を取り込んで反映（決定 108）", [["self_update.py"]]),
+    "retry":   ("止まった週 1・月 1 の仕事の、失敗した手順だけを 1 日 1 回やり直す（決定 113）", [["schedule.py", "retry-failed"]]),
 }
+RETRY_JOBS = {"trends": "話題曲の調査", "brief": "ブリーフ", "auto": "毎週の制作", "growth": "成長分析", "monthly": "月 1 の仕事"}
+RETRY_AFTER_HOURS = 20   # 失敗してからこの時間はやり直さない（その仕事の決まった時刻の実行・自分の毎時の実行に任せる）
 
 
 def calendar(job: str) -> dict:
@@ -110,6 +114,8 @@ def calendar(job: str) -> dict:
         import reference_db
         dirs = [str(d) for d in reference_db.audio_dirs()]
         return {**({"WatchPaths": dirs} if dirs else {}), "StartOnMount": True, "StartInterval": 1800}
+    if job == "retry":   # 毎日 1 回（決定 113）
+        return {"StartCalendarInterval": [{"Hour": 12, "Minute": 5}]}
     if job == "update":   # 10 分ごとに GitHub の更新を確かめる（決定 108）
         return {"StartInterval": 600}
     raise KeyError(job)
@@ -117,7 +123,7 @@ def calendar(job: str) -> dict:
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
-        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *"}
+        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *", "retry": "5 12 * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）
@@ -162,8 +168,8 @@ def status() -> None:
         print(f"  ○ {j:<8} 登録済み（{'動いている' if state == 'running' else '待機中'}" + (f"・前回の終了コード {code}" if code and code != "0" and code != "(never exited)" else "") + "）")
 
 
-def run_job(job: str) -> int:
-    """仕事を 1 つ実行してログに残す。まだ無いスクリプトは飛ばす"""
+def run_job(job: str, only: list[int] | None = None, title: str = "") -> int:
+    """仕事を 1 つ実行してログに残す。まだ無いスクリプトは飛ばす。only：この番号の手順だけ（やり直し。決定 113）"""
     desc, cmds = JOBS[job]
     log = OUT / "logs" / f"{job}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
@@ -175,12 +181,15 @@ def run_job(job: str) -> int:
     code = 0
     try:
         with log.open("a", encoding="utf-8") as f:
-            f.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M} {job}：{desc} =====\n")
-            for c in cmds:
+            f.write(f"\n===== {datetime.now():%Y-%m-%d %H:%M} {job}：{title or desc} =====\n")
+            for i, c in enumerate(cmds):
+                if only is not None and i not in only:
+                    continue
                 script = S / c[0]
                 if not script.exists():
                     f.write(f"（{c[0]} がまだ無いので飛ばしました）\n")
                     continue
+                f.write(f"▷ 手順 {i}：{' '.join(c)}\n")   # どの手順の結果か（失敗した手順だけやり直すため。決定 113）
                 f.flush()
                 r = subprocess.run([PY, str(script), *c[1:]], stdout=f, stderr=subprocess.STDOUT, cwd=ROOT,
                                    env={**os.environ, "PATH": os.environ.get("PATH", "") + ":" + PATH_ENV})
@@ -190,6 +199,49 @@ def run_job(job: str) -> int:
     finally:
         lock.unlink(missing_ok=True)
     return code
+
+
+def failed_steps(job: str) -> tuple[list[int], datetime | None]:
+    """最後の実行で失敗した手順の番号と、その実行の時刻（失敗が無ければ空）"""
+    log = OUT / "logs" / f"{job}.log"
+    if not log.exists():
+        return [], None
+    last = log.read_text(encoding="utf-8", errors="replace").split("\n===== ")[-1]
+    import re
+    m = re.match(r"=* ?(\d{4}-\d{2}-\d{2} \d{2}:\d{2})", last)
+    when = datetime.strptime(m.group(1), "%Y-%m-%d %H:%M") if m else None
+    marks = re.findall(r"▷ 手順 (\d+)：.*?→ 終了コード (\d+)", last, re.S)
+    if marks:
+        return [int(i) for i, c in marks if c != "0"], when
+    codes = re.findall(r"→ 終了コード (\d+)", last)   # 目印の無い古い記録：あるスクリプトの順に結果を当てはめる
+    run_idx = [i for i, c in enumerate(JOBS[job][1]) if (S / c[0]).exists()]
+    return [i for i, c in zip(run_idx, codes) if c != "0"], when
+
+
+def retry_failed() -> int:
+    """止まった週 1・月 1 の仕事の、失敗した手順だけをやり直す（毎日 1 回。決定 113）"""
+    from _common import notify
+    fixed, still, waiting = [], [], []
+    for job, ja in RETRY_JOBS.items():
+        steps, when = failed_steps(job)
+        if not steps:
+            continue
+        if when and (datetime.now() - when).total_seconds() < RETRY_AFTER_HOURS * 3600:
+            print(f"   {ja}：失敗してからまだ {RETRY_AFTER_HOURS} 時間たっていないので、今日はやり直しません")
+            waiting.append(ja)
+            continue
+        names = "・".join(JOBS[job][1][i][0] for i in steps)
+        print(f"▶ {ja}（{job}）の失敗した手順をやり直します：{names}", flush=True)
+        code = run_job(job, only=steps, title=f"止まっていた手順のやり直し（{names}）")
+        (fixed if code == 0 else still).append(ja)
+        print(f"   {'○ 直りました' if code == 0 else '✕ まだ失敗しています（明日もう一度）'}")
+    if fixed:
+        notify("止まっていた自動の仕事が直りました", "・".join(fixed))
+    if still:
+        notify("自動の仕事がまだ止まっています", "・".join(still) + "（明日もう一度やり直します。ダッシュボードの「仕組みの詰まり」を見てください）")
+    print(f"【結果】やり直し：直った {len(fixed)}・まだ止まっている {len(still)}・明日やり直す {len(waiting)}" if fixed or still or waiting
+          else "【結果】止まっている仕事はありません")
+    return 0
 
 
 def ack_job(job: str) -> int:
@@ -213,12 +265,14 @@ def trim(log: Path, keep: int = 4000) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="定期実行の設定（Mac の launchd）")
-    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "ack", "cron", "status"])
+    ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "ack", "cron", "status", "retry-failed"])
     ap.add_argument("job", nargs="?", help="run のときの仕事の名前")
     ap.add_argument("--only", help="install / write をこの仕事だけに（カンマ区切り）")
     a = ap.parse_args()
     jobs = a.only.split(",") if a.only else [*JOBS, *SERVICES]
 
+    if a.command == "retry-failed":   # 止まった仕事の、失敗した手順だけをやり直す（決定 113）
+        sys.exit(retry_failed())
     if a.command == "status":
         if sys.platform != "darwin":
             sys.exit("[停止] status は Mac 専用です")
