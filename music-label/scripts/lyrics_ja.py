@@ -8,7 +8,8 @@
   ・日本語の歌詞・インスト・Suno がまだ書いていない歌詞（{{SUNO_…}} が残っている）は訳さない
   ・Claude（効き目の低い設定・答えも短い）。1 曲 数円。鍵が無いときは作らない（「訳はまだ」と出す）
 
-載せる場所：曲の案のポップアップ（不定期）・公開の準備のページ・公開セットの「歌詞_日本語訳.txt」（対訳）・楽曲管理シートの「歌詞の日本語訳」
+載せる場所：曲の案のポップアップ（不定期）・公開の準備のページ・公開セットの「歌詞_日本語訳.txt」・楽曲管理シートの「歌詞の日本語訳」
+  （どこも、英語の歌詞を全部 → その下の別枠に日本語訳だけ。オーナーの指示 2026-10-27）
 
 使い方：
   python3 scripts/lyrics_ja.py song <曲 ID>      # その曲の訳を作る（あれば作らない）
@@ -117,37 +118,20 @@ def pairs(lyrics: str, tr: dict | None) -> list[tuple[str, str]]:
 
 
 def pair_text(lyrics: str, tr: dict | None) -> str:
-    """対訳（元の行の下に訳）。公開セットの 歌詞_日本語訳.txt"""
+    """公開セットの 歌詞_日本語訳.txt：英語の歌詞を全部 → 区切り → 日本語訳だけ（オーナーの指示 2026-10-27）"""
     if not tr:
         return ""
-    if not tr.get("paired"):
-        return _norm(lyrics) + "\n\n――― 日本語訳 ―――\n\n" + tr.get("text", "")
-    out = []
-    for s, j in pairs(lyrics, tr):
-        if not s.strip():
-            out.append("")
-        elif TAG.match(s):
-            out.append(f"{s}  {j}" if j and j != s else s)
-        else:
-            out += [s, f"　{j}"] if j else [s]
-    return "\n".join(out).strip() + "\n"
+    return _norm(lyrics) + "\n\n" + "――――― 日本語訳（読む用。配信には入れない） ―――――" + "\n\n" + str(tr.get("text", "")).strip() + "\n"
 
 
 def pair_html(lyrics: str, tr: dict | None, esc) -> str:
-    """ページに載せる対訳（元の行の下に、小さく訳）"""
+    """ページに載せる形：英語の歌詞を全部 → 下の別枠に日本語訳だけ（作曲の案のポップアップと同じ形）"""
     if not tr:
         return ""
-    rows = []
-    for s, j in pairs(lyrics, tr) if tr.get("paired") else []:
-        if not s.strip():
-            rows.append('<div style="height:.6em"></div>')
-        elif TAG.match(s):
-            rows.append(f'<div style="color:var(--sub);font-size:12px;margin-top:4px">{esc(s)} {esc(j) if j != s else ""}</div>')
-        else:
-            rows.append(f'<div>{esc(s)}</div>' + (f'<div style="color:var(--sub);font-size:13px;margin-bottom:2px">{esc(j)}</div>' if j else ""))
-    if not tr.get("paired"):
-        rows.append(f'<div style="white-space:pre-wrap;color:var(--sub)">{esc(tr.get("text", ""))}</div>')
-    return '<div class="lyr-ja">' + "".join(rows) + "</div>"
+    return ('<div style="white-space:pre-wrap;font-size:13px;line-height:1.6">' + esc(_norm(lyrics)) + "</div>"
+            '<div style="margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">'
+            '<b>日本語訳</b> <span style="color:var(--sub);font-size:12px">（読む用。Suno・DistroKid には上の英語の歌詞だけを入れます）</span>'
+            '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin-top:6px">' + esc(str(tr.get("text", "")).strip()) + "</div></div>")
 
 
 # ---------------------------------------------------------------------------

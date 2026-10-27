@@ -217,8 +217,7 @@ def lyrics_ja_html(song: dict) -> str:
     if not tr:
         return ("<section><h2>歌詞と日本語訳</h2><p class='sub'>日本語訳はまだです（公開セットを作るときに作ります。すぐ作るときは "
                 f"<code>python3 scripts/lyrics_ja.py song {E(song['id'])}</code>）</p></section>")
-    return ("<details><summary><b>歌詞と日本語訳</b>（読む用。Suno・DistroKid には歌詞だけを入れます）</summary>"
-            + lyrics_ja.pair_html(song["lyrics"], tr, E) + "</details>")
+    return "<section><h2>歌詞と日本語訳</h2>" + lyrics_ja.pair_html(song["lyrics"], tr, E) + "</section>"
 
 
 def song_page(song_id: str, token: str) -> str | None:
