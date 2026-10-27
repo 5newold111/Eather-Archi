@@ -130,21 +130,19 @@ def _explain(row: dict, phase: dict) -> dict:
 
     if name == "Suno で作曲":
         import take_check
-        acts = [{"kind": "run", "primary": True, "label": "Suno に入力する（ブラウザが開きます）", "action": "fill_suno", "id": row.get("id")},
+        sid = row.get("id") or ""
+        # 標準はふだんのブラウザで「写して貼る」。専用の Chrome への自動入力はロボット確認が何度も出る原因になるので予備（決定 104）
+        acts = [{"kind": "link", "label": "Suno に写して貼る", "url": f"/paste/{sid}" if sid else "/paste"},
                 {"kind": "retake", "id": row.get("id"), "reasons": list(take_check.MANUAL)},   # 2 曲とも良くないとき（決定 100）
                 {"kind": "run", "label": "曲を取り込む", "action": "scan"},
-                {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"},
-                {"kind": "run", "label": "Suno の画面の部品を記録する（うまく入らない欄があるとき・Claude に見せる用）", "action": "browser_parts", "site": "suno"},
-                {"kind": "run", "label": "専用の Chrome を作り直す（ログインが何度も断られるとき）", "action": "browser_reset",
-                 "confirm": "専用の Chrome のログインの記録を消して作り直します。Suno と DistroKid に、もう一度ログインが要ります。よいですか？"}]
-        steps = ["初回だけ：「Suno にログイン」を押し、開いた Chrome でログインする（システムはつながっていないので、Google でのログインも通ります）",
-                 "「Suno に入力する」を押す → 専用の Chrome で「高度な」に切り替え、歌詞・スタイル・除外するスタイル・声の性別・間隔・Max mode・音量の大きさ・スタイルの影響度・バラエティ・あなたの好み・曲名が、曲のイメージに合わせて自動で入ります。入ったかを読み返して確かめ、全部そろったときだけ「終わりました ✓」と出ます",
-                 "ブラウザの右下の案内に従って内容を確かめ、Suno の「作成」（Create）を押す（押すのは Gon さんだけ）",
+                {"kind": "run", "label": "予備：専用の Chrome に自動で入れる（ロボット確認が出やすい）", "action": "fill_suno", "id": row.get("id"),
+                 "confirm": "専用の Chrome に自動で入れます。Suno のロボット確認が何度も出やすくなります。ふだんは「Suno に写して貼る」を使ってください。続けますか？"}]
+        steps = ["「Suno に写して貼る」を押す（ページが開きます）。ふだんのブラウザで Suno の作曲画面も開き、2 つを横に並べる",
+                 "ページの下の大きなボタンを押す → Suno の欄に貼る（⌘V）、をくり返す。歌詞・スタイル・除外するスタイル・曲名は写して貼り、"
+                 "声の性別・間隔・Max mode・Weirdness・スタイルの影響度・バラエティ・あなたの好みは、出ている値に Suno の画面で合わせる",
+                 "全部入ったら、Suno の「作成」（Create）を押す（押すのは Gon さんだけ。ロボット確認が出たら自分でチェック）",
                  "できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード",
                  "数分で自動で取り込まれて、次のフェーズに進みます（すぐ進めたいときは「曲を取り込む」）"]
-        if not _has_playwright():
-            acts.insert(0, {"kind": "terminal", "label": "ブラウザ入力の部品を入れる（初回だけ・ターミナルが開きます）", "key": "playwright"})
-            steps.insert(0, "初回だけ：「ブラウザ入力の部品を入れる」を押し、ターミナルの作業が終わるまで待つ")
         return {"cause": f"{title}の Suno での作曲を待っています。この工程は Gon さんの番です{_late(phase)}。", "steps": steps, "actions": acts}
 
     if name.startswith("仕上げ"):

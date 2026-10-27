@@ -145,7 +145,7 @@ def make(p: list[dict], tag: str, dry: bool = False) -> int:
             step(f"Claude がブリーフを書いています（{len(group)} 曲）")
             subprocess.run([PY, S / "write_brief.py", *group, "--references", refs, *([] if inst else ["--lyrics-mode", "full"])])
     print("\n【結果】集中配信のブリーフを作りました。次は：")
-    print("   1 ダッシュボードの「作曲待ちの曲を Suno に入力する」→ 1 曲ずつ「Create」を押し、聴いて 1 本だけダウンロード")
+    print("   1 ダッシュボードの「作曲待ちの曲を Suno に写して貼る」→ 1 曲ずつ「Create」を押し、聴いて 1 本だけダウンロード")
     print("   2 取り込み・音量・ジャケット・下書きは毎時の自動の流れで進みます（前倒しした週も）")
     print("   3 「登録を待つ曲を続けて DistroKid に入力する」→ 1 曲ずつ Continue と「登録した」→ 続けて歌詞")
     return 0

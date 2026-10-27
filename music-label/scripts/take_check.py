@@ -241,7 +241,7 @@ def main() -> None:
         if not ok:
             print(f"【結果】この曲はもう {MAX_RETAKES} 回直しました。曲の案から作り直すか（不定期配信の「却下して作り直す」）、このまま聴いて選んでください")
             sys.exit(2)
-        print(f"【結果】{song['artist']}「{song['title']}」の入力を直しました：{how}。もう一度「Suno に入力する」を押してください")
+        print(f"【結果】{song['artist']}「{song['title']}」の入力を直しました：{how}。もう一度「Suno に写して貼る」で入れてください")
         return
     if a.apply:
         print(f"【結果】{gate(song)}")
