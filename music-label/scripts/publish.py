@@ -319,10 +319,14 @@ def advance(song: dict) -> str:
         step(f"{song['artist']} のジャケットがまだ無いので作っています（kit_images.py）")
         subprocess.run([sys.executable, str(S / "kit_images.py"), "--kit", str(song["kit"]), "--only", song["slug"], "--kind", "cover"])
         cover = _songs.cover_source(song)
+    if cover is None and song["kind"] != "debut":
+        cover = ensure_weekly_cover(song)   # 毎週の曲・不定期の曲：取り込んで進めるたびに作る（曜日・週を問わない。決定 112）
     if cover is None:
         st["status"] = "waiting_cover"
         _songs.save_state(song, st)
-        print("   － ジャケットがまだありません（デビュー曲は kit_images.py、毎週の曲は run_week.py の仕上げで作られます）")
+        n = len(cover_candidates(song)) if song["kind"] != "debut" else 0
+        print("   － ジャケットがまだありません" + (f"（候補 {n} 枚：ダッシュボードのポップアップで 1 枚選んでください）" if n else
+              "（OpenAI の鍵が無いか、作れませんでした。ダッシュボードの「ジャケットを作る」でもう一度）"))
         return st["status"]
     # DistroKid の下書きと歌詞
     write_draft(song, st)
@@ -570,6 +574,37 @@ def cmd_scan(args) -> int:
 def cover_dir(song: dict) -> Path:
     """毎週の曲（不定期の曲も）のジャケットの候補・選択・仕上がりの置き場所"""
     return OUT / "visuals" / song["slug"] / "cover" / song["week"]
+
+
+COVER_RETRY_HOURS = 6   # 候補づくりに失敗したとき、次に自動で試すまでの時間（10 分ごとに料金のかかる作り直しをしないため）
+
+
+def ensure_weekly_cover(song: dict) -> Path | None:
+    """毎週の曲・不定期の曲のジャケット（決定 73・112）。
+    候補が無ければ作る（generate_visuals.py。OpenAI の画像の料金）→ 選んであれば 3000×3000 に仕上げる。
+    最初の 5 曲は Gon さんがポップアップで選ぶ（選ぶまでは「ジャケット待ち」）。6 曲目からは自動で選ばれる。
+    いままでは run_week.py の仕上げ（火〜木・今週の曲だけ）でしか作らず、ほかの曜日・前の週・不定期の曲が止まっていた"""
+    d = cover_dir(song)
+    if not (d / "candidates.json").exists():
+        mark = d / "auto_attempt.json"
+        try:
+            last = datetime.fromisoformat(read_json(mark).get("at", "")) if mark.exists() else None
+        except (ValueError, OSError):
+            last = None
+        if not os.environ.get("OPENAI_API_KEY"):
+            return None
+        if last and (datetime.now() - last).total_seconds() < COVER_RETRY_HOURS * 3600:
+            return None   # さっき試してだめだった：しばらく待つ
+        d.mkdir(parents=True, exist_ok=True)
+        mark.write_text(json.dumps({"at": datetime.now().isoformat(timespec="seconds")}), encoding="utf-8")
+        step(f"{song['artist']}「{song['title']}」のジャケットの候補を作っています（数分。OpenAI の画像の料金がかかります）")
+        lab = ["--label", song["label_slug"]] if song.get("label_slug") not in (None, "", "drive") else []
+        subprocess.run([sys.executable, str(S / "generate_visuals.py"), "--artist", song["slug"], *lab, "--kind", "cover",
+                        "--brief", str(song["brief"])])
+    if (d / "selection_cover.json").exists() and not (d / "cover_final.jpg").exists():
+        step(f"{song['artist']}「{song['title']}」の選んだジャケットを 3000×3000 に仕上げています")
+        subprocess.run([sys.executable, str(S / "finalize_cover.py"), str(song["brief"])])
+    return _songs.cover_source(song)
 
 
 def cover_candidates(song: dict) -> list[dict]:
