@@ -534,7 +534,8 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}a.btn{display:inline-block;text-decoration:none;border-radius:6px;padding:6px 12px;font-size:13px;border:1px solid var(--line);color:var(--ink)}
 #dlg-job{margin:8px 0 4px;font-size:14px;color:var(--sub);white-space:pre-line}#dlg-job:not(:empty){border:1.5px solid var(--line);border-radius:8px;padding:6px 10px}#dlg-job.running{border-color:var(--warn);background:var(--warn-t);color:var(--ink)}.job.done{color:var(--good)}.job.incomplete{color:#b07a00}.job.error{color:var(--crit)}#dlg-job.job{font-weight:600}ul.list li.click{cursor:pointer}ul.list li.click:hover{outline:2px solid var(--accent)}
 .irr-f label{display:block;margin:10px 0 3px;font-size:13px;color:var(--sub)}.irr-f input[type=text],.irr-f textarea,.irr-f select{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
-.irr-f textarea{min-height:5em;resize:vertical;line-height:1.5}.irr-f textarea.lyr{min-height:16em;font-size:13px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-f label.chk{display:flex;gap:8px;align-items:center;margin:10px 0 2px;font-weight:600}.irr-f label.chk input{width:auto;margin:0}.irr-row>div{flex:1 1 220px}
+.irr-f textarea{min-height:5em;resize:vertical;line-height:1.5}.irr-f textarea.lyr{min-height:16em;font-size:13px;overflow:hidden}
+.ja-box{margin:8px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}.ja-box .ja-text{white-space:pre-wrap;font-size:13px;line-height:1.6;margin-top:6px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-f label.chk{display:flex;gap:8px;align-items:center;margin:10px 0 2px;font-weight:600}.irr-f label.chk input{width:auto;margin:0}.irr-row>div{flex:1 1 220px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.chips button{font-size:12px;padding:2px 10px}.irr-note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
 .redo{border:1.5px dashed var(--crit);border-radius:10px;padding:8px 12px;margin:14px 0 4px}
 </style></head><body>
@@ -824,7 +825,7 @@ function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===
     ${f("story","曲のイメージ（エピソード：いつ・どこで・何を見て・感じたか）",d.story,true)}
     ${d.when_where||d.realized?`<p class="sub">${d.when_where?`いつ・どこで：${E(d.when_where)}　`:""}${d.realized?`たどり着いた思い（サビの芯）：${E(d.realized)}`:""}</p>`:""}
     ${f("lyrics",d.instrumental?"歌詞（インストの組なので、声の断片だけ）":"歌詞（Suno に入れる。[Verse] などの印つき）",d.lyrics,true)}
-    ${d.lyrics_ja?(d.lyrics_ja.length?`<details class="lyr-ja" open><summary><b>歌詞と日本語訳</b>（読む用。Suno には歌詞だけを入れます）</summary>${d.lyrics_ja.map(([a,b])=>!a.trim()?`<div style="height:.6em"></div>`:/^\s*\[[^\]]+\]\s*$/.test(a)?`<div class="sub" style="margin-top:4px">${E(a)} ${b!==a?E(b):""}</div>`:`<div>${E(a)}</div>${b?`<div class="sub">${E(b)}</div>`:""}`).join("")}</details>`:`<p class="sub">日本語訳はまだです（作っています。少しして開き直すと出ます）</p>`):""}
+    ${d.lyrics_ja?(d.lyrics_ja.length?`<div class="ja-box"><b>日本語訳</b> <span class="sub">（読む用。Suno には上の英語の歌詞だけを入れます）</span><div class="ja-text">${E(d.lyrics_ja.map(([a,b])=>b).join("\n"))}</div></div>`:`<div class="ja-box"><b>日本語訳</b> <span class="sub">まだです（作っています。少しして開き直すと出ます）</span></div>`):""}
     ${f("style","Suno のスタイル（英語。ジャンル・テンポ・楽器・声の質感）",d.style,true)}
     ${f("exclude","入れない要素（英語・任意）",d.exclude)}
     ${f("cover","ジャケットのイメージ（英語。色・光・構図）",d.cover,true)}
@@ -835,7 +836,9 @@ function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===
     <label for="irr-reason" class="sub" style="display:block;margin-top:6px">どこが好みでなかったか（任意。例：もっと明るく・歌詞が説明的すぎる・テンポを遅く）</label>
     <textarea id="irr-reason" maxlength="1000" style="width:100%;min-height:3em;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"></textarea>
     <div class="acts"><button data-irr="redo" data-id="${E(d.id)}" data-slug="${E(d.slug)}">却下して作り直す</button><button class="ghost" data-irr="discard" data-id="${E(d.id)}">作り直さずにやめる</button></div></div>`;
-  const dlg=document.getElementById("dlg");if(!dlg.open)dlg.showModal()}
+  const dlg=document.getElementById("dlg");if(!dlg.open)dlg.showModal();fitLyr()}
+function fitLyr(){const t=document.getElementById("irr-f-lyrics");if(t){t.style.height="auto";t.style.height=(t.scrollHeight+4)+"px"}}   // 英語の歌詞を全部見せる（決定 107）
+document.addEventListener("input",e=>{if(e.target.id==="irr-f-lyrics")fitLyr()});
 function irrFields(){const out={};for(const k of Object.keys((DATA.irregular||{}).editable||{})){const e=document.getElementById("irr-f-"+k);if(e)out[k]=e.value}return out}
 async function irrPost(op,id,fields,btn){if(STATIC)return;if(btn)btn.disabled=true;const dj=document.getElementById("dlg-job");
   try{const r=await fetch("/api/irregular",{method:"POST",headers:{"Content-Type":"application/json","X-Label-Token":TOKEN},body:JSON.stringify({op,id,fields})});
