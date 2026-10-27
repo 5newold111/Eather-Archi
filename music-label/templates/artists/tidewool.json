@@ -17,7 +17,7 @@
   },
   "formation": "duo",
   "cadence": "weekly",
-  "debut_week": "2026-10-26",
+  "debut_week": "2026-10-19",
   "persona": {
     "members": [
       {
@@ -312,7 +312,41 @@
       "declan_fay",
       "hollowplan"
     ],
-    "collab_style": "DECLAN FAY とは、夜の雨の県道を描く男女の掛け合い（アイラが上・ゲシンが中・低い声の相手がさらに下）。HOLLOWPLAN には、2 人のハミングと雨と木の軋みのフィールド録音を素材として渡し、つなぎの曲に溶かしてもらう。"
+    "collab_style": "DECLAN FAY とは、夜の雨の県道を描く男女の掛け合い（アイラが上・ゲシンが中・低い声の相手がさらに下）。HOLLOWPLAN には、2 人のハミングと雨と木の軋みのフィールド録音を素材として渡し、つなぎの曲に溶かしてもらう。",
+    "fit": [
+      {
+        "partner": "declan_fay",
+        "score": 3,
+        "why": "ジャンルの重なり 5%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
+        "partner_brings": "DECLAN FAY の声と音の色（warm baritone・tape hiss・gated reverb snare）",
+        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
+        "caution": "テンポと声の高さが合うか、聴いて確かめる"
+      },
+      {
+        "partner": "nao_easterly",
+        "score": 3,
+        "why": "ジャンルの重なり 5%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
+        "partner_brings": "VERNALIGHT の声と音の色（sunrise・eastbound・bright synth arpeggio）",
+        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
+        "caution": "テンポと声の高さが合うか、聴いて確かめる"
+      },
+      {
+        "partner": "soft_cantilever",
+        "score": 3,
+        "why": "ジャンルの重なり 18%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
+        "partner_brings": "SOFT CANTILEVER の声と音の色（sunlit city pop・fingerstyle bass・clean guitar cuts）",
+        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
+        "caution": "テンポと声の高さが合うか、聴いて確かめる"
+      },
+      {
+        "partner": "hollowplan",
+        "score": 2,
+        "why": "ジャンルの重なり 3%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
+        "partner_brings": "HOLLOWPLAN の声と音の色（deep house・lo-fi・vocal chops）",
+        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
+        "caution": "テンポと声の高さが合うか、聴いて確かめる"
+      }
+    ]
   },
   "profile": {
     "hometown": "ニュージーランド南島・オタゴ地方・マニオトト平原（パテアロア近くの羊牧場）",
@@ -1284,6 +1318,6 @@
     ]
   },
   "source": {
-    "pulled_at": "2026-10-13T08:31:53"
+    "pulled_at": "2026-10-27T06:01:53"
   }
 }
