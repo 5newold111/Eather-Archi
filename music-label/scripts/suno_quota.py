@@ -266,6 +266,12 @@ def _counts(st: dict, today: date) -> dict[tuple[date, str | None], int]:
     return cnt
 
 
+def reset_cache() -> None:
+    """制作の絞り込みの計算を、最初からやり直す（ダッシュボードのように動きっぱなしのところは、表示のたびに呼ぶ）"""
+    _MEMO.clear()
+    _PROJ.clear()
+
+
 def allow_production(artist: dict, production_monday: date, today: date | None = None) -> tuple[bool, str]:
     """この制作週に、この組の曲を作ってよいか（枠を使っていないときは常に作る）"""
     st = settings()

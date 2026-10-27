@@ -1412,6 +1412,33 @@ def suno_batch_finish(sess: Session, tabs: list[dict], later: list, ok_songs: li
     return ok_songs, problems
 
 
+SUNO_MODEL_OK = os.environ.get("SUNO_MODEL_EXPECT", "v6").lower()   # TuneCore でも配信できるのは v6 系（v6・v6-wild・v6-mini）だけ
+
+
+def suno_model(sess: Session) -> str | None:
+    """作曲画面に出ているモデルの表示（例 v6・v6-wild・v5.5）を読む。読めなければ None（切り替えはしない。決定 110）"""
+    try:
+        return sess.page.evaluate(r"""() => {
+          const rx = /^v\d+(\.\d+)?\+?([-\s](wild|mini|beta|pro))?$/i;
+          for (const e of document.querySelectorAll('button, [role=button], [role=combobox], span, div')) {
+            if (e.children.length > 2) continue;
+            const t = (e.innerText || '').trim();
+            if (t.length <= 14 && rx.test(t) && e.offsetParent !== null) return t;
+          }
+          return null; }""")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def record_model(song: dict, model: str | None) -> None:
+    """曲ごとに、入力したときのモデルを残す（楽曲管理シートの「Suno のモデル」。決定 110）"""
+    if not model:
+        return
+    st = _songs.state(song)
+    st.update({"suno_model": model, "suno_model_at": datetime.now().isoformat(timespec="seconds")})
+    _songs.save_state(song, st)
+
+
 def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
     """全部の曲で、作曲画面のすべての欄に入ったことを確かめられたら 0、そうでなければ 2"""
     import publish
@@ -1458,6 +1485,11 @@ def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
         if not on_page(sess, "suno"):
             bad.insert(0, f"Suno の作曲画面ではありません（いまの画面：{sess.page.url}）")
         name = f"{song['artist']}「{song['title']}」"
+        model = suno_model(sess)   # モデルが v6 か（切り替えはしない。決定 110）
+        record_model(song, model)
+        model_ng = bool(model) and not model.lower().startswith(SUNO_MODEL_OK)
+        if model_ng:
+            print(f"   ⚠ {name}：Suno のモデルが {model} になっています（{SUNO_MODEL_OK} に切り替えてから Create）")
         if bad or sess.unsure:
             parts = save_parts(sess, "suno")
             if parts:
@@ -1475,6 +1507,11 @@ def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
         lines = [f"{name}（{n}／{len(songs)} 曲目）",
                  f"イメージの写し具合：{sc_ok}／{sc_n}（設定書の特徴語・禁止事項・毎曲の癖が、Suno の欄に入っているか）",
                  *[f"⚠ {k}：{t}" for k, st, t in dz["checks"] if st == "warn"]]
+        if model_ng:
+            lines.insert(1, f"⚠ Suno のモデルが「{model}」になっています。画面のモデルの選択で {SUNO_MODEL_OK}（{SUNO_MODEL_OK}-wild・{SUNO_MODEL_OK}-mini も可）に"
+                            "切り替えてから Create してください（TuneCore でも配信できるのは v6 系だけ）")
+        elif not model:
+            lines.append("Suno のモデルの表示を読めませんでした。画面で v6 になっているか、目で確かめてください")
         if bad:
             lines += ["⚠ 次の欄が入っていません。手で入れてください：", *bad]
             if manual:

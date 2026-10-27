@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import re
 import unicodedata
 from pathlib import Path
@@ -92,7 +93,22 @@ def weekly_songs() -> list[dict]:
     return out
 
 
+_FROZEN = threading.local()   # ダッシュボードの 1 回の表示の間だけ、曲の一覧を覚えておく（何百回も読み直して遅くなるのを防ぐ）
+
+
+def freeze() -> None:
+    """この先 thaw() までは、曲の一覧を読み直さない（同じスレッドの中だけ）"""
+    _FROZEN.songs = debut_songs() + weekly_songs()
+
+
+def thaw() -> None:
+    _FROZEN.songs = None
+
+
 def all_songs() -> list[dict]:
+    fz = getattr(_FROZEN, "songs", None)
+    if fz is not None:
+        return fz
     return debut_songs() + weekly_songs()
 
 

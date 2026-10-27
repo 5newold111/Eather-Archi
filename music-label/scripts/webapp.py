@@ -72,6 +72,20 @@ def _iso(x):
 
 
 def status_json() -> dict:
+    """ダッシュボードのデータ。曲の一覧は 1 回だけ読む（案内のたびに全部のファイルを読み直すと、曲が増えるほど遅くなる）"""
+    _songs.freeze()
+    try:
+        import suno_quota
+        suno_quota.reset_cache()   # Suno の枠の計算は表示のたびに新しく（動きっぱなしなので、前の計算を持ち越さない）
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        return _status_json()
+    finally:
+        _songs.thaw()
+
+
+def _status_json() -> dict:
     load_dotenv(override=True)   # 「仕組みの詰まり」も、いまの .env で判定する
     arts = []
     for r in _status.artists_overview():
@@ -888,7 +902,9 @@ function render(){
 let opened=false;
 function deepLink(){if(opened)return;opened=true;const m=location.hash.match(/open=([a-z]+:\d+:\d+)/);if(m)try{openGuide(m[1])}catch(e){}}
 let VER0=null;   // 最初に読んだ版。新しい版になったら（自動で更新を反映したら）読み直す（決定 108）
-async function load(){if(STATIC){DATA=STATIC;render();deepLink();return}let r;try{r=await fetch("/api/status")}catch(_){return}if(!r.ok)return;DATA=await r.json();
+let LOADING=false;   // 前の読み込みが終わる前に、次の読み込みを始めない（重なると遅くなって表が出なくなる）
+async function load(){if(STATIC){DATA=STATIC;render();deepLink();return}if(LOADING)return;LOADING=true;let r;
+  try{r=await fetch("/api/status")}catch(_){LOADING=false;return}if(!r.ok){LOADING=false;return}try{DATA=await r.json()}finally{LOADING=false}
   if(VER0===null)VER0=DATA.version||"";
   else if(DATA.version&&DATA.version!==VER0){const busy=document.getElementById("dlg").open||["INPUT","TEXTAREA","SELECT"].includes((document.activeElement||{}).tagName);
     if(!busy){location.reload();return}}
