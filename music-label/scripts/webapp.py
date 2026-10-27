@@ -33,6 +33,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -146,7 +147,10 @@ def status_json() -> dict:
                       "lyrics": len(reference_db.lyrics_pending()), "whisper": reference_db.whisper_ready(),
                       "melody": len(reference_db.melody_pending()), "demucs": __import__("melody").demucs_ready(),
                       "infl": reference_db.influence_pending(),   # 影響を受けたアーティストの曲で、まだ済んでいない数（決定 91）
-                      "infl_picked": sum(len(v.get("picks", [])) for v in __import__("influences").load().values() if (v or {}).get("applied"))}
+                      "infl_picked": sum(len(v.get("picks", [])) for v in __import__("influences").load().values() if (v or {}).get("applied")),
+                      "tags": len(reference_db.tags_pending()), "tagger": __import__("audio_tags").ready(),   # API なしの分析（決定 103）
+                      "cc": bool(shutil.which("claude")) or any(x.is_file() for x in (Path.home() / ".local/bin/claude", Path("/opt/homebrew/bin/claude"))),
+                      "answers": len(list(reference_db.SUB_DIR.glob("答え_*[0-9].json"))) if reference_db.SUB_DIR.exists() else 0}
     except Exception:  # noqa: BLE001
         ref_enrich = {"pending": 0, "yen": [0, 0], "lyrics": 0, "whisper": True}
     try:   # 毎日配信（5 組の持ち回り。決定 94）と SNS の毎日の投稿
@@ -192,8 +196,10 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "reference_db.py"), "--audio-melody", "15"], "既存楽曲のメロディーを起こす"
     if action == "ref_lyrics":   # 既存楽曲の歌詞を Mac の中で聞き取る（無料。決定 86）
         return [PY, str(S / "reference_db.py"), "--audio-lyrics", "30"], "既存楽曲の歌詞を聞き取る"
-    if action == "ref_enrich":   # 音源から測れない項目を Claude に Web で調べてもらう（決定 85。料金がかかるので押す前に確認）
-        return [PY, str(S / "reference_db.py"), "--audio-enrich", "50"], "参考曲の足りない項目を Claude に調べてもらう"
+    if action == "ref_enrich":   # 足りない項目を API なしで埋める：曲を聞いて判定 → 残りを Claude Code（月額プラン）で調べる（決定 103）
+        return [PY, str(S / "reference_db.py"), "--free", "40"], "参考曲の足りない項目を埋める（無料）"
+    if action == "ref_import":   # claude.ai に貼って返ってきた答えを取り込む（Claude Code が使えないときの予備）
+        return [PY, str(S / "reference_db.py"), "--enrich-import"], "調べた答えを取り込む"
     if action == "influences":   # SSDDB の中から、組が影響を受けたアーティストを選んで「影響」に足し、その曲を先に解析する（決定 91）
         return [PY, str(S / "influences.py"), "--apply"], "影響を受けたアーティストを選ぶ（SSDDB から）"
     if action == "influences_analyze":   # 影響を受けたアーティストの曲の歌詞・メロディーを先に起こす（無料）
@@ -352,7 +358,13 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
             # 歌詞を聞き取る部品（決定 86）。最初の聞き取りのときに、モデル（約 500 MB）を自動でダウンロードする
             "whisper": f"{{ {shlex.quote(PY)} -m pip install --user faster-whisper || {shlex.quote(PY)} -m pip install --user --break-system-packages faster-whisper; }}",
             # メロディーを起こすときに歌を正確に取り出す部品（任意。約 2 GB。決定 90）
-            "demucs": f"{{ {shlex.quote(PY)} -m pip install --user demucs || {shlex.quote(PY)} -m pip install --user --break-system-packages demucs; }}"}
+            "demucs": f"{{ {shlex.quote(PY)} -m pip install --user demucs || {shlex.quote(PY)} -m pip install --user --break-system-packages demucs; }}",
+            # 曲を聞いて声・楽器・ジャンル・ムードを判定する部品（約 1 GB。判定モデル 約 350 MB は最初の判定のときに取ってくる。決定 103）
+            "tagger": f"{{ {shlex.quote(PY)} -m pip install --user torch transformers || {shlex.quote(PY)} -m pip install --user --break-system-packages torch transformers; }}",
+            # Claude Code（月額プランで、楽曲分析の調べ物を API の料金なしで。決定 103）。.env の鍵は渡さない（渡すと API の料金になる）
+            "claude_code": "{ command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash; } && echo && "
+                           "echo 'Claude Code が起動したら /login で「Claude アカウント（Pro・Max）」を選んでください。終わったら /exit' && "
+                           "env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN \"$(command -v claude || echo \"$HOME/.local/bin/claude\")\""}
 
 
 def _fix_buttons(how: str) -> list[dict]:
@@ -510,7 +522,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><button data-act="fill_suno_batch" class="ghost" data-confirm="作曲待ちの曲を、タブを分けて 3 曲までまとめて Suno に入力します。&#10;入れ終わったらシステムは Chrome から離れるので、各タブで Gon さんが Create を押してください（タブの間は 10〜20 秒あける）。&#10;タブ同士で中身が書き換わったら、自動で 1 曲だけに戻します。始めますか？">まとめて Suno に入力する（3 曲まで）</button><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を Claude に調べてもらう</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button>
 </div>
 <div id="jobs"></div>
 <div class="tabs" role="tablist">
@@ -819,14 +831,15 @@ function render(){
    bm.hidden=!re1.melody;bd.hidden=!re1.melody||!!re1.demucs;
    if(re1.melody){bm.textContent=`メロディーを起こす（${re1.melody} 曲・無料）`;
     bm.dataset.confirm=`既存楽曲 ${re1.melody} 曲のうち ${Math.min(re1.melody,15)} 曲のメロディーを、Mac の中で起こして MIDI（GarageBand で開けます）に残します（1 曲 2〜5 分・料金はかかりません）。始めますか？`}}
-  {const re2=DATA.ref_enrich||{},n=re2.infl||{},b=document.getElementById("ref-infl-an"),m=(n.lyrics||0)+(n.melody||0);   // 影響を受けたアーティスト（決定 91）
+  {const re2=DATA.ref_enrich||{},n=re2.infl||{},b=document.getElementById("ref-infl-an"),m=(n.lyrics||0)+(n.melody||0)+(n.tags||0);   // 影響を受けたアーティスト（決定 91）
    if(re2.infl_picked)document.getElementById("ref-infl").textContent=`影響を受けたアーティストを選び直す（SSDDB から・今 ${re2.infl_picked} 組）`;
-   b.hidden=!m;if(m){b.textContent=`影響を受けたアーティストの曲を解析する（歌詞 ${n.lyrics||0}・メロディー ${n.melody||0} 曲・無料）`;
+   b.hidden=!m;if(m){b.textContent=`影響を受けたアーティストの曲を解析する（歌詞 ${n.lyrics||0}・メロディー ${n.melody||0}・判定 ${n.tags||0} 曲・無料）`;
     b.dataset.confirm=`影響を受けたアーティストの曲の歌詞（${n.lyrics||0} 曲）とメロディー（${n.melody||0} 曲）を、Mac の中で先に起こします（1 曲 2〜5 分・料金はかかりません）。始めますか？`}}
-  {const b=document.getElementById("ref-enrich"),re=DATA.ref_enrich||{pending:0,yen:[0,0]};b.hidden=!re.pending;   // 参考曲の足りない項目（決定 85）
-   if(re.pending){const n=Math.min(re.pending,50),lo=Math.round(re.yen[0]*n/re.pending),hi=Math.round(re.yen[1]*n/re.pending);
-    b.textContent=`足りない項目を Claude に調べてもらう（${re.pending} 曲）`;
-    b.dataset.confirm=`既存楽曲 ${re.pending} 曲のうち ${n} 曲の、声・楽器・歌詞のテーマ・世界観を、Claude に Web で調べてもらいます。\n料金の目安：${lo.toLocaleString()}〜${hi.toLocaleString()} 円（1 曲 20〜50 円）。\n始めますか？`}}
+  {const b=document.getElementById("ref-enrich"),re=DATA.ref_enrich||{pending:0,tags:0},m=(re.pending||0)+(re.tags||0);b.hidden=!m;   // 参考曲の足りない項目を API なしで（決定 103）
+   document.getElementById("ref-tagger").hidden=!re.tags||!!re.tagger;document.getElementById("ref-cc").hidden=!re.pending||!!re.cc;
+   const bi=document.getElementById("ref-import");bi.hidden=!re.answers;if(re.answers)bi.textContent=`調べた答えを取り込む（${re.answers} ファイル）`;
+   if(m){b.textContent=`足りない項目を埋める（無料・判定 ${re.tags||0} 曲・調べ物 ${re.pending||0} 曲）`;
+    b.dataset.confirm=`API の料金はかかりません。\n① 曲を聞いて判定（Mac の中）：${re.tags||0} 曲の声・楽器・ジャンル・ムード${re.tagger||!re.tags?"":"（部品が入っていないので今回は飛ばします）"}\n② Claude Code（月額プラン）に Web で調べてもらう：${Math.min(re.pending||0,40)} 曲のテーマ・世界観など${re.cc?"（プランの使用量には数えます）":"（Claude Code が無いので、claude.ai に貼る依頼ファイルを作ります）"}\n始めますか？`}}
   document.getElementById("system").innerHTML=DATA.system.length?`<ul class="list">${DATA.system.map(x=>`<li class="${x.sev}"><b>${E(x.what)}</b><br><code>${E(x.how)}</code>${(x.acts||[]).map((a,i)=>" "+actHTML(a,i,{})).join("")}</li>`).join("")}</ul>`:`<p class="empty">仕組みの詰まりはありません</p>`;
   const t=DATA.tracker,cols=["順番","詰まっていること","担当","次の一歩","状態"];
   document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;

@@ -16,7 +16,7 @@
   python3 scripts/influences.py --apply      # 管理表の「影響」に足して、設定書を作り直す
   python3 scripts/influences.py --artist tidewool --max 2
   python3 scripts/influences.py --analyze    # 影響を受けたアーティストの曲の歌詞・メロディーを先に起こす（Mac の中・無料）
-  python3 scripts/influences.py --analyze --enrich   # Web の調べ物も（Claude・1 曲 20〜50 円）
+  python3 scripts/influences.py --analyze --enrich   # Web の調べ物も（Claude Code の月額プラン・API の料金なし）
 """
 from __future__ import annotations
 
@@ -167,7 +167,7 @@ def apply_to_book(slug: str, picks: list[dict], dbs: dict[str, dict]) -> str:
 def analyze(enrich: bool) -> int:
     """影響を受けたアーティストの曲を先に解析する（並び順で先頭に来るので、その曲数だけ動かす）"""
     n = rdb.influence_pending()
-    print(f"▶ 影響を受けたアーティストの曲：歌詞がまだ {n['lyrics']} 曲・メロディーがまだ {n['melody']} 曲・Web の調べ物がまだ {n['enrich']} 曲")
+    print(f"▶ 影響を受けたアーティストの曲：歌詞がまだ {n['lyrics']} 曲・メロディーがまだ {n['melody']} 曲・判定がまだ {n.get('tags', 0)} 曲・Web の調べ物がまだ {n['enrich']} 曲")
     if not any(n.values()):
         subprocess.run([sys.executable, str(ROOT / "scripts" / "reference_db.py"), "--artists"])   # 組ごとの近い参考曲は作り直す
         print("【結果】影響を受けたアーティストの曲は、全部解析済みです（SSD がつながっていないときも 0 になります）")
@@ -178,11 +178,14 @@ def analyze(enrich: bool) -> int:
     if n["melody"]:
         print("【進み具合】メロディーを起こします（MIDI にも残します）", flush=True)
         rdb.audio_melody(n["melody"])
+    if n.get("tags"):   # 曲を聞いて判定（無料・Mac の中。影響の曲が先に並ぶ。決定 103）
+        print("【進み具合】曲を聞いて、声・楽器・ジャンル・ムードを判定します", flush=True)
+        rdb.audio_tags_run(n["tags"])
     if n["enrich"] and enrich:
-        print("【進み具合】Claude に Web で調べてもらいます", flush=True)
-        rdb.audio_enrich(n["enrich"])
+        print("【進み具合】Claude Code（月額プラン）に Web で調べてもらいます（API の料金なし）", flush=True)
+        rdb.enrich_sub(n["enrich"])
     elif n["enrich"]:
-        print(f"   Web の調べ物は {n['enrich']} 曲残っています（料金がかかるので、ダッシュボードの「足りない項目を Claude に調べてもらう」で。影響の曲から先に調べます）")
+        print(f"   Web の調べ物は {n['enrich']} 曲残っています（ダッシュボードの「足りない項目を埋める（無料）」で。影響の曲から先に調べます）")
     subprocess.run([sys.executable, str(ROOT / "scripts" / "reference_db.py"), "--artists"])
     print("【結果】影響を受けたアーティストの曲を解析して、組ごとの参考曲を作り直しました")
     return 0
@@ -194,7 +197,7 @@ def main() -> None:
     ap.add_argument("--artist", help="この組だけ（slug）")
     ap.add_argument("--max", type=int, default=3, help="1 組に何組まで（既定 3）")
     ap.add_argument("--analyze", action="store_true", help="影響を受けたアーティストの曲の歌詞・メロディーを起こす（選び直さない）")
-    ap.add_argument("--enrich", action="store_true", help="--analyze のとき、Web の調べ物も（Claude・料金あり）")
+    ap.add_argument("--enrich", action="store_true", help="--analyze のとき、Web の調べ物も（Claude Code の月額プラン・API の料金なし）")
     a = ap.parse_args()
     if a.analyze:
         sys.exit(analyze(a.enrich))

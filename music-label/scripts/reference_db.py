@@ -785,16 +785,17 @@ def _merge_enrich(d: dict, e: dict) -> None:
     ref = d.setdefault("reference", {})
     v = e.get("vocal") or {}
     voc = d.setdefault("vocal", {})
-    if v.get("sex") not in (None, "", "unknown"):
+    heard = bool(d.get("_tagged"))   # 曲を聞いて判定した声・楽器は、Web の情報で上書きしない（判定が「分からない」ときだけ足す。決定 103）
+    if v.get("sex") not in (None, "", "unknown") and not (heard and voc.get("sex") not in (None, "", "unknown")):
         voc["sex"] = v["sex"]
-    if v.get("range") not in (None, "", "unknown"):
+    if v.get("range") not in (None, "", "unknown") and not (heard and voc.get("range") not in (None, "", "unknown")):
         voc["range"] = v["range"]
     if v.get("timbre"):
         voc["timbre"] = v["timbre"]
     if v.get("delivery_style"):
         voc.setdefault("delivery", {})["style"] = v["delivery_style"]
     ins = e.get("instruments") or {}
-    if ins.get("list"):
+    if ins.get("list") and not (heard and (d.get("instruments") or {}).get("list")):
         d.setdefault("instruments", {})["list"] = ins["list"]
     if ins.get("formation_feel"):
         d.setdefault("instruments", {})["formation_feel"] = ins["formation_feel"]
@@ -814,7 +815,7 @@ def _merge_enrich(d: dict, e: dict) -> None:
         wv["setting"] = st
     if w.get("eras"):
         wv.setdefault("era_mix", {})["eras"] = w["eras"]
-    if w.get("mood"):
+    if w.get("mood") and not (heard and wv.get("mood")):
         wv["mood"] = w["mood"]
     if w.get("artist_background"):
         wv["artist_background"] = w["artist_background"]
@@ -900,6 +901,306 @@ def audio_enrich(limit: int = 50) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# API を使わない分析（決定 103）
+#   ① 曲を聞いて判定する（audio_tags.py。Mac の中・無料）：声の性別・高さ・歌い方・楽器・編成・ジャンル・ムード
+#   ② 残り（歌のテーマ・世界観・アーティストの背景・歌詞の聞き違い）は、Claude Code（月額プラン）に Web で調べてもらう。
+#      API の料金はかからない（プランの使用量の上限には数える）。Claude Code が無いときは、claude.ai に貼る依頼ファイルを作る
+SUB_DIR = DIGEST_DIR / "enrich_queue"
+SUB_BATCH = 8   # 1 回の依頼で調べる曲の数（多すぎると途中で切れやすい）
+
+
+def tags_pending() -> list[tuple[Path, Path]]:
+    """まだ「曲を聞いて判定」していない既存楽曲（音源が見つかる曲だけ）"""
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    out = []
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        f = Path((index.get(p.stem) or {}).get("file", ""))
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if f.is_file() and not d.get("_tagged"):
+            out.append((p, f, d))
+    return [(p, f) for p, f, _ in (out[i] for i in _influence_first([d for _, _, d in out]))]   # 影響を受けたアーティストの曲を先に
+
+
+def _merge_tags(d: dict, t: dict) -> None:
+    """曲を聞いて判定した結果を解析シートに入れる（人が書いた欄は上書きしない）"""
+    import audio_tags
+    v, voc = t.get("vocal") or {}, d.setdefault("vocal", {})
+    if v.get("sex") not in (None, "", "unknown") and voc.get("sex") in (None, "", "unknown"):
+        voc["sex"] = v["sex"]
+    if v.get("range") not in (None, "", "unknown") and voc.get("range") in (None, "", "unknown"):
+        voc["range"] = v["range"]
+    if v.get("delivery") and not (voc.get("delivery") or {}).get("style"):
+        voc.setdefault("delivery", {})["style"] = "・".join(v["delivery"])
+    ins = d.setdefault("instruments", {})
+    if t.get("instruments") and not ins.get("list"):
+        ins["list"] = [{"name": x["name"], "role": x["role"]} for x in t["instruments"]]
+    if t.get("formation_feel") and not ins.get("formation_feel"):
+        ins["formation_feel"] = t["formation_feel"]
+    ref = d.setdefault("reference", {})
+    if t.get("genre_tags") and not ref.get("tags"):
+        ref["tags"] = t["genre_tags"]
+    if t.get("mood") and not (d.get("worldview") or {}).get("mood"):
+        d.setdefault("worldview", {})["mood"] = t["mood"]
+    d["_tagged"] = {"at": datetime.now().isoformat(timespec="seconds"), "model": audio_tags.MODEL, "sex": v.get("sex"),
+                    "singing": v.get("singing"), "top": t.get("top", [])[:10]}
+    if "曲を聞いて判定" not in str(d.get("analyzed_by", "")):
+        d["analyzed_by"] = str(d.get("analyzed_by", "auto")) + " + 曲を聞いて判定（AudioSet）"
+
+
+def audio_tags_run(limit: int = 0, quiet: bool = False) -> int:
+    """既存楽曲を聞いて、声・楽器・ジャンル・ムードを判定する（1 回に limit 曲まで。0 なら全部。無料）"""
+    import audio_tags
+    pend = tags_pending()
+    if not pend:
+        if not quiet:
+            print("【結果】判定する曲はありません（全部済んだか、SSD がつながっていません）")
+        return 0
+    if not audio_tags.ready():
+        if not quiet:
+            print("【結果】曲を聞いて判定する部品（torch・transformers）が入っていません。ダッシュボードの「曲を聞いて判定する部品を入れる」か、"
+                  "ターミナルで  python3 -m pip install torch transformers  を実行してください（約 1 GB）")
+        return 2
+    run = pend[:limit] if limit > 0 else pend
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲を聞いて、声・楽器・ジャンル・ムードを判定します（Mac の中で。1 曲 15〜40 秒。料金はかかりません。"
+          "初回だけ判定モデル 約 350 MB を取ってきます）")
+    ok = 0
+    for i, (p, f) in enumerate(run, 1):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ref = d.get("reference") or {}
+        print(f"【進み具合】{i}/{len(run)} 曲目：{ref.get('artist_name') or '?'}「{ref.get('title') or f.stem}」を聞いています", flush=True)
+        try:
+            t = audio_tags.tag(f, d.get("melody"))
+        except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
+            print(f"   ✕ 判定できませんでした（{type(e).__name__}: {str(e)[:160]}）")
+            continue
+        _merge_tags(d, t)
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        ok += 1
+        v = t["vocal"]
+        print(f"   ○ 声 {v['sex']}（高さ {v['range']}）・楽器 {'・'.join(x['name'] for x in t['instruments'][:5]) or '－'}・"
+              f"ジャンル {', '.join(t['genre_tags']) or '－'}・ムード {t['mood'] or '－'}")
+    if ok:
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
+    left = len(pend) - len(run)
+    print(f"【結果】{ok} 曲を聞いて判定し、解析シートに入れて参考曲に登録し直しました" + (f"。まだ {left} 曲あります" if left > 0 else ""))
+    return 0
+
+
+SUB_SYSTEM = ENRICH_SYSTEM.replace("You get one song", "You get a list of songs, each with an id,").replace(
+    "Keep it short. Search at most a few times.", "Keep it short. Search at most a few times per song.") + """
+- "heard" (when given) is what a machine judged by listening to the audio: voice, instruments, genres, mood. Prefer it for the
+  voice and instruments unless public information clearly says otherwise; your main job is the theme, worldview, artist background,
+  note placement and lyrics_check.
+- Return one entry per input id, in the same order, and nothing else."""
+
+
+def _sub_schema() -> dict:
+    import copy
+    item = copy.deepcopy(ENRICH_SCHEMA)
+    item["properties"] = {"id": {"type": "string"}, **item["properties"]}
+    item["required"] = ["id", *item["required"]]
+    return {"type": "object", "additionalProperties": False, "required": ["songs"],
+            "properties": {"songs": {"type": "array", "items": item}}}
+
+
+def _sub_item(p: Path, d: dict) -> dict:
+    ref, m, ly = d.get("reference") or {}, d.get("_measure") or {}, d.get("lyrics") or {}
+    heard_ly = ly.get("transcript") if (ly.get("transcript_meta") or {}).get("clarity") == "unclear" else None
+    tg = d.get("_tagged")
+    return {"id": p.stem, "title": ref.get("title"), "artist": ref.get("artist_name"), "year": ref.get("release_year"),
+            "genre_tags": ref.get("tags"),
+            "measured": {"bpm": (d.get("groove") or {}).get("bpm"), "key": m.get("key"), "duration_sec": m.get("duration_sec")},
+            **({"heard": {"voice": (d.get("vocal") or {}).get("sex"), "instruments": [x.get("name") for x in (d.get("instruments") or {}).get("list") or []],
+                          "mood": (d.get("worldview") or {}).get("mood")}} if tg else {}),
+            **({"heard_lyrics": heard_ly[:3000]} if heard_ly else {})}
+
+
+def _apply_sub(results: list[dict], via: str) -> tuple[int, int]:
+    """Claude（月額プラン・claude.ai）の答えを解析シートに入れる。(入れた曲, 見つかった曲)"""
+    ok = found = 0
+    for e in results or []:
+        p = AUDIO_CACHE / f"{str(e.get('id', '')).strip()}.json"
+        if not re.fullmatch(r"aud-[\w-]+", str(e.get("id", ""))) or not p.exists():
+            continue
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ok += 1
+        if e.get("found"):
+            found += 1
+            _merge_enrich(d, e)
+            d["analyzed_by"] = str(d.get("analyzed_by", "auto")) + f" + claude（{via}・Web で調べた）"
+        d["_enriched"] = {"at": datetime.now().isoformat(timespec="seconds"), "found": bool(e.get("found")), "via": via,
+                          "confidence": e.get("confidence"), "identified_as": e.get("identified_as", "")}
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+    return ok, found
+
+
+def _claude_code() -> tuple[str | None, str]:
+    """Claude Code（月額プランでログイン済み）があるか。(コマンドの場所, 状態)"""
+    exe = shutil.which("claude") or next((str(x) for x in (Path.home() / ".local/bin/claude", Path.home() / ".claude/local/claude",
+                                                            Path("/opt/homebrew/bin/claude"), Path("/usr/local/bin/claude")) if x.is_file()), None)
+    if not exe:
+        return None, "Claude Code が入っていません"
+    import subprocess
+    try:
+        r = subprocess.run([exe, "auth", "status", "--json"], capture_output=True, text=True, timeout=60, env=_sub_env())
+        st = json.loads(r.stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as e:
+        return None, f"Claude Code のログインを確かめられませんでした（{type(e).__name__}）"
+    if not st.get("loggedIn"):
+        return None, "Claude Code にログインしていません（ターミナルで  claude  を起動して /login → 「Claude アカウント（Pro・Max）」を選ぶ）"
+    how = str(st.get("authMethod") or "")
+    if "api" in how.lower() or st.get("apiProvider") not in (None, "firstParty"):
+        return None, (f"Claude Code が API の鍵でログインしています（{how}）。このままだと API の料金になるので使いません。"
+                      "ターミナルで  claude auth logout  →  claude auth login  で「Claude アカウント（Pro・Max）」を選んでください")
+    return exe, "OK"
+
+
+def _sub_env() -> dict:
+    """Claude Code に渡す環境：API の鍵を外す（.env から読んだ鍵があると、Claude Code も API の料金で動いてしまう）"""
+    return {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+
+
+def _sub_prompt(items: list[dict]) -> str:
+    return ("Fill the sheet for each of these songs. Use web search. Return JSON only, matching the schema.\n\n"
+            + json.dumps(items, ensure_ascii=False, indent=1))
+
+
+def _parse_sub(text: str) -> list[dict] | None:
+    t = (text or "").strip()
+    t = re.sub(r"^```(?:json)?\s*|\s*```$", "", t)
+    for cand in (t, t[t.find("{"):t.rfind("}") + 1] if "{" in t else ""):
+        try:
+            v = json.loads(cand)
+        except ValueError:
+            continue
+        if isinstance(v, dict) and isinstance(v.get("songs"), list):
+            return v["songs"]
+        if isinstance(v, list):
+            return v
+    return None
+
+
+def enrich_sub(limit: int = 40) -> int:
+    """②：まだの曲を Claude Code（月額プラン）に Web で調べてもらって足す（API の料金なし。決定 103）"""
+    import subprocess
+    import tempfile
+    pend = enrich_pending()
+    if not pend:
+        print("【結果】調べる曲はありません（全部調べ済みか、曲名・アーティストが読めていない曲だけです）")
+        return 0
+    exe, st = _claude_code()
+    if not exe:
+        print(f"－ {st}")
+        print("   代わりに、claude.ai に貼る依頼ファイルを作ります（貼って返ってきた答えを取り込めば、同じく API の料金はかかりません）")
+        return enrich_export(limit)
+    run = pend[:limit] if limit > 0 else pend
+    groups = [run[i:i + SUB_BATCH] for i in range(0, len(run), SUB_BATCH)]
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲を、Claude Code（月額プラン）に Web で調べてもらいます"
+          f"（{SUB_BATCH} 曲ずつ {len(groups)} 回。API の料金はかかりません。プランの使用量には数えます。1 回 3〜8 分）")
+    ok = found = 0
+    schema = json.dumps(_sub_schema(), ensure_ascii=False)
+    for gi, g in enumerate(groups, 1):
+        items = [_sub_item(p, json.loads(p.read_text(encoding="utf-8"))) for p in g]
+        print(f"【進み具合】{gi}/{len(groups)} 回目：" + "・".join(f"{x['artist']}「{x['title']}」" for x in items)[:200], flush=True)
+        cmd = [exe, "-p", "--output-format", "json", "--json-schema", schema, "--system-prompt", SUB_SYSTEM,
+               "--tools", "WebSearch,WebFetch", "--allowedTools", "WebSearch,WebFetch", "--strict-mcp-config", "--no-session-persistence"]
+        try:
+            with tempfile.TemporaryDirectory() as tmp:   # 空のフォルダで動かす（このリポジトリの決まりを読ませない）
+                r = subprocess.run(cmd, input=_sub_prompt(items), capture_output=True, text=True, timeout=1800, cwd=tmp, env=_sub_env())
+        except subprocess.TimeoutExpired:
+            print("   ✕ 30 分たっても答えが返りませんでした。この回は飛ばします")
+            continue
+        except OSError as e:
+            print(f"   ✕ Claude Code を動かせませんでした（{e}）")
+            break
+        try:
+            out = json.loads(r.stdout or "{}")
+        except ValueError:
+            out = {"is_error": True, "result": (r.stdout or r.stderr or "")[-300:]}
+        msg = str(out.get("result") or "")
+        if out.get("is_error") or r.returncode != 0:
+            if re.search(r"limit|上限|quota|usage", msg + (r.stderr or ""), re.I):
+                print("   ✕ 月額プランの使用量の上限に達しました。時間をおいて（数時間後）もう一度押すと続きを調べます。ここで止めます")
+                break
+            print(f"   ✕ 調べられませんでした（{(msg or r.stderr or '')[:200]}）")
+            continue
+        res = out.get("structured_output")
+        res = res.get("songs") if isinstance(res, dict) else _parse_sub(msg)
+        if not res:
+            print("   ✕ 答えが決まった形になっていませんでした。この回は飛ばします")
+            continue
+        a, b = _apply_sub(res, "Claude Code・月額プラン")
+        ok, found = ok + a, found + b
+        print(f"   ○ {a} 曲を入れました（見つかった曲 {b}）")
+    if ok:
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
+    left = len(enrich_pending())
+    print((f"【結果】{ok} 曲を調べ、{found} 曲のテーマ・世界観などを足して、参考曲に登録し直しました（API の料金なし）" if ok else
+           "【結果】今回は 1 曲も調べられませんでした（上の ✕ の理由を見てください）")
+          + (f"。まだ {left} 曲あります（もう一度押すと続きを調べます）" if left else ""))
+    return 0
+
+
+def enrich_export(limit: int = 40) -> int:
+    """②の予備：claude.ai に貼る依頼ファイルを作る（Claude Code が使えないとき）"""
+    pend = enrich_pending()
+    if not pend:
+        print("【結果】調べる曲はありません")
+        return 0
+    run = pend[:limit] if limit > 0 else pend
+    SUB_DIR.mkdir(parents=True, exist_ok=True)
+    for old in SUB_DIR.glob("依頼_*.md"):
+        old.unlink()
+    files = []
+    for gi in range(0, len(run), SUB_BATCH):
+        items = [_sub_item(p, json.loads(p.read_text(encoding="utf-8"))) for p in run[gi:gi + SUB_BATCH]]
+        f = SUB_DIR / f"依頼_{gi // SUB_BATCH + 1:02d}.md"
+        f.write_text(SUB_SYSTEM + "\n\nReturn a single JSON object {\"songs\": [...]} matching this JSON Schema:\n```json\n"
+                     + json.dumps(_sub_schema(), ensure_ascii=False) + "\n```\n\n" + _sub_prompt(items) + "\n", encoding="utf-8")
+        files.append(f)
+    print(f"【結果】依頼ファイルを {len(files)} 個作りました：{SUB_DIR}")
+    print("   1 つずつ中身を全部コピーして claude.ai（Web 検索をオン）に貼り、返ってきた JSON を")
+    print(f"   {SUB_DIR}/答え_01.json のように保存してから、ダッシュボードの「調べた答えを取り込む」か")
+    print("   python3 scripts/reference_db.py --enrich-import  を実行してください（料金はかかりません）")
+    return 0
+
+
+def enrich_import(path: str | None = None) -> int:
+    """②の予備：claude.ai の答え（JSON）を取り込む。path を省くと enrich_queue の 答え_*.json を全部"""
+    files = [Path(path)] if path else sorted(SUB_DIR.glob("答え_*.json")) if SUB_DIR.exists() else []
+    if not files:
+        print(f"【結果】取り込む答えがありません（{SUB_DIR} に 答え_01.json などの名前で保存してください）")
+        return 0
+    ok = found = 0
+    for f in files:
+        res = _parse_sub(f.read_text(encoding="utf-8"))
+        if not res:
+            print(f"   ✕ {f.name}：JSON として読めませんでした")
+            continue
+        a, b = _apply_sub(res, "claude.ai")
+        ok, found = ok + a, found + b
+        f.rename(f.with_name(f.stem + "_取り込み済み.json"))
+        print(f"   ○ {f.name}：{a} 曲（見つかった曲 {b}）")
+    if ok:
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)
+    print(f"【結果】{ok} 曲の答えを取り込み、参考曲に登録し直しました")
+    return 0
+
+
+def analyze_free(limit: int = 40) -> int:
+    """①→② をまとめて：曲を聞いて判定してから、残りを月額プランで調べる（ダッシュボードの「足りない項目を埋める（無料）」）"""
+    rc = audio_tags_run(0)
+    if rc == 2:
+        print("   ①（曲を聞いて判定）は飛ばして、②（月額プランで調べる）だけ進めます")
+    return enrich_sub(limit)
+
+
 CATEGORY = [("iCloud", "iCloud にだけある"), (".m4p", "コピー防止つき（.m4p）"), ("DRM", "コピー防止つき（DRM）"), ("解析しない形式", "解析しない形式"),
             ("ファイルを読めません", "ファイルを読めない"), ("中身が空", "中身が空"), ("音声ファイルとして読めません", "音声ファイルとして読めない"),
             ("音声が入っていません", "音声が入っていない"), ("短すぎ", "短すぎる（10 秒未満）"), ("メモリ", "メモリが足りない"),
@@ -950,8 +1251,8 @@ def audio_report() -> int:
                 cnt[m] = cnt.get(m, 0) + 1
         lines += [f"## 解析はできたが、足りない項目がある曲（{len(partial)} 曲）", "",
                   "項目ごとの曲数：" + "・".join(f"{k} {v} 曲" for k, v in sorted(cnt.items(), key=lambda x: -x[1])), "",
-                  "（声の性別・楽器・歌詞のテーマ・世界観は、音源からは測れません。ダッシュボードの「足りない項目を Claude に調べてもらう」で足せます。"
-                  f"まだ調べていない曲 {len(enrich_pending())} 曲）", ""]
+                  "（声の性別・楽器・ジャンル・ムードは「曲を聞いて判定」で、歌詞のテーマ・世界観は Claude Code（月額プラン）で埋められます。"
+                  f"ダッシュボードの「足りない項目を埋める（無料）」。まだ判定していない曲 {len(tags_pending())} 曲・まだ調べていない曲 {len(enrich_pending())} 曲）", ""]
         lines += [f"- {rel}：{'・'.join(miss)}" for rel, miss in partial[:300]]
         lines.append("")
     AUDIO_REPORT.parent.mkdir(parents=True, exist_ok=True)
@@ -1394,7 +1695,7 @@ def influence_pending() -> dict[str, int]:
     keys = set().union(set(), *(influence_names(a) for a in all_artists()))
     hit = lambda p: akey((json.loads(p.read_text(encoding="utf-8")).get("reference") or {}).get("artist_name")) in keys
     return {"lyrics": sum(1 for p, _ in lyrics_pending() if hit(p)), "melody": sum(1 for p, _ in melody_pending() if hit(p)),
-            "enrich": sum(1 for p in enrich_pending() if hit(p))}
+            "enrich": sum(1 for p in enrich_pending() if hit(p)), "tags": sum(1 for p, _ in tags_pending() if hit(p))}
 
 
 def assigned_to(s: dict, artist: dict) -> bool:
@@ -1563,18 +1864,20 @@ def health() -> int:
                 ("歌詞（聞き取り・原文）", rate(lambda d: ((d.get("lyrics") or {}).get("transcript_meta") or {}).get("clarity") in ("clear", "given", "none"))),
                 ("歌詞のテーマ", rate(lambda d: (d.get("lyrics") or {}).get("theme"))),
                 ("メロディー（旋律の特徴）", rate(lambda d: (d.get("melody") or {}).get("usable"))),
+                ("曲を聞いて判定（声・楽器・ジャンル・ムード）", rate(lambda d: d.get("_tagged"))),
                 ("Web で調べた項目", rate(lambda d: d.get("_enriched")))]
         print(f"   解析シートに入っている項目（{n} 曲のうち）：")
         for label, c in rows:
             print(f"     {ok(c >= n * 0.8)} {label}：{c} 曲（{int(c * 100 / n)}%）")
-        pend = {"歌詞の聞き取り": len(lyrics_pending()), "メロディー": len(melody_pending()), "Web の調べ物": len(enrich_pending())}
+        pend = {"歌詞の聞き取り": len(lyrics_pending()), "メロディー": len(melody_pending()), "曲を聞いて判定": len(tags_pending()),
+                "Web の調べ物": len(enrich_pending())}
         print("   まだの曲：" + "・".join(f"{k} {v} 曲" for k, v in pend.items()) + ("" if whisper_ready() else "（歌を聞き取る部品 faster-whisper が入っていません）"))
         if rows[2][1] < n * 0.8:
             warn.append("曲名・アーティスト名が読めていない曲が多い：ファイル名を「アーティスト - 曲名」にするか、曲の情報（タグ）を入れる")
         if pend["歌詞の聞き取り"] or pend["メロディー"]:
             warn.append("歌詞・メロディーがまだの曲がある：ダッシュボードの「歌詞を聞き取る」「メロディーを起こす」（無料）。見張りでも少しずつ進みます")
-        if pend["Web の調べ物"] and rows[5][1] < n * 0.5:
-            warn.append("声・楽器・テーマが空の曲が多い：「足りない項目を Claude に調べてもらう」（1 曲 20〜50 円）")
+        if (pend["Web の調べ物"] or pend["曲を聞いて判定"]) and min(rows[3][1], rows[6][1]) < n * 0.5:
+            warn.append("声・楽器・テーマが空の曲が多い：ダッシュボードの「足りない項目を埋める（無料）」（曲を聞いて判定 → 月額プランの Claude Code で調べる）")
     # 4 組ごとの近い参考曲
     print("\n■ 組ごとの近い参考曲（作曲でいちばん優先される曲）")
     for a in all_artists():
@@ -1642,6 +1945,16 @@ def main() -> None:
                     help="既存楽曲の歌詞を Mac の中で聞き取って、解析シートに入れる（N 曲まで。省くと全部。無料。決定 86）")
     ap.add_argument("--audio-melody", type=int, metavar="N", nargs="?", const=0,
                     help="既存楽曲のメロディーを起こして MIDI に残し、旋律の特徴を解析シートに入れる（N 曲まで。省くと全部。無料。決定 90）")
+    ap.add_argument("--audio-tags", type=int, metavar="N", nargs="?", const=0,
+                    help="既存楽曲を聞いて、声・楽器・ジャンル・ムードを Mac の中で判定する（N 曲まで。省くと全部。無料。決定 103）")
+    ap.add_argument("--enrich-sub", type=int, metavar="N", nargs="?", const=40,
+                    help="テーマ・世界観などを Claude Code（月額プラン）に Web で調べてもらう（N 曲まで。既定 40。API の料金なし。決定 103）")
+    ap.add_argument("--free", type=int, metavar="N", nargs="?", const=40,
+                    help="--audio-tags（全部）→ --enrich-sub（N 曲）を続けて（無料の分析。決定 103）")
+    ap.add_argument("--enrich-export", type=int, metavar="N", nargs="?", const=40,
+                    help="claude.ai に貼る依頼ファイルを作る（Claude Code が使えないときの予備）")
+    ap.add_argument("--enrich-import", metavar="FILE", nargs="?", const="",
+                    help="claude.ai の答え（JSON）を取り込む（省くと enrich_queue の 答え_*.json を全部）")
     ap.add_argument("--audio-enrich", type=int, metavar="N", nargs="?", const=50,
                     help="音源から測れない項目（声・楽器・テーマ・世界観）を Claude に Web で調べてもらう（1 回に N 曲まで。既定 50。決定 85）")
     args = ap.parse_args()
@@ -1653,7 +1966,17 @@ def main() -> None:
         sys.exit(audio_lyrics(args.audio_lyrics))
     if args.audio_melody is not None:
         sys.exit(audio_melody(args.audio_melody))
-    if args.audio_enrich is not None:
+    if args.audio_tags is not None:
+        sys.exit(audio_tags_run(args.audio_tags))
+    if args.enrich_sub is not None:
+        sys.exit(enrich_sub(args.enrich_sub))
+    if args.free is not None:
+        sys.exit(analyze_free(args.free))
+    if args.enrich_export is not None:
+        sys.exit(enrich_export(args.enrich_export))
+    if args.enrich_import is not None:
+        sys.exit(enrich_import(args.enrich_import or None))
+    if args.audio_enrich is not None:   # API（有料）で調べる。ふだんは --free を使う（決定 103）
         sys.exit(audio_enrich(args.audio_enrich))
     if args.audio_report:
         sys.exit(audio_report())
@@ -1673,6 +1996,8 @@ def main() -> None:
             audio_lyrics(5, quiet=True)
         if melody_pending():   # メロディーがまだの曲：1 回に 3 曲ずつ、自動で起こす（決定 90）
             audio_melody(3, quiet=True)
+        if tags_pending():   # 曲を聞いて判定がまだの曲：1 回に 5 曲ずつ（部品が入っているときだけ。決定 103）
+            audio_tags_run(5, quiet=True)
         return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}
