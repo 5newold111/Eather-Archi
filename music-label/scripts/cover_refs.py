@@ -12,7 +12,9 @@
              曲名とアーティスト名が一致する曲のジャケット画像を見つける（out/references/artwork/<ID>.jpg。Mac の中だけ。外には出さない）
   2 読む   … Claude が画像を見て、色・画材・構図・光・質感・空気・時代感・文字の扱いを言葉にする（<ID>.json）。
              その絵だけの特徴的なモチーフ（真似してはいけないもの）も書き出す
-  3 使う   … ジャケットを作るとき、その組・その曲に近い参考の言葉を 2〜3 枚ぶん混ぜて「アートの方向」にする。
+  （足りないとき）その組のジャンルで実際に販売されているアルバム（Apple のジャンル別の人気アルバム）のジャケットも探して読む（決定 114）
+  3 使う   … ジャケットの候補は 1 枚ごとに別の参考を 1 枚選び、その「作り方」（画材・構図・光・質感・時代感）を借りる（混ぜない。決定 114）。
+             選ぶ順：その曲で借りた参考曲 → 組が選んだ参考曲 → 組に近い参考データベースの曲 → 組の音とビジュアルの言葉に近いもの
              参考のジャケットの画像そのものは画像を作る AI に渡さない。実在の名前も入れない（docs/04 の借り方と同じ：要素だけ借りる）
 
 使い方：
@@ -203,8 +205,50 @@ def collect(slug: str | None = None, limit: int = 30, quiet: bool = False) -> tu
 
 # ---------------------------------------------------------------------------
 # 3 使う
-def analyses_for(slug: str, brief: dict | None = None, n: int = 3) -> list[dict]:
-    """この組・この曲に近い参考のジャケットの読み取り（近い順に n 枚）"""
+def _words(*xs) -> set[str]:
+    out = set()
+    for x in xs:
+        if isinstance(x, (list, tuple)):
+            out |= _words(*x)
+        elif isinstance(x, dict):
+            out |= _words(*x.values())
+        elif x:
+            out |= {w for w in re.findall(r"[a-z][a-z\-]{3,}", str(x).lower())}
+    return out - {"with", "from", "that", "this", "into", "very", "soft", "light", "color", "colour"}
+
+
+def act_words(a: dict) -> set[str]:
+    """組の音とビジュアルの言葉（参考ジャケットの近さを測る）"""
+    snd, v = a.get("sound") or {}, a.get("visual") or {}
+    return _words(snd.get("genres"), snd.get("dna_tags"), snd.get("palette"), v.get("space"), v.get("light"), v.get("materials"),
+                  v.get("palette"), (v.get("photo_direction") or {}).get("taste"), (a.get("persona") or {}).get("scene"),
+                  (a.get("lyrics") or {}).get("themes"))
+
+
+def nearest_by_vibe(slug: str, skip: set[str], n: int) -> list[tuple[str, dict]]:
+    """読んだ参考ジャケット全部から、組の音とビジュアルの言葉に近い順（ジャンルで探した分はその組を少し優先）"""
+    a = next((x for x in all_artists() if x.get("slug") == slug), {}) or {}
+    aw = act_words(a)
+    scored = []
+    for p in ART.glob("*.json") if ART.exists() else []:
+        if p.stem in skip:
+            continue
+        try:
+            m = read_json(p)
+        except (OSError, ValueError):
+            continue
+        an = m.get("analysis")
+        if not an:
+            continue
+        w = _words(an.get("medium"), an.get("texture"), an.get("composition"), an.get("lighting"), an.get("mood"),
+                   an.get("era_feel"), an.get("transferable"), an.get("palette"))
+        sim = len(aw & w) / max(1, len(aw | w)) + (0.15 if slug in (m.get("for_slugs") or []) else 0)
+        scored.append((sim, p.stem, an))
+    return [(k, an) for _, k, an in sorted(scored, key=lambda x: -x[0])[:n]]
+
+
+def analyses_for(slug: str, brief: dict | None = None, n: int = 3, fill: bool = True) -> list[dict]:
+    """この組・この曲に近い参考のジャケットの読み取り（近い順に n 枚。足りなければ組の雰囲気に近いもので埋める。決定 114）"""
     pri: dict[str, float] = {}
     for s in ((brief or {}).get("slots") or {}).values():   # この曲で借りた参考曲（世界観・楽器の枠を重く）
         if s and s.get("title"):
@@ -222,14 +266,127 @@ def analyses_for(slug: str, brief: dict | None = None, n: int = 3) -> list[dict]
                 pri[k] = max(pri.get(k, 0), 1.0 + float(close[p.stem]))
     except Exception:  # noqa: BLE001
         pass
-    got = []
+    got, ids = [], set()
     for k, w in sorted(pri.items(), key=lambda x: -x[1]):
         p = ART / f"{k}.json"
         if p.exists() and (an := read_json(p).get("analysis")):
             got.append(an)
+            ids.add(k)
         if len(got) >= n:
             break
+    if len(got) < n and fill:
+        got += [an for _, an in nearest_by_vibe(slug, ids, n - len(got))]
     return got
+
+
+def _scrub_names(text: str) -> str:
+    """参考の曲名・アーティスト名・アルバム名が混ざっていたら伏せる（実在の名前は画像の指示に入れない）"""
+    names = [w for e in sources() for w in (e["title"], e["artist"])]
+    for p in ART.glob("*.json") if ART.exists() else []:
+        try:
+            m = read_json(p)
+        except (OSError, ValueError):
+            continue
+        names += [m.get("title", ""), m.get("artist", "")]
+    for w in sorted({x for x in names if x and len(x) >= 4}, key=len, reverse=True):
+        text = re.sub(re.escape(w), "", text, flags=re.I)
+    return text
+
+
+def direction_one(an: dict) -> str:
+    """参考 1 枚の「作り方」だけを借りる指示（英語。実在の名前なし。その絵だけのモチーフは使わないと明記。決定 114）"""
+    t = ("Art direction borrowed from ONE real, commercially released album cover that fits this act (borrow only the approach; "
+         "create a new, original image): "
+         f"medium: {an.get('medium', '')}; finish and texture: {an.get('texture', '')}; composition: {an.get('composition', '')}; "
+         f"light: {an.get('lighting', '')}; palette: {', '.join(an.get('palette') or [])}; era feel: {an.get('era_feel', '')}; "
+         f"mood: {', '.join(an.get('mood') or [])}. Principle: {an.get('transferable', '')}")
+    if an.get("do_not_copy"):
+        t += " Do NOT reuse these recognisable elements of that cover: " + "; ".join(an["do_not_copy"]) + "."
+    return _scrub_names(t)
+
+
+# Apple のジャンル（人気アルバムの一覧）。組の音の言葉 → ジャンルの番号
+GENRE_IDS = [("city pop", 27), ("j-pop", 27), ("jpop", 27), ("anime", 29), ("k-pop", 51), ("kpop", 51),
+             ("hip hop", 18), ("hip-hop", 18), ("rap", 18), ("lo-fi", 18), ("lofi", 18), ("r&b", 15), ("soul", 15), ("neo-soul", 15),
+             ("house", 17), ("techno", 17), ("dance", 17), ("edm", 17), ("disco", 17), ("ambient", 7), ("electronic", 7), ("synth", 7),
+             ("jazz", 11), ("blues", 2), ("folk", 10), ("acoustic", 10), ("singer-songwriter", 10), ("country", 6),
+             ("classical", 5), ("new age", 13), ("reggae", 24), ("latin", 12), ("soundtrack", 16), ("metal", 1153),
+             ("punk", 20), ("indie", 20), ("alternative", 20), ("shoegaze", 20), ("post-rock", 20), ("rock", 21), ("pop", 14)]
+
+
+def genre_ids(a: dict) -> list[tuple[int, str, str]]:
+    """(Apple のジャンルの番号, 国, ジャンルの言葉)"""
+    words = " ".join(str(x).lower() for x in ((a.get("sound") or {}).get("genres") or []) + ((a.get("sound") or {}).get("dna_tags") or []))
+    out = []
+    for kw, gid in GENRE_IDS:
+        if kw in words and gid not in [g for g, _, _ in out]:
+            out.append((gid, "jp" if gid in (27, 29) else "us", kw))
+    return out[:3] or [(14, "us", "pop")]
+
+
+def genre_albums(gid: int, store: str = "us", kw: str = "", limit: int = 40) -> list[dict]:
+    """そのジャンルで実際に販売されている人気アルバム（Apple の公開の一覧。使えなければ、ジャンルの言葉で Apple を検索）。{title, artist, art}"""
+    out = []
+    try:
+        d = json.loads(_get(f"https://itunes.apple.com/{store}/rss/topalbums/limit={limit}/genre={gid}/json"))
+        for e in (d.get("feed") or {}).get("entry") or []:
+            imgs = e.get("im:image") or []
+            if imgs:
+                out.append({"title": (e.get("im:name") or {}).get("label", ""), "artist": (e.get("im:artist") or {}).get("label", ""),
+                            "art": re.sub(r"/\d+x\d+bb", "/600x600bb", imgs[-1].get("label", ""))})
+    except Exception:  # noqa: BLE001
+        pass
+    if out or not kw:
+        return out
+    q = urllib.parse.urlencode({"term": kw, "media": "music", "entity": "album", "limit": limit, "country": store})
+    try:
+        for t in json.loads(_get(f"https://itunes.apple.com/search?{q}")).get("results", []):
+            if t.get("artworkUrl100") and t.get("collectionName"):
+                out.append({"title": t["collectionName"], "artist": t.get("artistName", ""),
+                            "art": t["artworkUrl100"].replace("100x100bb", "600x600bb")})
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def collect_genre(slug: str, want: int = 8, max_new: int = 6, quiet: bool = False) -> int:
+    """組に近い参考ジャケットが want 枚に足りなければ、組のジャンルの実在アルバムのジャケットを最大 max_new 枚読む（決定 114）"""
+    a = next((x for x in all_artists() if x.get("slug") == slug), None)
+    if not a:
+        return 0
+    # 組に確かに合う参考だけを数える：組の参考曲・近い参考データベースの曲（Gon さんが入れた曲）＋ この組のためにジャンルで探した分
+    have = sum(1 for p in ART.glob("*.json") if slug in (read_json(p).get("for_slugs") or [])) if ART.exists() else 0
+    have += len(analyses_for(slug, None, want, fill=False))
+    if have >= want:
+        return 0
+    ART.mkdir(parents=True, exist_ok=True)
+    done = 0
+    for gid, store, kw in genre_ids(a):
+        for al in genre_albums(gid, store, kw):
+            if done >= max_new:
+                return done
+            k = ref_id(al["title"], al["artist"])
+            meta_p = ART / f"{k}.json"
+            meta = read_json(meta_p) if meta_p.exists() else {}
+            if meta.get("analysis"):
+                if slug not in (meta.get("for_slugs") or []):
+                    meta.setdefault("for_slugs", []).append(slug)
+                    write_json(meta_p, meta)
+                continue
+            img = ART / f"{k}.jpg"
+            try:
+                img.write_bytes(_get(al["art"]))
+            except Exception:  # noqa: BLE001
+                continue
+            res, msg = analyze(img)
+            meta.update({"title": al["title"], "artist": al["artist"], "from": [f"ジャンルの人気アルバム（Apple・{gid}）"],
+                         "found_on": "Apple Music", "image": img.name, "analysis": res, "for_slugs": [slug]})
+            write_json(meta_p, meta)
+            if res:
+                done += 1
+                if not quiet:
+                    print(f"   ○ {a.get('name')} 向け：{res['medium']}・{'、'.join(res['mood'][:3])}（ジャンルの人気アルバム）")
+    return done
 
 
 def art_direction(slug: str, brief: dict | None = None, n: int = 3) -> str:
@@ -249,11 +406,7 @@ def art_direction(slug: str, brief: dict | None = None, n: int = 3) -> str:
     if avoid:
         lines.append("Do NOT reuse these recognisable elements from the references: " + "; ".join(avoid) + ".")
     text = " ".join(lines)
-    for e in sources():   # 念のため：参考曲の曲名・アーティスト名が混ざっていたら伏せる（実在の名前は画像の指示に入れない）
-        for w in (e["title"], e["artist"]):
-            if len(w) >= 4:
-                text = re.sub(re.escape(w), "", text, flags=re.I)
-    return text
+    return _scrub_names(text)   # 念のため：参考の曲名・アーティスト名が混ざっていたら伏せる（実在の名前は画像の指示に入れない）
 
 
 def main() -> None:
@@ -270,7 +423,8 @@ def main() -> None:
             print("－ ANTHROPIC_API_KEY が無いので、ジャケットを読めません（.env に入れてください）")
             return
         d, m = collect(a.artist or a.slug, a.limit, a.quiet)
-        print(f"▶ 参考のジャケット：新しく読んだ {d} 枚・見つからなかった {m} 曲（{ART}）")
+        g = sum(collect_genre(x["slug"], quiet=a.quiet) for x in all_artists() if not (a.artist or a.slug) or x["slug"] == (a.artist or a.slug))
+        print(f"▶ 参考のジャケット：新しく読んだ {d} 枚（ジャンルの人気アルバムから {g} 枚）・見つからなかった {m} 曲（{ART}）")
         return
     if a.cmd == "list":
         for e in sources(a.slug):

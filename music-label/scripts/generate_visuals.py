@@ -213,14 +213,44 @@ def prompts_debut(artist: dict) -> list[dict]:
     return out
 
 
-def prompts_cover(artist: dict, brief: dict) -> list[dict]:
+# 実際に発売された CD・レコードのジャケットに見せる（AI っぽい見た目を避ける。オーナーの指示 2026-10-27。決定 114）
+REAL_RELEASE = ("Make it look like the cover of a real album that a record label released and sold on CD and vinyl, not like AI art: "
+                "either a real photograph (shot on film or a real camera, natural light falloff, real-world imperfections, visible grain, "
+                "slightly imperfect focus and framing) or a real graphic-design layout (print texture, flat inks, paper tooth, restrained shapes). "
+                "One clear idea, generous negative space, restrained detail, believable materials. "
+                "Avoid the typical AI look: no hyper-detailed digital painting, no glossy plastic sheen, no airbrushed smoothness, "
+                "no oversaturated neon gradients, no glowing particles or bokeh orbs, no dreamy fog, no surreal floating objects, "
+                "no fantasy concept-art scenery, no perfect symmetry, no lens-flare spectacle.")
+
+
+def series_look(artist: dict) -> str:
+    """組らしさ（色・カメラ・味・光の温度）だけ。場所や小物は入れない（場面は曲ごとに変える。決定 115）"""
+    v = artist["visual"]
+    pd = v.get("photo_direction", {})
+    return (f"palette {', '.join(v.get('palette', []))}; camera feel: {v.get('camera', '')}; taste: {pd.get('taste', '')}; "
+            f"contrast {pd.get('contrast', '')}; color temperature {pd.get('color_temperature', '')}")
+
+
+def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> list[dict]:
     v = artist["visual"]
     rule = v.get("cover_series_rule", "")
     theme = ", ".join(artist.get("lyrics", {}).get("themes", [])[:3])
     seed = brief.get("cover_prompt_seed") or ""
-    try:   # Gon さんが入れた参考曲のジャケットから読み取った「アートの方向」（cover_refs.py。決定 35）
+    refs = []
+    try:   # 実在の CD ジャケットの読み取り：候補 1 枚ごとに別の 1 枚の「作り方」を借りる（混ぜない。決定 35・114）
         import cover_refs
-        seed += " " + cover_refs.art_direction(artist.get("slug", ""), brief)
+        import _claude
+        if _claude.available():   # 組に合う参考が足りなければ、組のジャンルの人気アルバムのジャケットを先に読む（1 枚 数円）
+            cover_refs.collect_genre(artist.get("slug", ""), quiet=True)
+        refs = [cover_refs.direction_one(an) for an in cover_refs.analyses_for(artist.get("slug", ""), brief, N_COVER)]
+        if not refs:
+            seed += " " + cover_refs.art_direction(artist.get("slug", ""), brief)
+    except Exception:  # noqa: BLE001
+        pass
+    scenes = []
+    try:   # 曲のワンシーン（映画のワンカットのような場面を 3 つ。前の曲と重ならない。決定 115）
+        import cover_scene
+        scenes = cover_scene.scenes_for(brief, brief_path)
     except Exception:  # noqa: BLE001
         pass
     title = (brief.get("title_candidates") or [""])[0]
@@ -235,12 +265,20 @@ def prompts_cover(artist: dict, brief: dict) -> list[dict]:
     room = f"no text at all; keep {where} of the image calm and uncluttered (small typography will be added there later)"
     variants = [room] * 6
     for i in range(N_COVER):
-        out.append({"kind": "cover", "no": i + 1, "prompt": scrub(
-            f"Album cover artwork, square 1:1, 3000x3000. {visual_base(artist)} Series rule: {rule}. "
-            f"Song theme: {theme}. {seed} {variants[i]}"
+        ref = refs[i % len(refs)] if refs else ""
+        sc = scenes[(i // 2) % len(scenes)] if scenes else None   # 3 つの場面 × 参考の作り方 2 通り
+        if sc:   # 曲のワンシーンが主役。組らしさは色と決まりごとで薄く（決定 115）
+            body = (cover_scene.scene_text(sc) + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
+                    + f"The act's series look, kept subtle (the scene comes first): {series_look(artist)}. "
+                    + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule else ""))
+        else:
+            body = f"{visual_base(artist)} Series rule: {rule}. Song theme: {theme}. {seed} "
+        out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
+                    "scene": (i // 2) % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""), "prompt": scrub(
+            f"Album cover artwork, square 1:1. {body}{ref} {variants[i]}"
             + (f" (title: '{title}')" if 'title only' in variants[i] and title else "") +
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
-            "not explicit. Original artwork, not a copy of any existing cover. High detail, crisp textures, not looking like CGI.", artist)})
+            "not explicit. Original artwork, not a copy of any existing cover. " + REAL_RELEASE, artist)})
     return out
 
 
@@ -324,7 +362,10 @@ def compliance_checklist(kind: str) -> list[str]:
 SCORE_SYSTEM = """You are the art director of EtherArchi, a music label where AI-generated music meets spatial design.
 Score each candidate image for the given artist on five criteria from 1 (poor) to 5 (excellent):
 consistency (fits the artist's visual sheet), symbolism (memorable, says something about the act),
-scene_fit (fits the listening scene / the song), safety (platform rules and the face-hiding rule), craft (finish).
+scene_fit (fits the listening scene / the song), safety (platform rules and the face-hiding rule),
+craft (finish, and whether it looks like a real album cover a label released on CD - a real photograph or real graphic design.
+Score craft 1-2 when it looks AI-generated: hyper-detailed, glossy or airbrushed surfaces, neon glow, floating surreal objects,
+fantasy concept art, fog and light particles).
 Then check every hard rule and the compliance list; list each violation you can SEE (a recognizable face, a third-party
 logo or character, a URL / handle / price, text that is not exactly the song title or artist name, an identifiable real
 building or sign, sexual or violent content). compliance_ok is false if there is any violation.
@@ -637,7 +678,7 @@ def main() -> None:
     elif args.kind == "cover":
         if not args.brief:
             ap.error("--kind cover には --brief が必要です")
-        cands = prompts_cover(artist, json.loads(args.brief.read_text(encoding="utf-8")))
+        cands = prompts_cover(artist, json.loads(args.brief.read_text(encoding="utf-8")), args.brief)
     else:
         cands = prompts_reshoot(artist, args.pivot_reason)
     print(f"  指示文を {len(cands)} 本作りました（実名・商標は含めていません）")

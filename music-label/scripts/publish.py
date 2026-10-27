@@ -585,7 +585,7 @@ def ensure_weekly_cover(song: dict) -> Path | None:
     最初の 5 曲は Gon さんがポップアップで選ぶ（選ぶまでは「ジャケット待ち」）。6 曲目からは自動で選ばれる。
     いままでは run_week.py の仕上げ（火〜木・今週の曲だけ）でしか作らず、ほかの曜日・前の週・不定期の曲が止まっていた"""
     d = cover_dir(song)
-    if not (d / "candidates.json").exists():
+    if not cover_candidates(song):   # 画像が 1 枚も無ければ作る（失敗しても候補の記録だけ残るので、ファイルの有無では見ない）
         mark = d / "auto_attempt.json"
         try:
             last = datetime.fromisoformat(read_json(mark).get("at", "")) if mark.exists() else None
@@ -648,9 +648,12 @@ def cmd_cover(args) -> int:
                 print("【結果】ジャケットを作る OpenAI の鍵がありません（「鍵を入れる」から入れてください）")
                 return 2
             step(f"{song['artist']}「{song['title']}」のジャケットの候補を作っています（数分。OpenAI の画像の料金がかかります）")
-            if args.redo:   # 作り直す：前の選択と仕上がりは消す（候補の画像は上書き）
+            if args.redo:   # 作り直す：前の選択と仕上がりは消す（候補の画像は上書き）。ジャケットの場面も選び直す（決定 115）
                 for f in ("selection_cover.json", "cover_final.jpg"):
                     (d / f).unlink(missing_ok=True)
+                b = read_json(song["brief"])
+                if b.pop("cover_scenes", None) is not None:
+                    Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             subprocess.run(gv)
         if (d / "selection_cover.json").exists() and not (d / "cover_final.jpg").exists():
             step("選んだジャケットを 3000×3000 に仕上げています")

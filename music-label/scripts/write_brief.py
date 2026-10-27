@@ -63,7 +63,7 @@ OUTPUT_SCHEMA = {
                           "changed": {"type": "array", "items": {"type": "string"}},
                           "contour_interval_changed": {"type": "boolean"},
                           "description": {"type": "string"}}}},
-        "cover_prompt_seed": {"type": "string", "description": "ジャケット生成の種（英語 3〜5 行）。色調・光・構図・質感・モチーフ。人の顔・文字・ロゴなし"},
+        "cover_prompt_seed": {"type": "string", "description": "ジャケット生成の種（英語 3〜5 行）。この曲を象徴するワンシーン（映画のワンカットのように：何が写るか・寄り方・場所・時間と光）と色調・質感。この曲だと一目で分かる具体的な場面に。人の顔・文字・ロゴなし（決定 115）"},
         "episode": {
             "type": "object", "additionalProperties": False,
             "description": "この曲のエピソード（決定 33）。アーティストがどんな場面で、何を見て・聞いて・考えて・感じて、何を思ったか。歌詞はここから書く。日本語（story_en だけ英語）。実在の名前なし",
