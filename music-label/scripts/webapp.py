@@ -810,6 +810,7 @@ function openDraft(id){const d=((DATA.irregular||{}).drafts||[]).find(x=>x.id===
     ${f("story","曲のイメージ（エピソード：いつ・どこで・何を見て・感じたか）",d.story,true)}
     ${d.when_where||d.realized?`<p class="sub">${d.when_where?`いつ・どこで：${E(d.when_where)}　`:""}${d.realized?`たどり着いた思い（サビの芯）：${E(d.realized)}`:""}</p>`:""}
     ${f("lyrics",d.instrumental?"歌詞（インストの組なので、声の断片だけ）":"歌詞（Suno に入れる。[Verse] などの印つき）",d.lyrics,true)}
+    ${d.lyrics_ja?(d.lyrics_ja.length?`<details class="lyr-ja" open><summary><b>歌詞と日本語訳</b>（読む用。Suno には歌詞だけを入れます）</summary>${d.lyrics_ja.map(([a,b])=>!a.trim()?`<div style="height:.6em"></div>`:/^\s*\[[^\]]+\]\s*$/.test(a)?`<div class="sub" style="margin-top:4px">${E(a)} ${b!==a?E(b):""}</div>`:`<div>${E(a)}</div>${b?`<div class="sub">${E(b)}</div>`:""}`).join("")}</details>`:`<p class="sub">日本語訳はまだです（作っています。少しして開き直すと出ます）</p>`):""}
     ${f("style","Suno のスタイル（英語。ジャンル・テンポ・楽器・声の質感）",d.style,true)}
     ${f("exclude","入れない要素（英語・任意）",d.exclude)}
     ${f("cover","ジャケットのイメージ（英語。色・光・構図）",d.cover,true)}
@@ -1061,6 +1062,12 @@ def _irregular(self):
     op, did = str(p.get("op") or ""), str(p.get("id") or "")
     if op == "save":
         ok, msg = irregular.save(did, p.get("fields") or {})
+        dp = irregular._draft_path(did) if ok and "lyrics" in (p.get("fields") or {}) else None
+        if dp:   # 歌詞を直したら、日本語訳を作り直す（後ろで。決定 107）
+            try:
+                start_job([PY, str(S / "lyrics_ja.py"), "brief", str(dp)], "歌詞の日本語訳を作る")
+            except Exception:  # noqa: BLE001
+                pass
         return self._json(200 if ok else 400, {"message": msg} if ok else {"error": msg})
     if op == "discard":
         ok, msg = irregular.discard(did)

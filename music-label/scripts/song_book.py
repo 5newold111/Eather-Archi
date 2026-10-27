@@ -51,10 +51,22 @@ COLUMNS = [  # (見出し, 幅, 書く人)
     ("曲 ID", 18, "機械"), ("アーティスト", 18, "機械"), ("曲名", 22, "機械"), ("曲名の別案", 26, "機械"),
     ("フェーズ", 18, "両方"), ("次にやること", 34, "機械"), ("制作週", 12, "機械"), ("配信予定日", 12, "オーナー"),
     ("BPM", 6, "機械"), ("ジャンル", 18, "機械"), ("言語", 10, "機械"), ("Suno の指示（スタイル）", 48, "機械"),
-    ("歌詞", 60, "機械"), ("選んだテイク", 16, "機械"), ("保管場所（SSD）", 36, "機械"),
+    ("歌詞", 60, "機械"), ("歌詞の日本語訳", 60, "機械"), ("選んだテイク", 16, "機械"), ("保管場所（SSD）", 36, "機械"),
     ("ISRC", 16, "オーナー"), ("UPC", 16, "オーナー"), ("配信 URL", 30, "オーナー"), ("メモ", 30, "オーナー"), ("更新日", 11, "機械"),
 ]
 OWNER = [h for h, _, who in COLUMNS if who == "オーナー"]
+
+
+def _ja(lyrics: str, language) -> str:
+    """歌詞の日本語訳（作ってあるものだけ。ここでは作らない。決定 107）"""
+    try:
+        import lyrics_ja
+        if not lyrics_ja.needed(lyrics, language):
+            return ""
+        tr = lyrics_ja.get(lyrics)
+        return tr["text"] if tr else "（訳はまだ）"
+    except Exception:  # noqa: BLE001
+        return ""
 AUDIO = {".mp3", ".wav", ".m4a", ".flac", ".aif", ".aiff"}
 
 
@@ -92,7 +104,8 @@ def debut_rows() -> list[dict]:
             "制作週": song["week"], "BPM": next((x.get("bpm", "") for x in read_json(song["kit"] / "kit.json").get("songs", [])
                                               if x.get("slug") == song["slug"]), ""),
             "ジャンル": _join(song["genre"]), "言語": song["language"],
-            "Suno の指示（スタイル）": song["style"], "歌詞": song["lyrics"], **release_info(song),
+            "Suno の指示（スタイル）": song["style"], "歌詞": song["lyrics"], "歌詞の日本語訳": _ja(song["lyrics"], song["language"]),
+            **release_info(song),
         })
     return rows
 
@@ -144,7 +157,7 @@ def weekly_rows() -> list[dict]:
             "配信予定日": str(b.get("release_at") or "")[:10],
             "BPM": meta.get("bpm", ""), "ジャンル": _join(meta.get("genre") or [meta.get("primary_genre"), meta.get("secondary_genre")] if meta else ""),
             "言語": meta.get("language", ""), "Suno の指示（スタイル）": b.get("suno_style_prompt", ""), "歌詞": lyrics,
-            "選んだテイク": chosen, "保管場所（SSD）": stored, **(release_info(song) if song else {}),
+            "歌詞の日本語訳": _ja(lyrics, b.get("language")), "選んだテイク": chosen, "保管場所（SSD）": stored, **(release_info(song) if song else {}),
         })
     return rows
 

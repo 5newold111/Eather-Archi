@@ -487,6 +487,13 @@ def write_draft(song: dict, st: dict) -> None:
     (d / "DistroKid下書き.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     if song.get("lyrics"):
         (d / "歌詞.txt").write_text(song["lyrics"].strip() + "\n", encoding="utf-8")   # Suno に入れた歌詞（札・指示つき）
+        try:   # 歌詞の日本語訳（対訳。Gon さんが読む用で、DistroKid には入れない。決定 107）
+            import lyrics_ja
+            tr = lyrics_ja.for_song(song, quiet=True)
+            if tr:
+                (d / "歌詞_日本語訳.txt").write_text(lyrics_ja.pair_text(song["lyrics"], tr), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 歌詞の日本語訳を作れませんでした（{e}）")
         try:   # 配信サイトに出す歌詞（札・指示を外し、決まりに合わせたもの。決定 52）
             import store_lyrics
             store_lyrics.write_for_song(song)

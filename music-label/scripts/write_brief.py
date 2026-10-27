@@ -643,6 +643,11 @@ def main() -> None:
         brief["validation"] = {"problems": problems, "checked_at": date.today().isoformat()}
         brief["generated_by"] = f"select_references.py + write_brief.py ({MODEL})"
         bp.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        try:   # 歌詞の日本語訳（Gon さんが読む用。Suno・DistroKid には入れない。決定 107）
+            import lyrics_ja
+            lyrics_ja.for_brief(bp)
+        except Exception as e:  # noqa: BLE001
+            print(f"  － 歌詞の日本語訳を作れませんでした（{e}）")
         print(f"  タイトル候補: {' / '.join(result['title_candidates'][:3])}")
         print(f"  → {rel(bp)} を更新しました")
 

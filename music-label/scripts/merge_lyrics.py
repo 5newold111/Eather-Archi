@@ -26,6 +26,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _lyric_rules import RULES_EN, tidy  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _translate(brief_path: Path) -> None:
+    """最終の歌詞の日本語訳（Gon さんが読む用。決定 107）"""
+    try:
+        import lyrics_ja
+        lyrics_ja.for_brief(brief_path)
+    except Exception as e:  # noqa: BLE001
+        print(f"  － 歌詞の日本語訳を作れませんでした（{e}）")
 PLACEHOLDERS = ["{{SUNO_VERSE_1}}", "{{SUNO_PRE_CHORUS}}", "{{SUNO_VERSE_2}}", "{{SUNO_BRIDGE}}"]
 HEADINGS = {"{{SUNO_VERSE_1}}": ["verse 1", "verse1", "verse one"], "{{SUNO_PRE_CHORUS}}": ["pre-chorus", "pre chorus", "prechorus"],
             "{{SUNO_VERSE_2}}": ["verse 2", "verse2", "verse two"], "{{SUNO_BRIDGE}}": ["bridge"]}
@@ -197,6 +206,7 @@ def main() -> None:
         brief["merge"] = {"mode": "topic_only", "problems": problems, "warnings": warnings, "suno_share_actual": 1.0, "verses_file": str(args.verses)}
         args.brief.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         final_path = args.brief.with_suffix(".lyrics_final.txt"); final_path.write_text(final + "\n", encoding="utf-8")
+        _translate(args.brief)
         if problems:
             print(f"\n=== 問題あり。Suno で出し直すか該当行を書き換えてください。途中結果: {final_path.name} ===")
             sys.exit(1)
@@ -267,6 +277,7 @@ def main() -> None:
     args.brief.write_text(json.dumps(brief, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     final_path = args.brief.with_suffix(".lyrics_final.txt")
     final_path.write_text(final + "\n", encoding="utf-8")
+    _translate(args.brief)
     if problems:
         print(f"\n=== 問題あり。節を直すか Suno で出し直してください。途中結果: {final_path.name} ===")
         sys.exit(1)

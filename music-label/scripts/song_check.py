@@ -205,6 +205,22 @@ def episode_html(ep: dict | None) -> str:
             + (f'<p class="sub">英語の紹介：{E(ep["story_en"])}</p>' if ep.get("story_en") else "") + "</section>")
 
 
+def lyrics_ja_html(song: dict) -> str:
+    """歌詞と日本語訳（対訳。作ってあるものだけ。決定 107）"""
+    try:
+        import lyrics_ja
+        if song.get("instrumental") or not lyrics_ja.needed(song.get("lyrics", ""), song.get("language")):
+            return ""
+        tr = lyrics_ja.get(song["lyrics"])
+    except Exception:  # noqa: BLE001
+        return ""
+    if not tr:
+        return ("<section><h2>歌詞と日本語訳</h2><p class='sub'>日本語訳はまだです（公開セットを作るときに作ります。すぐ作るときは "
+                f"<code>python3 scripts/lyrics_ja.py song {E(song['id'])}</code>）</p></section>")
+    return ("<details><summary><b>歌詞と日本語訳</b>（読む用。Suno・DistroKid には歌詞だけを入れます）</summary>"
+            + lyrics_ja.pair_html(song["lyrics"], tr, E) + "</details>")
+
+
 def song_page(song_id: str, token: str) -> str | None:
     song = _songs.by_id(song_id)
     if song is None:
@@ -226,7 +242,7 @@ def song_page(song_id: str, token: str) -> str | None:
     backs = _guide.back_actions(song)
     back = ("<section><h2>間違えて進めたとき</h2><p class='sub'>前の工程に戻せます。消さずに「戻したもの」フォルダに移すので、あとから取り出せます。</p>"
             + "".join(_btn(a) for a in backs) + "</section>") if backs else ""
-    body = head + episode_html(song.get("episode")) + "".join(secs) + back
+    body = head + episode_html(song.get("episode")) + lyrics_ja_html(song) + "".join(secs) + back
     return PAGE.replace("__BODY__", body).replace("__TOKEN__", token).replace("__AUTO__", "false" if all_done else "true")
 
 

@@ -132,7 +132,21 @@ def summary(d: dict) -> dict:
             "realized": ep.get("realized", ""), "lyrics": d.get("suno_lyrics", ""), "style": d.get("suno_style_prompt", ""),
             "exclude": d.get("suno_exclude", "") or "", "cover": d.get("cover_prompt_seed", ""), "notes": d.get("notes_ja", ""),
             "bpm": d.get("bpm"), "history": ir.get("history", []),
-            "collab": (d.get("featured_guest") or {}).get("name", ""), "collab_score": ((d.get("featured_guest") or {}).get("fit") or {}).get("score")}
+            "collab": (d.get("featured_guest") or {}).get("name", ""), "collab_score": ((d.get("featured_guest") or {}).get("fit") or {}).get("score"),
+            "lyrics_ja": _ja_pairs(d)}
+
+
+def _ja_pairs(d: dict) -> list | None:
+    """歌詞の日本語訳（[元の行, 訳の行] の並び。作ってあるものだけ。決定 107）"""
+    try:
+        import lyrics_ja
+        lyr = d.get("suno_lyrics", "")
+        if d.get("language") == "none" or not lyrics_ja.needed(lyr, d.get("language")):
+            return None
+        tr = lyrics_ja.get(lyr)
+        return [list(x) for x in lyrics_ja.pairs(lyr, tr)] if tr else []
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def _refs_count() -> int:
