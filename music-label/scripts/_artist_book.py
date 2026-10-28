@@ -414,6 +414,51 @@ class ReadOnlyBook(Exception):
 # ---------------------------------------------------------------------------
 # Excel ファイル（作成とデザインもここ）
 # ---------------------------------------------------------------------------
+class BookBusy(Exception):
+    """ほかの仕事が管理表に書き込んでいて、待っても空かなかった"""
+
+
+_BOOK_LOCK = OUT / "artist_book" / ".book.lock"
+
+
+class book_lock:
+    """管理表（Excel）への書き込みを 1 つずつにする鍵。ダッシュボードの承認・保存と、定期実行・ほかの仕事が同時に書くと、
+    書きかけのファイルを読んで失敗したり、片方の書き込みが消えたりするため（決定 119）。鍵は Mac の中（out/）に置く"""
+
+    def __init__(self, wait: float = 120.0) -> None:
+        self.wait, self.f = wait, None
+
+    def __enter__(self):
+        import fcntl
+        _BOOK_LOCK.parent.mkdir(parents=True, exist_ok=True)
+        self.f = open(_BOOK_LOCK, "w")
+        end = time.time() + self.wait
+        while True:
+            try:
+                fcntl.flock(self.f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return self
+            except BlockingIOError:
+                if time.time() > end:
+                    self.f.close()
+                    raise BookBusy("ほかの仕事が管理表に書き込んでいます。少し待ってから、もう一度押してください") from None
+                time.sleep(0.2)
+
+    def __exit__(self, *exc) -> None:
+        import fcntl
+        fcntl.flock(self.f, fcntl.LOCK_UN)
+        self.f.close()
+
+
+def save_atomic(wb, path: Path) -> None:
+    """となりに書き終えてから差し替える（書いている途中のファイルを、ほかの仕事が読まないように）"""
+    tmp = path.with_name(f".{path.stem}.{os.getpid()}.tmp.xlsx")
+    try:
+        wb.save(tmp)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
 class XlsxBook:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -423,13 +468,18 @@ class XlsxBook:
 
     def create(self, data: dict[str, list[dict]] | None = None) -> None:
         """デザイン付きで丸ごと書き出す（data があれば中身ごと）"""
-        write_designed(self.path, data or {t: [] for t in TAB_ORDER})
+        with book_lock():
+            write_designed(self.path, data or {t: [] for t in TAB_ORDER})
 
     def read(self) -> dict[str, list[dict]]:
         from openpyxl import load_workbook
         return read_workbook(load_workbook(self.path, data_only=True))
 
     def append(self, tab: str, rows: list[dict]) -> None:
+        with book_lock():
+            self._append(tab, rows)
+
+    def _append(self, tab: str, rows: list[dict]) -> None:
         from openpyxl import load_workbook
         wb = load_workbook(self.path)
         if TABS[tab][0] not in wb.sheetnames:   # 新しく足したタブ（コラボの相性など）が無い管理表：デザインごと作り直してから足す
@@ -450,13 +500,17 @@ class XlsxBook:
                 c = max([i["_pos"] for i in items] + [1]) + 1
                 write_col(ws, tab, c, d, lay["rows"], acts)
                 items.append({"_pos": c})
-        wb.save(self.path)
+        save_atomic(wb, self.path)
 
     def update(self, tab: str, pos: int, key: str, value) -> None:
         self.update_many([(tab, pos, key, value)])
 
     def update_many(self, edits: list[tuple[str, int, str, object]]) -> None:
         """(タブ, 位置, 項目, 値) をまとめて書き込む。位置は横型なら行番号、縦型なら列番号"""
+        with book_lock():
+            self._update_many(edits)
+
+    def _update_many(self, edits: list[tuple[str, int, str, object]]) -> None:
         from openpyxl import load_workbook
         wb = load_workbook(self.path)
         lays: dict[str, dict] = {}
@@ -470,7 +524,7 @@ class XlsxBook:
                 ws.cell(row=pos, column=lay["heads"].index(key_to_header(tab)[key]) + 1, value=v)
             else:
                 ws.cell(row=lay["rows"][key], column=pos, value=v)
-        wb.save(self.path)
+        save_atomic(wb, self.path)
 
 
 def read_workbook(wb) -> dict[str, list[dict]]:
@@ -736,7 +790,7 @@ def write_designed(path: Path, data: dict[str, list[dict]]) -> None:
     wb.calculation.fullCalcOnLoad = True   # 開いたときに件数の数式を計算し直す
     path.parent.mkdir(parents=True, exist_ok=True)
     carry_extra_sheets(path, wb)   # 決まったタブ以外（詰まっているところ など）は前の Excel から引き継ぐ
-    wb.save(path)
+    save_atomic(wb, path)
 
 
 # ---------------------------------------------------------------------------

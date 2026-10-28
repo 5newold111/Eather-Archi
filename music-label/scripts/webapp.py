@@ -185,12 +185,18 @@ def _status_json() -> dict:
         quota = suno_quota.status()
     except Exception as e:  # noqa: BLE001
         quota = {"on": False, "error": str(e)}
+    try:   # アーティスト追加：承認待ちの組の項目の要約・デビューが近い組・管理表の組の一覧（決定 119）
+        import act_review
+        _, book = act_review.book_data()
+        acts = {**act_review.review(book), "index": act_review.acts_index(book)}
+    except Exception as e:  # noqa: BLE001
+        acts = {"acts": [], "pending": 0, "upcoming": [], "index": [], "error": str(e)}
     try:   # 最後に自動で反映した更新（決定 108）
         upd = read_json(OUT / "update" / "last.json") if (OUT / "update" / "last.json").exists() else {}
     except Exception:  # noqa: BLE001
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
-            "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota,
+            "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -234,6 +240,24 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "influences.py"), "--analyze"], "影響を受けたアーティストの曲を解析する"
     if action == "collab_fit":   # まだ吟味していない組み合わせのコラボの相性（決定 97）
         return [PY, str(S / "collab_fit.py")], "コラボの相性を吟味する"
+    if action in ("act_approve", "act_reject", "act_debut"):   # アーティスト追加：項目ごとの承認・却下、デビューの承認（決定 119）
+        import act_review
+        try:
+            rv = act_review.review()
+        except Exception:  # noqa: BLE001
+            return None
+        a = next((x for x in rv["acts"] if x["id"] == p.get("id")), None)
+        if not a:
+            return None
+        if action == "act_debut":
+            return [PY, str(S / "act_review.py"), "debut", a["id"]], f"{a['name']} をデビューさせる"
+        it = next((i for i in a["items"] if i["tab"] == p.get("tab")), None)
+        if not it:
+            return None
+        if action == "act_approve":
+            return [PY, str(S / "act_review.py"), "approve", a["id"], it["tab"]], f"{a['name']}：「{it['name']}」を承認"
+        return ([PY, str(S / "act_review.py"), "reject", a["id"], it["tab"], "--reason", str(p.get("reason") or "")[:300]],
+                f"{a['name']}：「{it['name']}」を却下")
     if action == "art_taste":   # まだ行の無い組のアートの好み（絵柄・テイスト・グラフィック・好きな漫画と映画。決定 118）
         return [PY, str(S / "art_taste.py")], "組ごとのアートの好みを書く"
     if action == "explore_report":   # 曲ごとの方向性の伸びと、くじの確率（決定 96）
@@ -502,7 +526,8 @@ h2{font-weight:500;font-size:16px;margin:24px 0 10px}.sub{color:var(--sub);font-
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 12px}
 .tab{background:none;color:var(--sub);border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;padding:8px 16px;font:inherit;cursor:pointer}
 .tab[aria-selected=true]{background:var(--card);color:var(--ink);border-color:var(--line);margin-bottom:-1px;font-weight:600}
-.tab .n{font-size:12px;color:var(--sub);margin-left:4px;font-weight:400}
+.tab .n{font-size:12px;color:var(--sub);margin-left:4px;font-weight:400}.tab .n.alert{color:var(--crit);font-weight:700}
+dialog.wide{max-width:min(900px,calc(100vw - 32px))}.fld{margin:8px 0}.fld>label{display:block;font-size:13px;margin-bottom:3px}.fld textarea,.fld input[type=number],.fld select{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}.fld input[type=number]{max-width:10em}details.sh{border:1px solid var(--line);border-radius:8px;padding:6px 10px;margin:8px 0}details.sh summary{cursor:pointer;font-weight:600}form.sh-row{border-top:1px dashed var(--line);padding-top:8px;margin-top:8px}.sh-msg{font-size:13px;color:var(--sub)}.rv-s{font-size:13px;color:var(--sub);margin:4px 0;white-space:pre-line}.rv-b{margin-top:4px}ul.list li.rv-done{border-left-color:var(--good)}ul.list li.rv-ng{border-left-color:var(--crit)}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:0 0 8px}.legend span{display:inline-flex;align-items:center;gap:5px}
 .sw{display:inline-block;width:22px;height:12px;border-radius:3px;border:1.5px solid}
 .gwrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:70vh}
@@ -567,6 +592,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
  <button class="tab" role="tab" id="tab-irregular" aria-controls="pane-irregular">不定期・毎日配信<span class="n" id="n-irregular"></span></button>
  <button class="tab" role="tab" id="tab-debut" aria-controls="pane-debut">デビュー<span class="n" id="n-debut"></span></button>
+ <button class="tab" role="tab" id="tab-acts" aria-controls="pane-acts">アーティスト追加<span class="n" id="n-acts"></span></button>
 </div>
 <div class="legend" aria-label="凡例">
  <span><i class="sw" style="background:var(--good-t);border-color:var(--good)"></i>✓ 済み</span>
@@ -601,6 +627,12 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
  <details><summary>曲の一覧</summary><div id="songs-debut"></div></details>
 </section>
+<section id="pane-acts" role="tabpanel" aria-labelledby="tab-acts" hidden>
+ <p class="sub">新しくデビューする組の、管理表の項目（人物・メンバー・音・見た目など）を 1 つずつ要約して並べます。読んで「承認」か「却下」を押してください。全部の項目を決めると「この組をデビューさせる」が押せます（デビュー日の予約まで自動）。新しい組の案ができたり、デビューが近づいたりすると、このタブに知らせが出ます。</p>
+ <div id="acts-upcoming"></div>
+ <h2>承認待ちの組</h2><div id="acts-review"></div>
+ <div class="panel act-only" id="acts-edit"></div>
+</section>
 <h2>仕組みの詰まり</h2><div id="system"></div>
 <p class="sub act-only" id="upd-info"></p>
 <details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
@@ -627,10 +659,11 @@ function dailyBox(){const el=document.getElementById("daily-box"),D=DATA.daily||
   el.innerHTML=`<b>毎日配信：${E(D.start)}〜${E(D.end)}（${D.days} 日）</b><p class="sub">曲がある日 ${D.filled}/${D.days}。持ち回り：${(D.order||[]).map(E).join(" → ")}。${nx}</p>`
     +`<button data-act="daily_make" data-confirm="21 日先までの、曲がまだ無い日の曲を作ります（参考曲の割り当て → Claude が書く。1 曲 約 30 円）。始めますか？">毎日配信の曲を作る（21 日先まで）</button> `
     +`<button class="ghost" data-act="daily_stop" data-confirm="毎日配信を止めて、ふだんの毎週の制作に戻します（作った曲と配信日はそのまま）。止めますか？">毎日配信を止める</button>`+sns}
-function selectTab(t){TAB=t;for(const k of TABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
+const ALLTABS=[...TABS,"acts"];   // 「アーティスト追加」はガントチャートの無いタブ（決定 119）
+function selectTab(t){TAB=t;for(const k of ALLTABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
   if(!location.hash.startsWith("#"+t))history.replaceState(null,"","#"+t)}
-for(const k of TABS)document.getElementById("tab-"+k).onclick=()=>selectTab(k);
-selectTab(TABS.find(k=>location.hash.startsWith("#"+k))||"regular");
+for(const k of ALLTABS)document.getElementById("tab-"+k).onclick=()=>selectTab(k);
+selectTab(ALLTABS.find(k=>location.hash.startsWith("#"+k))||"regular");
 const OPEN={};
 function gantt(key){
   const sec=DATA.timeline[key],el=document.getElementById("g-"+key);
@@ -787,6 +820,8 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="suno_retake"){p.why=[...b.closest(".rt").querySelectorAll("input:checked")].map(x=>x.value).join(",");if(!p.why){alert("良くなかったところを 1 つ以上選んでください");return}}
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
+  if(b.dataset.tab)p.tab=b.dataset.tab;
+  if(b.dataset.act==="act_reject"){const why=prompt("却下する理由（あとで直すときの手がかりになります。空でもかまいません）","");if(why===null)return;p.reason=why}
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});
 // ---- Suno のダウンロード枠（決定 105）
@@ -869,12 +904,70 @@ document.addEventListener("click",e=>{const pk=e.target.closest("[data-pick]");i
   if(op==="redo"){const reason=(document.getElementById("irr-reason")||{}).value||"";if(!confirm("この案を却下して、新しい案を作りますか？"+(reason?"":"\n（理由は空のままでも作り直せます）")))return;
     act("irregular_propose",{slug:b.dataset.slug,redo:id,reason},b);const dj=document.getElementById("dlg-job");if(dj){dj.className="job running";dj.textContent="新しい案を作っています…（できたら、このポップアップが新しい案に変わります）"}}});
 document.addEventListener("keydown",e=>{const li=e.target.closest&&e.target.closest("li[data-draft]");if(li&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openDraft(li.dataset.draft)}});
+// ---- アーティスト追加（決定 119）：承認待ちの組の項目ごとの要約と承認・デビューの知らせ・管理表を見て直す
+const RST={pending:["wait","● 承認待ち"],mixed:["wait","● 一部が承認待ち"],approved:["done","✓ 承認済み"],rejected:["ng","✕ 却下"]};
+function actsTab(){const A=DATA.acts_review||{acts:[],upcoming:[],index:[]},acts=A.acts||[],up=A.upcoming||[];
+  const n=document.getElementById("n-acts"),soon=up.filter(u=>u.soon);
+  n.textContent=(A.pending?`承認待ち ${A.pending}`:"")+(soon.length?`${A.pending?"・":""}★ デビュー間近 ${soon.length} 組`:"");
+  n.classList.toggle("alert",!!(A.pending||soon.length));
+  document.getElementById("acts-upcoming").innerHTML=up.length?`<ul class="list">${up.map(u=>`<li class="${u.soon?"":"rv-done"}">★ <b>${E(u.name)}</b> がデビューします：${E(u.debut_week)} の週（${u.days>0?`あと ${u.days} 日`:"今週"}）</li>`).join("")}</ul>`:"";
+  const box=document.getElementById("acts-review");
+  if(A.error)box.innerHTML=`<p class="empty">管理表を読めませんでした（${E(A.error)}）。SSD をつないでから、もう一度開いてください。</p>`;
+  else box.innerHTML=acts.length?acts.map(a=>{const left=a.items.filter(i=>i.state==="pending"||i.state==="mixed").length;
+    return `<div class="panel ${a.ready?"done":""}"><h3 style="margin:0 0 4px">${E(a.name)} <span class="sub">${E(a.label)}${a.formation?`・${E(a.formation)}`:""}</span></h3>
+    <p class="sub" style="margin:0 0 8px">${E(a.summary)}</p>
+    <ul class="list">${a.items.map(i=>{const [c,t]=RST[i.state]||["plan",i.state];
+      return `<li class="${c==="done"?"rv-done":c==="ng"?"rv-ng":""}"><span class="badge ${c}">${t}</span> <b>${E(i.name)}</b>${i.count>1?`（${i.count} 行）`:""}<div class="rv-s">${E(i.summary)}</div>
+      <div class="act-only rv-b">${i.state==="pending"||i.state==="mixed"?`<button data-act="act_approve" data-id="${E(a.id)}" data-tab="${E(i.tab)}">承認</button> `:""}${i.state!=="rejected"?`<button class="ghost" data-act="act_reject" data-id="${E(a.id)}" data-tab="${E(i.tab)}">却下</button> `:""}<button class="ghost" data-edit="${E(a.id)}" data-tab="${E(i.tab)}">中身を見る・直す</button></div></li>`}).join("")}</ul>
+    <div class="act-only" style="margin-top:8px">${a.ready?`<button data-act="act_debut" data-id="${E(a.id)}" data-confirm="${E(a.name)} の項目を全部決めました。この組を採用して設定書に取り込み、デビュー日を予約します。進めますか？">この組をデビューさせる</button>`
+      :`<span class="sub">全部の項目を「承認」か「却下」にすると「この組をデビューさせる」が押せます（残り ${left} 項目）。却下した項目は「中身を見る・直す」で直し、状態を『提案』に戻すと、また承認できます。</span>`}</div></div>`}).join("")
+    :`<p class="empty">承認待ちの組はありません。新しい組の案ができると、ここに項目ごとの要約が並び、タブに「承認待ち」の数が出ます。</p>`;
+  const ed=document.getElementById("acts-edit");if(ed.contains(document.activeElement))return;
+  const idx=A.index||[];
+  ed.innerHTML=`<b>管理表を見る・直す</b><p class="sub">もうデビューした組も含めて、管理表に書いてある中身をここで見て直せます。保存すると管理表に書き込み、設定書に取り込み直します（次の曲づくり・ジャケットから使われます）。</p>`
+    +(idx.length?`<select id="acts-pick" aria-label="組を選ぶ">${idx.map(x=>`<option value="${E(x.id)}">${E(x.name)}（${E(x.status)}）</option>`).join("")}</select> <button data-edit-pick="1">開く</button>`:`<p class="empty">管理表に組がありません（SSD をつないでください）</p>`)}
+let SHEET=null;
+const STS=["提案","採用","却下","反映済み"];
+const listText=v=>(Array.isArray(v)?v:String(v??"").split("\n")).map(x=>String(x).trim()).filter(Boolean).join("\n");
+function fieldHTML(f,id){const lab=`<label for="${id}"><b>${E(f.label)}</b>${f.help?` <span class="sub">${E(f.help)}</span>`:""}</label>`;
+  if(f.key==="id")return `<div class="fld"><label><b>${E(f.label)}</b>（直せません）</label><code>${E(f.value)}</code></div>`;
+  if(f.key==="status"){const cur=String(f.value??"");return `<div class="fld">${lab}<select id="${id}">${[...new Set([cur,...STS])].map(o=>`<option value="${E(o)}"${o===cur?" selected":""}>${E(o||"（空＝採用）")}</option>`).join("")}</select></div>`}
+  if(f.kind==="bool")return `<div class="fld"><label><input type="checkbox" id="${id}"${f.value?" checked":""}> <b>${E(f.label)}</b>${f.help?` <span class="sub">${E(f.help)}</span>`:""}</label></div>`;
+  if(f.kind==="int")return `<div class="fld">${lab}<input type="number" id="${id}" value="${E(f.value??"")}"></div>`;
+  const v=f.kind==="list"?listText(f.value):String(f.value??"");
+  const rows=Math.min(10,Math.max(f.kind==="list"?2:1,v.split("\n").length,Math.ceil(v.length/46)));
+  return `<div class="fld">${lab}${f.kind==="list"?`<span class="sub">（1 行に 1 つ）</span>`:""}<textarea id="${id}" rows="${rows}">${E(v)}</textarea></div>`}
+async function openSheet(aid,focus){const dl=document.getElementById("dlg"),body=document.getElementById("dlg-body");
+  dl.classList.add("wide");body.innerHTML="<p>管理表を読んでいます…</p>";if(!dl.open)dl.showModal();
+  let j;try{const r=await fetch("/api/book/act?id="+encodeURIComponent(aid));j=await r.json();if(!r.ok)throw new Error(j.error||"読めませんでした")}
+  catch(e){body.innerHTML=`<p>${E(e.message||"読めませんでした")}</p>`;return}
+  SHEET=j;
+  body.innerHTML=`<h3 id="dlg-title">${E(j.name)} の管理表</h3><p class="sub">項目を直して「この行を保存」を押すと、管理表に書き込みます（直したところだけ）。リストの項目は 1 行に 1 つ。組の ID は直せません（ほかのタブとのつながりが切れるため）。</p><div id="dlg-job"></div>`
+    +j.tabs.map((t,ti)=>`<details class="sh"${t.tab===focus||(!focus&&ti===0)?" open":""}><summary>${E(t.name)}${t.rows.length>1?`（${t.rows.length} 行）`:""}</summary>`
+      +t.rows.map((r,ri)=>`<form class="sh-row" data-ti="${ti}" data-ri="${ri}">${t.rows.length>1?`<p class="sub" style="margin:0">${ri+1} 行目${r.status?`・${E(r.status)}`:""}</p>`:""}${r.fields.map((f,fi)=>fieldHTML(f,`f-${ti}-${ri}-${fi}`)).join("")}<button type="submit">この行を保存</button> <span class="sh-msg" role="status"></span></form>`).join("")+`</details>`).join("");
+  const d=focus&&body.querySelector("details[open]");if(d)d.scrollIntoView({block:"start"})}
+async function saveRow(form){if(STATIC||!SHEET)return;const ti=+form.dataset.ti,ri=+form.dataset.ri,t=SHEET.tabs[ti],r=t.rows[ri],vals={};
+  r.fields.forEach((f,fi)=>{if(f.key==="id")return;const el=document.getElementById(`f-${ti}-${ri}-${fi}`);if(!el)return;
+    const v=f.kind==="bool"?el.checked:f.kind==="list"?listText(el.value):el.value,old=f.kind==="bool"?!!f.value:f.kind==="list"?listText(f.value):String(f.value??"");
+    if(v!==old)vals[f.key]=v});
+  const msg=form.querySelector(".sh-msg"),btn=form.querySelector("button[type=submit]");
+  if(!Object.keys(vals).length){msg.textContent="変わったところがありません";return}
+  btn.disabled=true;msg.textContent="管理表に書き込んでいます…";
+  try{const res=await fetch("/api/book/save",{method:"POST",headers:{"Content-Type":"application/json","X-Label-Token":TOKEN},body:JSON.stringify({tab:t.tab,pos:r.pos,values:vals})});
+    const j=await res.json();if(!res.ok){msg.textContent="✕ "+(j.error||"書き込めませんでした");return}
+    msg.textContent=`✓ ${j.message}（${Object.keys(vals).length} 項目）。設定書に取り込み直しています`;
+    r.fields.forEach(f=>{if(f.key in vals)f.value=f.kind==="list"?vals[f.key].split("\n"):vals[f.key]});
+    if(j.job)watch(j.job)}catch(e){msg.textContent="✕ 書き込めませんでした"}finally{btn.disabled=false}}
+document.addEventListener("submit",e=>{const f=e.target.closest&&e.target.closest("form.sh-row");if(!f)return;e.preventDefault();saveRow(f)});
+document.addEventListener("click",e=>{const b=e.target.closest("button[data-edit],button[data-edit-pick]");if(!b||STATIC)return;
+  if(b.dataset.editPick){const sel=document.getElementById("acts-pick");if(sel)openSheet(sel.value)}else openSheet(b.dataset.edit,b.dataset.tab)});
+document.getElementById("dlg").addEventListener("close",()=>document.getElementById("dlg").classList.remove("wide"));
 function render(){
   document.getElementById("upd").textContent=DATA.generated+" 時点";
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  irrForm();irrDrafts();dailyBox();quotaBox();
+  irrForm();irrDrafts();dailyBox();quotaBox();actsTab();
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
      +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")
@@ -1004,6 +1097,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read_bytes(), ctype, extra=extra)
         if path == "/api/busy":   # 自動の更新（self_update.py）が、動いている仕事を待つために見る（決定 108）
             return self._json(200, {"running": [j["label"] for j in JOBS.values() if j["state"] == "running"], "version": VERSION})
+        if path == "/api/book/act":   # 管理表の、1 組ぶんの全部のタブ（ダッシュボードで見て直す。決定 119）
+            import act_review
+            aid = (parse_qs(urlparse(self.path).query).get("id") or [""])[0]
+            try:
+                if aid not in {x["id"] for x in act_review.acts_index()}:
+                    return self._json(404, {"error": "その組は管理表にありません"})
+                return self._json(200, act_review.act_sheet(aid))
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": f"管理表を読めませんでした：{e}"})
         if path == "/api/status":
             try:
                 return self._json(200, status_json())
@@ -1021,6 +1123,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._upload()
         if urlparse(self.path).path == "/api/irregular":
             return self._irregular()
+        if urlparse(self.path).path == "/api/book/save":
+            return self._book_save()
         if urlparse(self.path).path != "/api/action":
             return self._json(404, {"error": "見つかりません"})
         try:
@@ -1038,6 +1142,29 @@ class Handler(BaseHTTPRequestHandler):
                 if j["state"] == "running" and j["label"].startswith("ブラウザで入力"):
                     stop_job(j["id"])
         return self._json(200, {"job": start_job(*found)})
+
+    def _book_save(self):
+        """管理表の 1 行（縦型のタブは 1 列）を書き換えて、設定書に取り込み直す（決定 119）"""
+        import act_review
+        try:
+            n = min(int(self.headers.get("Content-Length", "0")), 300000)
+            p = json.loads(self.rfile.read(n) or b"{}")
+            tab, pos, values = str(p.get("tab", "")), int(p.get("pos")), p.get("values")
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return self._json(400, {"error": "内容が読めません"})
+        if not isinstance(values, dict):
+            return self._json(400, {"error": "内容が読めません"})
+        with LOCK:
+            try:
+                wrote, msg = act_review.save_fields(tab, pos, values)
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": f"管理表に書き込めませんでした：{e}"})
+        if not wrote:
+            return self._json(400, {"error": msg})
+        job = None
+        if not any(j["state"] == "running" and j["label"] == "管理表を設定書に取り込む" for j in JOBS.values()):
+            job = start_job([PY, str(S / "artist_book.py"), "pull", "--if-exists"], "管理表を設定書に取り込む")
+        return self._json(200, {"ok": True, "wrote": wrote, "message": msg, "job": job})
 
 
 UPLOAD_MAX = 400 * 1024 * 1024     # 1 曲の WAV でも足りる大きさ

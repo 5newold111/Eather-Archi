@@ -11,6 +11,7 @@
                    ・全部のレーベルが上限に達していたら、新しい子レーベルの候補をレポートに書く（アカウント作成は人）
   propose          今すぐ 1 組を管理表に提案する（--label を指定。--legacy で旧方式＝設定書を直接下書きして予約）
   cancel           予約した新人を取り消す（--artist を指定）
+  book             管理表で採用された組のデビューだけを予約する（新しい提案はしない。ダッシュボードの承認から。決定 119）
 
   追加の条件
     Postdog Records（drive）     : 毎月（1 日のある週ごとに 1 組。予約済みの新人がいる間は増やさない）
@@ -288,7 +289,7 @@ def schedule_debut(artist: dict) -> date:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="レーベルの拡大（月 1 組・隔週への切り替え）")
-    ap.add_argument("command", choices=["check", "propose", "cancel"])
+    ap.add_argument("command", choices=["check", "propose", "cancel", "book"])
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--label")
     ap.add_argument("--artist")
@@ -296,6 +297,17 @@ def main() -> None:
     ap.add_argument("--legacy", action="store_true", help="propose：管理表を通さず設定書を直接下書きして予約する（旧方式）")
     a = ap.parse_args()
     today = date.today()
+
+    if a.command == "book":   # 採用した組のデビューだけを予約する（ダッシュボードの「この組をデビューさせる」から。決定 119）
+        n = 0
+        for lab in labels():
+            for art in adopted_unbooked(lab):
+                debut = schedule_debut(art)
+                notify("EtherArchi：採用した組のデビューを予約しました", f"{art['name']} を {debut} の週に予約")
+                step(f"{art['name']}（{art['slug']}）を {debut} の週にデビュー予約しました（取り消し：expand_label.py cancel --artist {art['slug']}）")
+                n += 1
+        print(f"【結果】デビューを予約した組：{n}")
+        return
 
     if a.command == "cancel":
         if not a.artist:
