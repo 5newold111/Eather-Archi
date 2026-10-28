@@ -111,6 +111,13 @@ def cmd_import_json(a) -> None:
 # ---------------------------------------------------------------------------
 # 管理表 → 設定書
 # ---------------------------------------------------------------------------
+def art_taste_of(rows: list[dict]) -> dict:
+    """「アートの好み」タブの行（採用の 1 行目）→ 設定書の visual.art_taste（実在の名前は入れない。決定 118）"""
+    r = rows[0] if rows else {}
+    return {k: r.get(k) for k in ("mediums", "imagery", "taste", "graphic", "type_feel", "colors", "from_works", "avoid", "collab_touch")
+            if r.get(k)}
+
+
 def group(data: dict, aid: str, tab: str, only_adopted: bool = True) -> list[dict]:
     rows = [r for r in data.get(tab, []) if r.get("act_id") == aid]
     return adopted(rows) if only_adopted else rows
@@ -199,7 +206,8 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
                    "tone": music.get("tone", ""), "forbidden_topics": music.get("avoid_topics", []),
                    "mode": LYRIC_MODE.get(music.get("lyric_mode", ""), "core_fixed"),
                    "suno_share": 0.45, "topic_only_ratio": 0.2},
-        "visual": {"space": vis.get("space", ""), "light": vis.get("light", ""), "materials": vis.get("materials", []),
+        "visual": {"art_taste": art_taste_of(group(data, aid, "art")),   # アートの好み（決定 118）
+                   "space": vis.get("space", ""), "light": vis.get("light", ""), "materials": vis.get("materials", []),
                    "palette": vis.get("palette", []), "camera": vis.get("camera", ""),
                    "cover_series_rule": vis.get("cover_rule", ""),
                    "blend_file": (old.get("visual") or {}).get("blend_file"),
@@ -223,7 +231,10 @@ def build_sheet(act: dict, data: dict, old: dict | None) -> tuple[dict, list[str
                     "likes": sum((m.get("likes", []) for m in members), []),
                     "favorite_food": "、".join(sum((m.get("like_foods", []) for m in members), [])),
                     "dislikes": sum((m.get("dislikes", []) for m in members), []),
-                    "favorite_artists_real": [i.get("author") or i.get("title") for i in music_infl]},
+                    "favorite_artists_real": [i.get("author") or i.get("title") for i in music_infl],
+                    "favorite_visual_artists_real": sum((list(r.get("visual_artists_real") or []) for r in group(data, aid, "art")), []),
+                    "favorite_manga_real": sum((list(r.get("manga_real") or []) for r in group(data, aid, "art")), []),   # 決定 118
+                    "favorite_films_real": sum((list(r.get("films_real") or []) for r in group(data, aid, "art")), [])},
         "concept_history": old.get("concept_history") or {"concept_version": 1, "history": []},
         "life": {
             "act": strip_row(act),
@@ -290,6 +301,7 @@ def cmd_pull(a) -> None:
     step(f"読み込みの記録：{snap.relative_to(ROOT)}")
     if not a.dry_run and acts:   # 組が足されたら、まだ吟味していない組み合わせのコラボの相性を書く（決定 97）
         subprocess.run([sys.executable, str(ROOT / "scripts" / "collab_fit.py"), "--if-new"])
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "art_taste.py"), "--if-new"])   # アートの好みの下書き（決定 118）
 
 
 # ---------------------------------------------------------------------------

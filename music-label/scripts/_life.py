@@ -76,6 +76,10 @@ def real_names(artist: dict) -> list[str]:
     """影響・参考曲の候補に書かれた実在の名前（短すぎる語と 1 語の曲名は誤検出が多いので除く）"""
     life = artist.get("life") or {}
     out = set(artist.get("profile", {}).get("favorite_artists_real", []) or [])
+    for k in ("favorite_visual_artists_real", "favorite_manga_real", "favorite_films_real"):   # 好きな写真家・漫画・映画（決定 118）
+        for x in artist.get("profile", {}).get(k, []) or []:
+            out.add(x)
+            out.add(str(x).split("（")[0].split("(")[0].strip())   # 「タイトル（作者・年）」のタイトルだけでも除く
     for i in life.get("influences", []):
         if str(i.get("kind", "")).startswith("音楽"):
             out.add(i.get("author") or i.get("title") or "")

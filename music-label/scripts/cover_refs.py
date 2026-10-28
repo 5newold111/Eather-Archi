@@ -220,7 +220,8 @@ def _words(*xs) -> set[str]:
 def act_words(a: dict) -> set[str]:
     """組の音とビジュアルの言葉（参考ジャケットの近さを測る）"""
     snd, v = a.get("sound") or {}, a.get("visual") or {}
-    return _words(snd.get("genres"), snd.get("dna_tags"), snd.get("palette"), v.get("space"), v.get("light"), v.get("materials"),
+    t = v.get("art_taste") or {}
+    return _words(t.get("mediums"), snd.get("genres"), snd.get("dna_tags"), snd.get("palette"), v.get("space"), v.get("light"), v.get("materials"),
                   v.get("palette"), (v.get("photo_direction") or {}).get("taste"), (a.get("persona") or {}).get("scene"),
                   (a.get("lyrics") or {}).get("themes"))
 

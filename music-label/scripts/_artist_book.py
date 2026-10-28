@@ -140,6 +140,16 @@ TABS: dict[str, tuple[str, list[tuple[str, str, str]]]] = {
         ("score", "相性（1〜5）", "int"), ("why", "相性の理由", "text"),
         ("partner_brings", "相手から取り込める強み（この組の曲に客演するとき）", "text"),
         ("how", "組み方の案（この組の曲で）", "text"), ("caution", "気をつけること", "text"), ("updated", "更新日", "text")]),
+    "art": ("アートの好み", [   # 組ごとの好きな絵柄・テイスト・グラフィック（art_taste.py が組を足すたびに下書き。決定 118）
+        ("act_id", "アーティストID", "text"), ("status", "状態", "text"),
+        ("mediums", "好きな画材・手法（写真・イラスト・コラージュ・版画など）", "list"),
+        ("imagery", "好きな絵柄・モチーフ", "text"), ("taste", "テイスト（空気・時代感・仕上げ）", "text"),
+        ("graphic", "グラフィック・レイアウト（余白・配置・図形）", "text"), ("type_feel", "文字の雰囲気", "text"),
+        ("colors", "好きな色", "list"), ("visual_artists_real", "好きな写真家・デザイナー・画家（実在。画像の指示には入れない）", "list"),
+        ("manga_real", "好きな漫画（実在。タイトル（作者・年））", "list"), ("films_real", "好きな映画（実在。タイトル（監督・年））", "list"),
+        ("from_works", "漫画・映画から借りる画づくり（作品名なし）", "text"),
+        ("avoid", "避けたい絵柄・表現", "list"), ("collab_touch", "コラボで相手のジャケットに渡す要素", "text"),
+        ("updated", "更新日", "text")]),
     "changes": ("変更の提案", [
         ("act_id", "アーティストID", "text"), ("status", "状態", "text"), ("date", "日付", "text"),
         ("tab", "タブ", "text"), ("field", "項目", "text"), ("current", "今の値", "text"),
@@ -208,6 +218,11 @@ HELP = {
     ("collabs", "score"): "5＝とても合う・1＝合わない。組を足すたびに Claude が吟味して書く。直してよい（直した値が使われる）",
     ("collabs", "partner_brings"): "相手の組がこの組の曲に客演するとき、旋律・編成・歌い方に 3〜5 割ほど取り込む強み",
     ("collabs", "status"): "採用（または空）の行だけ、ダッシュボードのコラボの相手の一覧に出る。外すなら却下",
+    ("art", "visual_artists_real"): "実在の名前は管理表と設定書のプロフィールにだけ置く。画像の指示には入れない（自動で除く）",
+    ("art", "collab_touch"): "この組が客演したとき、相手の曲のジャケットに 3 割ほど混ぜる要素",
+    ("art", "manga_real"): "メンバーが本当に好きそうな実在の漫画。作品名は画像の指示には入れない（自動で除く）",
+    ("art", "films_real"): "メンバーが本当に好きそうな実在の映画。作品名は画像の指示には入れない（自動で除く）",
+    ("art", "from_works"): "好きな漫画・映画から借りる画づくり（画面の切り取り方・色の付け方・光・コマ割りの感じ）。ジャケットの指示に入る",
     ("acts", "id"): "英小文字と _ だけ（例 nao_easterly）。ほかのタブの行とつなぐ目印。あとから変えない",
     ("acts", "scene"): "この組の曲が聴かれる場面。毎週の曲づくりの前提になる。主な場面を先頭に書く（ライブハウス／パーティ・クラブ／ひとりで聴く／ドライブ。"
                        "例「ライブハウス：土曜の小箱（近い場面：パーティ・クラブ）」）。先頭の場面で曲の長さ・ブレイクの可否が決まる（決定 29）",
@@ -246,7 +261,7 @@ GROUPS = {   # タブの色分け：(見出しの色, 帯の色, 項目欄の色
 }
 TAB_GROUP = {"acts": "person", "members": "person", "timeline": "person", "debut": "person", "marks": "person",
              "influences": "person", "seeds": "song", "lyrics": "song", "updates": "song", "choices": "song",
-             "music": "song", "visual": "look", "collabs": "song", "changes": "ops"}
+             "music": "song", "visual": "look", "collabs": "song", "art": "look", "changes": "ops"}
 STATUS_STYLE = {"提案": ("FFF1C2", "7A5A00"), "採用": ("D9EFDE", "1E6B3A"), "保留": ("E8ECEF", "52626E"),
                 "却下": ("F7D9D9", "A12B2B"), "反映済み": ("DCE6F6", "1F4E99")}
 ACT_COLORS = ["F3DDB0", "CAD5EE", "CFE6D4", "D6E0E6", "E4D7EF", "F5D2C6", "DCE9C9", "F0E4BC", "CDE4EC", "EAD4DF"]
@@ -284,6 +299,7 @@ TAB_HELP = {
     "music": "1 列 = 1 組。声・歌い方・癖・音・曲の形・歌詞の決まり",
     "visual": "1 列 = 1 組。部屋・光・色・顔を見せない方法・ロゴ・写真",
     "collabs": "組と組のコラボの相性。組を足すたびに機械が吟味して書く。1 行 = この組の曲に相手が客演するとき",
+    "art": "1 行 = 1 組。ジャケットの絵柄・テイスト・グラフィックの好み。組を足すたびに機械が下書きする。直してよい（直した値が使われる）",
     "changes": "方針転換などで機械が出す変更の案",
 }
 

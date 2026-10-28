@@ -42,7 +42,7 @@ Rules:
   the way "artist.face_hiding" describes; one shows another person from the song's story ("who": "other": the "you", a passenger,
   a friend...); the third is free ("artist", "other" or "none" for a people-free detail or place).
 - Vary how the body is shown and how far away: hands in extreme close-up, waist-down, a far silhouette, an over-the-shoulder view...
-  Respect "artist.never".
+  Respect "artist.never". Choose moments that suit the act's own art taste in "artist.art_taste" (its favourite imagery and mediums).
 - Do not repeat the subjects, places or framings listed under "previous_covers" (they belong to the act's earlier songs).
 - No text, no logos, no brands, no real people, no real or identifiable buildings, signs or places.
 - Write moment / framing / place / time_light / props / human / memory_look in English; why_ja in one short Japanese sentence."""
@@ -94,8 +94,10 @@ def artist_card(slug: str) -> dict:
     members = [{k: m.get(k) for k in ("gender", "age", "height", "hair_color", "hair_length", "hair_style", "fashion", "instruments") if m.get(k)}
                for m in life.get("members", [])]
     marks = [{k: x.get(k) for k in ("where", "what") if x.get(k)} for x in life.get("marks", []) if x.get("kind") not in (None, "", "なし")]
+    t = (a.get("visual") or {}).get("art_taste") or {}
     return {"formation": a.get("formation", ""), "members_look": members, "visible_marks": marks,
-            "face_hiding": [fc.get("primary", ""), *(fc.get("secondary") or [])], "never": fc.get("never") or []}
+            "face_hiding": [fc.get("primary", ""), *(fc.get("secondary") or [])], "never": fc.get("never") or [],
+            "art_taste": {k: t.get(k) for k in ("mediums", "imagery", "taste", "from_works", "avoid") if t.get(k)}}   # 組の好きな絵柄（決定 118）
 
 
 def scenes_for(brief: dict, brief_path: Path | None = None, redo: bool = False) -> list[dict]:

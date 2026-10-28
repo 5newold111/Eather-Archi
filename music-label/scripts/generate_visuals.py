@@ -237,6 +237,34 @@ REAL_RELEASE = ("Make it look like the cover of a real album that a record label
                 "no fantasy concept-art scenery, no perfect symmetry, no lens-flare spectacle.")
 
 
+def art_taste_clause(artist: dict) -> str:
+    """組のアートの好み（管理表の「アートの好み」。実在の名前は入っていない。決定 118）"""
+    t = (artist.get("visual") or {}).get("art_taste") or {}
+    if not t:
+        return ""
+    parts = [f"mediums they love: {', '.join(t['mediums'])}" if t.get("mediums") else "",
+             f"favourite imagery: {t['imagery']}" if t.get("imagery") else "", f"taste: {t['taste']}" if t.get("taste") else "",
+             f"graphic habits: {t['graphic']}" if t.get("graphic") else "", f"colours: {', '.join(t['colors'])}" if t.get("colors") else "",
+             f"what they borrow from the comics and films they love: {t['from_works']}" if t.get("from_works") else "",
+             f"never: {', '.join(t['avoid'])}" if t.get("avoid") else ""]
+    return "This act's own taste in cover art (the cover must feel clearly theirs, not another act's): " + "; ".join(x for x in parts if x) + ". "
+
+
+def guest_touch(brief: dict) -> str:
+    """コラボの曲：客演する組の『コラボで渡す要素』を 3 割ほど（この組の見た目が先。決定 118）"""
+    g = brief.get("featured_guest") or {}
+    if not g.get("slug"):
+        return ""
+    try:
+        ga = load_artist(g["slug"], None)
+    except Exception:  # noqa: BLE001
+        return ""
+    t = (ga.get("visual") or {}).get("art_taste") or {}
+    touch = t.get("collab_touch") or "; ".join(x for x in (t.get("taste"), ", ".join(t.get("mediums") or [])) if x)
+    return (f"A guest act joins this song: bring in about a third of the guest's touch ({touch}) while keeping this act's own look first. "
+            if touch else "")
+
+
 def series_look(artist: dict) -> str:
     """組らしさ（色・カメラ・味・光の温度）だけ。場所や小物は入れない（場面は曲ごとに変える。決定 115）"""
     v = artist["visual"]
@@ -290,11 +318,12 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
                        + (f"Never: {'; '.join(fc.get('never') or [])}. " if fc.get("never") else ""))
             elif sc.get("who") == "other":
                 who = "This person is someone from the song's story, not the artist; their face is never shown. "
-            body = (cover_scene.scene_text(sc) + who + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
+            body = (cover_scene.scene_text(sc) + who + art_taste_clause(artist) + guest_touch(brief)
+                    + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
                     + f"The act's series look, kept subtle (the scene comes first): {series_look(artist)}. "
                     + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule else ""))
         else:
-            body = f"{visual_base(artist)} Series rule: {rule}. Song theme: {theme}. {seed} "
+            body = f"{visual_base(artist)} {art_taste_clause(artist)}{guest_touch(brief)}Series rule: {rule}. Song theme: {theme}. {seed} "
         body, ref = strip_names(body, artist), strip_names(ref, artist)
         out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
                     "scene": (i // 2) % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
