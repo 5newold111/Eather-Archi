@@ -546,6 +546,9 @@ dialog.wide{max-width:min(900px,calc(100vw - 32px))}.fld{margin:8px 0}.fld>label
 .b.done{background:var(--good-t);border-color:var(--good)}.b.wait{background:var(--warn-t);border-color:var(--warn)}.b.ng{background:var(--crit-t);border-color:var(--crit);font-weight:600}
 .b.run{background:transparent;border-color:var(--ink);border-style:dashed}.b.plan{background:var(--plan-t);border-color:var(--muted);border-style:dotted;color:var(--sub)}
 .m{position:absolute;width:14px;height:14px;transform:rotate(45deg);border:2px solid;cursor:pointer;z-index:2}.m.done{background:var(--good);border-color:var(--good)}.m.plan{background:var(--card);border-color:var(--muted)}
+img.zoomable{cursor:zoom-in}#zoom{width:fit-content;max-width:min(96vw,1100px)}#zoom .z-in{padding:12px}
+#zoom img{display:block;margin:0 auto;max-width:min(92vw,1060px);max-height:76vh;width:auto;height:auto;border-radius:6px;cursor:zoom-out}
+#zoom .z-bar{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:10px;font-size:13px;text-align:center}
 #tip{position:fixed;z-index:20;max-width:320px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.15);pointer-events:none;display:none}
 .panel{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;margin:12px 0}
 .panel.ng{border-left-color:var(--crit)}.panel.done{border-left-color:var(--good)}
@@ -642,6 +645,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
 </main>
 <div id="tip" role="tooltip"></div>
+<dialog id="zoom" aria-label="ジャケットの候補を大きく見る"><div class="z-in" id="zoom-body"></div></dialog>
 <dialog id="dlg" aria-labelledby="dlg-title"><form method="dialog"><button class="x" aria-label="閉じる">×</button></form><div class="dlg-in" id="dlg-body"></div></dialog>
 <script>
 const TOKEN="__TOKEN__";const STATIC=__STATIC__;
@@ -722,7 +726,7 @@ let ACTS=[];
 function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
   switch(a.kind){
    case "run":return `<button class="act-only ${a.primary?"":"ghost"}" data-act="${E(a.action)}" ${a.slug?`data-slug="${slug}"`:""} ${a.id?`data-id="${id}"`:""} ${a.week?`data-week="${E(a.week)}"`:""} ${a.site?`data-site="${E(a.site)}"`:""} ${a.to?`data-to="${E(a.to)}"`:""} ${a.service?`data-service="${E(a.service)}"`:""} ${a.redo?`data-redo="1"`:""} ${a.job?`data-job="${E(a.job)}"`:""} ${a.confirm?`data-confirm="${E(a.confirm)}"`:""}>${E(a.label)}</button>`;
-   case "cover_pick":return `<span class="act-only" style="display:inline-block;width:150px;vertical-align:top;font-size:12px"><img src="${E(a.img)}" alt="ジャケットの候補 ${E(a.no)}" loading="lazy" style="width:150px;height:150px;object-fit:cover;border-radius:6px;display:block;margin-bottom:4px;border:1px solid var(--line)"><button data-act="cover" data-id="${id}" data-no="${E(a.no)}">${E(a.label)}</button>${a.note?`<span class="sub" style="display:block">${E(a.note)}</span>`:""}</span>`;
+   case "cover_pick":return `<span class="act-only" style="display:inline-block;width:150px;vertical-align:top;font-size:12px"><img class="zoomable" tabindex="0" title="押すと大きく表示" data-id="${id}" data-no="${E(a.no)}" data-label="${E(a.label)}" data-note="${E(a.note||"")}" src="${E(a.img)}" alt="ジャケットの候補 ${E(a.no)}" loading="lazy" style="width:150px;height:150px;object-fit:cover;border-radius:6px;display:block;margin-bottom:4px;border:1px solid var(--line)"><button data-act="cover" data-id="${id}" data-no="${E(a.no)}">${E(a.label)}</button>${a.note?`<span class="sub" style="display:block">${E(a.note)}</span>`:""}</span>`;
    case "copy":return `<button class="ghost" data-copy="${i}">${E(a.label)}</button>`;
    case "link":return `<a class="btn" href="${E(a.url)}" target="_blank" rel="noopener">${E(a.label)} ↗</a>`;
    case "terminal":return `<button class="ghost act-only" data-act="terminal" data-key="${E(a.key)}">${E(a.label)}</button>`;
@@ -966,6 +970,23 @@ document.addEventListener("submit",e=>{const f=e.target.closest&&e.target.closes
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-edit],button[data-edit-pick]");if(!b||STATIC)return;
   if(b.dataset.editPick){const sel=document.getElementById("acts-pick");if(sel)openSheet(sel.value)}else openSheet(b.dataset.edit,b.dataset.tab)});
 document.getElementById("dlg").addEventListener("close",()=>document.getElementById("dlg").classList.remove("wide"));
+// ---- ジャケットの候補：画像を押すと大きく表示（← → で前後の候補・その場で選べる。決定 121）
+let ZOOM=[],ZI=0;
+function zoomShow(){const z=ZOOM[ZI],many=ZOOM.length>1;
+  document.getElementById("zoom-body").innerHTML=`<img src="${E(z.src)}" alt="${E(z.alt)}" data-zoom-close="1">`
+   +`<div class="z-bar">${many?`<button class="ghost" data-zoom-step="-1" aria-label="前の候補">← 前</button>`:""}<span><b>${E(z.alt)}</b>（${ZI+1}/${ZOOM.length}）${z.note?`<span class="sub" style="display:block">${E(z.note)}</span>`:""}</span>`
+   +`${many?`<button class="ghost" data-zoom-step="1" aria-label="次の候補">次 →</button>`:""}`
+   +`${z.id&&!STATIC?`<button data-act="cover" data-id="${E(z.id)}" data-no="${E(z.no)}" data-zoom-close="1">${E(z.label||"この候補にする")}</button>`:""}<button class="ghost" data-zoom-close="1">閉じる</button></div>`}
+function zoomOpen(img){const all=[...(img.closest(".dlg-in")||document).querySelectorAll("img.zoomable")];
+  ZOOM=all.map(x=>({src:x.src,alt:x.alt,note:x.dataset.note||"",id:x.dataset.id||"",no:x.dataset.no||"",label:x.dataset.label||""}));
+  ZI=Math.max(0,all.indexOf(img));zoomShow();const d=document.getElementById("zoom");if(!d.open)d.showModal()}
+function zoomStep(n){ZI=(ZI+n+ZOOM.length)%ZOOM.length;zoomShow()}
+document.addEventListener("click",e=>{const img=e.target.closest("img.zoomable");if(img){zoomOpen(img);return}
+  const st=e.target.closest("[data-zoom-step]");if(st){zoomStep(+st.dataset.zoomStep);return}
+  const d=document.getElementById("zoom");if(d.open&&(e.target===d||e.target.closest("[data-zoom-close]")))d.close()});
+document.addEventListener("keydown",e=>{const d=document.getElementById("zoom");
+  if(d.open&&ZOOM.length>1&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){e.preventDefault();zoomStep(e.key==="ArrowRight"?1:-1);return}
+  const img=e.target.closest&&e.target.closest("img.zoomable");if(img&&(e.key==="Enter"||e.key===" ")){e.preventDefault();zoomOpen(img)}});
 function render(){
   document.getElementById("upd").textContent=DATA.generated+" 時点";
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
