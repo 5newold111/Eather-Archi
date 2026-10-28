@@ -102,6 +102,20 @@ def save_criteria(c: dict) -> None:
 # ---------------------------------------------------------------------------
 # 指示文（プロンプト）
 # ---------------------------------------------------------------------------
+def _names_of(artist: dict) -> list[str]:
+    names = list(artist.get("profile", {}).get("favorite_artists_real", []))
+    names += [i.get("name", "") for i in artist.get("persona", {}).get("influences", [])]
+    names += real_names(artist)
+    return [n for n in names + BANNED_IN_PROMPT if n and n not in ("（bio のみ）",)]
+
+
+def strip_names(text: str, artist: dict) -> str:
+    """Claude が書いた場面などに紛れた実名・禁止語を取り除く（scrub で処理ごと止まらないように。決定 117）"""
+    for n in sorted(_names_of(artist), key=len, reverse=True):
+        text = re.sub(re.escape(n), "", text, flags=re.I)
+    return text
+
+
 def scrub(text: str, artist: dict) -> str:
     """実名・禁止語を落とす。favorite_artists_real / influences.name は最初から使わないが、念のため検査する"""
     names = list(artist.get("profile", {}).get("favorite_artists_real", []))
@@ -268,13 +282,23 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
         ref = refs[i % len(refs)] if refs else ""
         sc = scenes[(i // 2) % len(scenes)] if scenes else None   # 3 つの場面 × 参考の作り方 2 通り
         if sc:   # 曲のワンシーンが主役。組らしさは色と決まりごとで薄く（決定 115）
-            body = (cover_scene.scene_text(sc) + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
+            who = ""
+            if sc.get("who") == "artist":   # 本人：アーティスト写真と同じ人に見えるように、管理表の見た目と顔の隠し方（決定 117）
+                fc = v.get("face_concealment") or {}
+                who = (f"This person is the artist themself, the same person as in the act's photos. {appearance_clause(artist)}"
+                       f"Hide the face this way: {fc.get('primary', 'from behind or in silhouette')}. "
+                       + (f"Never: {'; '.join(fc.get('never') or [])}. " if fc.get("never") else ""))
+            elif sc.get("who") == "other":
+                who = "This person is someone from the song's story, not the artist; their face is never shown. "
+            body = (cover_scene.scene_text(sc) + who + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
                     + f"The act's series look, kept subtle (the scene comes first): {series_look(artist)}. "
                     + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule else ""))
         else:
             body = f"{visual_base(artist)} Series rule: {rule}. Song theme: {theme}. {seed} "
+        body, ref = strip_names(body, artist), strip_names(ref, artist)
         out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
-                    "scene": (i // 2) % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""), "prompt": scrub(
+                    "scene": (i // 2) % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
+                    "who": (sc or {}).get("who", ""), "prompt": scrub(
             f"Album cover artwork, square 1:1. {body}{ref} {variants[i]}"
             + (f" (title: '{title}')" if 'title only' in variants[i] and title else "") +
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
