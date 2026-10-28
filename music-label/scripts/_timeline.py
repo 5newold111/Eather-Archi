@@ -96,10 +96,22 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
 
 
 # ---------------------------------------------------------------------------
+def debut_done(slug: str) -> bool:
+    """デビューが終わったか：デビュー曲が配信中、または DistroKid に登録済みで配信日を過ぎた（決定 120。終わった組はデビューのタブに出さない）"""
+    today = date.today()
+    for s in _songs.debut_songs():
+        if s["slug"] != slug:
+            continue
+        st = _songs.state(s)
+        rel = _d(st.get("released")) or _d(st.get("release_date"))
+        if st.get("status") == "live" or (st.get("status") == "registered" and rel and rel <= today):
+            return True
+    return False
+
+
 def in_regular(slug: str) -> bool:
-    """デビューを終えて定期配信の流れにいるか（デビュー曲が配信中、またはデビュー曲の作業セットが無い組）"""
-    ds = [s for s in _songs.debut_songs() if s["slug"] == slug]
-    return not ds or any(_songs.state(s).get("status") == "live" for s in ds)
+    """デビューを終えて定期配信の流れにいるか（デビューが終わった組、またはデビュー曲の作業セットが無い組）"""
+    return not any(s["slug"] == slug for s in _songs.debut_songs()) or debut_done(slug)
 
 
 def debut_rows() -> list[dict]:
@@ -110,6 +122,8 @@ def debut_rows() -> list[dict]:
         song = next((s for s in _songs.debut_songs() if s["slug"] == slug), None) if slug else None
         if song is None:
             continue   # デビュー曲の作業セットが無い組（最初から定期配信）
+        if debut_done(slug):
+            continue   # デビューが終わった組は出さない（定期配信のタブへ。決定 120）
         kit_day = _d(song["week"]) or today
         steps = {s["name"]: s for s in _status.artist_steps(a)}
         phases = []

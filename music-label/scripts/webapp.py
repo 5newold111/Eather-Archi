@@ -205,8 +205,12 @@ def _status_json() -> dict:
 
 
 def _flow(s: dict) -> str:
-    """どのタブに並べるか：デビュー曲はデビュー、不定期の曲は不定期配信、毎週の曲は定期配信（決定 54・72）"""
-    return "debut" if s.get("kind") == "debut" else ("irregular" if s.get("irregular") or s.get("daily") else "regular")
+    """どのタブに並べるか：デビュー曲はデビュー、不定期の曲は不定期配信、毎週の曲は定期配信（決定 54・72）。
+    デビューが終わった組のデビュー曲は定期配信へ（残ったやること〔歌詞を出す など〕は定期配信のタブに出す。決定 120）"""
+    if s.get("kind") == "debut":
+        import _timeline
+        return "regular" if _timeline.debut_done(s.get("slug", "")) else "debut"
+    return "irregular" if s.get("irregular") or s.get("daily") else "regular"
 
 
 # ---------------------------------------------------------------------------
@@ -621,7 +625,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
- <p class="sub">デビュー前の組。デビュー曲が配信されると、自動で「定期配信」に移ります。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <p class="sub">デビュー前の組。デビュー曲が配信される（DistroKid に登録して配信日を過ぎる）と、デビューが終わったとして、このタブから外れて「定期配信」に移ります。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
  <div class="board" id="b-debut"></div>
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
