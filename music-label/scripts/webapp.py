@@ -199,11 +199,31 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
+            "debut_done": _debut_done_rows(),
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
             "tracker": {"rows": rows, "src": src}, "songs": songs,
             "jobs": [{k: j.get(k, "") for k in ("id", "label", "state", "started", "progress", "step")} for j in list(JOBS.values())[-8:]]}
+
+
+def _debut_done_rows() -> list[dict]:
+    """デビューが終わった（デビューのタブから外れた）組のデビュー曲と、その「← 戻る」のボタン（決定 137）。
+    デビュー曲を作り直す・登録をやり直すときに、ここから戻すと、組はまたデビューのタブに出る"""
+    import _guide
+    import _timeline
+    out = []
+    for s in _songs.debut_songs():
+        try:
+            if not _timeline.debut_done(s["slug"]):
+                continue
+            st = _songs.state(s)
+            out.append({"id": s["id"], "slug": s["slug"], "artist": s["artist"], "title": s["title"],
+                        "status_ja": STATUS_JA.get(st.get("status", ""), st.get("status", "")),
+                        "release": st.get("released") or st.get("release_date") or "", "back": _guide.back_actions(s)})
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def _flow(s: dict) -> str:
@@ -661,6 +681,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
  <details><summary>曲の一覧</summary><div id="songs-debut"></div></details>
+ <details id="debut-done-box"><summary>デビューが終わった組のデビュー曲（作り直す・登録をやり直すときに戻す）</summary><div id="debut-done"></div></details>
 </section>
 <section id="pane-acts" role="tabpanel" aria-labelledby="tab-acts" hidden>
  <p class="sub">新しくデビューする組の、管理表の項目（人物・メンバー・音・見た目など）を 1 つずつ要約して並べます。読んで「承認」か「却下」を押してください。全部の項目を決めると「この組をデビューさせる」が押せます（デビュー日の予約まで自動）。新しい組の案ができたり、デビューが近づいたりすると、このタブに知らせが出ます。</p>
@@ -1019,12 +1040,14 @@ document.addEventListener("click",e=>{const img=e.target.closest("img.zoomable")
 document.addEventListener("keydown",e=>{const d=document.getElementById("zoom");
   if(d.open&&ZOOM.length>1&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){e.preventDefault();zoomStep(e.key==="ArrowRight"?1:-1);return}
   const img=e.target.closest&&e.target.closest("img.zoomable");if(img&&(e.key==="Enter"||e.key===" ")){e.preventDefault();zoomOpen(img)}});
+function debutDone(){const el=document.getElementById("debut-done"),rs=DATA.debut_done||[];   // 決定 137
+  el.innerHTML=rs.length?`<p class="sub">デビュー曲を作り直す・DistroKid の登録をやり直すときは、ここから戻します。戻すと、その組はまたこのタブに並びます。DistroKid 側の登録（配信の取り下げなど）は、DistroKid の画面で Gon さんが行ってください。</p><ul class="list">${rs.map(r=>`<li><b>${E(r.artist)}</b>「${E(r.title)}」 <span class="sub">${E(r.status_ja)}${r.release?`・配信日 ${E(r.release)}`:""}</span><div class="act-only" style="margin-top:6px">${(r.back||[]).map((a,i)=>actHTML(a,i,{id:r.id})).join(" ")}</div></li>`).join("")}</ul>`:`<p class="empty">デビューが終わった組はまだありません。</p>`}
 function render(){
   document.getElementById("upd").textContent=DATA.generated+" 時点";
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  irrForm();irrDrafts();dailyBox();quotaBox();actsTab();
+  irrForm();irrDrafts();dailyBox();quotaBox();actsTab();debutDone();
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
      +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")
