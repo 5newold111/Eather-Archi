@@ -18,6 +18,9 @@
   ・6 案は、それぞれ印象のまったく違うデザインにする（オーナーの指示 2026-10-29。決定 123）：案ごとに「見た目の作り」（look：画材・手法・
     色の組み立て・光と色調・構図）を別々にし、文字も書体・置き方・並べ方・色を 6 案で重ねない。Claude が重ねてきても、仕組みが書体と置き方を
     入れ替えて、6 案とも別の書体・別の置き方にする（diversify）
+  ・それでも似ていた（オーナーの指示 2026-10-29。決定 126）ので、6 案をデザインの系統で分ける：写真・グラフィック（色面と形・文字が主役）・
+    イラスト・コラージュ・版画（リソグラフ・シルクスクリーン・青写真）・映画的な実験写真（夜のフラッシュ・ぶれ・二重露光）を 1 案に 1 つずつ。
+    系統が重なったら、使っていない系統に入れ替える
   ・Claude（効き目の低い設定・答えも短い）で 1 曲 数円。ブリーフに保存して、作り直すとき以外はもう一度は呼ばない。鍵が無いときはエピソードから 1 場面を組み立てる
   ・実在の名前・ブランド・建物・文字は入れない
 
@@ -34,13 +37,34 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, read_json, write_json  # noqa: E402
 
-SCENE_VERSION = 4   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
+SCENE_VERSION = 5   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
 N_SCENES = 6
 SHOTS = ["extreme close-up", "close-up", "cut-out fragment", "medium", "wide"]
+
+# デザインの系統（6 案に 1 つずつ。決定 126）：(ふだんの作り〔英語〕, 日本語の名前, Claude への説明)
+FAMILIES = {
+    "photo": ("documentary 35mm film photograph, natural light, real grain, off-centre subject with wide empty space, warm muted colours",
+              "写真（フィルム）", "documentary or film photograph of the moment (real camera, grain, natural light)"),
+    "graphic": ("flat graphic design: one bold colour field with one simple cut-out shape or silhouette of the subject, almost no detail, "
+                "strong two-colour contrast, Swiss-poster composition", "グラフィック（色面と形）",
+                "graphic design - a flat colour field and one or two simple shapes or a silhouette taken from the scene; the title will be set "
+                "large, so the image stays very simple"),
+    "illustration": ("hand-drawn illustration in gouache and ink on paper, visible brush strokes and pencil lines, limited earthy palette",
+                     "イラスト（手描き）", "hand-made illustration or painting of the scene (gouache, ink, pastel, woodcut, line drawing)"),
+    "collage": ("cut-paper collage of torn photographs, coloured paper and tape, layered, visible scissor edges, bold primary colours",
+                "コラージュ", "collage or mixed media (torn photos, cut paper, tape, found printed matter)"),
+    "print": ("two-colour risograph print, grainy ink, slight misregistration, flat shapes, pastel paper",
+              "版画（リソグラフ）", "print process with limited inks (risograph, screen print, cyanotype, letterpress, photocopy)"),
+    "cinematic": ("night photograph with hard direct flash, deep black background, one vivid accent colour, motion blur at the edges",
+                  "映画的な実験写真", "cinematic or experimental photograph (night flash, long exposure, motion blur, double exposure, "
+                  "infrared, extreme crop)"),
+}
+
 
 def _system() -> str:
     import cover_text
     fonts = "\n".join(f"  - {k}: {v}" for k, v in cover_text.FONT_STYLES.items() if k in cover_text.fonts_available())
+    families = "\n".join(f"  - {k}: {v[2]}" for k, v in FAMILIES.items())
     return f"""You are the art director of a record label. For ONE song, choose the six most memorable, striking scenes of the song - each
 like one frame cut out of a film of the song - and each becomes one album-cover idea. A listener must recognise THIS song at first sight.
 The song's theme and imagery come FIRST, before the act's look: read the lyrics and the episode and pick the moments the song is about.
@@ -66,12 +90,13 @@ Rules:
   script and handwriting). case: upper / lower / as_is. ink: "light", "dark" or a hex colour taken from the scene. Fonts (pick the
   title font in "font"; "artist_font" may pair a second font or be ""):
 {fonts}
-- SIX COMPLETELY DIFFERENT IMPRESSIONS: the six covers must not look like a set. Give each its own "look" (in English): a different
-  medium or technique (e.g. 35mm film snapshot, large-format still life, risograph print, cut-paper collage, cyanotype, Polaroid,
-  flash photograph at night, painted illustration, photocopy zine, long-exposure blur - start from the act's favourite mediums
-  and go beyond them), a different colour scheme (warm / cold / monochrome / one vivid accent / pastel / high-contrast), a different
-  light and grade, and a different composition (centred, off-centre with big empty space, tight crop, symmetric, layered, framed by
-  a foreground). No two looks may share the medium or the colour scheme.
+- SIX COMPLETELY DIFFERENT DESIGNS: the six covers must not look like a set or like variations of one photo. Each cover belongs to a
+  different design "family" - use every family exactly once:
+{families}
+  Give each its own "look" (in English) inside its family: the medium or technique, a colour scheme (warm / cold / monochrome / one
+  vivid accent / pastel / high-contrast - no two covers share a scheme), light and grade, and composition (centred, off-centre with
+  big empty space, tight crop, symmetric, layered, framed by a foreground - no two share a composition). The scene itself stays
+  the song's real moment; the family decides how it is rendered.
 - The lettering must differ just as much: every cover uses a DIFFERENT title font, and no two covers share the same place + align +
   layout. Mix small refined captions with one or two bold title-led designs; mix light, dark and coloured ink. Each still fits the
   act's taste and its own look.
@@ -93,10 +118,10 @@ TYPE_SCHEMA = {"type": "object", "additionalProperties": False,
 SCHEMA = {"type": "object", "additionalProperties": False, "required": ["song_image", "scenes"],
           "properties": {"song_image": {"type": "string"}, "scenes": {"type": "array", "items": {
               "type": "object", "additionalProperties": False,
-              "required": ["who", "member", "shot", "moment", "framing", "place", "time_light", "props", "human", "memory_look",
+              "required": ["who", "member", "shot", "family", "moment", "framing", "place", "time_light", "props", "human", "memory_look",
                            "look", "text_space", "type", "why_ja", "look_ja", "type_ja"],
               "properties": {"who": {"type": "string", "enum": ["artist", "other", "none"]}, "member": {"type": "string"},
-                             "shot": {"type": "string", "enum": SHOTS},
+                             "shot": {"type": "string", "enum": SHOTS}, "family": {"type": "string", "enum": list(FAMILIES)},
                              "moment": {"type": "string"}, "framing": {"type": "string"}, "place": {"type": "string"},
                              "time_light": {"type": "string"}, "props": {"type": "array", "items": {"type": "string"}},
                              "human": {"type": "string"}, "memory_look": {"type": "string"}, "text_space": {"type": "string"},
@@ -126,12 +151,7 @@ def lyrics_head(brief_path: Path | None, brief: dict, lines: int = 16) -> str:
 
 
 # 鍵が無いときと、Claude の案が重なったときに使う、印象の違う 6 通りの作りと文字（決定 123）
-LOOKS = [("35mm film snapshot, warm amber grade, off-centre subject with wide empty space", "フィルムの温かい色・余白"),
-         ("night flash photograph, hard direct flash, deep black background, one vivid accent colour", "夜のフラッシュ・黒に差し色"),
-         ("two-colour risograph print, grainy ink, flat shapes, pastel paper", "リソグラフ・2 色・パステル"),
-         ("black-and-white large-format still life, centred and symmetric, soft window light", "白黒・静物・中央"),
-         ("faded Polaroid with light leak, cold blue-green cast, tight crop", "ポラロイド・冷たい色・寄り"),
-         ("cut-paper collage with photographic fragments, layered, bold primary colours", "コラージュ・原色・重ね")]
+LOOKS = [(v[0], v[1]) for v in FAMILIES.values()]
 TYPE_PRESETS = [
     {"font": "cormorant-garamond", "case": "lower", "tracking": 0.18, "place": "bottom", "align": "center", "layout": "stack", "size": 0.05, "artist_size": 0.028, "ink": "light"},
     {"font": "bebas-neue", "case": "upper", "tracking": 0.06, "place": "top", "align": "left", "layout": "title_first", "size": 0.1, "artist_size": 0.03, "ink": "light"},
@@ -161,8 +181,13 @@ def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
         have = set(cover_text.fonts_available())
     except Exception:  # noqa: BLE001
         have = {p["font"] for p in TYPE_PRESETS}
-    fonts, spots, mediums = set(), set(), set()
+    fonts, spots, mediums, fams = set(), set(), set(), set()
     for i, sc in enumerate(scenes):
+        fam = sc.get("family")
+        if fam not in FAMILIES or fam in fams:   # 系統が重なったら、使っていない系統に（作りもその系統のふだんの作りに。決定 126）
+            fam = next((f for f in FAMILIES if f not in fams), list(FAMILIES)[i % len(FAMILIES)])
+            sc["family"], sc["look"], sc["look_ja"] = fam, FAMILIES[fam][0], FAMILIES[fam][1]
+        fams.add(fam)
         t = dict(sc.get("type") or {})
         spot = (t.get("place"), t.get("align"), t.get("layout"))
         if not t.get("font") or t["font"] not in have or t["font"] in fonts or spot in spots:
@@ -176,12 +201,14 @@ def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
             spot = (t.get("place"), t.get("align"), t.get("layout"))
         fonts.add(t.get("font"))
         spots.add(spot)
+        if fam == "graphic":   # 色面と形の案は、曲名を大きく主役に（決定 126）
+            t = {**t, "size": max(float(t.get("size") or 0), 0.1), "artist_size": 0.03, "case": "upper",
+                 "tracking": min(float(t.get("tracking") or 0.04), 0.08)}
         sc["type"] = t
         md = _medium(sc.get("look", ""))
-        if not sc.get("look") or md in mediums:
-            en, ja = next(((e, j) for e, j in LOOKS if _medium(e) not in mediums), LOOKS[i % len(LOOKS)])
-            sc["look"], sc["look_ja"] = en, ja
-            md = _medium(en)
+        if not sc.get("look") or md in mediums:   # 系統の中で画材がほかの案と同じなら、その系統のふだんの作りに
+            sc["look"], sc["look_ja"] = FAMILIES[fam][0], FAMILIES[fam][1]
+            md = _medium(sc["look"])
         mediums.add(md)
     return scenes
 
@@ -195,7 +222,7 @@ def fallback(brief: dict) -> list[dict]:
             ("artist", "wide", "a small silhouette"), ("other", "close-up", "hands only"), ("none", "close-up", "no people")]
     return diversify([{"who": who, "member": "", "shot": shot, "moment": saw[i % len(saw)], "framing": shot, "place": str(ep.get("when_where") or ""),
                        "time_light": "", "props": saw[(i + 1) % len(saw):][:2], "human": human, "memory_look": "none",
-                       "look": LOOKS[i][0], "look_ja": LOOKS[i][1], "text_space": "", "type": dict(TYPE_PRESETS[i]),
+                       "family": list(FAMILIES)[i], "look": LOOKS[i][0], "look_ja": LOOKS[i][1], "text_space": "", "type": dict(TYPE_PRESETS[i]),
                        "why_ja": "エピソードの『見たもの』から", "type_ja": ""}
                       for i, (who, shot, human) in enumerate(plan)], brief.get("artist_slug", ""))
 
@@ -278,8 +305,6 @@ def scene_text(sc: dict) -> str:
         t += f"People: {sc['human']} (never a face, never eyes). "
     if sc.get("memory_look") and str(sc["memory_look"]).lower() not in ("none", "no", ""):
         t += f"It is a memory: {sc['memory_look']}. "
-    if sc.get("look"):   # この案だけの見た目の作り（6 案で印象を変える。決定 123）
-        t += f"This cover's own look, different from the other covers of this song: {sc['look']}. "
     return t
 
 

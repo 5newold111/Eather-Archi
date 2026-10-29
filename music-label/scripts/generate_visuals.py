@@ -237,11 +237,23 @@ REAL_RELEASE = ("Make it look like the cover of a real album that a record label
                 "no fantasy concept-art scenery, no perfect symmetry, no lens-flare spectacle.")
 
 
-def art_taste_clause(artist: dict) -> str:
-    """組のアートの好み（管理表の「アートの好み」。実在の名前は入っていない。決定 118）"""
+# 6 案に共通の「AI っぽさを避ける」だけの文（画材・余白の指定は入れない。案ごとの作りを優先して 6 案を似せないため。決定 126）
+REAL_BASE = ("It must look like the cover of a real album that a record label released and sold on CD and vinyl, made with real "
+             "materials and real tools, not like AI art. Avoid the typical AI look: no hyper-detailed digital painting, no glossy plastic "
+             "sheen, no airbrushed smoothness, no oversaturated neon gradients, no glowing particles or bokeh orbs, no dreamy fog, no surreal "
+             "floating objects, no fantasy concept-art scenery, no lens-flare spectacle.")
+
+
+def art_taste_clause(artist: dict, slim: bool = False) -> str:
+    """組のアートの好み（管理表の「アートの好み」。実在の名前は入っていない。決定 118）。
+    slim：好きな絵柄・テイスト・避けるものだけ（画材・色・グラフィックは案ごとの作りに任せる。決定 126）"""
     t = (artist.get("visual") or {}).get("art_taste") or {}
     if not t:
         return ""
+    if slim:
+        parts = [f"favourite imagery: {t['imagery']}" if t.get("imagery") else "", f"taste: {t['taste']}" if t.get("taste") else "",
+                 f"never: {', '.join(t['avoid'])}" if t.get("avoid") else ""]
+        return "The act's taste, as a light starting point only: " + "; ".join(x for x in parts if x) + ". "
     parts = [f"mediums they love: {', '.join(t['mediums'])}" if t.get("mediums") else "",
              f"favourite imagery: {t['imagery']}" if t.get("imagery") else "", f"taste: {t['taste']}" if t.get("taste") else "",
              f"graphic habits: {t['graphic']}" if t.get("graphic") else "", f"colours: {', '.join(t['colors'])}" if t.get("colors") else "",
@@ -296,7 +308,7 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
         import _claude
         if _claude.available():   # 組に合う参考が足りなければ、組のジャンルの人気アルバムのジャケットを先に読む（1 枚 数円）
             cover_refs.collect_genre(artist.get("slug", ""), quiet=True)
-        refs = [cover_refs.direction_one(an) for an in cover_refs.analyses_for(artist.get("slug", ""), brief, N_COVER)]
+        refs = [cover_refs.direction_one(an, slim=True) for an in cover_refs.analyses_for(artist.get("slug", ""), brief, N_COVER)]
         if not refs:
             seed += " " + cover_refs.art_direction(artist.get("slug", ""), brief)
     except Exception:  # noqa: BLE001
@@ -322,7 +334,8 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
                 "the artist name and song title will be set there afterwards as part of the design")
         lead = (f"The song's theme and imagery come first - the cover must make a listener recognise this song: "
                 f"{str(song_img or seed or theme).strip().rstrip('.')}. ")
-        if sc:   # 曲のシーンが主役。組らしさは色と決まりごとで薄く（決定 115）
+        look = (sc or {}).get("look", "")
+        if sc:   # 曲のシーンが主役。どう描くかは、その案の系統と作り（6 案で別々。決定 115・126）
             who = ""
             if sc.get("who") == "artist":   # 本人（バンドならメンバー）：アーティスト写真と同じ人に見えるように（決定 117）
                 fc = v.get("face_concealment") or {}
@@ -332,22 +345,23 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
                        + (f"Never: {'; '.join(fc.get('never') or [])}. " if fc.get("never") else ""))
             elif sc.get("who") == "other":
                 who = "This person is someone from the song's story, not the artist; their face is never shown. "
-            body = (lead + cover_scene.scene_text(sc) + who + art_taste_clause(artist) + guest_touch(brief)
+            body = (lead + cover_scene.scene_text(sc) + who
+                    + (art_taste_clause(artist, slim=True) if look else art_taste_clause(artist)) + guest_touch(brief)
                     + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() and seed.strip() not in lead else "")
-                    + (f"This cover's own look (above) decides the medium, colours and composition; the act's taste is a starting point, "
-                       f"not a template. Only a faint trace of the act's series look: {series_look(artist)}. " if sc.get("look") else
-                       f"The act's series look, kept subtle (the song and the scene come first): {series_look(artist)}. ")
-                    + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule and i == 0 else ""))
+                    + ("" if look else f"The act's series look, kept subtle (the song and the scene come first): {series_look(artist)}. "))
         else:
             body = f"{lead}{visual_base(artist)} {art_taste_clause(artist)}{guest_touch(brief)}Series rule: {rule}. Song theme: {theme}. {seed} "
         body, ref = strip_names(body, artist), strip_names(ref, artist)
         out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
                     "scene": i % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
                     "who": (sc or {}).get("who", ""), "shot": (sc or {}).get("shot", ""), "member": (sc or {}).get("member", ""),
-                    "type": t, "type_ja": (sc or {}).get("type_ja", ""), "look_ja": (sc or {}).get("look_ja", ""), "prompt": scrub(
-            f"Album cover artwork, square 1:1. {body}{ref} {room}"
+                    "type": t, "type_ja": (sc or {}).get("type_ja", ""), "look_ja": (sc or {}).get("look_ja", ""),
+                    "family": (sc or {}).get("family", ""), "prompt": scrub(
+            (f"Album cover artwork, square 1:1, made as: {look}. This medium, colour scheme and composition are what make this cover "
+             f"different from the other five covers of this song - commit to them fully. " if look else "Album cover artwork, square 1:1. ")
+            + f"{body}{ref} {room}"
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
-            "not explicit. Original artwork, not a copy of any existing cover. " + REAL_RELEASE, artist)})
+            "not explicit. Original artwork, not a copy of any existing cover. " + (REAL_BASE if look else REAL_RELEASE), artist)})
     return out
 
 

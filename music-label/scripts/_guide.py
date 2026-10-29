@@ -27,7 +27,8 @@ def _cover_note(c: dict) -> str:
     """候補の説明：どのシーンか（寄り・引き・だれが写るか・曲のどこか）＋ Claude の一言（決定 122）"""
     import cover_scene
     who = {"artist": "本人", "other": "曲の人物", "none": "人なし"}.get(c.get("who"), "")
-    head = "・".join(x for x in (cover_scene.SHOT_JA.get(c.get("shot"), ""), who, c.get("look_ja", "")) if x)   # 作りの印象も（決定 123）
+    fam = (cover_scene.FAMILIES.get(c.get("family") or "") or ("", ""))[1]   # デザインの系統（決定 126）
+    head = "・".join(x for x in (fam, cover_scene.SHOT_JA.get(c.get("shot"), ""), who, c.get("look_ja", "") if c.get("look_ja") != fam else "") if x)   # 作りの印象も（決定 123）
     scene = f"【{head}】{c.get('scene_ja', '')}" if head or c.get("scene_ja") else ""
     note = c["note"] if c["ok"] else "（禁止ルールに当たる心配あり）" + c["note"]
     return " ".join(x for x in (scene, note) if x)

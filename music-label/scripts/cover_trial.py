@@ -156,7 +156,8 @@ def page() -> str:
         who = {"artist": "本人", "other": "曲の人物", "none": "人なし"}.get(c.get("who"), "")
         img = f"<img src='{song_check.furl(f)}' alt='案 {c['no']}' loading='lazy'>" if c.get("file") and f.exists() else f"<p>✕ 作れませんでした：{E(str(c.get('error', '')))[:200]}</p>"
         t = c.get("type") or {}
-        body += (f"<div class='c'>{img}<p class='s'><b>案 {c['no']}</b>（{E(cover_scene.SHOT_JA.get(c.get('shot'), c.get('shot', '')))}・{E(who)}"
+        fam = (cover_scene.FAMILIES.get(c.get("family") or "") or ("", ""))[1]
+        body += (f"<div class='c'>{img}<p class='s'><b>案 {c['no']}{('：' + E(fam)) if fam else ''}</b>（{E(cover_scene.SHOT_JA.get(c.get('shot'), c.get('shot', '')))}・{E(who)}"
                  f"{('・' + E(c['member'])) if c.get('member') else ''}）{E(c.get('scene_ja', ''))}</p>"
                  f"<p class='s'>作り：{E(c.get('look_ja', ''))}／文字：{E(str(t.get('font', '')))}・{E(str(t.get('place', '')))}・{E(str(t.get('layout', '')))}"
                  f"{('（' + E(c['type_ja']) + '）') if c.get('type_ja') else ''}</p>"

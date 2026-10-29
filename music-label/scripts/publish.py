@@ -645,7 +645,7 @@ def cover_candidates(song: dict) -> list[dict]:
             out.append({"no": c["no"], "file": pv if pv and pv.exists() else f, "total": c.get("total"), "ok": c.get("compliance_ok") is not False,
                         "note": c.get("claude_note") or c.get("comment_ja") or "", "scene_ja": c.get("scene_ja", ""),
                         "shot": c.get("shot", ""), "who": c.get("who", ""), "type_ja": c.get("type_ja", ""),
-                        "look_ja": c.get("look_ja", "")})
+                        "look_ja": c.get("look_ja", ""), "family": c.get("family", "")})
     return sorted(out, key=lambda c: (not c["ok"], -(c["total"] or 0)))
 
 

@@ -294,8 +294,15 @@ def _scrub_names(text: str) -> str:
     return text
 
 
-def direction_one(an: dict) -> str:
-    """参考 1 枚の「作り方」だけを借りる指示（英語。実在の名前なし。その絵だけのモチーフは使わないと明記。決定 114）"""
+def direction_one(an: dict, slim: bool = False) -> str:
+    """参考 1 枚の「作り方」だけを借りる指示（英語。実在の名前なし。その絵だけのモチーフは使わないと明記。決定 114）。
+    slim：構図の考え方だけ（画材・色は案ごとの作りに任せる。6 案を似せないため。決定 126）"""
+    if slim:
+        t = ("From one real, commercially released album cover, borrow only its composition idea (not its medium, colours or "
+             f"motifs): composition: {an.get('composition', '')}. Principle: {an.get('transferable', '')}")
+        if an.get("do_not_copy"):
+            t += " Do NOT reuse: " + "; ".join(an["do_not_copy"]) + "."
+        return _scrub_names(t)
     t = ("Art direction borrowed from ONE real, commercially released album cover that fits this act (borrow only the approach; "
          "create a new, original image): "
          f"medium: {an.get('medium', '')}; finish and texture: {an.get('texture', '')}; composition: {an.get('composition', '')}; "
