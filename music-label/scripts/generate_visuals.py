@@ -273,7 +273,19 @@ def series_look(artist: dict) -> str:
             f"contrast {pd.get('contrast', '')}; color temperature {pd.get('color_temperature', '')}")
 
 
+def _text_room(t: dict) -> str:
+    """文字を置く場所（候補ごとのデザイン）→ 画像の AI に空けておいてもらう場所"""
+    if t.get("layout") == "split":
+        return "a strip along the top edge and another along the bottom edge"
+    v = {"top": "upper", "bottom": "lower", "middle": "central"}.get(t.get("place"), "upper or lower")
+    h = {"left": "-left", "right": "-right"}.get(t.get("align"), "")
+    return f"the {v}{h} part of the image (about a fifth of the height)"
+
+
 def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> list[dict]:
+    """ジャケットの候補 6 つ = 曲の印象的なシーン 6 つ × 1 案ずつ（オーナーの指示 2026-10-29。決定 122）。
+    いちばん先に曲のテーマとイメージ、次にそのシーン（本人・メンバー・曲の人物、寄り・切り取り・引き）、組の好み、実在の CD の作り方 1 枚、
+    最後に文字を置く場所を空けておく指示。文字は画像の AI に描かせず、候補ごとのデザインで cover_text.py が入れる"""
     v = artist["visual"]
     rule = v.get("cover_series_rule", "")
     theme = ", ".join(artist.get("lyrics", {}).get("themes", [])[:3])
@@ -289,50 +301,77 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
             seed += " " + cover_refs.art_direction(artist.get("slug", ""), brief)
     except Exception:  # noqa: BLE001
         pass
-    scenes = []
-    try:   # 曲のワンシーン（映画のワンカットのような場面を 3 つ。前の曲と重ならない。決定 115）
+    scenes, song_img = [], ""
+    try:   # 曲の印象的なシーン 6 つ（映画のワンカットのような場面。前の曲と重ならない。決定 115・122）
         import cover_scene
         scenes = cover_scene.scenes_for(brief, brief_path)
+        song_img = cover_scene.song_image(brief)
     except Exception:  # noqa: BLE001
         pass
-    title = (brief.get("title_candidates") or [""])[0]
     out = []
-    # 文字は画像を作る AI に描かせない。仕上げで cover_text.py が曲名とアーティスト名を重ねる（決定 36）。その場所を空けておく
-    try:
-        import cover_text
-        where = {"top": "the top fifth", "bottom": "the bottom fifth"}.get(cover_text.spec_for(artist.get("slug", ""))["place"],
-                                                                         "the top or bottom fifth")
-    except Exception:  # noqa: BLE001
-        where = "the top or bottom fifth"
-    room = f"no text at all; keep {where} of the image calm and uncluttered (small typography will be added there later)"
-    variants = [room] * 6
     for i in range(N_COVER):
         ref = refs[i % len(refs)] if refs else ""
-        sc = scenes[(i // 2) % len(scenes)] if scenes else None   # 3 つの場面 × 参考の作り方 2 通り
-        if sc:   # 曲のワンシーンが主役。組らしさは色と決まりごとで薄く（決定 115）
+        sc = scenes[i % len(scenes)] if scenes else None   # 1 シーン = 1 案
+        t = dict((sc or {}).get("type") or {})
+        try:
+            import cover_text
+            t = {k: v for k, v in cover_text.merge_design(artist.get("slug", ""), t).items() if k in cover_text.KEYS}
+        except Exception:  # noqa: BLE001
+            pass
+        room = (f"No text or lettering anywhere in the image. Keep {(sc or {}).get('text_space') or _text_room(t)} calm and uncluttered: "
+                "the artist name and song title will be set there afterwards as part of the design")
+        lead = (f"The song's theme and imagery come first - the cover must make a listener recognise this song: "
+                f"{str(song_img or seed or theme).strip().rstrip('.')}. ")
+        if sc:   # 曲のシーンが主役。組らしさは色と決まりごとで薄く（決定 115）
             who = ""
-            if sc.get("who") == "artist":   # 本人：アーティスト写真と同じ人に見えるように、管理表の見た目と顔の隠し方（決定 117）
+            if sc.get("who") == "artist":   # 本人（バンドならメンバー）：アーティスト写真と同じ人に見えるように（決定 117）
                 fc = v.get("face_concealment") or {}
-                who = (f"This person is the artist themself, the same person as in the act's photos. {appearance_clause(artist)}"
+                who = (f"This person is the artist themself{(' - ' + sc['member']) if sc.get('member') else ''}, the same person as in "
+                       f"the act's photos. {appearance_clause(artist)}"
                        f"Hide the face this way: {fc.get('primary', 'from behind or in silhouette')}. "
                        + (f"Never: {'; '.join(fc.get('never') or [])}. " if fc.get("never") else ""))
             elif sc.get("who") == "other":
                 who = "This person is someone from the song's story, not the artist; their face is never shown. "
-            body = (cover_scene.scene_text(sc) + who + art_taste_clause(artist) + guest_touch(brief)
-                    + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() else "")
-                    + f"The act's series look, kept subtle (the scene comes first): {series_look(artist)}. "
+            body = (lead + cover_scene.scene_text(sc) + who + art_taste_clause(artist) + guest_touch(brief)
+                    + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() and seed.strip() not in lead else "")
+                    + f"The act's series look, kept subtle (the song and the scene come first): {series_look(artist)}. "
                     + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule else ""))
         else:
-            body = f"{visual_base(artist)} {art_taste_clause(artist)}{guest_touch(brief)}Series rule: {rule}. Song theme: {theme}. {seed} "
+            body = f"{lead}{visual_base(artist)} {art_taste_clause(artist)}{guest_touch(brief)}Series rule: {rule}. Song theme: {theme}. {seed} "
         body, ref = strip_names(body, artist), strip_names(ref, artist)
         out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
-                    "scene": (i // 2) % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
-                    "who": (sc or {}).get("who", ""), "prompt": scrub(
-            f"Album cover artwork, square 1:1. {body}{ref} {variants[i]}"
-            + (f" (title: '{title}')" if 'title only' in variants[i] and title else "") +
+                    "scene": i % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
+                    "who": (sc or {}).get("who", ""), "shot": (sc or {}).get("shot", ""), "member": (sc or {}).get("member", ""),
+                    "type": t, "type_ja": (sc or {}).get("type_ja", ""), "prompt": scrub(
+            f"Album cover artwork, square 1:1. {body}{ref} {room}"
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
             "not explicit. Original artwork, not a copy of any existing cover. " + REAL_RELEASE, artist)})
     return out
+
+
+def text_previews(cands: list[dict], outdir: Path, artist: dict, brief_path: Path | None) -> int:
+    """候補ごとに、そのデザインでアーティスト名と曲名を入れた見本（cover_NN_text.jpg）を作る（決定 122）。
+    元の画像（cover_NN.png）は文字なしのまま残し、選んだあとの仕上げで、同じデザインで 3000×3000 に入れ直す"""
+    import cover_text
+    import _songs
+    song = _songs.by_key(brief_path.stem) if brief_path else None
+    brief = json.loads(brief_path.read_text(encoding="utf-8")) if brief_path and brief_path.exists() else {}
+    title = (song or {}).get("title") or (brief.get("title_candidates") or [""])[0]
+    name = (song or {}).get("artist") or artist.get("name", "")
+    if not title or not name:
+        return 0
+    n = 0
+    for c in cands:
+        src = outdir / c["file"] if c.get("file") else None
+        if c.get("kind") != "cover" or not src or not src.exists():
+            continue
+        prev = outdir / f"cover_{c['no']:02d}_text.jpg"
+        r = cover_text.apply(src, name, title, artist.get("slug", ""), out=prev, design=c.get("type") or {}, keep_notext=False)
+        if r.get("ok"):
+            c["preview"] = prev.name
+            c["type"] = r.get("design") or c.get("type")
+            n += 1
+    return n
 
 
 def prompts_reshoot(artist: dict, pivot_reason: str) -> list[dict]:
@@ -470,7 +509,7 @@ def claude_score(cands: list[dict], outdir: Path, artist: dict, criteria: dict, 
             "hard_rules": criteria.get("hard_rules", []), "compliance": compliance_checklist(kind),
             "owner_preferences": criteria.get("preferences", [])}, ensure_ascii=False)}]
         for c in group:
-            content += [{"type": "text", "text": f"Candidate {c['no']}:"}, _claude.image_block(thumbnail(outdir / c["file"]))]
+            content += [{"type": "text", "text": f"Candidate {c['no']}:"}, _claude.image_block(thumbnail(outdir / (c["preview"] if c.get("preview") and (outdir / c["preview"]).exists() else c["file"])))]
         print(f"  Claude が {kind} の候補 {len(group)} 枚を見て採点しています…")
         res, msg = _claude.call_json(SCORE_SYSTEM, content, SCORE_SCHEMA, effort="medium")
         if not res:
@@ -636,7 +675,7 @@ def write_review_html(path: Path, artist: dict, cands: list[dict], note: str, ki
     for kind in sorted({c["kind"] for c in cands}):
         parts.append(f"<h2>{_h.escape(kind)}</h2><div class='grid'>")
         for c in sorted([c for c in cands if c["kind"] == kind], key=lambda c: -c["total"]):
-            img = (f"<img src='{_h.escape(c['file'])}' alt='{kind} {c['no']}'>" if c.get("file")
+            img = (f"<img src='{_h.escape(c.get('preview') or c['file'])}' alt='{kind} {c['no']}'>" if c.get("file")
                    else "<div class='empty'>未生成（指示文のみ）</div>")
             ng = f"<div class='ng'>除外：{_h.escape('、'.join(c.get('violations', [])))}</div>" if c.get("compliance_ok") is False else ""
             cmd = f"{base} --choose {kind}:{c['no']} --reason"
@@ -771,6 +810,13 @@ def main() -> None:
                 "ネットワークか API の一時的な問題の可能性。少し待って再実行")
         print(f"  → 対処のヒント: {hint}")
 
+    if generated and args.kind == "cover":   # 候補ごとのデザインで、アーティスト名と曲名を入れた見本を作る（採点も選ぶのも文字入りで。決定 122）
+        try:
+            n_tx = text_previews(cands, outdir, artist, args.brief)
+            if n_tx:
+                print(f"  {n_tx} 枚に、アーティスト名と曲名を候補ごとのデザインで入れた見本を作りました")
+        except Exception as e:  # noqa: BLE001
+            print(f"  － 文字入りの見本を作れませんでした（{e}）。仕上げで文字を入れます")
     n_scored = claude_score(cands, outdir, artist, criteria,
                             json.loads(args.brief.read_text(encoding="utf-8")) if args.brief else None) if generated else 0
     if n_scored:

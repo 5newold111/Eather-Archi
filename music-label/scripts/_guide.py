@@ -23,6 +23,16 @@ OPENAI_KEYS = "https://platform.openai.com/api-keys"
 SPOTIFY_DASH = "https://developer.spotify.com/dashboard"
 
 
+def _cover_note(c: dict) -> str:
+    """候補の説明：どのシーンか（寄り・引き・だれが写るか・曲のどこか）＋ Claude の一言（決定 122）"""
+    import cover_scene
+    who = {"artist": "本人", "other": "曲の人物", "none": "人なし"}.get(c.get("who"), "")
+    head = "・".join(x for x in (cover_scene.SHOT_JA.get(c.get("shot"), ""), who) if x)
+    scene = f"【{head}】{c.get('scene_ja', '')}" if head or c.get("scene_ja") else ""
+    note = c["note"] if c["ok"] else "（禁止ルールに当たる心配あり）" + c["note"]
+    return " ".join(x for x in (scene, note) if x)
+
+
 def _has_playwright() -> bool:
     """ブラウザで自動入力する部品（Playwright）が入っているか"""
     import importlib, importlib.util, os, site
@@ -165,7 +175,7 @@ def _explain(row: dict, phase: dict) -> dict:
                         "steps": ["気に入った候補の「これにする」を押す（数十秒で次のフェーズへ）", "どれも好みでなければ「候補を作り直す」"],
                         "actions": [{"kind": "cover_pick", "id": song["id"], "no": c["no"], "img": song_check.furl(c["file"]),
                                      "label": f"#{c['no']} これにする" + (f"（{c['total']:.1f} 点）" if isinstance(c.get("total"), (int, float)) else ""),
-                                     "note": c["note"] if c["ok"] else "（禁止ルールに当たる心配あり）" + c["note"]} for c in cands[:6]]
+                                     "note": _cover_note(c)} for c in cands[:6]]
                                    + [{"kind": "run", "label": "候補を作り直す（OpenAI の画像の料金がかかります）", "action": "cover", "id": song["id"], "redo": "1",
                                        "confirm": "ジャケットの候補を作り直しますか？（OpenAI の画像の料金がかかります）"}]}
             if "鍵" in d:

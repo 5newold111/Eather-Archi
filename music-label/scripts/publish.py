@@ -641,8 +641,10 @@ def cover_candidates(song: dict) -> list[dict]:
     for c in read_json(p):
         f = d / c["file"] if c.get("kind") == "cover" and c.get("file") else None
         if f is not None and f.exists():
-            out.append({"no": c["no"], "file": f, "total": c.get("total"), "ok": c.get("compliance_ok") is not False,
-                        "note": c.get("claude_note") or c.get("comment_ja") or ""})
+            pv = d / c["preview"] if c.get("preview") else None   # アーティスト名と曲名を入れた見本（決定 122）
+            out.append({"no": c["no"], "file": pv if pv and pv.exists() else f, "total": c.get("total"), "ok": c.get("compliance_ok") is not False,
+                        "note": c.get("claude_note") or c.get("comment_ja") or "", "scene_ja": c.get("scene_ja", ""),
+                        "shot": c.get("shot", ""), "who": c.get("who", ""), "type_ja": c.get("type_ja", "")})
     return sorted(out, key=lambda c: (not c["ok"], -(c["total"] or 0)))
 
 

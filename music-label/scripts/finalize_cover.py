@@ -102,6 +102,7 @@ def main() -> None:
     ap.add_argument("--no-archive", "--no-drive", dest="no_archive", action="store_true", help="ローカル保存にも SSD にも入れない")
     args = ap.parse_args()
 
+    design = None   # 選んだ候補の文字のデザイン（決定 122）
     if args.input:
         src = Path(args.input)
         dst = Path(args.out) if args.out else src.with_name("cover_final.jpg")
@@ -119,6 +120,8 @@ def main() -> None:
                      "（OpenAI の残高が入るまでは、候補画像を手で置いて --input で仕上げることもできます）")
         no = read_json(sel)["chosen"]
         src = folder / f"cover_{int(no):02d}.png"
+        if (folder / "candidates.json").exists():
+            design = next((c.get("type") for c in read_json(folder / "candidates.json") if c.get("kind") == "cover" and c.get("no") == int(no)), None)
         if not src.exists():
             sys.exit(f"[エラー] 選ばれた候補の画像がありません: {src}")
         dst = Path(args.out) if args.out else folder / "cover_final.jpg"
@@ -128,7 +131,9 @@ def main() -> None:
         import cover_text
         song = _songs.by_key(Path(args.brief).stem)
         if song and song.get("title"):
-            tr = cover_text.apply(dst, song["artist"], song["title"], song["slug"])
+            for old in (dst.with_suffix(".text.json"), dst.with_name(dst.stem + "_notext" + dst.suffix)):   # 前に仕上げた版の文字は使わない
+                old.unlink(missing_ok=True)
+            tr = cover_text.apply(dst, song["artist"], song["title"], song["slug"], design=design or {})
             print(f"   {'○' if tr['ok'] else '－'} 文字：" + ("・".join(tr.get("shown", [])) + f"（{tr.get('font')}・{tr.get('place')}）" if tr["ok"] else tr["reason"]))
     rel = dst.resolve().relative_to(ROOT) if dst.resolve().is_relative_to(ROOT) else dst
     step(("仕上がりました" if rep["ok"] else "仕上げましたが ✕ があります") + f": {rel}")
