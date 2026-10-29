@@ -1352,8 +1352,29 @@ DK_STATE_JS = """() => {
           password: !!document.querySelector('input[type=password]'),
           frames: document.querySelectorAll('iframe').length,
           robot: /verify you are human|checking your browser|are you a robot|captcha|just a moment/i.test(t),
+          done: /your music is on its way|we're processing your (album|single|release)/i.test(t), text: t.slice(0, 1500),
           upload_words: /upload|new release|add a track|artist\/band name/i.test(t)};
 }""" % DK_FORM
+
+
+def dk_done_page(sess: Session, st: dict) -> str:
+    """DistroKid の登録が終わった画面（Hooray, your music is on its way!）が出ているとき（決定 133）：
+    そこに出ている曲が、仕組みの「登録の準備ができた」曲なら「登録した」と記録する。戻り値：記録した曲の説明（無ければ空）"""
+    import publish
+    text = str(st.get("text") or "").lower()
+    for song in _songs.all_songs():
+        stt = _songs.state(song)
+        if stt.get("status") not in ("ready", "waiting_cover") or not song.get("title"):
+            continue
+        if song["title"].lower() in text and song["artist"].lower() in text:
+            f = publish.draft_fields(song)
+            rel = str(f.get("Release date") or "")
+            day = rel[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", rel) else date.today().isoformat()
+            r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
+            print(r.stdout.strip())
+            print(f"   ○ DistroKid の登録が終わった画面に {song['artist']}「{song['title']}」が出ていたので、登録したと記録しました（配信日 {day}）")
+            return f"{song['artist']}「{song['title']}」"
+    return ""
 
 
 def dk_wait_form(sess: Session) -> bool:
@@ -1377,11 +1398,22 @@ def dk_wait_form(sess: Session) -> bool:
             sess.page.wait_for_timeout(1000)
         print(f"   記録：DistroKid の画面 → 場所={st.get('path', '?')}・題={st.get('title', '?')}・登録の欄={st.get('form', 0)}・"
               f"入力欄={st.get('inputs', 0)}・パスワード欄={'あり' if st.get('password') else 'なし'}・枠={st.get('frames', 0)}・"
-              f"ロボットの確認={'あり' if st.get('robot') else 'なし'}", flush=True)
-        if attempt == 0 and not st.get("password") and not st.get("robot") and "/new" not in str(st.get("path", "")):
+              f"ロボットの確認={'あり' if st.get('robot') else 'なし'}・登録が終わった画面={'あり' if st.get('done') else 'なし'}", flush=True)
+        if st.get("done"):   # 前の登録が終わった画面のまま：その曲を記録して、新しい登録の画面を開き直す（決定 133）
+            got = dk_done_page(sess, st)
+            if attempt < 2:
+                if got:
+                    sess.show("前の登録が終わっていました", [f"{got} は DistroKid の登録が済んでいたので、登録したと記録しました。",
+                                                         "新しい登録の画面を開き直します。"], [])
+                sess.goto(SITES["distrokid"])
+                continue
+        if attempt == 0 and not st.get("password") and not st.get("robot") and not st.get("done") and "/new" not in str(st.get("path", "")):
             sess.goto(SITES["distrokid"])   # ログインはできていて別のページにいる：登録の画面を開き直す
             continue
-        if st.get("robot"):
+        if st.get("done"):
+            lines = ["DistroKid の「登録が終わった」画面（Hooray, your music is on its way!）のままです。",
+                     "画面の上の「Upload」か、新しい曲を登録するボタンを押して、登録の画面（Artist/Band name の欄がある画面）を開いてから「続ける」を押してください。"]
+        elif st.get("robot"):
             lines = ["DistroKid の「ロボットではない」の確認が出ています。画面の確認を Gon さんが済ませてから「続ける」を押してください（システムは押しません）。"]
         elif st.get("password"):
             lines = ["DistroKid のログインの画面です。この専用のブラウザで、いつものアカウントでログインしてから「続ける」を押してください。",
