@@ -384,7 +384,12 @@
   },
   "distribution": {
     "bio_en": "SOFT CANTILEVER are three architecture-school classmates from Melbourne: Kino Dela Paz, a Filipino-Australian singer-guitarist from the western suburbs; Bia Takeda, a Japanese-Brazilian bassist who grew up between Londrina, Hamamatsu and São Paulo; and Tav Reid, a Samoan-Scottish Kiwi drummer who traded the drafting table for a carpenter's belt. They make sunlit city pop and indie funk for daytime highways, with a warm mid-range lead, a harmony that always lands a third above, and basslines drawn up like floor plans. Their first real audience came from phone videos shot beside a white van at service stations up the Hume, one song per stop, watched by truckies, caravanning grandparents and anyone who has ever eaten a pie in a car park. Put them on when the road opens up and the next servo is forty minutes away.",
-    "spotify_uri": "spotify:artist:4VnwGLyuCpNYnEif15MxF9"
+    "spotify_uri": "spotify:artist:4VnwGLyuCpNYnEif15MxF9",
+    "artist_pages": {
+      "spotify": "https://open.spotify.com/artist/4VnwGLyuCpNYnEif15MxF9",
+      "youtube_music": "https://music.youtube.com/channel/UCeeatv50kkoFeswiDg3IwIQ",
+      "apple_music": "https://music.apple.com/jp/artist/soft-cantilever/6826166910"
+    }
   },
   "collab": {
     "preferred_partners": [

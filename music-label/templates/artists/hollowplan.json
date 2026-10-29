@@ -335,7 +335,12 @@
   },
   "distribution": {
     "bio_en": "HOLLOWPLAN is Abena Ofori, a Ghanaian-British architectural model maker who writes house music after her shifts in a Hackney Wick workshop. Born in Peckham and raised in Leeds, she found her sound on the overnight coach between London and her parents' house, recording the hum of 3 a.m. motorway services and her own breath instead of words. Her tracks are built like the plans she cuts by hand: a steady pulse around an empty centre, the courtyard of her late grandmother's house in Kumasi. It is music for the long, quiet stretch of a night drive, when there is nothing to do but keep going.",
-    "spotify_uri": "spotify:artist:6IQ45KMUBwSq8uhzS2yF33"
+    "spotify_uri": "spotify:artist:6IQ45KMUBwSq8uhzS2yF33",
+    "artist_pages": {
+      "spotify": "https://open.spotify.com/artist/6IQ45KMUBwSq8uhzS2yF33",
+      "youtube_music": "https://music.youtube.com/channel/UC6Jh9U0ripxN93H2uF5ZvKw",
+      "apple_music": "https://music.apple.com/jp/artist/hollowplan/6826796599"
+    }
   },
   "collab": {
     "preferred_partners": [
