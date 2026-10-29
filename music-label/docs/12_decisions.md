@@ -1807,3 +1807,16 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 5 組（DECLAN FAY・HOLLOWPLAN・VERNALIGHT・SOFT CANTILEVER・TIDEWOOL）は、Gon さんが送った住所で記録済み（決定 136・138）なので、デビュー完了のまま
 - 試験：Spotify のページの無い組が、デビューのタブに残り、最後の列が「● Gon さん」、押すと住所の欄が出て、「今やること」にも出る。
   記録すると、デビューのタブから外れ、設定書にも ID が入ることを確かめた
+
+## 140. DistroKid の登録画面：デビュー済みはドロップダウンから選ぶ・初めては「＋ new artist」・デビュー済みは Artist already in を Yes（2026-10-29。オーナーの指示）
+
+- デビュー済み（Spotify のアーティストのページを記録した組。決定 139）：Artist/band name の欄はドロップダウンになっているので、そこから
+  その組の名前を選ぶ（select の選択肢・選ぶ箱のどちらでも。名前が同じものを選ぶ）。見つからないときは名前の欄に入れてみて、記録に残す
+- 初めて配信する組：Artist/band name の欄の下の「＋ new artist」を押してから、デビューする組の名前を入れる
+- Artist already in 〜?（Spotify・Apple Music・YouTube Music・Instagram・Facebook）：デビュー済みの組はどれも Yes（すでにあるページ）。
+  Spotify は記録した ID（spotify:artist:…）を Yes の下の欄に入れ、ほかのサービスは DistroKid が出す前の曲のページの候補を選ぶ。
+  候補が出ていないサービスは、Gon さんに選んでもらうよう案内する。初めての組はこれまでどおり No（新しいページ）
+- 画面の部品名は「Artist/band name」「new artist」の文字を手がかりに探す。ドロップダウンの有無・選んだ名前・「＋ new artist」の有無を
+  記録に 1 行残す（「診断の記録を Claude に送る」で届く）
+- 試験：仮のページで、ドロップダウンから選べる・「＋ new artist」を押すと名前の欄が出る・Spotify は Yes、Apple Music は前のページの候補を
+  選ぶことを確かめた。本物の DistroKid ではまだ

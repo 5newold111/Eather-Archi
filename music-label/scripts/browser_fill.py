@@ -2672,10 +2672,104 @@ def _field(*keys: str):
     return do, ok
 
 
+def _debuted(song: dict) -> bool:
+    """その組はデビュー済みか（Spotify のアーティストのページを記録した組。決定 139）。デビュー済みなら DistroKid の
+    アーティスト名はドロップダウンから選び、Artist already in は Yes（すでにあるページ）にする（決定 140）"""
+    try:
+        import _timeline
+        return _timeline.debut_done(song["slug"])
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# アーティスト名の欄（Artist/band name）：デビュー済みの組はドロップダウンから選ぶ・初めての組は「＋ new artist」を押して名前を入れる（決定 140）
+ARTIST_FIELD_JS = r"""([name, mode]) => {
+  const vis = e => !!(e && (e.offsetWidth || e.offsetHeight || e.getClientRects().length));
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const want = norm(name);
+  const heads = [...document.querySelectorAll('label, h1, h2, h3, h4, h5, div, span, p')]
+    .filter(e => vis(e) && /artist\s*\/\s*band name/i.test(e.innerText || '') && (e.innerText || '').length < 80);
+  let box = heads.length ? heads[heads.length - 1] : document.body;
+  for (let i = 0; i < 5 && box.parentElement && !box.querySelector('select, input[name=bandname], [role=combobox]'); i++) box = box.parentElement;
+  const sels = [...document.querySelectorAll('select[name=bandname], select[name*=artist i], select[id*=artist i]'), ...box.querySelectorAll('select')].filter(vis);
+  if (mode === 'read') {
+    if (sels.length) { const s = sels[0]; return {value: ((s.options[s.selectedIndex] || {}).text || '').trim(), kind: 'select'}; }
+    const inp = [...document.querySelectorAll('input[name=bandname]')].find(vis);
+    if (inp) return {value: inp.value, kind: 'input'};
+    const cb = [...box.querySelectorAll('[role=combobox], [class*=select i]')].find(vis);
+    return {value: cb ? (cb.innerText || '').trim() : '', kind: cb ? 'combobox' : ''};
+  }
+  if (mode === 'pick') {
+    const out = {select: sels.length > 0, combobox: false, picked: '', options: 0};
+    if (sels.length) {
+      const s = sels[0], opts = [...s.options];
+      out.options = opts.length;
+      const o = opts.find(x => norm(x.text) === want) || opts.find(x => norm(x.text).startsWith(want));
+      if (o) { s.value = o.value; s.dispatchEvent(new Event('input', {bubbles: true})); s.dispatchEvent(new Event('change', {bubbles: true})); out.picked = o.text.trim(); }
+      return out;
+    }
+    const cb = [...box.querySelectorAll('[role=combobox], [class*=select i], [class*=dropdown i]')].find(vis);
+    if (cb) { document.querySelectorAll('[data-pd-artist-cb]').forEach(e => e.removeAttribute('data-pd-artist-cb'));
+              cb.setAttribute('data-pd-artist-cb', '1'); out.combobox = true; }
+    return out;
+  }
+  if (mode === 'new') {   // 「＋ new artist」
+    const cands = [...document.querySelectorAll('a, button, span, div, label, p')]
+      .filter(e => vis(e) && /^\+?\s*new artist$/i.test((e.innerText || '').trim()));
+    document.querySelectorAll('[data-pd-newartist]').forEach(e => e.removeAttribute('data-pd-newartist'));
+    if (!cands.length) return {newlink: ''};
+    const el = cands[cands.length - 1];
+    el.setAttribute('data-pd-newartist', '1');
+    return {newlink: (el.innerText || '').trim()};
+  }
+  return {};
+}"""
+
+
 def _sec_artist_do(c: DK) -> None:
+    """デビュー済みの組：Artist/band name のドロップダウンからその組を選ぶ。初めて配信する組：欄の下の「＋ new artist」を押してから
+    名前を入れる（オーナーの指示 2026-10-29。決定 140）。どちらも見つからない画面では、これまでどおり欄に名前を入れる"""
+    name, page = c.f["artist"]["value"], c.sess.page
+    try:
+        if _debuted(c.song):
+            r = page.evaluate(ARTIST_FIELD_JS, [name, "pick"])
+            print(f"   記録：アーティスト名の欄（デビュー済み）→ ドロップダウン={'あり（' + str(r.get('options')) + ' 件）' if r.get('select') else ('選ぶ箱' if r.get('combobox') else 'なし')}"
+                  f"・選んだ={r.get('picked') or '－'}", flush=True)
+            if r.get("picked"):
+                c.sess.settle(3000)
+                return
+            if r.get("combobox"):
+                page.locator('[data-pd-artist-cb="1"]').first.click()
+                page.wait_for_timeout(700)
+                opt = page.get_by_text(name, exact=True)
+                for i in range(opt.count() - 1, -1, -1):
+                    if opt.nth(i).is_visible():
+                        opt.nth(i).click()
+                        print(f"   … ドロップダウンから {name} を選びました")
+                        c.sess.settle(3000)
+                        return
+            if r.get("select") or r.get("combobox"):
+                print(f"   ⚠ ドロップダウンに {name} が見つかりません（DistroKid に前の曲を出したときの名前と違う？）。名前の欄に入れてみます")
+        else:
+            r = page.evaluate(ARTIST_FIELD_JS, [name, "new"])
+            print(f"   記録：アーティスト名の欄（初めての組）→ 「＋ new artist」={'あり' if r.get('newlink') else 'なし'}", flush=True)
+            if r.get("newlink"):
+                page.locator('[data-pd-newartist="1"]').first.click()
+                page.wait_for_timeout(900)
+    except Exception as e:  # noqa: BLE001
+        print(f"   － アーティスト名の欄を読めませんでした（{e}）")
     fill_fields(c.sess, "distrokid", [c.f["artist"]], fresh=False)
     c.sess.page.keyboard.press("Tab")   # 名前の欄から離れる（DistroKid はここで同じ名前を探し始め、Artist already in を作り直す）
     c.sess.settle(3000)
+
+
+def _sec_artist_ok(c: DK):
+    """アーティスト名が入っているか（ドロップダウンで選んだ場合も）"""
+    try:
+        v = c.sess.page.evaluate(ARTIST_FIELD_JS, [c.f["artist"]["value"], "read"]).get("value", "")
+    except Exception:  # noqa: BLE001
+        return None
+    return bool(v) and v.strip().lower() == str(c.f["artist"]["value"]).strip().lower()
 
 
 NO_TEXT_JS = r"""(name) => {
@@ -2711,7 +2805,52 @@ def _click_no_text(sess: Session, css: str) -> None:
         pass
 
 
+EXISTING_PAGE_JS = r"""(name) => {
+  const rs = [...document.querySelectorAll(`input[type=radio][name="${name}"]`)];
+  if (!rs.length) return {found: false};
+  const cur = rs.find(r => r.checked);
+  if (cur && cur.value !== 'new') return {found: true, picked: cur.value || 'yes', already: true};
+  const shown = r => !!(r.offsetWidth || r.offsetHeight || (r.parentElement && r.parentElement.offsetWidth));
+  const ex = rs.find(r => r.value !== 'new' && r.value !== '' && shown(r)) || rs.find(r => r.value === '');
+  document.querySelectorAll('[data-pd-yes]').forEach(e => e.removeAttribute('data-pd-yes'));
+  if (!ex) return {found: true, picked: ''};
+  ex.setAttribute('data-pd-yes', '1');
+  return {found: true, picked: ex.value || 'yes', label: ((ex.closest('label') || ex.parentElement || {}).innerText || '').trim().slice(0, 60)};
+}"""
+
+
+def _sec_ids_yes(c: DK) -> None:
+    """デビュー済みの組：Artist already in 〜? はどのサービスも Yes（すでにあるページ）。Spotify は記録した ID を入れ、
+    ほかのサービスは DistroKid が出す、前の曲のページを選ぶ（決定 140）"""
+    _items, texts = artist_id_radios(c.song)
+    for name, svc in ARTIST_ID_RADIOS:
+        try:
+            r = c.sess.page.evaluate(EXISTING_PAGE_JS, name)
+        except Exception:  # noqa: BLE001
+            continue
+        if not r.get("found"):
+            continue
+        if r.get("already"):
+            continue
+        if r.get("picked"):
+            try:
+                c.sess.page.locator('[data-pd-yes="1"]').first.check(force=True)
+                print(f"   … Artist already in {svc}? → Yes（{r.get('label') or 'すでにあるページ'}）")
+            except Exception:  # noqa: BLE001
+                pass
+            c.sess.page.wait_for_timeout(500)
+        else:
+            c.notes["ids"] = f"{svc}：すでにあるページの候補が出ていません。DistroKid の画面で前の曲のページを選んでください"
+    for _label, css, val in texts:   # Spotify：Yes の下の欄に記録した ID（spotify:artist:…）
+        loc = c.sess.page.locator(css)
+        if loc.count() and loc.first.is_visible() and loc.first.input_value() != val:
+            loc.first.fill(val)
+
+
 def _sec_ids_do(c: DK) -> None:
+    if _debuted(c.song):   # デビュー済み：どのサービスも Yes（決定 140）
+        _sec_ids_yes(c)
+        return
     items, texts = artist_id_radios(c.song)
     for item in items:   # 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す
         for t in range(4):
@@ -2741,6 +2880,15 @@ def _sec_ids_do(c: DK) -> None:
 
 
 def _sec_ids_ok(c: DK):
+    if _debuted(c.song):   # デビュー済み：出ているサービスが全部 Yes（new 以外）になっているか（決定 140）
+        try:
+            st = c.sess.page.evaluate("""(names) => names.map(n => { const rs = [...document.querySelectorAll(`input[type=radio][name="${n}"]`)];
+                if (!rs.length) return null; const cur = rs.find(r => r.checked); return !!cur && cur.value !== 'new'; })""",
+                                      [n for n, _ in ARTIST_ID_RADIOS])
+        except Exception:  # noqa: BLE001
+            return None
+        got = [x for x in st if x is not None]
+        return all(got) if got else None
     items, _ = artist_id_radios(c.song)
     states = []
     for _, css in items:
@@ -2843,7 +2991,8 @@ def dk_sections(song: dict) -> list[dict]:
     S_ = lambda key, name, pair, again=True: {"key": key, "name": name, "do": pair[0], "ok": pair[1], "again": again}  # noqa: E731
     return [
         S_("previous", "前に出したことがある？ → No", _radio('input[type=radio][name^="previouslyReleased_"][value="0"]')),
-        {"key": "artist", "name": "アーティスト名", "do": _sec_artist_do, "ok": _field("artist")[1], "again": False},
+        {"key": "artist", "name": "アーティスト名（デビュー済み：ドロップダウンから選ぶ／初めて：＋ new artist）", "do": _sec_artist_do,
+         "ok": _sec_artist_ok, "again": False},
         {"key": "ids", "name": "Artist already in（Spotify・Apple Music・YouTube Music・Instagram・Facebook）", "do": _sec_ids_do, "ok": _sec_ids_ok, "again": True},
         S_("release", "配信日", _field("release")),
         S_("language", "言語", _field("language")),
