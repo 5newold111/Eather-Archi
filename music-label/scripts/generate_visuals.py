@@ -241,8 +241,8 @@ REAL_RELEASE = ("Make it look like the cover of a real album that a record label
 REAL_BASE = ("It must look like the cover of a real album that a record label released and sold on CD and vinyl, made with real "
              "materials and real tools, not like AI art. Avoid the typical AI look: no hyper-detailed digital painting, no glossy plastic "
              "sheen, no airbrushed smoothness, no oversaturated neon gradients, no glowing particles or bokeh orbs, no dreamy fog, no surreal "
-             "floating objects, no fantasy concept-art scenery, no lens-flare spectacle. The picture fills the whole square edge to edge: "
-             "no circular crop, round frame, porthole, oval vignette or circle mask around it, and no decorative circles or dots.")
+             "floating objects, no fantasy concept-art scenery, no lens-flare spectacle. By default the picture fills the square edge to edge "
+             "(a round frame or circular crop only if it is part of this cover's idea).")
 
 
 def art_taste_clause(artist: dict, slim: bool = False) -> str:
@@ -479,7 +479,6 @@ consistency (fits the artist's visual sheet), symbolism (memorable, says somethi
 scene_fit (fits the listening scene / the song), safety (platform rules and the face-hiding rule),
 craft (finish, and whether it looks like a real album cover a label released on CD - a real photograph or real graphic design.
 Score craft 1-2 when it looks AI-generated: hyper-detailed, glossy or airbrushed surfaces, neon glow, floating surreal objects,
-a picture put inside a circle, oval or round vignette for no reason,
 fantasy concept art, fog and light particles).
 Then check every hard rule and the compliance list; list each violation you can SEE (a recognizable face, a third-party
 logo or character, a URL / handle / price, text that is not exactly the song title or artist name, an identifiable real
