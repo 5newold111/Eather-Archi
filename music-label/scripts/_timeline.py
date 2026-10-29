@@ -148,11 +148,17 @@ def debut_rows() -> list[dict]:
         try:
             import publish
             left = publish.artist_pages_missing(slug)
+            published = bool(publish.spotify_artist_id(slug))   # もう配信されている（Spotify にページがある）組
         except Exception:  # noqa: BLE001
-            left = []
-        phases.append(_ph("配信確認（アーティストのページ）", sp_day, sp_day, "wait" if live else "plan", "あなた",
-                          f"デビュー曲が配信されたら、アーティストのページ 5 つを記録する（あと {len(left)} つ：{'・'.join(left)}。全部そろうとデビュー完了）"))
+            left, published = [], False
+        last = _ph("配信確認（アーティストのページ）", sp_day, sp_day, "wait" if (live or published) else "plan", "あなた",
+                   f"デビュー曲が配信されたら、アーティストのページ 5 つを記録する（あと {len(left)} つ：{'・'.join(left)}。全部そろうとデビュー完了）")
         b = _status.blocker(list(steps.values()))
+        if published:   # もう配信されている組：前の工程は全部済みとして、配信確認だけを Gon さんの番にする（配信待ちの状態。決定 142）
+            for ph in phases:
+                ph["state"], ph["who"] = "done", ""
+            b = {"state": "wait", "who": "あなた", "detail": last["detail"], "name": last["name"]}
+        phases.append(last)
         rows.append({"slug": slug, "artist": a.get("name", slug), "label": _label(a), "title": song["title"], "id": song["id"],
                      "row": f"{a.get('name', slug)}", "sub": f"デビュー曲「{song['title']}」", "phases": phases,
                      "blocker": _blk(b)})
