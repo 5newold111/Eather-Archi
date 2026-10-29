@@ -534,7 +534,10 @@ def _pick(loc, avoid, field_only: bool = False):
 def find(sess: Session, site: str, f: dict):
     page = sess.page
     sel = learned().get(LEARN_AS.get(site, site), {}).get(f["key"])
-    if sel and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)) and not _site_chrome(page.locator(sel).first):
+    # 本物の画面でわかった欄の名前（css）がある欄は、そちらを先に使う。覚えた場所が別の箱を指していることがある
+    # （DistroKid のジャンルの欄が「#albumuuid」として覚えられていた。決定 135）
+    if sel and not f.get("css") and (_visible(page.locator(sel)) or (f["type"] == "select" and page.locator(sel).count() > 0)) \
+            and not _site_chrome(page.locator(sel).first):
         return page.locator(sel).first
     if f.get("css"):   # 本物の画面の部品の一覧でわかった欄の名前（DistroKid。2026-10-22）
         loc = page.locator(f["css"])
@@ -549,6 +552,8 @@ def find(sess: Session, site: str, f: dict):
             return loc.first
         if f.get("css_only"):
             return None   # この欄の名前が無い画面（Pop にはサブジャンルの欄が無いなど）：ほかの探し方で別の箱を触らない
+        if sel and _visible(page.locator(sel)) and not _site_chrome(page.locator(sel).first):
+            return page.locator(sel).first   # 欄の名前が見つからない画面：覚えた場所を使う
     if f["type"] == "file":
         want = "audio" if f["key"] == "audio" else "image"
         inputs = page.locator("input[type=file]")
@@ -1353,7 +1358,7 @@ DK_STATE_JS = """() => {
           frames: document.querySelectorAll('iframe').length,
           robot: /verify you are human|checking your browser|are you a robot|captcha|just a moment/i.test(t),
           done: /your music is on its way|we're processing your (album|single|release)/i.test(t), text: t.slice(0, 1500),
-          upload_words: /upload|new release|add a track|artist\/band name/i.test(t)};
+          upload_words: /upload|new release|add a track|artist.band name/i.test(t)};
 }""" % DK_FORM
 
 
@@ -3303,6 +3308,26 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     return 2
 
 
+def prepare_photo(slug: str) -> dict:
+    """サイト用のアーティスト写真を作る。ブラウザの部品（Playwright）が入った Python に画像の部品（Pillow）が無いときは、
+    Pillow のある Python で作る（2026-10-25 の「No module named 'PIL'」。決定 135）"""
+    import artist_photo
+    try:
+        return artist_photo.prepare(slug)
+    except ImportError:
+        import _common
+        py = _common.python_with("PIL")
+        if not py:
+            raise
+        code = ("import json,sys;sys.path.insert(0,'scripts');import artist_photo as a;"
+                f"print(json.dumps(a.prepare({slug!r}), default=str))")
+        r = subprocess.run([py, "-c", code], cwd=str(S.parent), capture_output=True, text=True, timeout=300)
+        if r.returncode:
+            raise RuntimeError((r.stderr or r.stdout).strip()[-300:])
+        d = json.loads(r.stdout.strip().splitlines()[-1])
+        return {k: (Path(v) if isinstance(v, str) else v) for k, v in d.items()}
+
+
 def run_photo(sess: Session, slug: str, service: str) -> int:
     """アーティスト写真をサイトのアーティストのページに入れる（決定 32）。
     システムはサイトのボタンを押さない。Gon さんが「写真を変える」などを押すと、ファイルを選ぶ画面の代わりに整えた画像が選ばれる。
@@ -3315,7 +3340,7 @@ def run_photo(sess: Session, slug: str, service: str) -> int:
     if art is None:
         sys.exit(f"[エラー] 組 {slug} が見つかりません")
     try:
-        imgs = artist_photo.prepare(slug)
+        imgs = prepare_photo(slug)
     except FileNotFoundError as e:
         print(f"【結果】まだ終わっていません：{e}")
         return 2
