@@ -1323,7 +1323,8 @@ def wait_for_form(sess: Session, name: str, how: str) -> bool:
     """入力欄のある画面が出るまで待つ。出なければ（ログインの画面・別の画面）、Gon さんに整えてもらう"""
     for _ in range(3):
         try:
-            sess.page.wait_for_selector("textarea, input[type=text], [contenteditable=true]", state="visible", timeout=15000)
+            sess.page.wait_for_selector("textarea, input:not([type]), input[type=text], input[type=search], [contenteditable=true]",
+                                        state="visible", timeout=15000)   # type の書き方が無い欄も（決定 131）
             sess.settle(500)
             return True
         except BrowserClosed:
@@ -1338,6 +1339,63 @@ def wait_for_form(sess: Session, name: str, how: str) -> bool:
         if sess.wait({"action": "continue"}).get("action") != "continue":
             return False
     return True
+
+
+DK_FORM = ("input[name=bandname], input.uploadFileTitle, input.trackupload_1, input[name=artwork], select[name=genre1], "
+           "input[name=releaseDate]")
+DK_STATE_JS = """() => {
+  const vis = e => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
+  const t = (document.body ? document.body.innerText : '').slice(0, 4000);
+  return {path: location.pathname, title: document.title.slice(0, 80),
+          form: [...document.querySelectorAll('%s')].filter(vis).length,
+          inputs: [...document.querySelectorAll('input:not([type=hidden]), select, textarea')].filter(vis).length,
+          password: !!document.querySelector('input[type=password]'),
+          frames: document.querySelectorAll('iframe').length,
+          robot: /verify you are human|checking your browser|are you a robot|captcha|just a moment/i.test(t),
+          upload_words: /upload|new release|add a track|artist\/band name/i.test(t)};
+}""" % DK_FORM
+
+
+def dk_wait_form(sess: Session) -> bool:
+    """DistroKid の登録画面（Upload）が開いたかを、登録画面だけにある欄で確かめる（決定 131）。
+    前は「文字の入力欄（type=text）が見えるか」で見ていて、DistroKid の欄にその書き方が無いと、登録画面が開いていても
+    「入力画面が見つかりません」になっていた。見つからないときは、いまの画面（ログイン・ロボットの確認・別のページ）を見分けて案内し、記録に残す"""
+    for attempt in range(4):
+        st = {}
+        for _ in range(30):   # 最大 約 30 秒
+            try:
+                st = sess.page.evaluate(DK_STATE_JS)
+            except BrowserClosed:
+                raise
+            except Exception:  # noqa: BLE001
+                if sess.closed():
+                    raise BrowserClosed()
+                st = {}
+            if st.get("form"):
+                sess.settle(500)
+                return True
+            sess.page.wait_for_timeout(1000)
+        print(f"   記録：DistroKid の画面 → 場所={st.get('path', '?')}・題={st.get('title', '?')}・登録の欄={st.get('form', 0)}・"
+              f"入力欄={st.get('inputs', 0)}・パスワード欄={'あり' if st.get('password') else 'なし'}・枠={st.get('frames', 0)}・"
+              f"ロボットの確認={'あり' if st.get('robot') else 'なし'}", flush=True)
+        if attempt == 0 and not st.get("password") and not st.get("robot") and "/new" not in str(st.get("path", "")):
+            sess.goto(SITES["distrokid"])   # ログインはできていて別のページにいる：登録の画面を開き直す
+            continue
+        if st.get("robot"):
+            lines = ["DistroKid の「ロボットではない」の確認が出ています。画面の確認を Gon さんが済ませてから「続ける」を押してください（システムは押しません）。"]
+        elif st.get("password"):
+            lines = ["DistroKid のログインの画面です。この専用のブラウザで、いつものアカウントでログインしてから「続ける」を押してください。",
+                     "（ログインはこの専用のブラウザが覚えるので、次からは要りません）"]
+        else:
+            lines = [f"いまの画面：{st.get('title') or '（題なし）'}（{st.get('path', '')}）",
+                     "DistroKid の登録の画面（Upload：Artist/Band name・曲名・音源の欄がある画面）を開いてから「続ける」を押してください。",
+                     "開いているのに進まないときは「画面の部品をコピー」を押して Claude に貼るか、ダッシュボードの「診断の記録を Claude に送る」を押してください。"]
+        sess.show("DistroKid の登録の画面が見つかりません", lines,
+                  [{"id": "continue", "label": "続ける", "primary": True}, {"id": "copy_parts", "label": "画面の部品をコピー（Claude に貼る用）"},
+                   {"id": "stop", "label": "やめる"}])
+        if sess.wait({"action": "continue"}).get("action") != "continue":
+            return False
+    return False
 
 
 def progress(i: int, n: int, song: dict, extra: str = "") -> None:
@@ -3069,7 +3127,7 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     if not sess.ensure_login("distrokid"):
         print("【結果】まだ終わっていません：DistroKid にログインできていません")
         return 2
-    if not wait_for_form(sess, "DistroKid", "登録の画面（Upload）を開いてから"):
+    if not dk_wait_form(sess):   # 登録画面にしかない欄で確かめる（決定 131）
         print("【結果】まだ終わっていません：DistroKid の登録画面が開けませんでした")
         return 2
     if not same_page_ready(song):   # 2 曲目から：デビュー曲と同じページにまとめるため、ページの ID がわかるまで待つ（決定 53）
