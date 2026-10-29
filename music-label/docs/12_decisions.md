@@ -1773,3 +1773,4 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 試験：DECLAN FAY で ID が読め、待ちが解け、DistroKid では「Yes」と URI を入れる選択になる。ID の無い組は今までどおり
 - 追記：VERNALIGHT（nao_easterly）の Spotify のページも記録（spotify:artist:1L1em2KI0Q5vtc5b5GpVIE。オーナーの指示）
 - 追記：SOFT CANTILEVER の Spotify のページも記録（spotify:artist:4VnwGLyuCpNYnEif15MxF9。オーナーの指示）
+- 追記：TIDEWOOL の Spotify のページも記録（spotify:artist:6jOuqYPHAZfLtVWC6DHclI。オーナーの指示）
