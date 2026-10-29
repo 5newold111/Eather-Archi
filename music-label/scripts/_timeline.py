@@ -97,23 +97,13 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
 
 # ---------------------------------------------------------------------------
 def debut_done(slug: str) -> bool:
-    """デビューが終わったか：Spotify にアーティストのページがある（決定 138）・デビュー曲が配信中・DistroKid に登録済みで配信日を過ぎた
-    （決定 120。終わった組はデビューのタブに出さない）"""
-    today = date.today()
-    try:   # Spotify にその組のアーティストのページがある（配信の確認で見つけた・Gon さんが記録した）＝デビュー済み（決定 138）
+    """デビューが終わったか：デビューのタブで Spotify のアーティストのページを記録した（配信の確認で自動で見つけた場合も）とき（決定 139）。
+    記録するまではデビューの流れのまま（デビュー曲が配信中でも）。終わった組はデビューのタブに出さない（決定 120）"""
+    try:
         import publish
-        if publish.spotify_artist_id(slug):
-            return True
+        return bool(publish.spotify_artist_id(slug))
     except Exception:  # noqa: BLE001
-        pass
-    for s in _songs.debut_songs():
-        if s["slug"] != slug:
-            continue
-        st = _songs.state(s)
-        rel = _d(st.get("released")) or _d(st.get("release_date"))
-        if st.get("status") == "live" or (st.get("status") == "registered" and rel and rel <= today):
-            return True
-    return False
+        return False
 
 
 def in_regular(slug: str) -> bool:
@@ -151,6 +141,11 @@ def debut_rows() -> list[dict]:
             plan[key] = (start, end)
             start = end + timedelta(days=1)
         phases += song_phases(song, plan, None)
+        # 最後：Spotify のアーティストのページを記録する（これでデビュー完了。決定 139）
+        sp_day = max([_d(ph["end"]) for ph in phases] + [today])
+        live = _songs.state(song).get("status") in ("registered", "live")
+        phases.append(_ph("Spotify のページ", sp_day, sp_day, "wait" if live else "plan", "あなた",
+                          "デビュー曲が Spotify に出たら、アーティストのページの住所を貼って記録する（これでデビュー完了）"))
         b = _status.blocker(list(steps.values()))
         rows.append({"slug": slug, "artist": a.get("name", slug), "label": _label(a), "title": song["title"], "id": song["id"],
                      "row": f"{a.get('name', slug)}", "sub": f"デビュー曲「{song['title']}」", "phases": phases,

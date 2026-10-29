@@ -1192,7 +1192,11 @@ def cmd_artist_page(args) -> int:
         print(f"[エラー] 組 {args.slug} が見つかりません")
         return 2
     save_artist_link(args.slug, "spotify", m.group(1), f"https://open.spotify.com/artist/{m.group(1)}")
-    print(f"【結果】{args.slug} の Spotify のアーティストのページを記録しました：spotify:artist:{m.group(1)}")
+    a = load_artist(args.slug, missing_ok=True)
+    if a is not None and (a.get("distribution") or {}).get("spotify_uri") != f"spotify:artist:{m.group(1)}":   # 設定書にも残す（決定 139）
+        a.setdefault("distribution", {})["spotify_uri"] = f"spotify:artist:{m.group(1)}"
+        save_artist(a)
+    print(f"【結果】{args.slug} の Spotify のアーティストのページを記録しました：spotify:artist:{m.group(1)}（デビュー完了）")
     return 0
 
 

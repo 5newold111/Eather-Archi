@@ -116,6 +116,13 @@ def _explain(row: dict, phase: dict) -> dict:
     if state == "done" and not phase.get("milestone"):
         return {"cause": f"済みました。{phase.get('detail', '')}", "steps": [], "actions": []}
 
+    if name == "Spotify のページ":   # デビュー完了の最後の一歩（決定 139）
+        return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が Spotify に出たら、アーティストのページを記録してください。"
+                         "記録するとデビュー完了になり、この組は「定期配信」のタブに移ります（2 曲目からの DistroKid の登録も、このページにまとめます）。",
+                "steps": ["Spotify で組の名前を探し、アーティストのページを開く",
+                          "住所（https://open.spotify.com/…/artist/…）をコピーして、下の欄に貼る",
+                          "「Spotify のページを記録する（デビュー完了）」を押す"],
+                "actions": [{"kind": "artist_page", "slug": row.get("slug"), "label": "Spotify のページを記録する（デビュー完了）"}]}
     if name == "名前の確認":
         return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",
                 "steps": ["「名前を確かめる」を押す（Spotify などを自動で調べます）",

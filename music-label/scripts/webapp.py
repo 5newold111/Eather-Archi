@@ -676,7 +676,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
- <p class="sub">デビュー前の組。デビュー曲が配信される（DistroKid に登録して配信日を過ぎる）と、デビューが終わったとして、このタブから外れて「定期配信」に移ります。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <p class="sub">デビュー前の組。デビュー曲が Spotify に出たら、最後の「Spotify のページ」でアーティストのページを記録してください。記録するとデビュー完了になり、このタブから外れて「定期配信」に移ります（記録するまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
  <div class="board" id="b-debut"></div>
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
@@ -811,7 +811,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-p],[data-g
 document.addEventListener("keydown",e=>{const b=e.target.closest&&e.target.closest("[data-p],li[data-g2]");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openGuide(b.dataset.p||b.dataset.g2)}});
 const COLS={irregular:[["ブリーフ","曲の案"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
   regular:[["ブリーフ","ブリーフ"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
-  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"]]};
+  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"],["Spotify のページ","Spotify のページ"]]};
 function boardRows(key){const rows=DATA.timeline[key].rows,by={};const order=[];
   rows.forEach((r,ri)=>{if(!by[r.slug]){by[r.slug]=[];order.push(r.slug)}by[r.slug].push(ri)});
   const out=[];order.forEach(slug=>{const idx=by[slug];
