@@ -15,6 +15,9 @@
     1 シーン = ジャケットの案 1 つ。本人（バンドならメンバー。楽器や役割で）を 2 つ以上・曲に出てくる人を 2 つ以上。
     引きの絵だけでなく、手元などのアップ・シーンの一部を切り取った画も入れる（アップ 2 つ以上・切り取り 1 つ以上・中くらい 1 つ以上・引き 1 つ以上）。
     場面ごとに、アーティスト名と曲名の文字のデザイン（書体・置く場所・寄せ方・大きさ・色）も、組の好み（文字の雰囲気・グラフィック）に合わせて決める
+  ・6 案は、それぞれ印象のまったく違うデザインにする（オーナーの指示 2026-10-29。決定 123）：案ごとに「見た目の作り」（look：画材・手法・
+    色の組み立て・光と色調・構図）を別々にし、文字も書体・置き方・並べ方・色を 6 案で重ねない。Claude が重ねてきても、仕組みが書体と置き方を
+    入れ替えて、6 案とも別の書体・別の置き方にする（diversify）
   ・Claude（効き目の低い設定・答えも短い）で 1 曲 数円。ブリーフに保存して、作り直すとき以外はもう一度は呼ばない。鍵が無いときはエピソードから 1 場面を組み立てる
   ・実在の名前・ブランド・建物・文字は入れない
 
@@ -31,7 +34,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, read_json, write_json  # noqa: E402
 
-SCENE_VERSION = 3   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
+SCENE_VERSION = 4   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
 N_SCENES = 6
 SHOTS = ["extreme close-up", "close-up", "cut-out fragment", "medium", "wide"]
 
@@ -63,11 +66,20 @@ Rules:
   script and handwriting). case: upper / lower / as_is. ink: "light", "dark" or a hex colour taken from the scene. Fonts (pick the
   title font in "font"; "artist_font" may pair a second font or be ""):
 {fonts}
-  Vary the lettering across the six where it suits the scene, but keep it this act's taste.
+- SIX COMPLETELY DIFFERENT IMPRESSIONS: the six covers must not look like a set. Give each its own "look" (in English): a different
+  medium or technique (e.g. 35mm film snapshot, large-format still life, risograph print, cut-paper collage, cyanotype, Polaroid,
+  flash photograph at night, painted illustration, photocopy zine, long-exposure blur - start from the act's favourite mediums
+  and go beyond them), a different colour scheme (warm / cold / monochrome / one vivid accent / pastel / high-contrast), a different
+  light and grade, and a different composition (centred, off-centre with big empty space, tight crop, symmetric, layered, framed by
+  a foreground). No two looks may share the medium or the colour scheme.
+- The lettering must differ just as much: every cover uses a DIFFERENT title font, and no two covers share the same place + align +
+  layout. Mix small refined captions with one or two bold title-led designs; mix light, dark and coloured ink. Each still fits the
+  act's taste and its own look.
 - text_space: in English, where the image must stay calm for the lettering (matching "type").
 - song_image: one English sentence of the song's theme and imagery (used first in every cover prompt).
-- Write moment / framing / place / time_light / props / human / memory_look / text_space in English; why_ja in one short Japanese
-  sentence (why this scene is this song); type_ja in one short Japanese sentence (why this lettering)."""
+- Write moment / framing / place / time_light / props / human / memory_look / text_space / look in English; why_ja in one short
+  Japanese sentence (why this scene is this song); look_ja in a few Japanese words (the impression of this design, e.g. 夜のフラッシュ写真・
+  冷たい青); type_ja in one short Japanese sentence (why this lettering)."""
 
 
 TYPE_SCHEMA = {"type": "object", "additionalProperties": False,
@@ -82,12 +94,13 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["song_im
           "properties": {"song_image": {"type": "string"}, "scenes": {"type": "array", "items": {
               "type": "object", "additionalProperties": False,
               "required": ["who", "member", "shot", "moment", "framing", "place", "time_light", "props", "human", "memory_look",
-                           "text_space", "type", "why_ja", "type_ja"],
+                           "look", "text_space", "type", "why_ja", "look_ja", "type_ja"],
               "properties": {"who": {"type": "string", "enum": ["artist", "other", "none"]}, "member": {"type": "string"},
                              "shot": {"type": "string", "enum": SHOTS},
                              "moment": {"type": "string"}, "framing": {"type": "string"}, "place": {"type": "string"},
                              "time_light": {"type": "string"}, "props": {"type": "array", "items": {"type": "string"}},
                              "human": {"type": "string"}, "memory_look": {"type": "string"}, "text_space": {"type": "string"},
+                             "look": {"type": "string"}, "look_ja": {"type": "string"},
                              "type": TYPE_SCHEMA, "why_ja": {"type": "string"}, "type_ja": {"type": "string"}}}}}}
 
 
@@ -112,17 +125,79 @@ def lyrics_head(brief_path: Path | None, brief: dict, lines: int = 16) -> str:
     return "\n".join([ln for ln in text.splitlines() if ln.strip() and "{{" not in ln][:lines])
 
 
+# 鍵が無いときと、Claude の案が重なったときに使う、印象の違う 6 通りの作りと文字（決定 123）
+LOOKS = [("35mm film snapshot, warm amber grade, off-centre subject with wide empty space", "フィルムの温かい色・余白"),
+         ("night flash photograph, hard direct flash, deep black background, one vivid accent colour", "夜のフラッシュ・黒に差し色"),
+         ("two-colour risograph print, grainy ink, flat shapes, pastel paper", "リソグラフ・2 色・パステル"),
+         ("black-and-white large-format still life, centred and symmetric, soft window light", "白黒・静物・中央"),
+         ("faded Polaroid with light leak, cold blue-green cast, tight crop", "ポラロイド・冷たい色・寄り"),
+         ("cut-paper collage with photographic fragments, layered, bold primary colours", "コラージュ・原色・重ね")]
+TYPE_PRESETS = [
+    {"font": "cormorant-garamond", "case": "lower", "tracking": 0.18, "place": "bottom", "align": "center", "layout": "stack", "size": 0.05, "artist_size": 0.028, "ink": "light"},
+    {"font": "bebas-neue", "case": "upper", "tracking": 0.06, "place": "top", "align": "left", "layout": "title_first", "size": 0.1, "artist_size": 0.03, "ink": "light"},
+    {"font": "special-elite", "case": "lower", "tracking": 0.03, "place": "bottom", "align": "right", "layout": "stack", "size": 0.045, "artist_size": 0.028, "ink": "dark"},
+    {"font": "dm-serif-display", "artist_font": "inter", "case": "as_is", "tracking": 0.0, "place": "middle", "align": "center", "layout": "title_first", "size": 0.085, "artist_size": 0.026, "ink": "dark"},
+    {"font": "kalam", "case": "as_is", "tracking": 0.0, "place": "top", "align": "right", "layout": "stack", "size": 0.06, "artist_size": 0.03, "ink": "light"},
+    {"font": "ibm-plex-mono", "case": "upper", "tracking": 0.22, "place": "top", "align": "center", "layout": "split", "size": 0.035, "artist_size": 0.024, "ink": "light"},
+]
+
+
+MEDIUMS = ["polaroid", "risograph", "collage", "cyanotype", "flash", "black-and-white", "monochrome", "illustration", "painted",
+           "painting", "photocopy", "zine", "long-exposure", "large-format", "still life", "film", "digital", "screen print", "woodcut",
+           "watercolor", "watercolour", "charcoal", "pencil", "infrared", "lomo", "instant", "double exposure"]
+
+
+def _medium(look: str) -> str:
+    """作りの画材・手法（重なりの判定用）：知っている言葉があればそれ、無ければ最初の 2 語"""
+    lk = str(look or "").lower()
+    return next((m for m in MEDIUMS if m in lk), " ".join(lk.split()[:2]))
+
+
+def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
+    """6 案の印象を重ねない：同じ書体・同じ置き方（場所＋寄せ＋並べ方）が出たら、まだ使っていない文字のデザインに丸ごと入れ替える。
+    同じ画材・手法の作り（look）が出たら、まだ使っていない作りに入れ替える（決定 123）"""
+    try:
+        import cover_text
+        have = set(cover_text.fonts_available())
+    except Exception:  # noqa: BLE001
+        have = {p["font"] for p in TYPE_PRESETS}
+    fonts, spots, mediums = set(), set(), set()
+    for i, sc in enumerate(scenes):
+        t = dict(sc.get("type") or {})
+        spot = (t.get("place"), t.get("align"), t.get("layout"))
+        if not t.get("font") or t["font"] not in have or t["font"] in fonts or spot in spots:
+            pr = next((p for p in TYPE_PRESETS if p["font"] in have and p["font"] not in fonts
+                       and (p["place"], p["align"], p["layout"]) not in spots), None)
+            if pr:
+                t = dict(pr)   # 書体だけでなく、大きさ・大文字小文字・字間・色も入れ替える（印象を変えるため）
+                sc["text_space"] = ""   # 文字の場所が変わったので、空けておく場所は置き方から決め直す
+            else:   # 用意した 6 通りも使い切ったとき：使っていない書体だけ替える
+                t["font"] = next((f for f in sorted(have) if f not in fonts), t.get("font"))
+            spot = (t.get("place"), t.get("align"), t.get("layout"))
+        fonts.add(t.get("font"))
+        spots.add(spot)
+        sc["type"] = t
+        md = _medium(sc.get("look", ""))
+        if not sc.get("look") or md in mediums:
+            en, ja = next(((e, j) for e, j in LOOKS if _medium(e) not in mediums), LOOKS[i % len(LOOKS)])
+            sc["look"], sc["look_ja"] = en, ja
+            md = _medium(en)
+        mediums.add(md)
+    return scenes
+
+
 def fallback(brief: dict) -> list[dict]:
-    """鍵が無いとき：エピソードから 6 場面を組み立てる（本人・物語の人・人なしと、寄り・引きを入れ替える）"""
+    """鍵が無いとき：エピソードから 6 場面を組み立てる（本人・物語の人・人なしと、寄り・引き、印象の違う作りと文字を入れ替える）"""
     ep = brief.get("episode") or {}
     saw = ep.get("saw") if isinstance(ep.get("saw"), list) else [ep.get("saw")] if ep.get("saw") else []
     saw = [str(x) for x in saw if x] or [str(ep.get("theme") or brief.get("cover_prompt_seed") or "")[:200]]
     plan = [("artist", "extreme close-up", "hands only"), ("other", "medium", "seen from behind"), ("none", "cut-out fragment", "no people"),
             ("artist", "wide", "a small silhouette"), ("other", "close-up", "hands only"), ("none", "close-up", "no people")]
-    return [{"who": who, "member": "", "shot": shot, "moment": saw[i % len(saw)], "framing": shot, "place": str(ep.get("when_where") or ""),
-             "time_light": "", "props": saw[(i + 1) % len(saw):][:2], "human": human, "memory_look": "none",
-             "text_space": "", "type": {}, "why_ja": "エピソードの『見たもの』から", "type_ja": ""}
-            for i, (who, shot, human) in enumerate(plan)]
+    return diversify([{"who": who, "member": "", "shot": shot, "moment": saw[i % len(saw)], "framing": shot, "place": str(ep.get("when_where") or ""),
+                       "time_light": "", "props": saw[(i + 1) % len(saw):][:2], "human": human, "memory_look": "none",
+                       "look": LOOKS[i][0], "look_ja": LOOKS[i][1], "text_space": "", "type": dict(TYPE_PRESETS[i]),
+                       "why_ja": "エピソードの『見たもの』から", "type_ja": ""}
+                      for i, (who, shot, human) in enumerate(plan)], brief.get("artist_slug", ""))
 
 
 def artist_card(slug: str) -> dict:
@@ -172,6 +247,7 @@ def scenes_for(brief: dict, brief_path: Path | None = None, redo: bool = False) 
     scenes = [s for s in (res or {}).get("scenes") or [] if s.get("moment")][:N_SCENES]
     if not scenes:
         return fallback(brief)
+    scenes = diversify(scenes, brief.get("artist_slug", ""))   # 書体・置き方・作りが重なったら入れ替える（決定 123）
     song_image = str((res or {}).get("song_image") or "")
     if brief_path:
         b = read_json(brief_path)
@@ -202,6 +278,8 @@ def scene_text(sc: dict) -> str:
         t += f"People: {sc['human']} (never a face, never eyes). "
     if sc.get("memory_look") and str(sc["memory_look"]).lower() not in ("none", "no", ""):
         t += f"It is a memory: {sc['memory_look']}. "
+    if sc.get("look"):   # この案だけの見た目の作り（6 案で印象を変える。決定 123）
+        t += f"This cover's own look, different from the other covers of this song: {sc['look']}. "
     return t
 
 
@@ -219,6 +297,7 @@ def main() -> None:
         ty = sc.get("type") or {}
         print(f"{i}. [{who}{('・' + sc['member']) if sc.get('member') else ''}・{SHOT_JA.get(sc.get('shot'), sc.get('shot', ''))}] "
               f"{sc.get('moment')}（{sc.get('place')}・{sc.get('time_light')}）— {sc.get('why_ja')}"
+              + (f"\n   作り：{sc.get('look_ja') or sc.get('look', '')}" if sc.get("look") else "")
               + (f"\n   文字：{ty.get('font')}・{ty.get('place')}・{ty.get('align')}・{ty.get('layout')}（{sc.get('type_ja', '')}）" if ty else ""))
 
 

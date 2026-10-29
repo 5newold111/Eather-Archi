@@ -644,7 +644,8 @@ def cover_candidates(song: dict) -> list[dict]:
             pv = d / c["preview"] if c.get("preview") else None   # アーティスト名と曲名を入れた見本（決定 122）
             out.append({"no": c["no"], "file": pv if pv and pv.exists() else f, "total": c.get("total"), "ok": c.get("compliance_ok") is not False,
                         "note": c.get("claude_note") or c.get("comment_ja") or "", "scene_ja": c.get("scene_ja", ""),
-                        "shot": c.get("shot", ""), "who": c.get("who", ""), "type_ja": c.get("type_ja", "")})
+                        "shot": c.get("shot", ""), "who": c.get("who", ""), "type_ja": c.get("type_ja", ""),
+                        "look_ja": c.get("look_ja", "")})
     return sorted(out, key=lambda c: (not c["ok"], -(c["total"] or 0)))
 
 
@@ -680,7 +681,7 @@ def cmd_cover(args) -> int:
                 b = read_json(song["brief"])
                 if b.pop("cover_scenes", None) is not None:
                     Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            subprocess.run(gv)
+            subprocess.run([*gv, "--ask"] if args.redo else gv)   # 作り直したら、自動で選ばずに Gon さんの選択を待つ（決定 123）
         if (d / "selection_cover.json").exists() and not (d / "cover_final.jpg").exists():
             step("選んだジャケットを 3000×3000 に仕上げています")
             subprocess.run([sys.executable, str(S / "finalize_cover.py"), brief])

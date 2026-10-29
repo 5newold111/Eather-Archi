@@ -334,15 +334,17 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
                 who = "This person is someone from the song's story, not the artist; their face is never shown. "
             body = (lead + cover_scene.scene_text(sc) + who + art_taste_clause(artist) + guest_touch(brief)
                     + (f"Mood notes from the song brief: {seed.strip()} " if seed.strip() and seed.strip() not in lead else "")
-                    + f"The act's series look, kept subtle (the song and the scene come first): {series_look(artist)}. "
-                    + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule else ""))
+                    + (f"This cover's own look (above) decides the medium, colours and composition; the act's taste is a starting point, "
+                       f"not a template. Only a faint trace of the act's series look: {series_look(artist)}. " if sc.get("look") else
+                       f"The act's series look, kept subtle (the song and the scene come first): {series_look(artist)}. ")
+                    + (f"The act's series habit, only if it fits this scene naturally (the scene always wins): {rule}. " if rule and i == 0 else ""))
         else:
             body = f"{lead}{visual_base(artist)} {art_taste_clause(artist)}{guest_touch(brief)}Series rule: {rule}. Song theme: {theme}. {seed} "
         body, ref = strip_names(body, artist), strip_names(ref, artist)
         out.append({"kind": "cover", "no": i + 1, "ref": i % len(refs) + 1 if refs else None,
                     "scene": i % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
                     "who": (sc or {}).get("who", ""), "shot": (sc or {}).get("shot", ""), "member": (sc or {}).get("member", ""),
-                    "type": t, "type_ja": (sc or {}).get("type_ja", ""), "prompt": scrub(
+                    "type": t, "type_ja": (sc or {}).get("type_ja", ""), "look_ja": (sc or {}).get("look_ja", ""), "prompt": scrub(
             f"Album cover artwork, square 1:1. {body}{ref} {room}"
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
             "not explicit. Original artwork, not a copy of any existing cover. " + REAL_RELEASE, artist)})
@@ -593,6 +595,8 @@ def decide(cands: list[dict], criteria: dict, ask_forced: bool = False) -> tuple
     ranked = sorted([c for c in cands if c.get("compliance_ok") is not False], key=lambda c: -c["total"])
     if not ranked:
         return None, "全候補が禁止ルールに当たったので作り直しが必要"
+    if ask_forced:   # 作り直した・撮り直し：候補が 1 枚でも自動では選ばない（決定 123）
+        return None, "オーナーに聞く"
     if len(ranked) < 2:
         return (ranked[0] if ranked else None), "候補が 1 つ"
     margin = ranked[0]["total"] - ranked[1]["total"]
@@ -729,6 +733,7 @@ def main() -> None:
     ap.add_argument("--pivot-reason", default="", help="reshoot のときの転換理由")
     ap.add_argument("--choose", help="オーナーの選択。例 logo:3 / photo:5 / cover:2")
     ap.add_argument("--reason", default="", help="選んだ理由（一言。基準に反映される）")
+    ap.add_argument("--ask", action="store_true", help="自動で選ばず、オーナーの選択を待つ（ジャケットを作り直したとき。決定 123）")
     ap.add_argument("--out", type=Path, default=ROOT / "out" / "visuals")
     ap.add_argument("--skip-name-check", action="store_true", help="名前の重複確認を飛ばす（テスト用。本番では使わない）")
     args = ap.parse_args()
@@ -748,6 +753,12 @@ def main() -> None:
     print(f"=== ビジュアル生成：{artist['name']}（{args.kind}）===")
     print(f"  顔を見せない方法：主「{artist['visual'].get('face_concealment',{}).get('primary','')}」")
 
+    # ジャケットを作り直した週は、自動で選ばない（Gon さんが選ぶまで待つ。印を置いておき、どこから作り直しても守る。決定 123）
+    owner_pick = outdir / "owner_pick.json"
+    if args.ask and not args.choose:
+        owner_pick.write_text(json.dumps({"why": "作り直したので Gon さんが選ぶ", "date": date.today().isoformat()}, ensure_ascii=False), encoding="utf-8")
+    ask_owner = args.kind == "reshoot" or owner_pick.exists()
+
     # 既存の候補があれば読み（選択の記録用）、無ければ指示文を作る
     cand_path = outdir / "candidates.json"
     if args.choose and cand_path.exists():
@@ -759,6 +770,7 @@ def main() -> None:
         record_choice(criteria, artist["slug"], kind, no, args.reason, cands)
         (outdir / f"selection_{kind}.json").write_text(json.dumps({"kind": kind, "chosen": no, "reason": args.reason, "by": "owner",
                                                             "date": date.today().isoformat()}, ensure_ascii=False, indent=2), encoding="utf-8")
+        owner_pick.unlink(missing_ok=True)   # Gon さんが選んだので、印は外す
         print(f"  選択を記録しました：{kind} #{no}（{args.reason}）")
         print(f"  基準の学習：{criteria['decisions_asked']}/{criteria['decisions_required_before_lock']} 回。"
               f"{'自動選択に切り替わりました' if criteria['locked'] else 'まだオーナーに聞きます'}")
@@ -827,7 +839,9 @@ def main() -> None:
 
     for kind in sorted({c["kind"] for c in cands}):
         sub = [c for c in cands if c["kind"] == kind]
-        chosen, note = decide(sub, criteria, ask_forced=(args.kind == "reshoot"))
+        chosen, note = decide(sub, criteria, ask_forced=ask_owner)
+        if ask_owner and args.kind == "cover":
+            note = "作り直したので自動では選びません。Gon さんが選んでください"
         print(f"  {kind}: {note}")
         if chosen:
             (outdir / f"selection_{kind}.json").write_text(json.dumps({"kind": kind, "chosen": chosen["no"], "by": "auto",
