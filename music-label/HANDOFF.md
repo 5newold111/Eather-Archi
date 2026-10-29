@@ -44,7 +44,7 @@
 | 楽曲分析を API なしで | 声・楽器・ジャンル・ムードは曲を聞いて Mac の中で判定、テーマ・世界観は Claude Code（月額プラン）で Web を調べる。ダッシュボードの「足りない項目を埋める（無料）」（`audio_tags.py`・`reference_db.py --free`。決定 103） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜131） |
+| 決めたこと | `docs/12_decisions.md`（1〜132） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |

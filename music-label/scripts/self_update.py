@@ -35,12 +35,15 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _common import OUT, ROOT, load_dotenv, notify, write_json  # noqa: E402
+from _common import OUT, ROOT, load_dotenv, notify, read_json, write_json  # noqa: E402
 
 load_dotenv()
 
 LAST = OUT / "update" / "last.json"
 SENT = OUT / "update" / "sent.json"
+FORCE = OUT / "update" / "force_once"   # ダッシュボードの「今すぐ更新を確かめる」：動いている仕事を待たずに反映する（決定 132）
+SKIP = OUT / "update" / "skipped.json"  # 反映を見送った理由（ダッシュボードに出す）
+WAITING_MAX_MIN = 20   # ブラウザの入力がこれより長く動いていたら、Gon さんの操作を待っているだけとみて、反映を止めない
 AUTO = "[auto] "
 SEND_OK = ("music-label/templates/artists/", "music-label/diagnostics/")   # 自動で送ってよい場所（決定 109。診断の記録は決定 130）
 SECRET = re.compile(r"sk-ant-|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN|xox[bpa]-[A-Za-z0-9-]{10,}")
@@ -71,7 +74,10 @@ def busy() -> list[str]:
         port = os.environ.get("WEBAPP_PORT", "8765")
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/busy", timeout=3) as r:
             d = json.loads(r.read() or b"{}")
-        out += [f"ダッシュボードの「{x}」" for x in d.get("running", [])]
+        mins = d.get("minutes") or {}
+        # ブラウザの入力は Gon さんの操作を待つ間ずっと「動いている」ので、長く待っているものでは反映を止めない（決定 132）
+        out += [f"ダッシュボードの「{x}」" for x in d.get("running", [])
+                if not (str(x).startswith("ブラウザで入力") and float(mins.get(x, 0) or 0) >= WAITING_MAX_MIN)]
     except Exception:  # noqa: BLE001  ダッシュボードが止まっている・古い版：数えない
         pass
     return out
@@ -197,7 +203,11 @@ def apply(force: bool = False) -> int:
     waiting = [] if force else busy()
     if waiting:
         print(f"…… 動いている仕事があるので、反映は次の回にします（{'・'.join(waiting)}）")
+        prev = read_json(SKIP) if SKIP.exists() else {}
+        write_json(SKIP, {"since": prev.get("since") or datetime.now().isoformat(timespec="seconds"),
+                          "at": datetime.now().isoformat(timespec="seconds"), "waiting": waiting, "behind": st["behind"]})
         return 0
+    SKIP.unlink(missing_ok=True)
     old = st["local"]
     log = git("log", "--format=%s", f"{old}..{st['remote']}").stdout.strip().splitlines()
     print(f"▶ 更新を取り込みます（{len(log)} 件）：" + " ／ ".join(log[:5]), flush=True)
@@ -263,7 +273,9 @@ def main() -> None:
         st = check()
         print(f"【結果】{st.get('error') or ('新しい更新が ' + str(st['behind']) + ' 件あります' if st['behind'] else '新しい更新はありません')}")
         return
-    sys.exit(apply(a.force))
+    force = a.force or FORCE.exists()
+    FORCE.unlink(missing_ok=True)
+    sys.exit(apply(force))
 
 
 if __name__ == "__main__":

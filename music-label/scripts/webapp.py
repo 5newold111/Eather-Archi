@@ -193,6 +193,8 @@ def _status_json() -> dict:
         acts = {"acts": [], "pending": 0, "upcoming": [], "index": [], "error": str(e)}
     try:   # 最後に自動で反映した更新（決定 108）
         upd = read_json(OUT / "update" / "last.json") if (OUT / "update" / "last.json").exists() else {}
+        if (OUT / "update" / "skipped.json").exists():   # 反映を見送っている理由（決定 132）
+            upd = {**upd, "skipped": read_json(OUT / "update" / "skipped.json")}
     except Exception:  # noqa: BLE001
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
@@ -368,6 +370,11 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "browser_fill.py"), "suno", *([song["id"]] if song else [])], \
             "ブラウザで入力（Suno" + (f"：{song['artist']}「{song['title']}」）" if song else "：作曲待ちの全曲）")
     if action == "self_update":   # 今すぐ更新を確かめて反映する。定期実行の「更新」の仕事として動かす（ダッシュボードの中で動かすと、立ち上げ直しで自分が止まるため）
+        try:   # 動いている仕事を待たずに反映する印（決定 132）
+            (OUT / "update").mkdir(parents=True, exist_ok=True)
+            (OUT / "update" / "force_once").write_text(datetime.now().isoformat(timespec="seconds"), encoding="utf-8")
+        except OSError:
+            pass
         if sys.platform == "darwin":
             return ["launchctl", "kickstart", f"gui/{os.getuid()}/jp.etherarchi.label.update"], "システムの更新を確かめる（数分。反映すると画面が読み直されます）"
         return [PY, str(S / "self_update.py")], "システムの更新を確かめる"
@@ -1021,6 +1028,7 @@ function render(){
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
      +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")
+     +(u.skipped&&u.skipped.behind?`<br><b>新しい版（${u.skipped.behind} 件）の反映を見送っています</b>：${E((u.skipped.waiting||[]).join("・"))} が動いているため（${E(String(u.skipped.since||"").replace("T"," ").slice(5,16))} から）。「今すぐ更新を確かめる」を押すと、待たずに反映します`:"")
      +` <button class="ghost" data-act="self_update">今すぐ更新を確かめる</button>`}
   {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）
    bl.hidden=!(re0.lyrics&&re0.whisper);bw.hidden=!(re0.lyrics&&!re0.whisper);
@@ -1149,7 +1157,16 @@ class Handler(BaseHTTPRequestHandler):
                 extra["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(f.name)}"
             return self._send(200, f.read_bytes(), ctype, extra=extra)
         if path == "/api/busy":   # 自動の更新（self_update.py）が、動いている仕事を待つために見る（決定 108）
-            return self._json(200, {"running": [j["label"] for j in JOBS.values() if j["state"] == "running"], "version": VERSION})
+            now = datetime.now()   # 動いている時間（分）も返す：ブラウザの入力が長く待っているだけなら、更新を止めない（決定 132）
+            run = [j for j in JOBS.values() if j["state"] == "running"]
+            mins = {}
+            for j in run:
+                try:
+                    t = datetime.combine(now.date(), datetime.strptime(j["started"], "%H:%M:%S").time())
+                    mins[j["label"]] = round(((now - t).total_seconds() % 86400) / 60, 1)
+                except (ValueError, KeyError):
+                    pass
+            return self._json(200, {"running": [j["label"] for j in run], "minutes": mins, "version": VERSION})
         if path == "/api/book/act":   # 管理表の、1 組ぶんの全部のタブ（ダッシュボードで見て直す。決定 119）
             import act_review
             aid = (parse_qs(urlparse(self.path).query).get("id") or [""])[0]
