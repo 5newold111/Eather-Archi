@@ -212,7 +212,9 @@ def apply(force: bool = False) -> int:
     log = git("log", "--format=%s", f"{old}..{st['remote']}").stdout.strip().splitlines()
     print(f"▶ 更新を取り込みます（{len(log)} 件）：" + " ／ ".join(log[:5]), flush=True)
     # Mac にだけある自動の記録（設定書）は、取り込んだ更新の後ろに付け直す（GitHub に出ていない記録だけなので、共有の履歴は書き換えない）
-    r = git("pull", "--rebase" if st["ahead"] else "--ff-only", "--quiet", "origin", st["branch"], timeout=300)
+    # --autostash：Mac の中でシステムが書き換えて、まだ記録していないファイル（ジャケットの好みの記録など）を一時的によけて取り込み、
+    # 取り込んだあとに戻す。無いと「Please commit or stash them」で止まり、更新がずっと入らなかった（決定 134）
+    r = git("pull", "--rebase" if st["ahead"] else "--ff-only", "--autostash", "--quiet", "origin", st["branch"], timeout=300)
     if r.returncode:
         if st["ahead"]:
             git("rebase", "--abort")

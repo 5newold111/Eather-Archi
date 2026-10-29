@@ -96,7 +96,7 @@ def main() -> None:
         sys.exit(1)
     st = self_update.check()
     if st["behind"] and self_update.only_auto(st["branch"]):   # GitHub の方が新しければ、自動の記録だけを後ろに付け直す
-        r = self_update.git("pull", "--rebase", "--quiet", "origin", st["branch"], timeout=300)
+        r = self_update.git("pull", "--rebase", "--autostash", "--quiet", "origin", st["branch"], timeout=300)
         if r.returncode:
             self_update.git("rebase", "--abort")
             print("【結果】送れませんでした（更新とぶつかりました。10 分後の自動の更新のあとに、もう一度押してください）")
