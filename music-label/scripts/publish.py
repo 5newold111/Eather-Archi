@@ -802,6 +802,84 @@ def spotify_artist_id(slug: str) -> str:
     return ident
 
 
+# デビューの配信確認で記録する、組のアーティストのページ（5 つ全部そろうとデビュー完了。オーナーの指示 2026-10-29。決定 141）
+ARTIST_PAGES = [("spotify", "Spotify", r"(?:spotify:artist:|open\.spotify\.com/(?:intl-[\w-]+/)?artist/)([A-Za-z0-9]{22})"),
+                ("youtube_music", "YouTube Music", r"(?:music\.youtube\.com|youtube\.com)/(?:channel|browse|@)[^\s]*"),
+                ("apple_music", "Apple Music", r"music\.apple\.com/[^\s]*artist/[^\s]*"),
+                ("instagram", "Instagram Profile Artist URL", r"instagram\.com/[A-Za-z0-9_.]+"),
+                ("facebook", "Facebook Profile Artist URL", r"(?:facebook\.com|fb\.com)/[^\s]+")]
+
+
+def artist_pages(slug: str) -> dict[str, str]:
+    """組のアーティストのページ {spotify, youtube_music, apple_music, instagram, facebook}（無いものは ""）。
+    設定書の distribution.artist_pages → Spotify は記録した ID・Apple Music は配信の確認で見つけたページも使う"""
+    a = load_artist(slug, missing_ok=True) or {}
+    pages = dict((a.get("distribution") or {}).get("artist_pages") or {})
+    out = {k: str(pages.get(k) or "") for k, _, _ in ARTIST_PAGES}
+    if not out["spotify"]:
+        sp = spotify_artist_id(slug)
+        out["spotify"] = f"https://open.spotify.com/artist/{sp}" if sp else ""
+    if not out["apple_music"]:
+        ap = artist_links(slug).get("apple") or {}
+        out["apple_music"] = ap.get("url") or ""
+    return out
+
+
+def artist_pages_missing(slug: str) -> list[str]:
+    """まだ記録していないアーティストのページ（サービスの名前）"""
+    have = artist_pages(slug)
+    return [name for k, name, _ in ARTIST_PAGES if not have.get(k)]
+
+
+def save_artist_pages(slug: str, values: dict[str, str]) -> tuple[list[str], list[str]]:
+    """アーティストのページを設定書に記録する。(記録したサービス, 住所の形が違ったサービス)。Spotify は ID も記録する"""
+    a = load_artist(slug, missing_ok=True)
+    if a is None:
+        raise ValueError(f"組 {slug} が見つかりません")
+    dist = a.setdefault("distribution", {})
+    pages = dict(dist.get("artist_pages") or {})
+    saved, bad = [], []
+    for k, name, rx in ARTIST_PAGES:
+        v = str(values.get(k) or "").strip()
+        if not v:
+            continue
+        m = re.search(rx, v)
+        if not m:
+            bad.append(name)
+            continue
+        if k == "spotify":
+            ident = m.group(1)
+            v = f"https://open.spotify.com/artist/{ident}"
+            dist["spotify_uri"] = f"spotify:artist:{ident}"
+            save_artist_link(slug, "spotify", ident, v)
+        elif not v.startswith("http"):
+            v = "https://" + v
+        if pages.get(k) != v:
+            pages[k] = v
+            saved.append(name)
+    dist["artist_pages"] = pages
+    save_artist(a)
+    return saved, bad
+
+
+def cmd_artist_pages(args) -> int:
+    """デビューの配信確認：組のアーティストのページ（Spotify・YouTube Music・Apple Music・Instagram・Facebook）を記録する（決定 141）"""
+    vals = {k: getattr(args, k) or "" for k, _, _ in ARTIST_PAGES}
+    try:
+        saved, bad = save_artist_pages(args.slug, vals)
+    except ValueError as e:
+        print(f"[エラー] {e}")
+        return 2
+    if saved:
+        print(f"   ○ 記録しました：{'・'.join(saved)}")
+    if bad:
+        print(f"   ✕ 住所の形が違うので記録しませんでした：{'・'.join(bad)}（各サービスのアーティストのページの住所を貼ってください）")
+    left = artist_pages_missing(args.slug)
+    print(f"【結果】{args.slug}：" + ("5 つのアーティストのページがそろいました（デビュー完了）" if not left
+                                     else f"あと {len(left)} つ（{'・'.join(left)}）でデビュー完了です"))
+    return 0 if not bad else 2
+
+
 def save_artist_link(slug: str, service: str, ident: str, url: str = "") -> None:
     d = read_json(ARTIST_LINKS) if ARTIST_LINKS.exists() else {}
     cur = d.setdefault(slug, {}).get(service) or {}
@@ -1215,6 +1293,10 @@ def main() -> None:
     p.add_argument("--quiet", action="store_true")
     p = sub.add_parser("suno-request", help="Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文を表示")
     p.add_argument("id", nargs="?", help="この曲だけ（省くと Suno で作る番の全曲）")
+    p = sub.add_parser("artist-pages", help="デビューの配信確認：アーティストのページ 5 つを記録する（決定 141）")
+    p.add_argument("slug")
+    for k, _n, _r in ARTIST_PAGES:
+        p.add_argument("--" + k.replace("_", "-"), dest=k, default="")
     p = sub.add_parser("back", help="間違えて進めた工程を戻す")
     p.add_argument("id")
     p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
@@ -1237,7 +1319,7 @@ def main() -> None:
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
           "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
-          "artist-page": cmd_artist_page, "live": cmd_live, "cover": cmd_cover}.get(args.cmd)
+          "artist-page": cmd_artist_page, "artist-pages": cmd_artist_pages, "live": cmd_live, "cover": cmd_cover}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

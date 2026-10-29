@@ -1820,3 +1820,17 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   記録に 1 行残す（「診断の記録を Claude に送る」で届く）
 - 試験：仮のページで、ドロップダウンから選べる・「＋ new artist」を押すと名前の欄が出る・Spotify は Yes、Apple Music は前のページの候補を
   選ぶことを確かめた。本物の DistroKid ではまだ
+
+## 141. デビューの配信確認：アーティストのページ 5 つを全部記録するまでデビュー完了にしない（2026-10-29。オーナーの指示）
+
+- デビューのタブの最後の工程を「配信確認（アーティストのページ）」にし、5 つの入力欄を出す：Spotify・YouTube Music・Apple Music・
+  Instagram Profile Artist URL・Facebook Profile Artist URL。記録済みの欄は入っていて ✓ が付く。わかったものから少しずつ記録してよい
+- 5 つ全部そろうとデビュー完了（_timeline.debut_done）。そろうまではデビューの流れのまま（デビュー曲が配信中でも）。決定 139 の「Spotify だけ」から広げた
+- 記録は設定書の distribution.artist_pages（Spotify は ID も spotify_uri・Mac の記録に）。住所の形をサービスごとに確かめ、違う形は記録せずに知らせる
+  （publish.py artist-pages）。配信の確認で自動で見つけた Spotify・Apple Music のページは、最初から入った状態にする
+- DistroKid の入力の「デビュー済み（ドロップダウンから選ぶ・Artist already in は Yes）」の判定は、Spotify のページがあるか（DistroKid・Spotify に
+  もういるか）のまま分ける（デビュー完了の 5 つとは別。Spotify だけ記録した組を「初めての組」として「＋ new artist」を押さないように）
+- いまの 5 組は Spotify だけ記録済みなので、反映すると 5 組ともデビューのタブに戻り、「配信確認」が「● Gon さん」になる。
+  残り 4 つ（YouTube Music・Apple Music・Instagram・Facebook）を記録すると、定期配信に移る
+- 試験：5 組がデビューのタブに戻り、表の最後の列が「配信確認」、押すと 5 つの欄が出る。4 つ入れて 1 つ形が違うと、その 1 つだけ記録されずに残り、
+  最後の 1 つを記録すると、その組はデビュー完了になってタブから外れることを確かめた

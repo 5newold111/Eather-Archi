@@ -97,11 +97,12 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
 
 # ---------------------------------------------------------------------------
 def debut_done(slug: str) -> bool:
-    """デビューが終わったか：デビューのタブで Spotify のアーティストのページを記録した（配信の確認で自動で見つけた場合も）とき（決定 139）。
-    記録するまではデビューの流れのまま（デビュー曲が配信中でも）。終わった組はデビューのタブに出さない（決定 120）"""
+    """デビューが終わったか：デビューのタブの配信確認で、アーティストのページ 5 つ（Spotify・YouTube Music・Apple Music・
+    Instagram・Facebook）を全部記録したとき（決定 139・141）。そろうまではデビューの流れのまま（デビュー曲が配信中でも）。
+    終わった組はデビューのタブに出さない（決定 120）"""
     try:
         import publish
-        return bool(publish.spotify_artist_id(slug))
+        return not publish.artist_pages_missing(slug)
     except Exception:  # noqa: BLE001
         return False
 
@@ -141,11 +142,16 @@ def debut_rows() -> list[dict]:
             plan[key] = (start, end)
             start = end + timedelta(days=1)
         phases += song_phases(song, plan, None)
-        # 最後：Spotify のアーティストのページを記録する（これでデビュー完了。決定 139）
+        # 最後：配信確認。アーティストのページ 5 つを記録する（全部そろうとデビュー完了。決定 139・141）
         sp_day = max([_d(ph["end"]) for ph in phases] + [today])
         live = _songs.state(song).get("status") in ("registered", "live")
-        phases.append(_ph("Spotify のページ", sp_day, sp_day, "wait" if live else "plan", "あなた",
-                          "デビュー曲が Spotify に出たら、アーティストのページの住所を貼って記録する（これでデビュー完了）"))
+        try:
+            import publish
+            left = publish.artist_pages_missing(slug)
+        except Exception:  # noqa: BLE001
+            left = []
+        phases.append(_ph("配信確認（アーティストのページ）", sp_day, sp_day, "wait" if live else "plan", "あなた",
+                          f"デビュー曲が配信されたら、アーティストのページ 5 つを記録する（あと {len(left)} つ：{'・'.join(left)}。全部そろうとデビュー完了）"))
         b = _status.blocker(list(steps.values()))
         rows.append({"slug": slug, "artist": a.get("name", slug), "label": _label(a), "title": song["title"], "id": song["id"],
                      "row": f"{a.get('name', slug)}", "sub": f"デビュー曲「{song['title']}」", "phases": phases,

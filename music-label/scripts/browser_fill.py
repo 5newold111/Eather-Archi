@@ -2673,11 +2673,12 @@ def _field(*keys: str):
 
 
 def _debuted(song: dict) -> bool:
-    """その組はデビュー済みか（Spotify のアーティストのページを記録した組。決定 139）。デビュー済みなら DistroKid の
-    アーティスト名はドロップダウンから選び、Artist already in は Yes（すでにあるページ）にする（決定 140）"""
+    """その組は DistroKid・Spotify にもういるか（Spotify のアーティストのページを記録した組）。いれば DistroKid の
+    アーティスト名はドロップダウンから選び、Artist already in は Yes（すでにあるページ）にする（決定 140）。
+    デビュー完了（ページ 5 つ。決定 141）とは分ける：Spotify だけ記録した組も、DistroKid ではもう「いる」"""
     try:
-        import _timeline
-        return _timeline.debut_done(song["slug"])
+        import publish
+        return bool(publish.spotify_artist_id(song["slug"]))
     except Exception:  # noqa: BLE001
         return False
 

@@ -312,6 +312,14 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         if song and ok(tr) and ok(ar):
             return [PY, str(S / "publish.py"), "live", song["id"], *(["--track", tr] if tr else []), *(["--artist", ar] if ar else [])], \
                 f"配信中の記録（{song['artist']}「{song['title']}」）"
+    if action == "artist_pages" and p.get("slug") in _slugs():   # デビューの配信確認：アーティストのページ 5 つ（決定 141）
+        import publish
+        args = []
+        for k, _n, _r in publish.ARTIST_PAGES:
+            v = str(p.get(k) or "").strip()[:300]
+            if v:
+                args += ["--" + k.replace("_", "-"), v]
+        return [PY, str(S / "publish.py"), "artist-pages", p["slug"], *args], f"アーティストのページを記録する（{p['slug']}）"
     if action == "artist_page" and p.get("slug") in _slugs():   # Spotify のアーティストのページを手で記録する（決定 53）
         page = str(p.get("page") or "").strip()
         if re.fullmatch(r"[\w:/.?=&-]{22,200}", page):
@@ -676,7 +684,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
- <p class="sub">デビュー前の組。デビュー曲が Spotify に出たら、最後の「Spotify のページ」でアーティストのページを記録してください。記録するとデビュー完了になり、このタブから外れて「定期配信」に移ります（記録するまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <p class="sub">デビュー前の組。デビュー曲が配信されたら、最後の「配信確認」で 5 つのアーティストのページ（Spotify・YouTube Music・Apple Music・Instagram・Facebook）を記録してください。全部そろうとデビュー完了になり、このタブから外れて「定期配信」に移ります（そろうまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
  <div class="board" id="b-debut"></div>
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
@@ -782,6 +790,7 @@ function actHTML(a,i,r){const id=E(a.id||r.id||""),slug=E(a.slug||r.slug||"");
    case "folder":return `<button class="ghost act-only" data-act="open_folder" data-id="${id}">${E(a.label)}</button>`;
    case "artist_folder":return `<button class="ghost act-only" data-act="open_artist" data-slug="${slug}">${E(a.label)}</button>`;
    case "mark_live":return `<span class="act-only" style="display:block"><input type="text" id="lt-${id}" placeholder="Spotify の曲の住所（https://open.spotify.com/track/…・なくても可）" style="min-width:22em;margin:2px 0"><br><input type="text" id="la-${id}" placeholder="Spotify のアーティストの住所（https://open.spotify.com/artist/…）" style="min-width:22em;margin:2px 0"><br><button data-act="mark_live" data-id="${id}">${E(a.label)}</button></span>`;
+   case "artist_pages":return `<span class="act-only" style="display:block">${(a.fields||[]).map(([k,n])=>`<label style="display:block;margin:4px 0;font-size:13px">${E(n)}${(a.values||{})[k]?" ✓":""}<br><input type="text" id="apg-${slug}-${E(k)}" value="${E((a.values||{})[k]||"")}" placeholder="https://…" style="width:min(36em,100%);box-sizing:border-box"></label>`).join("")}<button data-act="artist_pages" data-slug="${slug}" data-fields="${E((a.fields||[]).map(f=>f[0]).join(","))}">${E(a.label)}</button></span>`;
    case "artist_page":return `<span class="act-only"><input type="text" id="ap-${slug}" placeholder="spotify:artist:… か https://open.spotify.com/artist/…" style="min-width:18em"> <button data-act="artist_page" data-slug="${slug}">${E(a.label)}</button></span>`;
    case "retake":return `<span class="act-only rt" style="display:block;margin:6px 0"><b>Suno で聴いて 2 曲とも良くないとき</b>：まず同じ入力のまま Create をもう一度（料金 0 円・Claude も使わない）。それでもだめなら、理由を選んで直す（1 回目は機械の直しで 0 円、2 回目は Claude の小さな書き直しで数円）<br>${(a.reasons||[]).map(x=>`<label style="display:inline-block;margin:2px 8px 2px 0;font-weight:400"><input type="checkbox" value="${E(x)}" style="width:auto"> ${E(x)}</label>`).join("")}<br><button class="ghost" data-act="suno_retake" data-id="${id}">理由のとおりに直す（このあと「Suno に入力する」）</button></span>`;
    case "registered":return `<span class="act-only"><input type="date" id="d-${id}" value="${DATA.timeline.today}"> <button data-act="registered" data-id="${id}">${E(a.label)}</button></span>`;
@@ -811,7 +820,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-p],[data-g
 document.addEventListener("keydown",e=>{const b=e.target.closest&&e.target.closest("[data-p],li[data-g2]");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openGuide(b.dataset.p||b.dataset.g2)}});
 const COLS={irregular:[["ブリーフ","曲の案"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
   regular:[["ブリーフ","ブリーフ"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
-  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"],["Spotify のページ","Spotify のページ"]]};
+  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"],["配信確認（アーティストのページ）","配信確認"]]};
 function boardRows(key){const rows=DATA.timeline[key].rows,by={};const order=[];
   rows.forEach((r,ri)=>{if(!by[r.slug]){by[r.slug]=[];order.push(r.slug)}by[r.slug].push(ri)});
   const out=[];order.forEach(slug=>{const idx=by[slug];
@@ -875,6 +884,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="quota_left"){p.left=(document.getElementById("quota-left")||{}).value||"";if(!/^\d+$/.test(p.left)){alert("Suno の画面の残りの曲数を数字で入れてください");return}}
   if(b.dataset.act==="suno_retake"){p.why=[...b.closest(".rt").querySelectorAll("input:checked")].map(x=>x.value).join(",");if(!p.why){alert("良くなかったところを 1 つ以上選んでください");return}}
+  if(b.dataset.act==="artist_pages"){(b.dataset.fields||"").split(",").forEach(k=>{if(k)p[k]=(document.getElementById(`apg-${b.dataset.slug}-${k}`)||{}).value||""})}   // 決定 141
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
   if(b.dataset.tab)p.tab=b.dataset.tab;

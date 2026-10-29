@@ -116,13 +116,18 @@ def _explain(row: dict, phase: dict) -> dict:
     if state == "done" and not phase.get("milestone"):
         return {"cause": f"済みました。{phase.get('detail', '')}", "steps": [], "actions": []}
 
-    if name == "Spotify のページ":   # デビュー完了の最後の一歩（決定 139）
-        return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が Spotify に出たら、アーティストのページを記録してください。"
-                         "記録するとデビュー完了になり、この組は「定期配信」のタブに移ります（2 曲目からの DistroKid の登録も、このページにまとめます）。",
-                "steps": ["Spotify で組の名前を探し、アーティストのページを開く",
-                          "住所（https://open.spotify.com/…/artist/…）をコピーして、下の欄に貼る",
-                          "「Spotify のページを記録する（デビュー完了）」を押す"],
-                "actions": [{"kind": "artist_page", "slug": row.get("slug"), "label": "Spotify のページを記録する（デビュー完了）"}]}
+    if name == "配信確認（アーティストのページ）":   # デビュー完了の最後の一歩（決定 139・141）
+        import publish
+        pages = publish.artist_pages(row.get("slug", ""))
+        left = publish.artist_pages_missing(row.get("slug", ""))
+        return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が配信されたら、5 つのサービスのアーティストのページを記録してください。"
+                         "全部そろうとデビュー完了になり、この組は「定期配信」のタブに移ります。"
+                         + (f"（あと {len(left)} つ：{'・'.join(left)}）" if left else "（5 つそろっています）"),
+                "steps": ["それぞれのサービスで組の名前を探し、アーティストのページを開いて住所をコピーする",
+                          "下の 5 つの欄に貼る（記録済みの欄は入っています。わかったものから少しずつでもよい）",
+                          "「アーティストのページを記録する」を押す"],
+                "actions": [{"kind": "artist_pages", "slug": row.get("slug"), "values": pages,
+                             "fields": [[k, n] for k, n, _ in publish.ARTIST_PAGES], "label": "アーティストのページを記録する"}]}
     if name == "名前の確認":
         return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",
                 "steps": ["「名前を確かめる」を押す（Spotify などを自動で調べます）",
