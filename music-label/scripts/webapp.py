@@ -263,7 +263,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return ([PY, str(S / "act_review.py"), "reject", a["id"], it["tab"], "--reason", str(p.get("reason") or "")[:300]],
                 f"{a['name']}：「{it['name']}」を却下")
     if action == "cover_trial":   # ジャケットの試し運転：実際に API を使って 6 案を作る（曲の状態は変えない。決定 125）
-        return [PY, str(S / "cover_trial.py")], "ジャケットの試し運転（実際に API を使う）"
+        why = str(p.get("reason") or "").strip()[:500]
+        return [PY, str(S / "cover_trial.py"), *(["--reason", why] if why else [])], "ジャケットの試し運転（実際に API を使う）"
     if action == "art_taste":   # まだ行の無い組のアートの好み（絵柄・テイスト・グラフィック・好きな漫画と映画。決定 118）
         return [PY, str(S / "art_taste.py")], "組ごとのアートの好みを書く"
     if action == "explore_report":   # 曲ごとの方向性の伸びと、くじの確率（決定 96）
@@ -310,7 +311,9 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id")))
         no = str(p.get("no") or "")
         if song and (not no or no.isdigit()):
-            return [PY, str(S / "publish.py"), "cover", song["id"], *(["--choose", no] if no else []), *(["--redo"] if p.get("redo") else [])], \
+            why = str(p.get("reason") or "").strip()[:500]   # 作り直す理由（決定 127）
+            return [PY, str(S / "publish.py"), "cover", song["id"], *(["--choose", no] if no else []), *(["--redo"] if p.get("redo") else []),
+                    *(["--reason", why] if why and p.get("redo") else [])], \
                 f"ジャケット（{song['artist']}「{song['title']}」" + (f"・#{no} を選ぶ）" if no else "・作り直す）" if p.get("redo") else "）")
     if action == "cover" and slug:
         return [PY, str(S / "kit_images.py"), "--only", slug, "--kind", "cover"], f"ジャケットを作る（{slug}）"
@@ -392,7 +395,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", "")))
         to = str(p.get("to") or "")
         if song and (not to or to in publish.BACK_TO):
-            return [PY, str(S / "publish.py"), "back", song["id"], *(["--to", to] if to else [])], \
+            why = str(p.get("reason") or "").strip()[:500] if to == "cover" else ""   # ジャケットに戻すとき：作り直す理由（決定 127）
+            return [PY, str(S / "publish.py"), "back", song["id"], *(["--to", to] if to else []), *(["--reason", why] if why else [])], \
                 f"戻す（{song['artist']}「{song['title']}」→ {publish.BACK_TO.get(to, '1 つ前')}）"
     if action == "photo_undo" and p.get("slug") in _slugs() and p.get("service") in ("spotify", "apple", "amazon"):
         return [PY, str(S / "artist_photo.py"), "undo", p["slug"], p["service"]], f"写真の記録を取り消す（{p['slug']} → {p['service']}）"
@@ -831,6 +835,10 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
   if(b.dataset.tab)p.tab=b.dataset.tab;
+  if((b.dataset.act==="cover"&&b.dataset.redo)||(b.dataset.act==="back"&&b.dataset.to==="cover")||b.dataset.act==="cover_trial"){   // 作り直す理由（決定 127）
+    if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
+    const why=prompt("作り直す理由・こうしてほしいところを書いてください（6 案すべての条件に入れます。空でもかまいません）\n例：全体的に暗い／もっと明るい色で／文字が小さすぎる／人物をもっと大きく","");
+    if(why===null)return;p.reason=why;act(b.dataset.act,p,b);return}
   if(b.dataset.act==="act_reject"){const why=prompt("却下する理由（あとで直すときの手がかりになります。空でもかまいません）","");if(why===null)return;p.reason=why}
   if(b.dataset.confirm&&!confirm(b.dataset.confirm))return;
   act(b.dataset.act,p,b)});

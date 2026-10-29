@@ -38,7 +38,7 @@ def pick_song(sid: str | None) -> dict | None:
     return sorted(pool, key=lambda s: s["week"])[-1] if pool else None
 
 
-def run(sid: str | None) -> int:
+def run(sid: str | None, reason: str = "") -> int:
     import _claude
     import cover_scene
     import generate_visuals as gv
@@ -54,8 +54,10 @@ def run(sid: str | None) -> int:
     out.mkdir(parents=True, exist_ok=True)
     bp = out / Path(song["brief"]).name   # 曲の ID と同じ名前（曲名・アーティスト名を本物から引くため）。本物のブリーフは変えない
     brief = read_json(song["brief"])
-    brief.pop("cover_scenes", None)
+    brief = cover_scene.remember_redo(brief, reason)   # 理由があれば条件に足す（前の案のシーンも見せる。決定 127）
     write_json(bp, brief)
+    if reason.strip():
+        print(f"   作り直す理由：{reason.strip()}（6 案すべての条件に入れます）")
     artist = load_artist(song["slug"], song.get("label_slug") if song.get("label_slug") not in (None, "", "drive") else None)
     print(f"▶ 試し運転：{song['artist']}「{song['title']}」（{song['id']}）。本物の曲の状態は変えません")
 
@@ -63,6 +65,8 @@ def run(sid: str | None) -> int:
     scenes = cover_scene.scenes_for(brief, bp, redo=True)
     brief = read_json(bp)
     print(f"   曲のテーマとイメージ：{cover_scene.song_image(brief)}")
+    if cover_scene.owner_request(brief):
+        print(f"   画像への条件（理由から）：{cover_scene.owner_request(brief)}")
     for i, sc in enumerate(scenes, 1):
         who = {"artist": "本人", "other": "曲の人物", "none": "人なし"}.get(sc.get("who"), "")
         ty = sc.get("type") or {}
@@ -150,7 +154,10 @@ def page() -> str:
     briefs = [p for p in run_dir.glob("*.json") if p.name != "candidates.json"]
     b = read_json(briefs[0]) if briefs else {}
     E = html.escape
-    body = f"<p class='s'>{E(run_dir.name)}・曲のテーマとイメージ：{E(cover_scene.song_image(b))}</p><div class='g'>"
+    body = f"<p class='s'>{E(run_dir.name)}・曲のテーマとイメージ：{E(cover_scene.song_image(b))}</p>"
+    if cover_scene.notes(b):
+        body += f"<p class='s'>作り直す理由（新しい順）：{E(' ／ '.join(cover_scene.notes(b)))}<br>画像への条件：{E(cover_scene.owner_request(b))}</p>"
+    body += "<div class='g'>"
     for c in cands:
         f = run_dir / (c.get("preview") or c.get("file") or "")
         who = {"artist": "本人", "other": "曲の人物", "none": "人なし"}.get(c.get("who"), "")
@@ -169,8 +176,9 @@ def page() -> str:
 def main() -> None:
     ap = argparse.ArgumentParser(description="ジャケットの試し運転（実際に API を使う。曲の状態は変えない）")
     ap.add_argument("song", nargs="?")
+    ap.add_argument("--reason", default="", help="作り直す理由・こうしてほしいところ（6 案の条件に入れる）")
     a = ap.parse_args()
-    sys.exit(run(a.song))
+    sys.exit(run(a.song, a.reason))
 
 
 if __name__ == "__main__":

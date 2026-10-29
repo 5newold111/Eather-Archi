@@ -678,9 +678,11 @@ def cmd_cover(args) -> int:
             if args.redo:   # 作り直す：前の選択と仕上がりは消す（候補の画像は上書き）。ジャケットの場面も選び直す（決定 115）
                 for f in ("selection_cover.json", "cover_final.jpg"):
                     (d / f).unlink(missing_ok=True)
-                b = read_json(song["brief"])
-                if b.pop("cover_scenes", None) is not None:
-                    Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                import cover_scene   # 作り直す理由を足し、前の案のシーンを残して、シーンから選び直す（決定 127）
+                b = cover_scene.remember_redo(read_json(song["brief"]), args.reason or "")
+                Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                if (args.reason or "").strip():
+                    print(f"   作り直す理由：{args.reason.strip()}（6 案すべての条件に入れます）")
             subprocess.run([*gv, "--ask"] if args.redo else gv)   # 作り直したら、自動で選ばずに Gon さんの選択を待つ（決定 123）
         if (d / "selection_cover.json").exists() and not (d / "cover_final.jpg").exists():
             step("選んだジャケットを 3000×3000 に仕上げています")
@@ -1048,8 +1050,9 @@ def go_back(song: dict, to: str | None = None) -> str:
         d = cover_dir(song)
         dest = _stash([d / "selection_cover.json", d / "cover_final.jpg", d / "cover_final_notext.jpg", d / "cover_final.text.json"], song)
         b = read_json(song["brief"]) if song.get("brief") and Path(song["brief"]).exists() else None
-        if b is not None and b.pop("cover_scenes", None) is not None:   # シーンも選び直す
-            Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if b is not None:   # シーンも選び直す（前の案のシーンは「作り直した案」に残す。理由は作り直しのときに足す。決定 127）
+            import cover_scene
+            Path(song["brief"]).write_text(json.dumps(cover_scene.remember_redo(b, ""), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         d.mkdir(parents=True, exist_ok=True)   # 作り直した候補は自動で選ばない（Gon さんが選ぶまで待つ。決定 123）
         (d / "owner_pick.json").write_text(json.dumps({"why": "DistroKid の登録の前にジャケットに戻した", "date": date.today().isoformat()},
                                                       ensure_ascii=False), encoding="utf-8")
@@ -1084,7 +1087,7 @@ def cmd_back(args) -> int:
         return 2
     print(f"○ {msg}")
     if args.to == "cover":   # そのまま 6 案を作り直す（OpenAI の画像の料金。決定 124）
-        return cmd_cover(argparse.Namespace(id=song["id"], redo=True, choose=None, reason=""))
+        return cmd_cover(argparse.Namespace(id=song["id"], redo=True, choose=None, reason=getattr(args, "reason", "") or ""))
     print(f"【結果】{msg}")
     return 0
 
@@ -1199,6 +1202,7 @@ def main() -> None:
     p = sub.add_parser("back", help="間違えて進めた工程を戻す")
     p.add_argument("id")
     p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
+    p.add_argument("--reason", default="", help="ジャケットに戻すとき：作り直す理由（6 案の条件に入れる。決定 127）")
     p = sub.add_parser("live", help="配信が始まったことを手で記録する（Spotify の鍵が無くても）")
     p.add_argument("id")
     p.add_argument("--track", help="Spotify の曲の住所（https://open.spotify.com/track/…）")
@@ -1210,7 +1214,7 @@ def main() -> None:
     p = sub.add_parser("cover", help="その曲のジャケットを作る・候補から選ぶ → 仕上げて公開の準備を続ける")
     p.add_argument("id")
     p.add_argument("--choose", type=int, help="選んだ候補の番号")
-    p.add_argument("--reason", default="", help="選んだ理由（一言。次からの自動選択の好みに使う）")
+    p.add_argument("--reason", default="", help="選んだ理由（一言。次からの自動選択の好みに使う）／--redo のとき：作り直す理由（6 案の条件に入れる。決定 127）")
     p.add_argument("--redo", action="store_true", help="候補を作り直す")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")

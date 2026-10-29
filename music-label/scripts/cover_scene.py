@@ -21,6 +21,10 @@
   ・それでも似ていた（オーナーの指示 2026-10-29。決定 126）ので、6 案をデザインの系統で分ける：写真・グラフィック（色面と形・文字が主役）・
     イラスト・コラージュ・版画（リソグラフ・シルクスクリーン・青写真）・映画的な実験写真（夜のフラッシュ・ぶれ・二重露光）を 1 案に 1 つずつ。
     系統が重なったら、使っていない系統に入れ替える
+  ・作り直すときの理由（オーナーの指示 2026-10-29。決定 127）：Gon さんが「候補を作り直す」で書いた理由（ブリーフの cover_redo_notes。
+    前の理由も残す）と、作り直した前の案のシーンを Claude に見せ、いちばん新しい理由を必ず守る条件にする（前の理由も、反しない限り守る）。
+    Claude は理由を画像の AI 向けの具体的な英語の指示（owner_request）にも書き直し、6 案すべての指示文の先頭近くに入る。
+    理由が系統や作りを指定している（例：全部写真で）ときは、系統の振り分けより理由を優先する
   ・Claude（効き目の低い設定・答えも短い）で 1 曲 数円。ブリーフに保存して、作り直すとき以外はもう一度は呼ばない。鍵が無いときはエピソードから 1 場面を組み立てる
   ・実在の名前・ブランド・建物・文字は入れない
 
@@ -38,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, read_json, write_json  # noqa: E402
 
 SCENE_VERSION = 5   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
+MAX_NOTES = 8   # 作り直しの理由はいくつまで見せるか（新しい順）
 N_SCENES = 6
 SHOTS = ["extreme close-up", "close-up", "cut-out fragment", "medium", "wide"]
 
@@ -102,6 +107,11 @@ Rules:
   act's taste and its own look.
 - text_space: in English, where the image must stay calm for the lettering (matching "type").
 - song_image: one English sentence of the song's theme and imagery (used first in every cover prompt).
+- "owner_feedback" (if present): the label owner rejected earlier covers of THIS song and wrote why (in Japanese, newest first).
+  The newest reason is a hard requirement for all six covers - scenes, looks and lettering; older reasons still apply unless the
+  newest contradicts them. If a reason names a style, family or colour (e.g. "all photographs", "brighter"), it overrides the family
+  rule above. Do not repeat what "rejected_covers" showed unless the owner asked for it. Write "owner_request": the owner's
+  requests rewritten as short, concrete English instructions for the image model ("" if there is no feedback).
 - Write moment / framing / place / time_light / props / human / memory_look / text_space / look in English; why_ja in one short
   Japanese sentence (why this scene is this song); look_ja in a few Japanese words (the impression of this design, e.g. 夜のフラッシュ写真・
   冷たい青); type_ja in one short Japanese sentence (why this lettering)."""
@@ -115,8 +125,8 @@ TYPE_SCHEMA = {"type": "object", "additionalProperties": False,
                               "align": {"type": "string", "enum": ["left", "center", "right"]},
                               "layout": {"type": "string", "enum": ["stack", "title_first", "split"]},
                               "size": {"type": "number"}, "artist_size": {"type": "number"}, "ink": {"type": "string"}}}
-SCHEMA = {"type": "object", "additionalProperties": False, "required": ["song_image", "scenes"],
-          "properties": {"song_image": {"type": "string"}, "scenes": {"type": "array", "items": {
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["song_image", "owner_request", "scenes"],
+          "properties": {"song_image": {"type": "string"}, "owner_request": {"type": "string"}, "scenes": {"type": "array", "items": {
               "type": "object", "additionalProperties": False,
               "required": ["who", "member", "shot", "family", "moment", "framing", "place", "time_light", "props", "human", "memory_look",
                            "look", "text_space", "type", "why_ja", "look_ja", "type_ja"],
@@ -173,7 +183,7 @@ def _medium(look: str) -> str:
     return next((m for m in MEDIUMS if m in lk), " ".join(lk.split()[:2]))
 
 
-def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
+def diversify(scenes: list[dict], slug: str = "", keep_families: bool = False) -> list[dict]:
     """6 案の印象を重ねない：同じ書体・同じ置き方（場所＋寄せ＋並べ方）が出たら、まだ使っていない文字のデザインに丸ごと入れ替える。
     同じ画材・手法の作り（look）が出たら、まだ使っていない作りに入れ替える（決定 123）"""
     try:
@@ -183,8 +193,10 @@ def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
         have = {p["font"] for p in TYPE_PRESETS}
     fonts, spots, mediums, fams = set(), set(), set(), set()
     for i, sc in enumerate(scenes):
-        fam = sc.get("family")
-        if fam not in FAMILIES or fam in fams:   # 系統が重なったら、使っていない系統に（作りもその系統のふだんの作りに。決定 126）
+        fam = sc.get("family") if sc.get("family") in FAMILIES else list(FAMILIES)[i % len(FAMILIES)]
+        if keep_families:   # 作り直しの理由が系統や作りを決めているとき：系統と作りは Claude の案のまま（決定 127）
+            fams.add(fam)
+        elif fam in fams or sc.get("family") not in FAMILIES:   # 系統が重なったら、使っていない系統に（作りもその系統のふだんの作りに。決定 126）
             fam = next((f for f in FAMILIES if f not in fams), list(FAMILIES)[i % len(FAMILIES)])
             sc["family"], sc["look"], sc["look_ja"] = fam, FAMILIES[fam][0], FAMILIES[fam][1]
         fams.add(fam)
@@ -206,7 +218,7 @@ def diversify(scenes: list[dict], slug: str = "") -> list[dict]:
                  "tracking": min(float(t.get("tracking") or 0.04), 0.08)}
         sc["type"] = t
         md = _medium(sc.get("look", ""))
-        if not sc.get("look") or md in mediums:   # 系統の中で画材がほかの案と同じなら、その系統のふだんの作りに
+        if not keep_families and (not sc.get("look") or md in mediums):   # 系統の中で画材がほかの案と同じなら、その系統のふだんの作りに
             sc["look"], sc["look_ja"] = FAMILIES[fam][0], FAMILIES[fam][1]
             md = _medium(sc["look"])
         mediums.add(md)
@@ -268,21 +280,60 @@ def scenes_for(brief: dict, brief_path: Path | None = None, redo: bool = False) 
         "lyrics_head": lyrics_head(brief_path, brief),
         "cover_seed_from_brief": brief.get("cover_prompt_seed", ""),
         "previous_covers": previous(brief),
+        "owner_feedback": notes(brief),
+        "rejected_covers": list(brief.get("cover_rejected") or [])[-12:],
         "artist": artist_card(brief.get("artist_slug", "")),
     }, ensure_ascii=False)
     res, _st = _claude.call_json(_system(), user, SCHEMA, effort="low", max_tokens=9000)
     scenes = [s for s in (res or {}).get("scenes") or [] if s.get("moment")][:N_SCENES]
     if not scenes:
         return fallback(brief)
-    scenes = diversify(scenes, brief.get("artist_slug", ""))   # 書体・置き方・作りが重なったら入れ替える（決定 123）
+    scenes = diversify(scenes, brief.get("artist_slug", ""), keep_families=bool(notes(brief)) and _names_style(notes(brief)[0]))   # 書体・置き方・作りが重なったら入れ替える（決定 123）
     song_image = str((res or {}).get("song_image") or "")
+    req = str((res or {}).get("owner_request") or "")
     if brief_path:
         b = read_json(brief_path)
         b["cover_scenes"] = {"made_at": datetime.now().isoformat(timespec="seconds"), "version": SCENE_VERSION,
-                             "song_image": song_image, "scenes": scenes}
+                             "song_image": song_image, "owner_request": req, "scenes": scenes}
         write_json(brief_path, b)
-    brief["cover_scenes"] = {"version": SCENE_VERSION, "song_image": song_image, "scenes": scenes}
+    brief["cover_scenes"] = {"version": SCENE_VERSION, "song_image": song_image, "owner_request": req, "scenes": scenes}
     return scenes
+
+
+def notes(brief: dict) -> list[str]:
+    """作り直しの理由（新しい順。決定 127）"""
+    out = [str(n.get("reason") if isinstance(n, dict) else n).strip() for n in (brief.get("cover_redo_notes") or [])]
+    return [x for x in reversed(out) if x][:MAX_NOTES]
+
+
+STYLE_WORDS = ("写真", "イラスト", "絵", "グラフィック", "コラージュ", "版画", "リソ", "白黒", "モノクロ", "色", "明る", "暗", "系統",
+               "全部", "すべて", "統一", "photo", "illustration", "graphic", "collage", "monochrome")
+
+
+def _names_style(note: str) -> bool:
+    """理由が作りや系統を指定しているか（そのときは系統の振り分けより理由を優先する）"""
+    return any(w in note for w in STYLE_WORDS) and any(w in note for w in ("全部", "すべて", "全て", "どれも", "統一", "all", "だけ", "のみ"))
+
+
+def owner_request(brief: dict) -> str:
+    """画像の AI 向けの、作り直しの理由（英語。Claude が書き直したもの。無ければ理由をそのまま）"""
+    t = str((brief.get("cover_scenes") or {}).get("owner_request") or "").strip()
+    if t:
+        return t
+    return " / ".join(notes(brief)[:3])
+
+
+def remember_redo(brief: dict, reason: str) -> dict:
+    """作り直す前に：理由を足し、前の案のシーンを「作り直した案」に残す（決定 127）。ブリーフ（dict）を返す"""
+    if reason.strip():
+        brief.setdefault("cover_redo_notes", []).append({"at": datetime.now().isoformat(timespec="seconds"), "reason": reason.strip()[:500]})
+    old = (brief.get("cover_scenes") or {}).get("scenes") or []
+    if old:
+        rej = brief.setdefault("cover_rejected", [])
+        rej += [f"[{sc.get('family', '')}/{sc.get('shot', '')}] {sc.get('moment', '')} — look: {sc.get('look', '')}" for sc in old]
+        brief["cover_rejected"] = rej[-18:]
+    brief.pop("cover_scenes", None)
+    return brief
 
 
 def song_image(brief: dict) -> str:

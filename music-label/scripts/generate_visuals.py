@@ -320,6 +320,11 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
         song_img = cover_scene.song_image(brief)
     except Exception:  # noqa: BLE001
         pass
+    try:   # 作り直しの理由（Gon さんが書いたもの。6 案すべての先頭近くに入れる。決定 127）
+        req = cover_scene.owner_request(brief)
+    except Exception:  # noqa: BLE001
+        req = ""
+    req_line = (f"The label owner rejected the previous covers of this song; this redo MUST follow their requests: {req.strip().rstrip('.')}. " if req else "")
     out = []
     for i in range(N_COVER):
         ref = refs[i % len(refs)] if refs else ""
@@ -356,10 +361,10 @@ def prompts_cover(artist: dict, brief: dict, brief_path: Path | None = None) -> 
                     "scene": i % len(scenes) + 1 if scenes else None, "scene_ja": (sc or {}).get("why_ja", ""),
                     "who": (sc or {}).get("who", ""), "shot": (sc or {}).get("shot", ""), "member": (sc or {}).get("member", ""),
                     "type": t, "type_ja": (sc or {}).get("type_ja", ""), "look_ja": (sc or {}).get("look_ja", ""),
-                    "family": (sc or {}).get("family", ""), "prompt": scrub(
+                    "family": (sc or {}).get("family", ""), "redo_reason": (cover_scene.notes(brief) or [""])[0] if scenes else "", "prompt": scrub(
             (f"Album cover artwork, square 1:1, made as: {look}. This medium, colour scheme and composition are what make this cover "
              f"different from the other five covers of this song - commit to them fully. " if look else "Album cover artwork, square 1:1. ")
-            + f"{body}{ref} {room}"
+            + req_line + f"{body}{ref} {room}"
             ". No people's faces, no URLs, no social handles, no prices, no third-party logos or characters, no real buildings or signs, "
             "not explicit. Original artwork, not a copy of any existing cover. " + (REAL_BASE if look else REAL_RELEASE), artist)})
     return out
