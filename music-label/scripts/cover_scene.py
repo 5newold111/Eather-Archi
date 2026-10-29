@@ -41,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, read_json, write_json  # noqa: E402
 
-SCENE_VERSION = 5   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
+SCENE_VERSION = 6   # 場面の選び方を変えたら上げる（古い版の場面は選び直す）
 MAX_NOTES = 8   # 作り直しの理由はいくつまで見せるか（新しい順）
 N_SCENES = 6
 SHOTS = ["extreme close-up", "close-up", "cut-out fragment", "medium", "wide"]
@@ -50,13 +50,14 @@ SHOTS = ["extreme close-up", "close-up", "cut-out fragment", "medium", "wide"]
 FAMILIES = {
     "photo": ("documentary 35mm film photograph, natural light, real grain, off-centre subject with wide empty space, warm muted colours",
               "写真（フィルム）", "documentary or film photograph of the moment (real camera, grain, natural light)"),
-    "graphic": ("flat graphic design: one bold colour field with one simple cut-out shape or silhouette of the subject, almost no detail, "
-                "strong two-colour contrast, Swiss-poster composition", "グラフィック（色面と形）",
+    "graphic": ("flat graphic design: one bold colour field with one simple flat shape or silhouette of an object or person from the scene "
+                "(never a circle, dot or round frame), almost no detail, strong two-colour contrast, asymmetric poster layout",
+                "グラフィック（色面と形）",
                 "graphic design - a flat colour field and one or two simple shapes or a silhouette taken from the scene; the title will be set "
                 "large, so the image stays very simple"),
     "illustration": ("hand-drawn illustration in gouache and ink on paper, visible brush strokes and pencil lines, limited earthy palette",
                      "イラスト（手描き）", "hand-made illustration or painting of the scene (gouache, ink, pastel, woodcut, line drawing)"),
-    "collage": ("cut-paper collage of torn photographs, coloured paper and tape, layered, visible scissor edges, bold primary colours",
+    "collage": ("collage of torn photographs and coloured paper in rectangular and irregular torn pieces, tape, layered, bold primary colours",
                 "コラージュ", "collage or mixed media (torn photos, cut paper, tape, found printed matter)"),
     "print": ("two-colour risograph print, grainy ink, slight misregistration, flat shapes, pastel paper",
               "版画（リソグラフ）", "print process with limited inks (risograph, screen print, cyanotype, letterpress, photocopy)"),
@@ -87,6 +88,8 @@ Rules:
 - Choose scenes that suit the act's art taste in "artist.art_taste" (favourite imagery and mediums), and do not repeat the subjects,
   places or framings listed under "previous_covers".
 - No text in the image itself, no logos, no brands, no real people, no real or identifiable buildings, signs or places.
+- Never put the picture inside a circle, oval, porthole or round vignette, and do not use circles or dots as decoration; a round
+  object may appear only when it truly belongs to the scene (a steering wheel, a record, the sun).
 - "type": design the lettering of the artist name and the song title for THIS scene, in the act's taste ("artist.art_taste.type_feel",
   "artist.art_taste.graphic", colours). Put it where the scene leaves calm space and where it belongs in the composition
   (place: top / bottom / middle; align: left / center / right; layout: "stack" = artist name above the title, "title_first" = title
@@ -345,10 +348,15 @@ def song_image(brief: dict) -> str:
     return "; ".join(str(x) for x in (ep.get("theme"), brief.get("cover_prompt_seed")) if x)[:400]
 
 
+_CUTOUT = __import__("re").compile(r"\bcut-?outs?\b(?! fragment)", __import__("re").I)
+
+
 def scene_text(sc: dict) -> str:
-    """指示文の「場面」の部分（英語）"""
-    t = (f"The cover is one single moment cut out of this song, like a still frame from a film: {sc.get('moment', '')}. "
-         f"Shot: {sc.get('shot', '') or 'as framed'}. Framing: {sc.get('framing', '')}. Place: {sc.get('place', '')}. "
+    """指示文の「場面」の部分（英語）。"cut-out" は丸い切り抜きと受け取られやすいので "cropped" に言い換える（決定 128）"""
+    sc = {k: (_CUTOUT.sub("cropped part", v.replace("cut-out fragment", "cropped fragment")) if isinstance(v, str) and k != "shot" else v)
+          for k, v in sc.items()}
+    t = (f"The cover is one single moment taken from this song, like a still frame from a film: {sc.get('moment', '')}. "
+         f"Shot: {SHOT_PROMPT.get(sc.get('shot', ''), sc.get('shot', '')) or 'as framed'}. Framing: {sc.get('framing', '')}. Place: {sc.get('place', '')}. "
          f"Time and light: {sc.get('time_light', '')}. ")
     if sc.get("props"):
         t += "In frame: " + ", ".join(sc["props"]) + ". "
@@ -359,6 +367,10 @@ def scene_text(sc: dict) -> str:
     return t
 
 
+# 画像の AI に渡す画の距離の言い方（"cut-out" は丸い切り抜きと受け取られやすいので、指示文では言い換える。決定 128）
+SHOT_PROMPT = {"cut-out fragment": "a cropped fragment of the moment - a partial, edge-to-edge rectangular crop (not a circular cut-out)",
+               "extreme close-up": "extreme close-up, filling the whole square frame edge to edge", "close-up": "close-up, filling the frame",
+               "medium": "medium shot", "wide": "wide shot"}
 SHOT_JA = {"extreme close-up": "大きく寄った画", "close-up": "寄った画", "cut-out fragment": "一部を切り取った画", "medium": "中くらい", "wide": "引きの画"}
 
 
