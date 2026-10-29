@@ -975,6 +975,7 @@ def cmd_suno_request(args) -> int:
 # ---------------------------------------------------------------------------
 # 戻す（ダッシュボードで間違えて進めたとき。決定 38）。消さずに out/publish/undo/ に移すので、あとから取り出せる
 BACK_TO = {"suno": "Suno で作曲（取り込みを取り消す）", "master": "音量を整え直す（取り込んだ曲はそのまま）",
+           "cover": "ジャケットを選び直す（6 案を作り直す）",
            "ready": "登録の準備ができた（DistroKid の登録を取り消す）", "registered": "DistroKid 登録済み（配信中を取り消す）"}
 
 
@@ -987,9 +988,12 @@ def default_back(status: str) -> str | None:
 def back_options(song: dict) -> list[str]:
     """この曲でいま選べる戻り先（近い順）"""
     s = _songs.state(song).get("status", "")
-    order = {"live": ["registered", "ready", "suno"], "registered": ["ready", "suno"], "ready": ["suno", "master"],
+    order = {"live": ["registered", "ready", "suno"], "registered": ["ready", "suno"], "ready": ["cover", "suno", "master"],
              "waiting_cover": ["suno", "master"], "waiting_ffmpeg": ["suno"], "imported": ["suno", "master"]}
-    return order.get(s, [])
+    out = order.get(s, [])
+    if song["kind"] == "debut":   # デビュー曲のジャケットは作業セットのもの（候補から選ぶ流れではない）
+        out = [t for t in out if t != "cover"]
+    return out
 
 
 def _stash(paths: list[Path], song: dict) -> Path | None:
@@ -1040,6 +1044,18 @@ def go_back(song: dict, to: str | None = None) -> str:
         st["status"] = ""
         note = (f"取り込んだもの・下書き・公開セットは {dest} に移しました。" if dest else "") + \
             "Suno でいいねした 1 本を、もう一度「楽曲情報」にダウンロードすると取り込みます"
+    elif to == "cover":   # ジャケットを選び直す：仕上がりと選択を「戻したもの」に移し、ジャケット待ちに戻す（決定 124）
+        d = cover_dir(song)
+        dest = _stash([d / "selection_cover.json", d / "cover_final.jpg", d / "cover_final_notext.jpg", d / "cover_final.text.json"], song)
+        b = read_json(song["brief"]) if song.get("brief") and Path(song["brief"]).exists() else None
+        if b is not None and b.pop("cover_scenes", None) is not None:   # シーンも選び直す
+            Path(song["brief"]).write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        d.mkdir(parents=True, exist_ok=True)   # 作り直した候補は自動で選ばない（Gon さんが選ぶまで待つ。決定 123）
+        (d / "owner_pick.json").write_text(json.dumps({"why": "DistroKid の登録の前にジャケットに戻した", "date": date.today().isoformat()},
+                                                      ensure_ascii=False), encoding="utf-8")
+        st.pop("ready_at", None)
+        st["status"] = "waiting_cover"
+        note = (f"前のジャケットは {dest} に移しました。" if dest else "") + "ジャケットの案を 6 つ作り直します（数分）。できたらポップアップで 1 枚選んでください"
     elif to == "master":   # 音量を整え直す：取り込んだ曲はそのまま、整えた音源と下書きをやり直す
         dest = _stash([OUT / "masters" / song["key"], PUB / song["key"]], song)
         sel_p = OUT / "takes" / song["key"] / "selection.json"
@@ -1067,6 +1083,8 @@ def cmd_back(args) -> int:
         print(f"【結果】まだ終わっていません：{e}")
         return 2
     print(f"○ {msg}")
+    if args.to == "cover":   # そのまま 6 案を作り直す（OpenAI の画像の料金。決定 124）
+        return cmd_cover(argparse.Namespace(id=song["id"], redo=True, choose=None, reason=""))
     print(f"【結果】{msg}")
     return 0
 

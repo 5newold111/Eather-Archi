@@ -65,9 +65,12 @@ def back_actions(song: dict | None) -> list[dict]:
     except Exception:  # noqa: BLE001
         return []
     label = {"suno": "← Suno で作曲に戻す（取り込みを取り消す）", "master": "← 音量を整え直す",
+             "cover": "← ジャケットに戻す（6 案を作り直して選び直す）",
              "ready": "← DistroKid の登録を取り消す（登録前に戻す）", "registered": "← 配信中を取り消す"}
     why = {"suno": "取り込んだ曲・下書き・公開セットを「戻したもの」フォルダに移して、Suno で作曲の段階に戻します（消しません）。",
-           "master": "音量を整えた音源と下書きを作り直します。", "ready": "DistroKid に登録した記録を取り消します（DistroKid の画面の登録そのものは取り消されません）。",
+           "master": "音量を整えた音源と下書きを作り直します。",
+           "cover": "いまのジャケットを「戻したもの」に移して、ジャケットのフェーズに戻し、曲の印象的なシーンから 6 案を作り直します"
+                    "（数分・OpenAI の画像の料金がかかります）。自動では選ばないので、できたら 1 枚選んでください。DistroKid の下書きも選んだジャケットで作り直します。", "ready": "DistroKid に登録した記録を取り消します（DistroKid の画面の登録そのものは取り消されません）。",
            "registered": "配信中の記録（ISRC・URL）を取り消します。"}
     return [{"kind": "run", "label": label[t], "action": "back", "id": song["id"], "to": t,
              "confirm": why[t] + " よいですか？"} for t in opts]
