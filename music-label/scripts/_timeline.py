@@ -97,12 +97,20 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
 
 # ---------------------------------------------------------------------------
 def debut_done(slug: str) -> bool:
-    """デビューが終わったか：デビューのタブの配信確認で、アーティストのページ（Spotify・YouTube Music・Apple Music。
-    Instagram・Facebook は任意）を記録したとき（決定 139・141・145）。そろうまではデビューの流れのまま（デビュー曲が配信中でも）。
+    """デビューが終わったか：デビュー曲が配信中、または DistroKid に登録済みで配信日を過ぎた、またはもう Spotify に
+    アーティストのページがある（決定 120・146）。アーティストのページの記録は条件にしない（定期配信のタブの通知で貼ってもらう）。
     終わった組はデビューのタブに出さない（決定 120）"""
+    today = date.today()
+    for s in _songs.debut_songs():
+        if s["slug"] != slug:
+            continue
+        st = _songs.state(s)
+        rel = _d(st.get("released")) or _d(st.get("release_date"))
+        if st.get("status") == "live" or (st.get("status") == "registered" and rel and rel <= today):
+            return True
     try:
         import publish
-        return not publish.artist_pages_missing(slug)
+        return bool(publish.spotify_artist_id(slug))
     except Exception:  # noqa: BLE001
         return False
 
@@ -142,33 +150,7 @@ def debut_rows() -> list[dict]:
             plan[key] = (start, end)
             start = end + timedelta(days=1)
         phases += song_phases(song, plan, None)
-        # 最後：配信確認。アーティストのページを記録する（必要な 3 つがそろうとデビュー完了。決定 139・141・145）
-        sp_day = max([_d(ph["end"]) for ph in phases] + [today])
-        live = _songs.state(song).get("status") in ("registered", "live")
-        try:
-            import publish
-            left = publish.artist_pages_missing(slug)
-            published = bool(publish.spotify_artist_id(slug))   # もう配信されている（Spotify にページがある）組
-        except Exception:  # noqa: BLE001
-            left, published = [], False
-        last = _ph("配信確認（アーティストのページ）", sp_day, sp_day, "wait" if (live or published) else "plan", "あなた",
-                   f"デビュー曲が配信されたら、アーティストのページを記録する（あと {len(left)} つ：{'・'.join(left)}。そろうとデビュー完了。Instagram・Facebook は任意）")
         b = _status.blocker(list(steps.values()))
-        if published:   # もう配信されている組：前の工程は全部済み、「配信待ち」を今日まで続く進行中の帯にし、
-            # その先の配信確認を Gon さんの番にする（デビューのタブとガントチャートに配信待ちで並ぶ。決定 142・143）
-            for ph in phases:
-                ph["state"], ph["who"] = "done", ""
-                if _d(ph["start"]) > today:   # 済んだ工程は今日より後ろに出さない（予定の日付のままだと未来に描かれる）
-                    ph["start"] = today.isoformat()
-                if _d(ph["end"]) > today:
-                    ph["end"] = today.isoformat()
-                if ph["name"] == "配信待ち":   # 今日まで続く帯
-                    ph["state"], ph["end"] = "run", today.isoformat()
-                    ph["start"] = min(_d(ph["start"]), today - timedelta(days=3)).isoformat()
-                    ph["detail"] = "配信されています。アーティストのページ（Spotify・YouTube Music・Apple Music）がそろうまで、配信待ち（配信確認中）のままにします"
-            last["start"] = last["end"] = today.isoformat()
-            b = {"state": "wait", "who": "あなた", "detail": last["detail"], "name": last["name"]}
-        phases.append(last)
         rows.append({"slug": slug, "artist": a.get("name", slug), "label": _label(a), "title": song["title"], "id": song["id"],
                      "row": f"{a.get('name', slug)}", "sub": f"デビュー曲「{song['title']}」", "phases": phases,
                      "blocker": _blk(b)})

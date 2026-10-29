@@ -802,8 +802,8 @@ def spotify_artist_id(slug: str) -> str:
     return ident
 
 
-# デビューの配信確認で記録する、組のアーティストのページ（決定 141）。Spotify・YouTube Music・Apple Music の 3 つがそろうとデビュー完了。
-# Instagram・Facebook は任意（入れなくても完了になる。オーナーの指示 2026-10-29。決定 145）
+# 組のアーティストのページ（決定 141）。デビュー完了の条件ではない（決定 146）。Spotify・YouTube Music・Apple Music が
+# 未記録の組は、定期配信のタブの通知ボタンから貼ってもらう。Instagram・Facebook は任意（決定 145）
 ARTIST_PAGES = [("spotify", "Spotify", r"(?:spotify:artist:|open\.spotify\.com/(?:intl-[\w-]+/)?artist/)([A-Za-z0-9]{22})"),
                 ("youtube_music", "YouTube Music", r"(?:music\.youtube\.com|youtube\.com)/(?:channel|browse|@)[^\s]*"),
                 ("apple_music", "Apple Music", r"music\.apple\.com/[^\s]*artist/[^\s]*"),
@@ -838,7 +838,7 @@ def artist_pages(slug: str) -> dict[str, str]:
 
 
 def artist_pages_missing(slug: str, optional: bool = False) -> list[str]:
-    """まだ記録していない、デビュー完了に要るアーティストのページ（サービスの名前）。optional=True なら任意のページも含める"""
+    """まだ記録していないアーティストのページ（Spotify・YouTube Music・Apple Music の名前）。optional=True なら任意のページも含める"""
     have = artist_pages(slug)
     return [name for k, name, _ in ARTIST_PAGES if not have.get(k) and (optional or k not in OPTIONAL_PAGES)]
 
@@ -887,8 +887,8 @@ def cmd_artist_pages(args) -> int:
     if bad:
         print(f"   ✕ 住所の形が違うので記録しませんでした：{'・'.join(bad)}（各サービスのアーティストのページの住所を貼ってください）")
     left = artist_pages_missing(args.slug)
-    print(f"【結果】{args.slug}：" + ("デビュー完了に要るアーティストのページ（Spotify・YouTube Music・Apple Music）がそろいました（デビュー完了）" if not left
-                                     else f"あと {len(left)} つ（{'・'.join(left)}）でデビュー完了です"))
+    print(f"【結果】{args.slug}：" + ("アーティストのページ（Spotify・YouTube Music・Apple Music）がそろいました" if not left
+                                     else f"あと {len(left)} つ（{'・'.join(left)}）です。わかったら定期配信のタブの通知から貼ってください"))
     return 0 if not bad else 2
 
 

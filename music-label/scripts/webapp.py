@@ -199,7 +199,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(),
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(),
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -221,6 +221,26 @@ def _debut_done_rows() -> list[dict]:
             out.append({"id": s["id"], "slug": s["slug"], "artist": s["artist"], "title": s["title"],
                         "status_ja": STATUS_JA.get(st.get("status", ""), st.get("status", "")),
                         "release": st.get("released") or st.get("release_date") or "", "back": _guide.back_actions(s)})
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
+def _page_remind() -> list[dict]:
+    """定期配信のタブの通知：デビューを終えた組で、Spotify・YouTube Music・Apple Music のアーティストのページがまだの組（決定 146）"""
+    import _guide
+    import _timeline
+    import publish
+    out = []
+    for a in _timeline.all_artists():
+        slug = a.get("slug")
+        try:
+            if not slug or not _timeline.debut_done(slug):
+                continue
+            left = publish.artist_pages_missing(slug)
+            if left:
+                out.append({"slug": slug, "artist": a.get("name", slug), "left": left,
+                            "action": _guide.artist_pages_action(slug, a.get("name", slug))})
         except Exception:  # noqa: BLE001
             continue
     return out
@@ -312,7 +332,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         if song and ok(tr) and ok(ar):
             return [PY, str(S / "publish.py"), "live", song["id"], *(["--track", tr] if tr else []), *(["--artist", ar] if ar else [])], \
                 f"配信中の記録（{song['artist']}「{song['title']}」）"
-    if action == "artist_pages" and p.get("slug") in _slugs():   # デビューの配信確認：アーティストのページ（決定 141・145）
+    if action == "artist_pages" and p.get("slug") in _slugs():   # アーティストのページ（定期配信のタブの通知・デビューの配信確認。決定 141・145・146）
         import publish
         args = []
         for k, _n, _r in publish.ARTIST_PAGES:
@@ -627,7 +647,7 @@ input[type=date]{font:inherit;font-size:13px;padding:3px 6px;border:1px solid va
 .cell:hover{outline:2px solid var(--accent);outline-offset:1px}.cell.done{background:var(--good-t);border-color:var(--good);color:var(--ink)}
 .cell.wait{background:var(--warn-t);border-color:var(--warn);color:var(--ink);font-weight:600}.cell.ng{background:var(--crit-t);border-color:var(--crit);color:var(--ink);font-weight:700}
 .backbox{border:1.5px dashed var(--muted);border-radius:10px;padding:8px 12px;margin:10px 0}.backbox .acts{margin-top:6px}
-.fwdbox{border:1.5px solid var(--good);background:var(--good-t);border-radius:10px;padding:8px 12px;margin:10px 0}.fwdbox .acts{margin-top:6px}
+button.remind{border:1.5px solid var(--warn);background:var(--warn-t);color:var(--ink);font-weight:600;margin:4px 0 10px}.fwdbox{border:1.5px solid var(--good);background:var(--good-t);border-radius:10px;padding:8px 12px;margin:10px 0}.fwdbox .acts{margin-top:6px}
 .cell.run{border-style:dashed;border-color:var(--ink);color:var(--ink)}.cell.plan{border-style:dotted;border-color:var(--muted)}
 .cell .d{display:block;font-weight:400;font-size:11px;color:var(--crit)}
 dialog{border:1px solid var(--line);border-radius:14px;padding:0;max-width:min(640px,calc(100vw - 32px));width:100%;background:var(--card);color:var(--ink);box-shadow:0 10px 40px rgba(0,0,0,.25)}
@@ -667,6 +687,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 </div>
 <section id="pane-regular" role="tabpanel" aria-labelledby="tab-regular">
  <p class="sub">デビュー曲が配信された組の、いま作っている曲がどのフェーズにいるか。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <div id="page-remind"></div>
  <div class="board" id="b-regular"></div>
  <h2>今やること（定期配信）</h2><div id="todo-regular"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-regular"></div></div></details>
@@ -684,7 +705,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
- <p class="sub">デビュー前の組。デビュー曲が配信されたら、最後の「配信確認」でアーティストのページ（Spotify・YouTube Music・Apple Music。Instagram・Facebook は任意）を記録してください。3 つがそろうとデビュー完了になり、このタブから外れて「定期配信」に移ります（そろうまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <p class="sub">デビュー前の組。デビュー曲が配信されたら、デビュー曲が配信されるとデビュー完了になり、このタブから外れて「定期配信」に移ります（そろうまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
  <div class="board" id="b-debut"></div>
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>
@@ -820,7 +841,7 @@ document.addEventListener("click",e=>{const b=e.target.closest("[data-p],[data-g
 document.addEventListener("keydown",e=>{const b=e.target.closest&&e.target.closest("[data-p],li[data-g2]");if(b&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openGuide(b.dataset.p||b.dataset.g2)}});
 const COLS={irregular:[["ブリーフ","曲の案"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
   regular:[["ブリーフ","ブリーフ"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["配信","配信中"]],
-  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"],["配信確認（アーティストのページ）","配信確認"]]};
+  debut:[["名前の確認","名前の確認"],["写真・ジャケット","写真・ジャケット"],["Suno で作曲","作曲（Suno）"],["仕上げ（音量・ジャケット）","仕上げ"],["DistroKid に登録","DistroKid 登録"],["配信待ち","配信待ち"],["デビュー","デビュー"]]};
 function boardRows(key){const rows=DATA.timeline[key].rows,by={};const order=[];
   rows.forEach((r,ri)=>{if(!by[r.slug]){by[r.slug]=[];order.push(r.slug)}by[r.slug].push(ri)});
   const out=[];order.forEach(slug=>{const idx=by[slug];
@@ -1050,6 +1071,15 @@ document.addEventListener("click",e=>{const img=e.target.closest("img.zoomable")
 document.addEventListener("keydown",e=>{const d=document.getElementById("zoom");
   if(d.open&&ZOOM.length>1&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){e.preventDefault();zoomStep(e.key==="ArrowRight"?1:-1);return}
   const img=e.target.closest&&e.target.closest("img.zoomable");if(img&&(e.key==="Enter"||e.key===" ")){e.preventDefault();zoomOpen(img)}});
+function pageRemind(){const el=document.getElementById("page-remind"),rs=DATA.page_remind||[];   // 決定 146
+  el.innerHTML=rs.length?`<button class="act-only remind" id="page-remind-btn">🔔 アーティストのページを貼ってください（${rs.length} 組）</button>`:""}
+function pageRemindOpen(){const rs=DATA.page_remind||[];const dl=document.getElementById("dlg");dl.classList.add("wide");
+  document.getElementById("dlg-body").innerHTML=`<h3 id="dlg-title">🔔 アーティストのページを貼ってください</h3>
+   <p>デビューを終えた組のうち、Spotify・YouTube Music・Apple Music のアーティストのページがまだ記録されていない組です。わかったものから貼ってください（Instagram・Facebook は任意）。全部そろうと、ここから消えます。</p>
+   <ol><li>欄の隣の「検索 ↗」を押すと、新しいタブでそのサービスの検索が組の名前で開きます</li><li>アーティストのページを開いて、上の住所（URL）をコピーして欄に貼ります</li><li>「アーティストのページを記録する」を押します</li></ol>
+   ${rs.length?rs.map(r=>`<div class="fwdbox" style="margin:12px 0"><b>${E(r.artist)}</b> <span class="sub">あと ${r.left.length} つ：${E(r.left.join("・"))}</span><div class="acts">${actHTML(r.action,0,{slug:r.slug})}</div></div>`).join(""):`<p class="empty">すべての組のページがそろっています。</p>`}`;
+  if(!dl.open)dl.showModal()}
+document.addEventListener("click",e=>{if(e.target.closest("#page-remind-btn"))pageRemindOpen()});
 function debutDone(){const el=document.getElementById("debut-done"),rs=DATA.debut_done||[];   // 決定 137
   el.innerHTML=rs.length?`<p class="sub">デビュー曲を作り直す・DistroKid の登録をやり直すときは、ここから戻します。戻すと、その組はまたこのタブに並びます。DistroKid 側の登録（配信の取り下げなど）は、DistroKid の画面で Gon さんが行ってください。</p><ul class="list">${rs.map(r=>`<li><b>${E(r.artist)}</b>「${E(r.title)}」 <span class="sub">${E(r.status_ja)}${r.release?`・配信日 ${E(r.release)}`:""}</span><div class="act-only" style="margin-top:6px">${(r.back||[]).map((a,i)=>actHTML(a,i,{id:r.id})).join(" ")}</div></li>`).join("")}</ul>`:`<p class="empty">デビューが終わった組はまだありません。</p>`}
 function render(){
@@ -1057,7 +1087,7 @@ function render(){
   for(const k of TABS){const rs=DATA.timeline[k].rows;const nArt=new Set(rs.map(r=>r.slug)).size;
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
-  irrForm();irrDrafts();dailyBox();quotaBox();actsTab();debutDone();
+  irrForm();irrDrafts();dailyBox();quotaBox();actsTab();debutDone();pageRemind();
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
      +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")

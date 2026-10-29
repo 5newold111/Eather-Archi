@@ -23,6 +23,15 @@ OPENAI_KEYS = "https://platform.openai.com/api-keys"
 SPOTIFY_DASH = "https://developer.spotify.com/dashboard"
 
 
+
+def artist_pages_action(slug: str, artist: str, pages: dict | None = None) -> dict:
+    """アーティストのページの入力欄・検索ボタン・記録ボタン（デビューの配信確認・定期配信のタブの通知で使う。決定 141・144・146）"""
+    import publish
+    return {"kind": "artist_pages", "slug": slug, "values": pages if pages is not None else publish.artist_pages(slug),
+            "search": publish.artist_page_search(artist),
+            "fields": [[k, n + ("（任意）" if k in publish.OPTIONAL_PAGES else "")] for k, n, _ in publish.ARTIST_PAGES],
+            "label": "アーティストのページを記録する"}
+
 def _cover_note(c: dict) -> str:
     """候補の説明：どのシーンか（寄り・引き・だれが写るか・曲のどこか）＋ Claude の一言（決定 122）"""
     import cover_scene
@@ -127,9 +136,7 @@ def _explain(row: dict, phase: dict) -> dict:
                 "steps": ["それぞれの欄の隣の「検索 ↗」を押すと、新しいタブでそのサービスの検索が組の名前で開きます。アーティストのページを開いて住所をコピーする",
                           "下の欄に貼る（記録済みの欄は入っています。わかったものから少しずつでもよい。「任意」の欄は空けたままでよい）",
                           "「アーティストのページを記録する」を押す"],
-                "actions": [{"kind": "artist_pages", "slug": row.get("slug"), "values": pages,
-                             "search": publish.artist_page_search(row.get("artist", "")),
-                             "fields": [[k, n + ("（任意）" if k in publish.OPTIONAL_PAGES else "")] for k, n, _ in publish.ARTIST_PAGES], "label": "アーティストのページを記録する"}]}
+                "actions": [artist_pages_action(row.get("slug", ""), row.get("artist", ""), pages)]}
     if name == "名前の確認":
         return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",
                 "steps": ["「名前を確かめる」を押す（Spotify などを自動で調べます）",
