@@ -251,6 +251,7 @@
     "topic_only_ratio": 0.2
   },
   "visual": {
+    "art_taste": {},
     "space": "ペンリン川沿いのボートヤードにある古い網小屋の 2 階（約 6m × 4m・天井高 2.4m・黒ずんだ樫の梁）。北向きの横長の窓が 2 つ川に面し、床は擦り減った松の板。壁は石灰で白く塗られ、片側にロープの束と櫂、反対側に染めた毛糸の束が紐に吊られて乾かされている。中央に古い作業台、隅に小さな薪ストーブ。",
     "light": "北窓からの曇天の拡散光が基本。夕方は川面の反射が天井で揺れる。夜は裸電球 1 つとストーブの火だけ。",
     "materials": [
@@ -313,40 +314,7 @@
       "hollowplan"
     ],
     "collab_style": "DECLAN FAY とは、夜の雨の県道を描く男女の掛け合い（アイラが上・ゲシンが中・低い声の相手がさらに下）。HOLLOWPLAN には、2 人のハミングと雨と木の軋みのフィールド録音を素材として渡し、つなぎの曲に溶かしてもらう。",
-    "fit": [
-      {
-        "partner": "declan_fay",
-        "score": 3,
-        "why": "ジャンルの重なり 5%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
-        "partner_brings": "DECLAN FAY の声と音の色（warm baritone・tape hiss・gated reverb snare）",
-        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
-        "caution": "テンポと声の高さが合うか、聴いて確かめる"
-      },
-      {
-        "partner": "nao_easterly",
-        "score": 3,
-        "why": "ジャンルの重なり 5%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
-        "partner_brings": "VERNALIGHT の声と音の色（sunrise・eastbound・bright synth arpeggio）",
-        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
-        "caution": "テンポと声の高さが合うか、聴いて確かめる"
-      },
-      {
-        "partner": "soft_cantilever",
-        "score": 3,
-        "why": "ジャンルの重なり 18%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
-        "partner_brings": "SOFT CANTILEVER の声と音の色（sunlit city pop・fingerstyle bass・clean guitar cuts）",
-        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
-        "caution": "テンポと声の高さが合うか、聴いて確かめる"
-      },
-      {
-        "partner": "hollowplan",
-        "score": 2,
-        "why": "ジャンルの重なり 3%・声の組み合わせ・BPM の近さから （仮：Claude の鍵が無いので、ジャンルの言葉・声・BPM から計算）",
-        "partner_brings": "HOLLOWPLAN の声と音の色（deep house・lo-fi・vocal chops）",
-        "how": "サビの後半のハモりか、2 番の掛け合いで入る",
-        "caution": "テンポと声の高さが合うか、聴いて確かめる"
-      }
-    ]
+    "fit": []
   },
   "profile": {
     "hometown": "ニュージーランド南島・オタゴ地方・マニオトト平原（パテアロア近くの羊牧場）",
@@ -386,7 +354,10 @@
       "Damien Rice",
       "The Unthanks",
       "Nic Jones"
-    ]
+    ],
+    "favorite_visual_artists_real": [],
+    "favorite_manga_real": [],
+    "favorite_films_real": []
   },
   "concept_history": {
     "concept_version": 1,
@@ -1318,6 +1289,6 @@
     ]
   },
   "source": {
-    "pulled_at": "2026-10-27T06:01:53"
+    "pulled_at": "2026-10-29T13:47:44"
   }
 }
