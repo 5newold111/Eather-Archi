@@ -42,7 +42,7 @@ load_dotenv()
 LAST = OUT / "update" / "last.json"
 SENT = OUT / "update" / "sent.json"
 AUTO = "[auto] "
-SEND_OK = ("music-label/templates/artists/",)   # 自動で送ってよい場所（決定 109）
+SEND_OK = ("music-label/templates/artists/", "music-label/diagnostics/")   # 自動で送ってよい場所（決定 109。診断の記録は決定 130）
 SECRET = re.compile(r"sk-ant-|sk-[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|-----BEGIN|xox[bpa]-[A-Za-z0-9-]{10,}")
 PY = sys.executable
 SELF_JOB = "update"
@@ -149,12 +149,13 @@ def send_local() -> str:
         return ""
     gtop("add", "--", *files)
     names = "・".join(Path(f).stem for f in files[:6]) + (f" ほか {len(files) - 6}" if len(files) > 6 else "")
-    msg = f"{AUTO}アーティストの設定書を Mac の最新にした（{names}）"
+    diag = all("/diagnostics/" in f for f in files)
+    msg = f"{AUTO}診断の記録を送った（{names}）" if diag else f"{AUTO}アーティストの設定書を Mac の最新にした（{names}）"
     r = gtop("commit", "-q", "-m", msg, "--", *files)
     if r.returncode:
         print(f"✕ 設定書を記録できませんでした：{(r.stderr or r.stdout).strip()[:200]}")
         return ""
-    print(f"   ○ 設定書を記録しました（{len(files)} 個）：{names}")
+    print(f"   ○ {'診断の記録' if diag else '設定書'}を記録しました（{len(files)} 個）：{names}")
     return names
 
 

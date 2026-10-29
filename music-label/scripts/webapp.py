@@ -262,6 +262,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             return [PY, str(S / "act_review.py"), "approve", a["id"], it["tab"]], f"{a['name']}：「{it['name']}」を承認"
         return ([PY, str(S / "act_review.py"), "reject", a["id"], it["tab"], "--reason", str(p.get("reason") or "")[:300]],
                 f"{a['name']}：「{it['name']}」を却下")
+    if action == "send_diag":   # ブラウザの自動入力の記録を、伏せ字にして Claude に送る（決定 130）
+        return [PY, str(S / "send_diag.py")], "診断の記録を Claude に送る"
     if action == "cover_trial":   # ジャケットの試し運転：実際に API を使って 6 案を作る（曲の状態は変えない。決定 125）
         why = str(p.get("reason") or "").strip()[:500]
         return [PY, str(S / "cover_trial.py"), *(["--reason", why] if why else [])], "ジャケットの試し運転（実際に API を使う）"
@@ -470,6 +472,17 @@ def stop_job(jid: str) -> bool:
     return True
 
 
+def _save_browser_log(label: str, state: str, out: str) -> None:
+    try:
+        d = OUT / "browser" / "jobs"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{datetime.now():%Y%m%d-%H%M%S}.txt").write_text(f"{label}（{state}）\n{out[-60000:]}", encoding="utf-8")
+        for old in sorted(d.glob("*.txt"))[:-15]:
+            old.unlink()
+    except OSError:
+        pass
+
+
 def start_job(cmd: list[str], label: str) -> str:
     jid = secrets.token_hex(4)
     job = {"id": jid, "label": label, "state": "running", "started": datetime.now().strftime("%H:%M:%S"), "out": ""}
@@ -514,6 +527,8 @@ def start_job(cmd: list[str], label: str) -> str:
             res = [ln[len("【結果】"):] for ln in r.stdout.splitlines() if ln.startswith("【結果】")]
             if res:
                 job["summary"] = res[-1]
+            if label.startswith("ブラウザで入力"):   # 診断の記録用に残す（send_diag.py が伏せ字にして送る。決定 130）
+                _save_browser_log(label, job["state"], r.stdout)
         except Exception as e:  # noqa: BLE001
             job["out"], job["state"] = str(e), "error"
     threading.Thread(target=run, daemon=True).start()
@@ -597,7 +612,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <main>
 <div class="tools act-only">
  <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button>
+ <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button>
 </div>
 <div class="tools act-only" id="quota" hidden></div>
 <div id="jobs"></div>
