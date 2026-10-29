@@ -1862,3 +1862,10 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
     Instagram：instagram.com/explore/search/keyword/?q= ／ Facebook：facebook.com/search/pages/?q=（Instagram・Facebook はログインした状態で使う）
 - ダッシュボードの画面は離れず、ボタンはリンクとして開くだけ（記録は今までどおり「アーティストのページを記録する」で）
 - 試験：SOFT CANTILEVER の配信確認で、5 つの欄の隣に検索が並び、それぞれ正しい住所・新しいタブで開くことを画面で確かめた
+
+## 145. 配信確認の Instagram・Facebook は任意にする（2026-10-29。オーナーの指示）
+
+- デビュー完了に要るアーティストのページは Spotify・YouTube Music・Apple Music の 3 つにする（決定 141 の 5 つから変更）
+- Instagram Profile Artist URL・Facebook Profile Artist URL は「（任意）」と表示し、空けたままでもデビュー完了になる。入れれば今までどおり記録する
+- publish.OPTIONAL_PAGES・artist_pages_missing(slug, optional=False)。ポップアップ・ガントチャート・デビューのタブの説明も合わせた
+- 試験：3 つを記録した組がデビュー完了になり、デビューのタブから外れること、残りの組のポップアップで 2 つの欄に「（任意）」が付くことを確かめた

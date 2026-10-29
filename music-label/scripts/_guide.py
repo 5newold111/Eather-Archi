@@ -120,15 +120,16 @@ def _explain(row: dict, phase: dict) -> dict:
         import publish
         pages = publish.artist_pages(row.get("slug", ""))
         left = publish.artist_pages_missing(row.get("slug", ""))
-        return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が配信されたら、5 つのサービスのアーティストのページを記録してください。"
-                         "全部そろうとデビュー完了になり、この組は「定期配信」のタブに移ります。"
-                         + (f"（あと {len(left)} つ：{'・'.join(left)}）" if left else "（5 つそろっています）"),
+        return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が配信されたら、アーティストのページを記録してください。"
+                         "Spotify・YouTube Music・Apple Music の 3 つがそろうとデビュー完了になり、この組は「定期配信」のタブに移ります。"
+                         "Instagram・Facebook は任意です（あれば入れてください。なくても完了になります）。"
+                         + (f"（あと {len(left)} つ：{'・'.join(left)}）" if left else "（必要なページはそろっています）"),
                 "steps": ["それぞれの欄の隣の「検索 ↗」を押すと、新しいタブでそのサービスの検索が組の名前で開きます。アーティストのページを開いて住所をコピーする",
-                          "下の 5 つの欄に貼る（記録済みの欄は入っています。わかったものから少しずつでもよい）",
+                          "下の欄に貼る（記録済みの欄は入っています。わかったものから少しずつでもよい。「任意」の欄は空けたままでよい）",
                           "「アーティストのページを記録する」を押す"],
                 "actions": [{"kind": "artist_pages", "slug": row.get("slug"), "values": pages,
                              "search": publish.artist_page_search(row.get("artist", "")),
-                             "fields": [[k, n] for k, n, _ in publish.ARTIST_PAGES], "label": "アーティストのページを記録する"}]}
+                             "fields": [[k, n + ("（任意）" if k in publish.OPTIONAL_PAGES else "")] for k, n, _ in publish.ARTIST_PAGES], "label": "アーティストのページを記録する"}]}
     if name == "名前の確認":
         return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",
                 "steps": ["「名前を確かめる」を押す（Spotify などを自動で調べます）",

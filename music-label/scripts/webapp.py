@@ -312,7 +312,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         if song and ok(tr) and ok(ar):
             return [PY, str(S / "publish.py"), "live", song["id"], *(["--track", tr] if tr else []), *(["--artist", ar] if ar else [])], \
                 f"配信中の記録（{song['artist']}「{song['title']}」）"
-    if action == "artist_pages" and p.get("slug") in _slugs():   # デビューの配信確認：アーティストのページ 5 つ（決定 141）
+    if action == "artist_pages" and p.get("slug") in _slugs():   # デビューの配信確認：アーティストのページ（決定 141・145）
         import publish
         args = []
         for k, _n, _r in publish.ARTIST_PAGES:
@@ -684,7 +684,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-irregular"></div></details>
 </section>
 <section id="pane-debut" role="tabpanel" aria-labelledby="tab-debut" hidden>
- <p class="sub">デビュー前の組。デビュー曲が配信されたら、最後の「配信確認」で 5 つのアーティストのページ（Spotify・YouTube Music・Apple Music・Instagram・Facebook）を記録してください。全部そろうとデビュー完了になり、このタブから外れて「定期配信」に移ります（そろうまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
+ <p class="sub">デビュー前の組。デビュー曲が配信されたら、最後の「配信確認」でアーティストのページ（Spotify・YouTube Music・Apple Music。Instagram・Facebook は任意）を記録してください。3 つがそろうとデビュー完了になり、このタブから外れて「定期配信」に移ります（そろうまではデビューの流れのまま）。マスを押すと、止まっている原因と Gon さんがやること・ボタンが出ます。</p>
  <div class="board" id="b-debut"></div>
  <h2>今やること（デビュー）</h2><div id="todo-debut"></div>
  <details><summary>日程を見る（ガントチャート）</summary><div class="gwrap"><div class="g" id="g-debut"></div></div></details>

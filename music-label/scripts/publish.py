@@ -802,12 +802,14 @@ def spotify_artist_id(slug: str) -> str:
     return ident
 
 
-# デビューの配信確認で記録する、組のアーティストのページ（5 つ全部そろうとデビュー完了。オーナーの指示 2026-10-29。決定 141）
+# デビューの配信確認で記録する、組のアーティストのページ（決定 141）。Spotify・YouTube Music・Apple Music の 3 つがそろうとデビュー完了。
+# Instagram・Facebook は任意（入れなくても完了になる。オーナーの指示 2026-10-29。決定 145）
 ARTIST_PAGES = [("spotify", "Spotify", r"(?:spotify:artist:|open\.spotify\.com/(?:intl-[\w-]+/)?artist/)([A-Za-z0-9]{22})"),
                 ("youtube_music", "YouTube Music", r"(?:music\.youtube\.com|youtube\.com)/(?:channel|browse|@)[^\s]*"),
                 ("apple_music", "Apple Music", r"music\.apple\.com/[^\s]*artist/[^\s]*"),
                 ("instagram", "Instagram Profile Artist URL", r"instagram\.com/[A-Za-z0-9_.]+"),
                 ("facebook", "Facebook Profile Artist URL", r"(?:facebook\.com|fb\.com)/[^\s]+")]
+OPTIONAL_PAGES = {"instagram", "facebook"}   # 任意（決定 145）
 
 
 def artist_page_search(name: str) -> dict[str, str]:
@@ -835,10 +837,10 @@ def artist_pages(slug: str) -> dict[str, str]:
     return out
 
 
-def artist_pages_missing(slug: str) -> list[str]:
-    """まだ記録していないアーティストのページ（サービスの名前）"""
+def artist_pages_missing(slug: str, optional: bool = False) -> list[str]:
+    """まだ記録していない、デビュー完了に要るアーティストのページ（サービスの名前）。optional=True なら任意のページも含める"""
     have = artist_pages(slug)
-    return [name for k, name, _ in ARTIST_PAGES if not have.get(k)]
+    return [name for k, name, _ in ARTIST_PAGES if not have.get(k) and (optional or k not in OPTIONAL_PAGES)]
 
 
 def save_artist_pages(slug: str, values: dict[str, str]) -> tuple[list[str], list[str]]:
@@ -885,7 +887,7 @@ def cmd_artist_pages(args) -> int:
     if bad:
         print(f"   ✕ 住所の形が違うので記録しませんでした：{'・'.join(bad)}（各サービスのアーティストのページの住所を貼ってください）")
     left = artist_pages_missing(args.slug)
-    print(f"【結果】{args.slug}：" + ("5 つのアーティストのページがそろいました（デビュー完了）" if not left
+    print(f"【結果】{args.slug}：" + ("デビュー完了に要るアーティストのページ（Spotify・YouTube Music・Apple Music）がそろいました（デビュー完了）" if not left
                                      else f"あと {len(left)} つ（{'・'.join(left)}）でデビュー完了です"))
     return 0 if not bad else 2
 
@@ -1303,7 +1305,7 @@ def main() -> None:
     p.add_argument("--quiet", action="store_true")
     p = sub.add_parser("suno-request", help="Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文を表示")
     p.add_argument("id", nargs="?", help="この曲だけ（省くと Suno で作る番の全曲）")
-    p = sub.add_parser("artist-pages", help="デビューの配信確認：アーティストのページ 5 つを記録する（決定 141）")
+    p = sub.add_parser("artist-pages", help="デビューの配信確認：アーティストのページを記録する（Instagram・Facebook は任意。決定 141・145）")
     p.add_argument("slug")
     for k, _n, _r in ARTIST_PAGES:
         p.add_argument("--" + k.replace("_", "-"), dest=k, default="")
