@@ -790,6 +790,18 @@ def artist_links(slug: str) -> dict:
     return (read_json(ARTIST_LINKS) if ARTIST_LINKS.exists() else {}).get(slug, {})
 
 
+def spotify_artist_id(slug: str) -> str:
+    """その組の Spotify のアーティストの ID（22 文字）。配信を見つけたときの記録 → 設定書の distribution.spotify_uri の順（決定 136）。
+    spotify_uri は「spotify:artist:ID」「https://open.spotify.com/intl-ja/artist/ID」「ID」のどれでもよい"""
+    ident = (artist_links(slug).get("spotify") or {}).get("id") or ""
+    if not ident:
+        a = load_artist(slug, missing_ok=True) or {}
+        raw = str((a.get("distribution") or {}).get("spotify_uri") or "")
+        m = re.search(r"(?:artist[:/])?([A-Za-z0-9]{22})(?:\b|$)", raw)
+        ident = m.group(1) if m else ""
+    return ident
+
+
 def save_artist_link(slug: str, service: str, ident: str, url: str = "") -> None:
     d = read_json(ARTIST_LINKS) if ARTIST_LINKS.exists() else {}
     cur = d.setdefault(slug, {}).get(service) or {}

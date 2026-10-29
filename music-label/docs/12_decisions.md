@@ -1760,3 +1760,14 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - 写真の部品：ブラウザの部品（Playwright）が入った Python に画像の部品（Pillow）が無く、アーティスト写真を入れるときに
   「No module named 'PIL'」で止まっていた（2026-10-25）→ そのときは Pillow のある Python で画像を作る（browser_fill.prepare_photo）
 - ついでに：画面の状態を読む文の書き方の警告（"\/"）を直した
+
+## 136. DECLAN FAY の Spotify のページを記録・Spotify の ID を 1 か所で読む（2026-10-29。オーナーの指示）
+
+- オーナー：DECLAN FAY はすでに Spotify に配信されている（https://open.spotify.com/intl-ja/artist/46BMrETamyXdvRSD1wj07k）
+- 設定書（templates/artists/declan_fay.json）の distribution.spotify_uri に spotify:artist:46BMrETamyXdvRSD1wj07k を記録した
+  （管理表から作り直しても distribution は残る）。これで 2 曲目（Either Side など）の「Spotify のページがわかるまで待つ」が解ける
+- 見つかった抜け：DistroKid の画面で「Artist already in Spotify? → Yes・この URI」を選ぶ処理は、配信の確認の記録（Mac の中の out/）しか
+  読んでおらず、設定書の spotify_uri を見ていなかった（待ちは解けても、画面では「No（新しいページ）」を選ぶおそれ）
+  → publish.spotify_artist_id にまとめ、配信の確認の記録 → 設定書の spotify_uri の順に読む（URI・住所・ID のどの書き方でもよい）。
+  待ちの判定と DistroKid の選択の両方で使う
+- 試験：DECLAN FAY で ID が読め、待ちが解け、DistroKid では「Yes」と URI を入れる選択になる。ID の無い組は今までどおり

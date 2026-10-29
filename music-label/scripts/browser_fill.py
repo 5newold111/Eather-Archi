@@ -1877,7 +1877,7 @@ def artist_id_radios(song: dict) -> tuple[list[tuple[str, str]], list[str]]:
     前の曲のページが見つかっている組は、そのページを選ぶ（Spotify は配信の確認で記録した ID）。わからなければ Gon さんに"""
     try:
         import publish
-        sp = (publish.artist_links(song["slug"]).get("spotify") or {}).get("id")
+        sp = publish.spotify_artist_id(song["slug"])   # 配信の確認の記録か、設定書の spotify_uri（決定 136）
     except Exception:  # noqa: BLE001
         sp = None
     pick, texts = [], []
@@ -2932,9 +2932,7 @@ def same_page_ready(song: dict) -> bool:
         return True
     try:
         import publish
-        from _common import load_artist
-        a = load_artist(song["slug"], song.get("label_slug"), missing_ok=True) or {}
-        return bool((a.get("distribution") or {}).get("spotify_uri") or (publish.artist_links(song["slug"]).get("spotify") or {}).get("id"))
+        return bool(publish.spotify_artist_id(song["slug"]))
     except Exception:  # noqa: BLE001
         return False
 
