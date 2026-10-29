@@ -97,8 +97,15 @@ def song_phases(song: dict, planned: dict[str, tuple[date, date]], release: date
 
 # ---------------------------------------------------------------------------
 def debut_done(slug: str) -> bool:
-    """デビューが終わったか：デビュー曲が配信中、または DistroKid に登録済みで配信日を過ぎた（決定 120。終わった組はデビューのタブに出さない）"""
+    """デビューが終わったか：Spotify にアーティストのページがある（決定 138）・デビュー曲が配信中・DistroKid に登録済みで配信日を過ぎた
+    （決定 120。終わった組はデビューのタブに出さない）"""
     today = date.today()
+    try:   # Spotify にその組のアーティストのページがある（配信の確認で見つけた・Gon さんが記録した）＝デビュー済み（決定 138）
+        import publish
+        if publish.spotify_artist_id(slug):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
     for s in _songs.debut_songs():
         if s["slug"] != slug:
             continue

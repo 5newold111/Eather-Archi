@@ -1785,3 +1785,12 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - DistroKid 側の登録（取り下げ・差し替え）は、仕組みの記録とは別。DistroKid の画面で Gon さんが行う
 - 試験：HOLLOWPLAN のデビュー曲を「登録済み・配信日を過ぎた」にすると欄に出て、「DistroKid の登録を取り消す」で
   「登録の準備ができた」に戻り、デビューのタブにまた並ぶことを確かめた
+
+## 138. HOLLOWPLAN はデビュー済み：Spotify にアーティストのページがある組はデビュー完了とみなす（2026-10-29。オーナーの指示）
+
+- オーナー：HOLLOWPLAN はデビューしていた（https://open.spotify.com/intl-ja/artist/6IQ45KMUBwSq8uhzS2yF33）。前のとおりデビュー完了にしておく
+- 設定書（templates/artists/hollowplan.json）の distribution.spotify_uri に spotify:artist:6IQ45KMUBwSq8uhzS2yF33 を記録。これで 5 組すべての
+  Spotify のページが記録された（決定 136）
+- デビュー完了の判定（_timeline.debut_done）に「Spotify にその組のアーティストのページがある（配信の確認で見つけた・Gon さんが記録した）」を足した。
+  デビュー曲の仕組みの記録が戻した状態（登録の準備ができた など）でも、デビュー完了として、デビューのタブから外れ、定期配信の流れになる
+- 試験：HOLLOWPLAN のデビュー曲の記録が「登録の準備ができた」のままでも、デビュー完了・定期配信の流れになり、デビューのタブから外れることを確かめた
