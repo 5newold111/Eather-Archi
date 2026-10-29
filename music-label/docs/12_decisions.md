@@ -1771,3 +1771,4 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   → publish.spotify_artist_id にまとめ、配信の確認の記録 → 設定書の spotify_uri の順に読む（URI・住所・ID のどの書き方でもよい）。
   待ちの判定と DistroKid の選択の両方で使う
 - 試験：DECLAN FAY で ID が読め、待ちが解け、DistroKid では「Yes」と URI を入れる選択になる。ID の無い組は今までどおり
+- 追記：VERNALIGHT（nao_easterly）の Spotify のページも記録（spotify:artist:1L1em2KI0Q5vtc5b5GpVIE。オーナーの指示）
