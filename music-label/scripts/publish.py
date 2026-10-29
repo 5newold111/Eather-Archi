@@ -810,6 +810,16 @@ ARTIST_PAGES = [("spotify", "Spotify", r"(?:spotify:artist:|open\.spotify\.com/(
                 ("facebook", "Facebook Profile Artist URL", r"(?:facebook\.com|fb\.com)/[^\s]+")]
 
 
+def artist_page_search(name: str) -> dict[str, str]:
+    """各サービスで組の名前を検索するページ（配信確認の入力欄の隣の「検索」。決定 144）"""
+    q = urllib.parse.quote(name.strip(), safe="")
+    return {"spotify": f"https://open.spotify.com/search/{q}/artists",
+            "youtube_music": f"https://music.youtube.com/search?q={q}",
+            "apple_music": f"https://music.apple.com/jp/search?term={q}",
+            "instagram": f"https://www.instagram.com/explore/search/keyword/?q={q}",
+            "facebook": f"https://www.facebook.com/search/pages/?q={q}"}
+
+
 def artist_pages(slug: str) -> dict[str, str]:
     """組のアーティストのページ {spotify, youtube_music, apple_music, instagram, facebook}（無いものは ""）。
     設定書の distribution.artist_pages → Spotify は記録した ID・Apple Music は配信の確認で見つけたページも使う"""

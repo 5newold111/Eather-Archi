@@ -123,10 +123,11 @@ def _explain(row: dict, phase: dict) -> dict:
         return {"cause": f"{row.get('artist', 'この組')} のデビュー曲が配信されたら、5 つのサービスのアーティストのページを記録してください。"
                          "全部そろうとデビュー完了になり、この組は「定期配信」のタブに移ります。"
                          + (f"（あと {len(left)} つ：{'・'.join(left)}）" if left else "（5 つそろっています）"),
-                "steps": ["それぞれのサービスで組の名前を探し、アーティストのページを開いて住所をコピーする",
+                "steps": ["それぞれの欄の隣の「検索 ↗」を押すと、新しいタブでそのサービスの検索が組の名前で開きます。アーティストのページを開いて住所をコピーする",
                           "下の 5 つの欄に貼る（記録済みの欄は入っています。わかったものから少しずつでもよい）",
                           "「アーティストのページを記録する」を押す"],
                 "actions": [{"kind": "artist_pages", "slug": row.get("slug"), "values": pages,
+                             "search": publish.artist_page_search(row.get("artist", "")),
                              "fields": [[k, n] for k, n, _ in publish.ARTIST_PAGES], "label": "アーティストのページを記録する"}]}
     if name == "名前の確認":
         return {"cause": "同じ名前のアーティストがいないか、まだ確かめていません。同じ名前があると、配信したときに別人のページに曲が混ざってしまいます。",

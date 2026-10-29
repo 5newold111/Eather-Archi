@@ -1853,3 +1853,12 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   その先の今日の位置に「● 配信確認（アーティストのページ）」（Gon さんの番）を置く。表でも「いま：配信待ち」から配信確認へ
 - 済んだ工程が、予定の日付のまま未来に描かれないよう、今日より後ろには出さない
 - 試験：5 組（Spotify だけ記録）のガントチャートで、配信待ちの帯が今日まで、配信確認が今日に並ぶことを画面で確かめた
+
+## 144. 配信確認の入力欄の隣に「検索 ↗」ボタン（新しいタブで、そのサービスの検索を組の名前で開く）（2026-10-29。オーナーの指示）
+
+- 配信確認（アーティストのページ）の 5 つの欄（Spotify・YouTube Music・Apple Music・Instagram・Facebook）の隣に、1 つずつ「検索 ↗」を置く
+- 押すと新しいタブで、そのサービスの検索ページが組の名前で開く（publish.artist_page_search）。見つけたアーティストのページの住所をコピーして欄に貼る
+  - Spotify：open.spotify.com/search/<名前>/artists ／ YouTube Music：music.youtube.com/search?q= ／ Apple Music：music.apple.com/jp/search?term= ／
+    Instagram：instagram.com/explore/search/keyword/?q= ／ Facebook：facebook.com/search/pages/?q=（Instagram・Facebook はログインした状態で使う）
+- ダッシュボードの画面は離れず、ボタンはリンクとして開くだけ（記録は今までどおり「アーティストのページを記録する」で）
+- 試験：SOFT CANTILEVER の配信確認で、5 つの欄の隣に検索が並び、それぞれ正しい住所・新しいタブで開くことを画面で確かめた
