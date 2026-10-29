@@ -334,7 +334,12 @@
   },
   "distribution": {
     "bio_en": "DECLAN FAY is Declan Twomey, a Cork-born baritone who has spent ten years working nights in Toronto — first driving a newspaper delivery van at 2 a.m., now running the overnight desk at a small community radio station. His father drove a taxi through Cork's late hours and taped the radio as he went; he died when Declan was nine, and nineteen years later those 43 cassettes crossed the Atlantic in a shoebox. Their hiss is still in every mix. The name came to him twice: once from his father's voice on an old home video, and again from the night-shift listeners who started calling him their Fay. His songs are slow, warm synthwave for the stretch between last call and first light: analog pads, a gated snare, a voice that sounds like it's riding in the passenger seat, and always a time on the clock. Put it on when you're driving home and everyone else is asleep.",
-    "spotify_uri": "spotify:artist:46BMrETamyXdvRSD1wj07k"
+    "spotify_uri": "spotify:artist:46BMrETamyXdvRSD1wj07k",
+    "artist_pages": {
+      "spotify": "https://open.spotify.com/artist/46BMrETamyXdvRSD1wj07k",
+      "youtube_music": "https://music.youtube.com/channel/UC6Jh9U0ripxN93H2uF5ZvKw",
+      "apple_music": "https://music.apple.com/jp/artist/declan-fay/6825649319"
+    }
   },
   "collab": {
     "preferred_partners": [
