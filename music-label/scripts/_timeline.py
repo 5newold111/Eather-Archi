@@ -154,9 +154,19 @@ def debut_rows() -> list[dict]:
         last = _ph("配信確認（アーティストのページ）", sp_day, sp_day, "wait" if (live or published) else "plan", "あなた",
                    f"デビュー曲が配信されたら、アーティストのページ 5 つを記録する（あと {len(left)} つ：{'・'.join(left)}。全部そろうとデビュー完了）")
         b = _status.blocker(list(steps.values()))
-        if published:   # もう配信されている組：前の工程は全部済みとして、配信確認だけを Gon さんの番にする（配信待ちの状態。決定 142）
+        if published:   # もう配信されている組：前の工程は全部済み、「配信待ち」を今日まで続く進行中の帯にし、
+            # その先の配信確認を Gon さんの番にする（デビューのタブとガントチャートに配信待ちで並ぶ。決定 142・143）
             for ph in phases:
                 ph["state"], ph["who"] = "done", ""
+                if _d(ph["start"]) > today:   # 済んだ工程は今日より後ろに出さない（予定の日付のままだと未来に描かれる）
+                    ph["start"] = today.isoformat()
+                if _d(ph["end"]) > today:
+                    ph["end"] = today.isoformat()
+                if ph["name"] == "配信待ち":   # 今日まで続く帯
+                    ph["state"], ph["end"] = "run", today.isoformat()
+                    ph["start"] = min(_d(ph["start"]), today - timedelta(days=3)).isoformat()
+                    ph["detail"] = "配信されています。アーティストのページ 5 つがそろうまで、配信待ち（配信確認中）のままにします"
+            last["start"] = last["end"] = today.isoformat()
             b = {"state": "wait", "who": "あなた", "detail": last["detail"], "name": last["name"]}
         phases.append(last)
         rows.append({"slug": slug, "artist": a.get("name", slug), "label": _label(a), "title": song["title"], "id": song["id"],
