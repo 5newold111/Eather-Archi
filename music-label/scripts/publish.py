@@ -819,7 +819,7 @@ def artist_page_search(name: str) -> dict[str, str]:
             "youtube_music": f"https://music.youtube.com/search?q={q}",
             "apple_music": f"https://music.apple.com/jp/search?term={q}",
             "instagram": f"https://www.instagram.com/explore/search/keyword/?q={q}",
-            "facebook": f"https://www.facebook.com/search/pages/?q={q}"}
+            "facebook": f"https://www.facebook.com/search/top/?q={q}"}   # ページ専用の検索は開けないことがあるので全体の検索（決定 147）
 
 
 def artist_pages(slug: str) -> dict[str, str]:
