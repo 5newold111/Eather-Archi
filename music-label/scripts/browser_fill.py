@@ -1569,12 +1569,57 @@ def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
     return 2
 
 
+def _upload_copy(song: dict, src: Path, name: str) -> Path:
+    """公開セットに無いときに DistroKid へ入れる写し（out/distrokid_upload/<曲>/<名前>。同じ中身なら写し直さない。決定 129）"""
+    import filecmp
+    import shutil
+    dst = OUT / "distrokid_upload" / song["key"] / name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if not (dst.exists() and filecmp.cmp(src, dst, shallow=False)):
+        try:
+            dst.unlink(missing_ok=True)
+            os.link(src, dst)   # 同じ実体を指す（容量を使わない）。できないときは写す
+        except OSError:
+            shutil.copy2(src, dst)
+    return dst
+
+
+def upload_files(song: dict) -> tuple[Path | None, Path | None, str]:
+    """DistroKid に入れる音源とジャケット（決定 129）。(音源, ジャケット, 説明)。
+    ① 公開セット（ローカル保存・SSD）のもの → ② 無ければ公開セットを作り直す → ③ それでも無ければ元のファイル
+    （音量を整えた音源 master.wav・仕上がったジャケット cover_final.jpg）を、公開セットと同じ名前で写して使う。
+    前は公開セットに無いと空のまま進み、音源とジャケットが入らなかった（ジャケットや曲名を変えたあと、公開セットが古いままのとき）"""
+    import publish
+
+    def now():
+        f = publish.draft_fields(song)
+        a = Path(f["音源ファイル"])
+        c = Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None
+        return (a if a.exists() else None), (c if c and c.exists() else None)
+    audio, cover = now()
+    how = "公開セットから"
+    if audio is None or cover is None:
+        try:   # 公開セットを最新にする（ジャケット・曲名を変えたあとなど）
+            publish.store_set(song)
+        except Exception:  # noqa: BLE001
+            pass
+        audio, cover = now()
+        how = "公開セットを作り直して"
+    _folder, audio_name, cover_name = publish.publish_folder(song)
+    if audio is None and (OUT / "masters" / song["key"] / "master.wav").exists():
+        audio, how = _upload_copy(song, OUT / "masters" / song["key"] / "master.wav", audio_name), "元のファイルから"
+    src_cover = _songs.cover_source(song)
+    if cover is None and src_cover is not None:
+        cover, how = _upload_copy(song, src_cover, cover_name or f"{_songs.cover_stem(song)}.jpg"), "元のファイルから"
+    return audio, cover, how
+
+
 def distrokid_fields(song: dict) -> list[dict]:
     import publish
     f = publish.draft_fields(song)
-    folder, audio, cover = publish.publish_folder(song)
-    audio_path = Path(f["音源ファイル"])
-    cover_path = Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None
+    a_up, c_up, _how = upload_files(song)   # 音源とジャケットは、無ければ公開セットを作り直す・元のファイルを使う（決定 129）
+    audio_path = a_up or Path(f["音源ファイル"])
+    cover_path = c_up or (Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None)
     rel = date.today().isoformat() if "いちばん早い" in f["Release date"] else f["Release date"]
     owner = os.environ.get("OWNER_LEGAL_NAME", "")
     # Songwriter の本名は名・ミドル・姓の 3 つの欄（ローマ字。例 OWNER_LEGAL_NAME=Taro Yamada）。本名は .env にだけ置く
