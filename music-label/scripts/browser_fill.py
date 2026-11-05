@@ -1774,23 +1774,6 @@ ARTIST_ID_RADIOS = [("spotifyArtistID", "Spotify"), ("appleArtistID", "Apple Mus
                     ("instagramProfileArtistID", "Instagram"), ("facebookProfileArtistID", "Facebook")]
 
 
-def distrokid_radios(song: dict) -> list[tuple[str, str]]:   # 今は dk_sections が使う。下書きの説明用に残す
-    """[(何を選ぶか, CSS)]"""
-    inst = "1" if song.get("instrumental") else "0"
-    return [
-        ("前に出したことがある？ → No", 'input[type=radio][name^="previouslyReleased_"][value="0"]'),
-        ("曲名に featured artist を出す？ → No", 'input[type=radio][name^="feat_"][value="0"]'),
-        ("バージョン → ふつうの版", 'input[type=radio][name^="version_"][value=""]'),
-        ("Dolby Atmos → No", 'input[type=radio][name="dolby_1"][value="0"]'),
-        ("自分で書いた曲（カバーではない）", 'input[type=radio][name^="coversong_"][value="0"]'),
-        ("Explicit（不適切な言葉）→ No", 'input[type=radio][name^="explicit_"][value="0"]'),
-        ("Clean 版の別にある？ → No（もともと Clean）", 'input[type=radio][name^="cleaned_"][value="0"]'),
-        ("インスト？ → " + ("歌詞なし" if inst == "1" else "歌詞あり"), f'input[type=radio][name^="instrumental_"][value="{inst}"]'),
-        ("AI を使った？ → Yes（正直に申告）", 'input[type=radio][name^="ai_gate_"][value="1"]'),
-        ("試聴の始まり → サービスにまかせる", 'input[type=radio][name="previewStart_1"][value="no"]'),
-    ]
-
-
 def ai_parts(song: dict) -> list[str]:
     """DistroKid の「Which parts of this song were AI-generated?」で選ぶもの（決定 61。オーナーの指示）。
     この仕組みの曲は、歌詞（Claude と Suno）・作曲・音（声と演奏）をすべて AI で作るので：
@@ -2619,18 +2602,6 @@ def guard_genres(sess: Session, fields: list[dict]) -> None:
             pass
 
 
-def guard_artist_no(sess: Session, song: dict, a_done: list[str]) -> None:
-    """「No」を選んだ Artist already in を、ページの中の見張りで守る（デビュー曲と、DistroKid が 0 件と出した組だけ）"""
-    names = [n for n, svc in ARTIST_ID_RADIOS if any(f"in {svc}?" in d and "→ No" in d for d in a_done)]
-    if song.get("kind") == "debut":
-        names = [n for n, _ in ARTIST_ID_RADIOS]
-    if names:
-        try:
-            sess.page.evaluate(GUARD_NO_JS, [names, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER]])
-        except Exception:  # noqa: BLE001
-            pass
-
-
 # ---------------------------------------------------------------------------
 # DistroKid の登録画面を「上から順に 1 項目ずつ」入れて確かめる（決定 68）
 # 本物の画面の並び（2026-10-22 の画面の部品の一覧から）。前は同じ項目を何か所もの処理で入れ直していたのを、ここ 1 か所にまとめた。
@@ -2675,7 +2646,7 @@ def _field(*keys: str):
 def _debuted(song: dict) -> bool:
     """その組は DistroKid・Spotify にもういるか（Spotify のアーティストのページを記録した組）。いれば DistroKid の
     アーティスト名はドロップダウンから選び、Artist already in は Yes（すでにあるページ）にする（決定 140）。
-    デビュー完了（ページ 5 つ。決定 141）とは分ける：Spotify だけ記録した組も、DistroKid ではもう「いる」"""
+    Spotify のページを記録した組は、DistroKid ではもう「いる」（決定 140・146）"""
     try:
         import publish
         return bool(publish.spotify_artist_id(song["slug"]))
