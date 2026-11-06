@@ -1913,3 +1913,11 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
     待っている間にも 1 回だけ小窓で知らせる（Continue を押さず、選び直してもらう）
 - Instagram・Facebook の Artist already in が No のままだった件：DistroKid が同じ名前のプロフィールを 0 件と出した欄（ZeroMatches）。
   見張りが止まっていたため、決定 140 の Yes（ほかのリリースとまとめる）に入れ直せなかったとみられる。見張りが動くようになったので、次の登録で確かめる
+
+## 150. デビュー済みの組でも、Instagram・Facebook の Artist already in は No にする（2026-11-06。オーナーの指示）
+
+- 理由：Instagram・Facebook の組のページ（プロフィール）はまだ作っていない（決定 147：まず Postdog Records でまとめて発信）
+- DistroKid の Artist already in：Spotify・Apple Music・YouTube Music は今までどおり Yes（決定 140）。Instagram・Facebook は
+  「No - <組> doesn't yet have a profile on …」を選び、確認の小窓に OK。DistroKid が作り直しても No を選び直す見張りを付ける
+- 組のページを作り、ダッシュボード（定期配信のタブの通知の小窓）に Instagram・Facebook の住所を記録したら、その組からは Yes にする
+- 一覧の ✓ も合わせた：No にするサービスは No なら ✓、Yes にするサービスは Yes なら ✓（browser_fill.meta_no）

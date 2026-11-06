@@ -2827,11 +2827,45 @@ EXISTING_PAGE_JS = r"""(name) => {
 }"""
 
 
+# Instagram・Facebook：組のページを作っていない（記録していない）なら No のまま出す（オーナーの指示 2026-11-06。決定 150）
+META_RADIOS = {"instagramProfileArtistID": "instagram", "facebookProfileArtistID": "facebook"}
+
+
+def meta_no(song: dict) -> list[str]:
+    """デビュー済みの組で、No にする Instagram・Facebook の丸の名前（ページの住所を記録していないもの。決定 150）"""
+    try:
+        import publish
+        pages = publish.artist_pages(song["slug"])
+    except Exception:  # noqa: BLE001
+        pages = {}
+    return [n for n, k in META_RADIOS.items() if not pages.get(k)]
+
+
 def _sec_ids_yes(c: DK) -> None:
-    """デビュー済みの組：Artist already in 〜? はどのサービスも Yes（すでにあるページ）。Spotify は記録した ID を入れ、
-    ほかのサービスは DistroKid が出す、前の曲のページを選ぶ（決定 140）"""
+    """デビュー済みの組：Artist already in 〜? は Spotify・Apple Music・YouTube Music が Yes（すでにあるページ）。Spotify は記録した ID を入れ、
+    ほかのサービスは DistroKid が出す、前の曲のページを選ぶ（決定 140）。Instagram・Facebook はページを記録していなければ No（決定 150）"""
     _items, texts = artist_id_radios(c.song)
+    no = meta_no(c.song)
+    for name in no:   # No（まだプロフィールが無い）を選び、確認の小窓（新しいページの話）に OK
+        css = f'input[type=radio][name="{name}"][value="new"]'
+        loc = c.sess.page.locator(css)
+        if not loc.count() or _visible_first(loc).is_checked():
+            continue
+        set_radios(c.sess, [("", css)])
+        confirm_new_page(c.sess, picked=True)
+        c.sess.page.wait_for_timeout(500)
+        if not _visible_first(loc).is_checked():
+            _click_no_text(c.sess, css)
+            confirm_new_page(c.sess, picked=True)
+        print(f"   … Artist already in {dict(ARTIST_ID_RADIOS)[name]}? → No（ページを作っていない）")
+    if no:   # DistroKid の検索が遅れて作り直しても、No を選び直す見張り
+        try:
+            c.sess.page.evaluate(GUARD_NO_JS, [no, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER]])
+        except Exception:  # noqa: BLE001
+            pass
     for name, svc in ARTIST_ID_RADIOS:
+        if name in no:
+            continue
         try:
             r = c.sess.page.evaluate(EXISTING_PAGE_JS, name)
         except Exception:  # noqa: BLE001
@@ -2888,11 +2922,13 @@ def _sec_ids_do(c: DK) -> None:
 
 
 def _sec_ids_ok(c: DK):
-    if _debuted(c.song):   # デビュー済み：出ているサービスが全部 Yes（new 以外）になっているか（決定 140）
+    if _debuted(c.song):   # デビュー済み：Yes にするサービスは Yes（new 以外）、No にする Instagram・Facebook は No か（決定 140・150）
+        no = meta_no(c.song)
         try:
-            st = c.sess.page.evaluate("""(names) => names.map(n => { const rs = [...document.querySelectorAll(`input[type=radio][name="${n}"]`)];
-                if (!rs.length) return null; const cur = rs.find(r => r.checked); return !!cur && cur.value !== 'new'; })""",
-                                      [n for n, _ in ARTIST_ID_RADIOS])
+            st = c.sess.page.evaluate("""([names, no]) => names.map(n => { const rs = [...document.querySelectorAll(`input[type=radio][name="${n}"]`)];
+                if (!rs.length) return null; const cur = rs.find(r => r.checked);
+                return no.includes(n) ? (!!cur && cur.value === 'new') : (!!cur && cur.value !== 'new'); })""",
+                                      [[n for n, _ in ARTIST_ID_RADIOS], no])
         except Exception:  # noqa: BLE001
             return None
         got = [x for x in st if x is not None]

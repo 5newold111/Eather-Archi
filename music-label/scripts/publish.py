@@ -492,7 +492,8 @@ def draft_fields(song: dict) -> dict:
             "すべて No（デビュー曲：新しいアーティストのページを作る。同じ名前の別人のページに混ざらないように）"
             if not ((a.get("distribution") or {}).get("spotify_uri") or artist_links(song["slug"]).get("spotify")) else
             f"Spotify：Yes（Artist ID {(a.get('distribution') or {}).get('spotify_uri') or artist_links(song['slug'])['spotify']['id']}）。"
-            "ほかの配信先（Apple Music・YouTube Music など）も、デビュー曲で作られたページがあれば Yes とその URL・ID、無ければ No"),
+            "Apple Music・YouTube Music：Yes（DistroKid が出す前の曲のページ）。"
+            "Instagram・Facebook：組のページを作っていなければ No（作ってダッシュボードに記録したら Yes。決定 150）"),
         "Track credits（Apple の決まり）": (f"Performer：本名（インストの組。役割 Performer）" if song.get("instrumental") or (a.get("lyrics") or {}).get("mode") == "instrumental"
                                        else f"Performer：{song['artist']}（役割 {_credit_role(a)}）") + "／Producer：本名（.env の OWNER_LEGAL_NAME。全組共通・役割 Producer）。Apple Music で公開される",
         "Important checkboxes（必須の宣誓）": "Gon さんが文を読んで、本当に当てはまるものを自分でチェックする（システムは押さない）。権利（Suno の Pro で作った曲か）・サンプル不使用・カバーでない・実在の名前を使っていない など。当てはまらない文があれば登録しない",
