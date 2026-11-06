@@ -159,6 +159,8 @@ def new_files() -> list[Path]:
     """見張るフォルダの中の、まだ取り込んでいない音源（ローカル保存の中・ダウンロード途中のものは除く）"""
     seen = read_json(REGISTRY) if REGISTRY.exists() else {}
     # 取り込んだファイルが、ローカル保存の曲のフォルダから SSD の曲のフォルダへ写ったもの（名前・大きさ・時刻が同じ）は取り込み直さない（決定 151）
+    # 見分けられなかったファイル（"why" の記録）は、次の取り込みでまた試す（前は一度「？」になると二度と見なかった。決定 152）
+    seen = {k: v for k, v in seen.items() if not (isinstance(v, dict) and v.get("song") is None and "why" in v)}
     known = {(Path(k.split("|")[0]).name, *k.split("|")[1:3]) for k in seen if k.count("|") == 2}
     skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み"), _songs.norm(archive.SONG_SET_DIR)}   # 配信用/ は取り込まない（決定 151）
     out = []
@@ -181,6 +183,30 @@ def new_files() -> list[Path]:
                 continue
             if _sig(f) not in seen and (f.name, str(st.st_size), str(int(st.st_mtime))) not in known:
                 out.append(f)
+    out += downloads_top(seen, known, out)
+    return out
+
+
+def downloads_top(seen: dict, known: set, already: list[Path]) -> list[Path]:
+    """ダウンロード（~/Downloads）の一番上に、ふだんのブラウザで保存した曲（7 日以内）。作曲待ちの曲と名前が合うものだけ（決定 152）。
+    取り込むと、その曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/）へ移る"""
+    if os.environ.get("SUNO_INBOX", "").strip():
+        return []
+    d = Path.home() / "Downloads"
+    try:
+        files = [f for f in d.iterdir() if f.is_file() and f.suffix.lower() in AUDIO and not f.name.startswith((".", "~"))]
+    except OSError:
+        return []
+    songs = [x for x in _songs.all_songs() if x.get("title") and _songs.state(x).get("status") not in DONE]
+    out = []
+    for f in files:
+        st = f.stat()
+        if f in already or time.time() - st.st_mtime < 15 or time.time() - st.st_mtime > 7 * 86400:
+            continue
+        if _sig(f) in seen or (f.name, str(st.st_size), str(int(st.st_mtime))) in known:
+            continue
+        if match(f, songs)[0] is not None:
+            out.append(f)
     return out
 
 
@@ -225,8 +251,27 @@ def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
             best, best_score, ties = s, score, []
         elif score == best_score:
             ties.append(s)
-    if best is None:
-        return None, "曲名が見つかりません（ファイル名を Suno の曲名のままにするか、曲名を含めてください）"
+    if best is None:   # 名前が少し違う（打ち間違い・記号・空白）：いちばん近い曲が、ほかよりはっきり近いときだけ（決定 152）
+        import difflib
+        squash = lambda t: re.sub(r"[\W_]+", "", t)  # noqa: E731
+        nm = squash(name)
+        scored = []
+        for s in songs:
+            r = max([difflib.SequenceMatcher(None, nm, squash(_songs.norm(t))).ratio() for t in [s["title"], *s["alts"]] if t] or [0])
+            for t in [s["title"], *s["alts"]]:   # ファイル名に曲名＋ほかの言葉（アーティスト名・日付など）が付いているとき
+                nt = squash(_songs.norm(t or ""))
+                if nt and len(nt) >= 4:
+                    r = max(r, max((difflib.SequenceMatcher(None, nm[i:i + len(nt)], nt).ratio() for i in range(0, max(1, len(nm) - len(nt) + 1))), default=0))
+            na = squash(_songs.norm(s["artist"]))
+            if na and (na in nm or na in squash(folders)):
+                r += 0.05
+            scored.append((r, s))
+        scored.sort(key=lambda x: -x[0])
+        if scored and scored[0][0] >= 0.8 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.1):
+            return scored[0][1], f"名前が少し違いますが、いちばん近い曲として見分けました（{scored[0][1]['title']}）"
+        near = "・".join(f"{x['artist']}「{x['title']}」" for r, x in scored[:3] if r >= 0.5)
+        return None, ("曲名が見つかりません（ファイル名を Suno の曲名のままにするか、曲名を含めてください）"
+                      + (f"。近い曲：{near}" if near else ""))
     if ties:
         names = "・".join(f"{x['artist']}「{x['title']}」" for x in [best, *ties])
         return None, f"どの曲か決められません（{names}）。アーティスト名のフォルダに入れるか、ファイル名にアーティスト名を足してください"
@@ -618,6 +663,8 @@ def cmd_scan(args) -> int:
             print(f"   ？ {f.name}：{why}")
             reg[_sig(f)] = {"song": None, "why": why, "at": datetime.now().isoformat(timespec="seconds")}
             continue
+        if why:   # 名前が少し違ったが、近い曲として見分けた（決定 152）
+            print(f"   ○ {f.name}：{why}")
         cur = picked.get(song["key"])
         if cur is None or f.stat().st_mtime > cur[1].stat().st_mtime:   # 同じ曲が 2 本あれば新しい方
             picked[song["key"]] = (song, f)
@@ -650,8 +697,12 @@ def cmd_scan(args) -> int:
         print(f"▶ {song['artist']}「{song['title']}」は DistroKid に登録できます（python3 scripts/publish.py draft {song['id']}）")
     if picked or ready:
         _book()
-    if not files and not args.quiet:
-        print(f"－ 新しい曲はありませんでした（見ているところ：{'、'.join(str(b) for b in inboxes())}）")
+    if not picked and not args.quiet:
+        if not files:
+            print(f"－ 新しい曲はありませんでした（見ているところ：{'、'.join(str(b) for b in inboxes())}、ダウンロードの一番上）")
+        wait = [s for s in songs if not _songs.state(s).get("status")]
+        if wait:   # どの曲の取り込みを待っているか（ファイル名と見比べられるように。決定 152）
+            print("   取り込みを待っている曲（ファイル名にこの曲名が入っていれば取り込めます）：" + "／".join(f"{s['artist']}「{s['title']}」" for s in wait[:12]))
     return 0
 
 
