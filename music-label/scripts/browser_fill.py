@@ -1301,7 +1301,7 @@ PARTS_JS = r"""() => {
   const frames = [...document.querySelectorAll('iframe')].map(f => { const r = f.getBoundingClientRect(); return `${cut(f.src || '（中身だけ）', 60)}（${Math.round(r.width)}×${Math.round(r.height)}）`; });
   const dlg = [...document.querySelectorAll('[role=dialog],[aria-modal=true],.swal2-popup,[class*=modal i]')].filter(vis).map(d => cut(d.innerText, 60));
   const head = `画面：${location.href}　題：${cut(document.title, 60)}\n`
-    + `登録画面の欄（アーティスト名 bandname）：${document.querySelector('input[name=bandname]') ? 'あり' : 'なし'}　入力欄：全部 ${all.length}・見えている ${shown.length}\n`
+    + `登録画面の欄（アーティスト名 bandname）：${(b => b ? (b.tagName === 'SELECT' ? 'あり（ドロップダウン）' : 'あり') : 'なし')(document.querySelector('[name=bandname]'))}　入力欄：全部 ${all.length}・見えている ${shown.length}\n`
     + `見出し：${heads.join(' ／ ') || '（なし）'}\n`
     + (dlg.length ? `開いている小窓：${dlg.join(' ／ ')}\n` : '')
     + (frames.length ? `埋め込みの枠（iframe）：${frames.join(' ／ ')}\n` : '')
@@ -1346,7 +1346,7 @@ def wait_for_form(sess: Session, name: str, how: str) -> bool:
     return True
 
 
-DK_FORM = ("input[name=bandname], input.uploadFileTitle, input.trackupload_1, input[name=artwork], select[name=genre1], "
+DK_FORM = ("[name=bandname], input.uploadFileTitle, input.trackupload_1, input[name=artwork], select[name=genre1], "
            "input[name=releaseDate]")
 DK_STATE_JS = """() => {
   const vis = e => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
@@ -2209,7 +2209,7 @@ APPLE_ROWS_JS = r"""() => {
   let scope = block;
   for (let i = 0; i < 6 && scope.parentElement; i++) {
     const up = scope.parentElement;
-    if (up.querySelector('select[name=genre1], select[name=language], input[name=bandname]')) break;
+    if (up.querySelector('select[name=genre1], select[name=language], [name=bandname]')) break;
     scope = up;
     if ([...scope.querySelectorAll(ROLE)].some(vis)) break;
   }
@@ -2643,6 +2643,42 @@ def _field(*keys: str):
     return do, ok
 
 
+FILE_NAMES_JS = "(css) => { const e = [...document.querySelectorAll(css)].find(x => x.files && x.files.length); return e ? [...e.files].map(x => x.name).join(',') : ''; }"
+
+
+def _loose(t: str) -> str:
+    return re.sub(r"[\W_]+", "", str(t or "").lower())
+
+
+def wrong_file(c: DK, key: str) -> str:
+    """音源・ジャケットの欄に、この曲の名前が付いていないファイルが入っていれば、そのファイル名（決定 149）。
+    2026-11-06：HOLLOWPLAN の曲の登録に、DECLAN FAY の別の曲の音源が入っていた"""
+    f = c.f.get(key)
+    if not f or not f.get("css"):
+        return ""
+    try:
+        got = c.sess.page.evaluate(FILE_NAMES_JS, f["css"])
+    except Exception:  # noqa: BLE001
+        return ""
+    if not got or (f.get("value") and Path(str(f["value"])).name in got):
+        return ""
+    return got if _loose(c.song.get("title")) and _loose(c.song.get("title")) not in _loose(got) else ""
+
+
+def _file_field(key: str, what: str):
+    """音源・ジャケット：入っているかに加えて、別の曲のファイルが入っていないか（決定 149）"""
+    do, ok0 = _field(key)
+
+    def ok(c: DK):
+        r = ok0(c)
+        if r is False:
+            w = wrong_file(c, key)
+            if w:
+                c.notes[key] = f"別の曲の{what}が入っています（{w[:70]}）。「{c.song.get('title')}」の{what}を選び直してください"
+        return r
+    return do, ok
+
+
 def _debuted(song: dict) -> bool:
     """その組は DistroKid・Spotify にもういるか（Spotify のアーティストのページを記録した組）。いれば DistroKid の
     アーティスト名はドロップダウンから選び、Artist already in は Yes（すでにあるページ）にする（決定 140）。
@@ -2970,11 +3006,11 @@ def dk_sections(song: dict) -> list[dict]:
         S_("language", "言語", _field("language")),
         {"key": "genre1", "name": "Primary genre", "do": _sec_genre1_do, "ok": _genre_ok("genre1", r"^(primary genre|genre)\b"), "again": True},
         {"key": "genre2", "name": "Secondary genre", "do": _sec_genre2_do, "ok": _genre_ok("genre2", r"^secondary genre"), "again": True},
-        S_("cover", "ジャケット", _field("cover"), again=False),
+        S_("cover", "ジャケット", _file_field("cover", "ジャケット"), again=False),
         S_("title", "曲名", _field("title")),
         S_("feat", "曲名に featured artist を出す？ → No", _radio('input[type=radio][name^="feat_"][value="0"]')),
         S_("version", "バージョン → ふつうの版", _radio('input[type=radio][name^="version_"][value=""]')),
-        S_("audio", "音源", _field("audio"), again=False),
+        S_("audio", "音源", _file_field("audio", "音源"), again=False),
         S_("dolby", "Dolby Atmos → No", _radio('input[type=radio][name="dolby_1"][value="0"]')),
         S_("coversong", "カバー曲？ → No（自分で書いた曲）", _radio('input[type=radio][name^="coversong_"][value="0"]')),
         S_("songwriter", "Songwriter（役割・名・姓）", _field("songwriter_role", "songwriter_first", "songwriter_middle", "songwriter_last")),
@@ -3343,13 +3379,13 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     sess.show("DistroKid に入れました（画面の上から順）" if not bad else "DistroKid に入れました（入っていない項目があります）",
               [f"{song['artist']}「{song['title']}」", *dk_checklist(secs, st, c), *gon], buttons, date_value=date.today().isoformat())
 
-    last = {"release": c.f.get("release", {}).get("value") or date.today().isoformat(), "n": 0}
+    last = {"release": c.f.get("release", {}).get("value") or date.today().isoformat(), "n": 0, "warned": set()}
 
     def watch_errors():   # 待っている間：差し戻し・戻された項目・登録が済んだか を見張る
         last["n"] += 1
         try:   # 登録が済んだか：Continue を押したあと、登録の画面から別の画面に変わり、差し戻しが無い（決定 68）
             pushed = sess.page.evaluate("() => { try { return Number(sessionStorage.getItem('pdContinue') || 0); } catch (x) { return 0; } }")
-            on_form = bool(sess.page.locator("input[name=bandname]").count())
+            on_form = bool(sess.page.locator("[name=bandname], input.uploadFileTitle, select[name=genre1]").count())   # 決定 149
             if not on_form:
                 if pushed and (time.time() * 1000 - pushed) < 30 * 60 * 1000 and not sess.js(VALIDATION_JS, default=""):
                     sess.msg = {"action": "registered", "date": last["release"], "auto": True}
@@ -3363,6 +3399,16 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
         if not txt:
             confirm_new_page(sess)   # 見張りが選び直したときの確認の小窓
             answer_ai_parts(sess, song)   # Gon さんが「Edit selections」を押したときなどに出る、AI で作った部分の質問
+            if last["n"] % 3 == 0:   # 別の曲の音源・ジャケットが入っていたら、1 回だけ知らせる（決定 149）
+                for key, what in (("audio", "音源"), ("cover", "ジャケット")):
+                    w = wrong_file(c, key)
+                    if w and w not in last["warned"]:
+                        last["warned"].add(w)
+                        print(f"   ⚠ 別の曲の{what}が入っています：{w}")
+                        sess.show(f"⚠ 別の曲の{what}が入っています",
+                                  [f"{song['artist']}「{song['title']}」の登録に、別の{what}が選ばれています：", w,
+                                   f"このまま Continue を押さず、{what}の欄で「{song['title']}」の{what}を選び直してください。",
+                                   *dk_checklist(secs, dk_check(c, secs), c), *gon], buttons, date_value=date.today().isoformat())
             if last["n"] % 3 == 0:   # 約 6 秒ごとに、上から読み返して、戻された項目を黙って入れ直す
                 before = dk_check(c, secs)
                 if any(v is False for k, v in before.items() if next(x for x in secs if x["key"] == k)["again"]):
