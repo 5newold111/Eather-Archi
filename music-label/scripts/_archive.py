@@ -23,9 +23,11 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
         02_写真/      <アーティスト名>_photo.jpg・_photo2.jpg
         03_ジャケット/ <アーティスト名>_<曲名>_1.jpg（作り直すと _2・_3 …）
         04_楽曲/<曲名>/ 公開セット：配信用の音源・ジャケット・DistroKid の下書き・選んだテイク・歌詞
+        楽曲情報/<曲名>/ Suno でいいねしてダウンロードした曲（取り込むとここへ移す）＋ 配信用/（DistroKid に入れる音源・ジャケット・下書き）。
+                        フォルダが無ければ作る（オーナーの指定 2026-11-06。決定 151）
     03_作業書/      デビュー_<日付>/ 作業書（PDF）・曲の情報・画像の依頼文
     09_移行前/      Google から移したもの（オーナーが入れる。機械は触らない）
-    楽曲情報/       Suno からダウンロードした曲（Suno のアプリの保存先。publish.py が見張って取り込む）
+    楽曲情報/       Suno からダウンロードした曲の受け口（Suno・専用の Chrome の保存先。取り込むと 02_アーティスト/<名前>/楽曲情報/<曲名>/ へ移す）
   前の並び（アーティスト情報・管理表・写真 など）で保管したものは、見つけしだい新しい名前へ移す。
 
 フォルダ名は、大文字・小文字、全角・半角、Mac の濁点の持ち方（NFD／NFC）の違いを同じ名前として扱う。
@@ -48,7 +50,8 @@ ARTIST_DIR = "02_アーティスト"
 KIT_DIR = "03_作業書"
 OLD_DIR = "09_移行前"
 INBOX_DIR = "楽曲情報"   # Suno からダウンロードした曲を入れるところ（publish.py が見張る。オーナーの指定 2026-10-21）
-SUBS = {"info": "01_情報", "photo": "02_写真", "cover": "03_ジャケット", "music": "04_楽曲"}
+SUBS = {"info": "01_情報", "photo": "02_写真", "cover": "03_ジャケット", "music": "04_楽曲", "inbox": INBOX_DIR}
+SONG_SET_DIR = "配信用"   # 楽曲情報/<曲名>/配信用/：DistroKid に入れる音源・ジャケット・下書き（決定 151）
 # 前の並びの名前 → 新しい名前
 _RENAME_TOP = {"管理表": BOOK_DIR, "アーティスト情報": ARTIST_DIR}
 _RENAME_SUB = {"情報": SUBS["info"], "写真": SUBS["photo"], "ジャケット": SUBS["cover"], "楽曲": SUBS["music"]}
@@ -191,6 +194,41 @@ def artist_folder(artist_name: str, kind: str | None = None, week: str | None = 
     if base is None:
         return None, how
     return _artist_path(child(base, ARTIST_DIR), artist_name, kind, week), how
+
+
+def song_folder(artist_name: str, title: str) -> Path:
+    """その曲のフォルダ：SSD の 02_アーティスト/<アーティスト名>/楽曲情報/<曲名>/（無ければ作る）。
+    SSD がつながっていなければ、ローカル保存の <アーティスト名>/楽曲情報/<曲名>/（次に SSD をつないだとき同じ並びで写る）（決定 151）"""
+    sf, _ = artist_folder(artist_name, "inbox", title)
+    return sf if sf is not None else local_folder(artist_name, "inbox", title)
+
+
+def song_folders(artist_name: str, title: str) -> list[Path]:
+    """その曲のフォルダのうち、いまあるもの（SSD → ローカル保存の順。作らない）"""
+    out = []
+    base, _ = root()
+    for top in ([find_child(base, ARTIST_DIR)] if base is not None else []) + [local_root()]:
+        a = find_child(top, artist_name) if top is not None and top.is_dir() else None
+        i = find_child(a, INBOX_DIR) if a is not None else None
+        s = find_child(i, title) if i is not None else None
+        if s is not None:
+            out.append(s)
+    return out
+
+
+def artist_inboxes() -> list[Path]:
+    """組ごとの「楽曲情報」のフォルダ（SSD の 02_アーティスト/*/楽曲情報 と ローカル保存の */楽曲情報。あるものだけ）"""
+    out = []
+    base, _ = root()
+    tops = ([find_child(base, ARTIST_DIR)] if base is not None else []) + [local_root()]
+    for top in tops:
+        if top is None or not top.is_dir():
+            continue
+        for a in sorted(d for d in top.iterdir() if d.is_dir()):
+            i = find_child(a, INBOX_DIR)
+            if i is not None:
+                out.append(i)
+    return out
 
 
 def store(src: Path, artist_name: str, kind: str, fname: str | None = None, sub: str | None = None,

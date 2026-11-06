@@ -82,7 +82,7 @@ def steps(song: dict) -> list[dict]:
                     "html": f'<audio controls preload="none" src="{furl(take)}"></audio>'})
     else:
         out.append({"name": "取り込み（Suno からダウンロードした曲）", "state": "wait",
-                    "text": "まだ取り込んでいません。Suno でいいねした 1 本を SSD の「楽曲情報」にダウンロードすると、数分で自動で取り込みます。",
+                    "text": "まだ取り込んでいません。Suno でいいねした 1 本を SSD の「楽曲情報」にダウンロードすると、数分で自動で取り込み、「02_アーティスト/<組>/楽曲情報/<曲名>/」に入れます。",
                     "actions": [{"action": "scan", "label": "すぐに取り込む"}]})
         return out
 

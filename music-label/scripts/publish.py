@@ -87,6 +87,10 @@ def inboxes() -> list[Path]:
     if base is not None:
         out.append(archive.child(base, archive.INBOX_DIR))
     out.append(archive.child(archive._mkdir(Path.home() / "Downloads"), archive.LOCAL_PARENT))
+    try:   # 組ごとの「楽曲情報」（02_アーティスト/<組>/楽曲情報/<曲名>/ に直接ダウンロードした曲も取り込む。決定 151）
+        out += [b for b in archive.artist_inboxes() if b not in out]
+    except OSError:
+        pass
     return out
 
 
@@ -154,7 +158,9 @@ def move_to_ssd() -> list[str]:
 def new_files() -> list[Path]:
     """見張るフォルダの中の、まだ取り込んでいない音源（ローカル保存の中・ダウンロード途中のものは除く）"""
     seen = read_json(REGISTRY) if REGISTRY.exists() else {}
-    skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み")}
+    # 取り込んだファイルが、ローカル保存の曲のフォルダから SSD の曲のフォルダへ写ったもの（名前・大きさ・時刻が同じ）は取り込み直さない（決定 151）
+    known = {(Path(k.split("|")[0]).name, *k.split("|")[1:3]) for k in seen if k.count("|") == 2}
+    skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み"), _songs.norm(archive.SONG_SET_DIR)}   # 配信用/ は取り込まない（決定 151）
     out = []
     for box in inboxes():
         if not box.is_dir():
@@ -173,7 +179,7 @@ def new_files() -> list[Path]:
             st = f.stat()
             if time.time() - st.st_mtime < 15:      # ダウンロードの途中かもしれない
                 continue
-            if _sig(f) not in seen:
+            if _sig(f) not in seen and (f.name, str(st.st_size), str(int(st.st_mtime))) not in known:
                 out.append(f)
     return out
 
@@ -194,7 +200,8 @@ def _clean(stem: str) -> str:
 def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
     """ファイル名（とフォルダ名）から曲を見分ける。(曲, 理由)"""
     name = _clean(f.stem)
-    folders = " ".join(_songs.norm(p) for p in f.parts[-3:-1])
+    folders = " ".join(_songs.norm(p) for p in f.parts[-4:-1])
+    in_song = _songs.norm(f.parent.name)   # 02_アーティスト/<組>/楽曲情報/<曲名>/ の中なら、フォルダの名前が曲名（決定 151）
     best, best_score, ties = None, 0, []
     for s in songs:
         titles = [t for t in [s["title"], *s["alts"]] if t]
@@ -203,6 +210,8 @@ def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
             nt = _songs.norm(t)
             if not nt:
                 continue
+            if in_song == nt:
+                score = max(score, 4)
             if name == nt:
                 score = max(score, 3)
             elif re.search(rf"(^| ){re.escape(nt)}( |$)", name):
@@ -233,6 +242,7 @@ def take_in(song: dict, f: Path) -> None:
     day = made_on(f)
     stem = _songs.audio_stem(song, day)
     f = rename_in_inbox(f, stem)
+    f = to_song_folder(song, f)   # 02_アーティスト/<組>/楽曲情報/<曲名>/ へ（無ければ作る。決定 151）
     dst = tdir / f"{stem}{f.suffix.lower()}"
     shutil.copy2(f, dst)
     sel_p = tdir / "selection.json"
@@ -281,6 +291,50 @@ def rename_in_inbox(f: Path, stem: str) -> Path:
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"   ○ 名前をそろえました：{f.name} → {new.name}")
     return new
+
+
+def to_song_folder(song: dict, f: Path) -> Path:
+    """取り込んだファイルを、その曲のフォルダ（SSD の 02_アーティスト/<組>/楽曲情報/<曲名>/。無ければ作る）へ移す（決定 151）。
+    もうそのフォルダの中なら動かさない。同じ名前があれば _2 を付ける。移せなければ元の場所のまま"""
+    try:
+        dst_dir = archive.song_folder(song["artist"], song["title"])
+        if f.parent.resolve() == dst_dir.resolve():
+            return f
+        dst = dst_dir / f.name
+        n = 2
+        while dst.exists():
+            dst = dst_dir / f"{f.stem}_{n}{f.suffix}"
+            n += 1
+        shutil.move(str(f), str(dst))
+    except OSError as e:
+        print(f"   － 曲のフォルダへ移せませんでした（{e}）。元の場所のまま使います")
+        return f
+    reg = read_json(REGISTRY) if REGISTRY.exists() else {}
+    reg[_sig(dst)] = {"song": song["id"], "moved_from": str(f), "at": datetime.now().isoformat(timespec="seconds")}
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"   ○ 曲のフォルダへ入れました：{archive.label(dst_dir) if archive.root()[0] else archive.local_label(dst_dir)}/{dst.name}")
+    return dst
+
+
+def song_set(song: dict) -> list[str]:
+    """その曲のフォルダの 配信用/ に、DistroKid に入れる音源・ジャケット・下書き・配信用の歌詞をそろえる（決定 151）。
+    ローカル保存の公開セットから。ローカル保存の曲のフォルダは同じ実体（容量を使わない）、SSD は写す"""
+    folder, audio, cover = publish_folder(song)
+    srcs = [folder / audio, *([folder / cover] if cover else [])]
+    if (PUB / song["key"]).is_dir():
+        srcs += sorted(f for f in (PUB / song["key"]).iterdir() if f.is_file() and not f.name.startswith("."))
+    srcs = [s for s in srcs if s.exists()]
+    if not srcs:
+        return []
+    lines = []
+    local = archive.child(archive.local_folder(song["artist"], "inbox", song["title"]), archive.SONG_SET_DIR)
+    ssd, _ = archive.artist_folder(song["artist"], "inbox", song["title"])
+    for s in srcs:
+        lines.append(f"{s.name}：ローカル保存に{archive.save(s, local, s.name, link=True)}")
+        if ssd is not None:
+            lines.append(f"{s.name}：SSD に{archive.save(local / s.name, archive.child(ssd, archive.SONG_SET_DIR), s.name)}")
+    return lines
 
 
 def advance(song: dict) -> str:
@@ -546,6 +600,11 @@ def store_set(song: dict) -> None:
     subprocess.run([sys.executable, str(S / "archive_sync.py"), "--only", song["slug"]], capture_output=True, text=True)
     folder, audio, cover = publish_folder(song)
     print(f"   ○ 公開セット：{archive.local_label(folder)}/")
+    try:   # 曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/配信用/）にも、DistroKid に入れるものをそろえる（決定 151）
+        if song_set(song):
+            print(f"   ○ 曲のフォルダ：{archive.INBOX_DIR}/{song['title']}/{archive.SONG_SET_DIR}/ に音源・ジャケット・下書きをそろえました")
+    except OSError as e:
+        print(f"   － 曲のフォルダにそろえられませんでした（{e}）")
 
 
 def cmd_scan(args) -> int:

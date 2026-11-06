@@ -1628,7 +1628,7 @@ def run_suno(sess: Session, ids: list[str], batch: int = 1) -> int:
         lines += ["① 画面の上が「高度な」（Advanced）になっているか確かめる",
                   "② 内容を確かめて「Create」を押す（押すのは Gon さんだけ）。システムはもうこの Chrome から離れています。"
                   "「私はロボットではありません」が出たら、Gon さんがチェックする",
-                  "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動）",
+                  "③ できた 2 つを聴いて、気に入った方に「いいね」→ その 1 本を SSD の「楽曲情報」にダウンロード（そこから先は自動。02_アーティスト/<組>/楽曲情報/<曲名>/ に移ります）",
                   *([f"次の曲（あと {len(later)} 曲）は、Create のあと少し時間をあけて、ダッシュボードでもう一度「Suno に入力する」を押してください"] if later else []),
                   "ロボット確認が何度も出て通らないとき：この専用の Chrome は使わず、ふだんの Chrome か Safari で http://localhost:8765/phone/{id} を開き、「写す」ボタンで Suno に貼ってください（ふだんのブラウザは確認が出にくい）".format(id=song["id"])]
         if len(songs) > 1:   # まとめて入力：案内は最後に、全部のタブを読み返してから出す
@@ -1679,20 +1679,51 @@ def _upload_copy(song: dict, src: Path, name: str) -> Path:
     return dst
 
 
+def archive_song_sets(song: dict) -> list[Path]:
+    """その曲の 配信用/ のフォルダ（SSD → ローカル保存。あるものだけ。決定 151）"""
+    try:
+        import _archive
+        out = []
+        for d in _archive.song_folders(song["artist"], song["title"]):
+            s = _archive.find_child(d, _archive.SONG_SET_DIR)
+            if s is not None:
+                out.append(s)
+        return out
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def upload_files(song: dict) -> tuple[Path | None, Path | None, str]:
-    """DistroKid に入れる音源とジャケット（決定 129）。(音源, ジャケット, 説明)。
-    ① 公開セット（ローカル保存・SSD）のもの → ② 無ければ公開セットを作り直す → ③ それでも無ければ元のファイル
+    """DistroKid に入れる音源とジャケット（決定 129・151）。(音源, ジャケット, 説明)。
+    ⓪ 曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/配信用/）→ ① 公開セット（ローカル保存・SSD）のもの → ② 無ければ公開セットを作り直す → ③ それでも無ければ元のファイル
     （音量を整えた音源 master.wav・仕上がったジャケット cover_final.jpg）を、公開セットと同じ名前で写して使う。
     前は公開セットに無いと空のまま進み、音源とジャケットが入らなかった（ジャケットや曲名を変えたあと、公開セットが古いままのとき）"""
     import publish
+    _folder, audio_name, cover_name = publish.publish_folder(song)
+
+    def from_song_folder():   # ⓪ 曲のフォルダ：02_アーティスト/<組>/楽曲情報/<曲名>/配信用/（SSD → ローカル保存。決定 151）
+        for d in archive_song_sets(song):
+            a, c = d / audio_name, (d / cover_name if cover_name else None)
+            if a.exists() and (c is None or c.exists()):
+                return a, c
+        return None, None
 
     def now():
         f = publish.draft_fields(song)
         a = Path(f["音源ファイル"])
         c = Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None
         return (a if a.exists() else None), (c if c and c.exists() else None)
-    audio, cover = now()
-    how = "公開セットから"
+    audio, cover = from_song_folder()
+    how = f"曲のフォルダ（楽曲情報/{song.get('title')}/配信用）から"
+    if audio is None or cover is None:
+        try:   # 曲のフォルダにそろっていなければ、公開セットから写してそろえる
+            publish.song_set(song)
+        except Exception:  # noqa: BLE001
+            pass
+        audio, cover = from_song_folder()
+    if audio is None or cover is None:
+        audio, cover = now()
+        how = "公開セットから"
     if audio is None or cover is None:
         try:   # 公開セットを最新にする（ジャケット・曲名を変えたあとなど）
             publish.store_set(song)
@@ -1700,7 +1731,6 @@ def upload_files(song: dict) -> tuple[Path | None, Path | None, str]:
             pass
         audio, cover = now()
         how = "公開セットを作り直して"
-    _folder, audio_name, cover_name = publish.publish_folder(song)
     if audio is None and (OUT / "masters" / song["key"] / "master.wav").exists():
         audio, how = _upload_copy(song, OUT / "masters" / song["key"] / "master.wav", audio_name), "元のファイルから"
     src_cover = _songs.cover_source(song)
