@@ -1211,7 +1211,8 @@ def cmd_suno_request(args) -> int:
 # 戻す（ダッシュボードで間違えて進めたとき。決定 38）。消さずに out/publish/undo/ に移すので、あとから取り出せる
 BACK_TO = {"suno": "Suno で作曲（取り込みを取り消す）", "master": "音量を整え直す（取り込んだ曲はそのまま）",
            "cover": "ジャケットを選び直す（6 案を作り直す）",
-           "ready": "登録の準備ができた（DistroKid の登録を取り消す）", "registered": "DistroKid 登録済み（配信中を取り消す）"}
+           "ready": "登録の準備ができた（DistroKid の登録を取り消す）", "registered": "DistroKid 登録済み（配信中を取り消す）",
+           "draft": "曲の案（作曲へ進めたのを取り消す）"}
 
 
 def default_back(status: str) -> str | None:
@@ -1226,6 +1227,8 @@ def back_options(song: dict) -> list[str]:
     order = {"live": ["registered", "ready", "suno"], "registered": ["ready", "suno"], "ready": ["cover", "suno", "master"],
              "waiting_cover": ["suno", "master"], "waiting_ffmpeg": ["suno"], "imported": ["suno", "master"]}
     out = order.get(s, [])
+    if (song.get("irregular") or {}).get("draft") and s not in ("registered", "live"):   # 曲の案から作曲へ進めた曲：案に戻せる（決定 155）
+        out = [*out, "draft"]
     if song["kind"] == "debut":   # デビュー曲のジャケットは作業セットのもの（候補から選ぶ流れではない）
         out = [t for t in out if t != "cover"]
     return out
@@ -1253,6 +1256,14 @@ def go_back(song: dict, to: str | None = None) -> str:
         raise ValueError(f"いまは「{now_ja}」なので、これより前には戻せません")
     if to not in back_options(song):
         raise ValueError(f"いまの段階（{now_ja}）からは「{BACK_TO.get(to, to)}」に戻せません")
+    if to == "draft":   # 曲の案に戻す：取り込み済みなら先に取り込みを取り消してから、作曲へ進めたのを取り消す（決定 155）
+        first = go_back(song, "suno") + " " if cur else ""
+        import irregular
+        ok, msg = irregular.unaccept(song["id"])
+        if not ok:
+            raise ValueError(msg)
+        _book()
+        return first + msg
     hist = st.setdefault("history", [])
     hist.append({"from": cur, "to": to, "at": datetime.now().isoformat(timespec="seconds"), "by": "戻す"})
     if to in ("registered", "ready", "suno"):   # 配信中を取り消す

@@ -338,6 +338,41 @@ def accept(draft_id: str) -> tuple[str | None, str]:
     return bp.stem, f"「{title}」を作曲へ進めました（曲 ID {bp.stem}）"
 
 
+def unaccept(song_id: str) -> tuple[bool, str]:
+    """「この案で作曲へ進む」を取り消して、曲の案（確認待ち）に戻す（オーナーの指示 2026-11-06。決定 155）。
+    作曲用のブリーフ（out/briefs/<曲 ID>.*）と、その曲の進み具合・ジャケットの候補は消さずに「戻したもの」（out/publish/undo/）へ移す。
+    曲名は、作曲へ進めたあとに変えていれば、それを案にも写す。取り込み済みの曲は、先に publish.go_back で Suno で作曲に戻してから呼ぶ"""
+    bp = BRIEFS / f"{song_id}.json"
+    if not bp.exists():
+        return False, "その曲のブリーフが見つかりません"
+    b = read_json(bp)
+    draft_id = (b.get("irregular") or {}).get("draft")
+    p = _draft_path(draft_id) if draft_id else None
+    if not p or not p.exists():
+        return False, "この曲は曲の案から作ったものではないので、曲の案には戻せません"
+    d = read_json(p)
+    if b.get("title"):
+        d["title"] = b["title"]
+        d["title_candidates"] = [b["title"]] + [c for c in (d.get("title_candidates") or []) if c != b["title"]]
+    dest = OUT / "publish" / "undo" / f"{song_id}_{datetime.now():%Y%m%d-%H%M%S}"
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in sorted(BRIEFS.glob(f"{song_id}.*")):   # ブリーフ・歌詞・指示文など、同じ名前のもの
+        shutil.move(str(f), str(dest / f.name))
+    st = OUT / "publish" / "state" / f"{song_id}.json"
+    if st.exists():
+        shutil.move(str(st), str(dest / f"state_{st.name}"))
+    week, slug = b.get("week_start", ""), b.get("artist_slug", "")
+    cov = OUT / "visuals" / slug / "cover" / week
+    if week and slug and cov.is_dir():   # ジャケットの候補（曲名・歌詞を直すと作り直すので、移しておく）
+        shutil.move(str(cov), str(dest / "cover"))
+    ir = d.get("irregular") or {}
+    ir.update({"status": "proposed", "returned_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "returned_from": song_id})
+    ir.pop("song_id", None)
+    d["irregular"] = ir
+    _write(p, d)
+    return True, f"「{_title(d)}」を曲の案（確認待ち）に戻しました。不定期配信のタブで直して、もう一度「作曲へ進む」を押せます（作曲用のファイルは {dest} に移しました）"
+
+
 def discard(draft_id: str) -> tuple[bool, str]:
     p = _draft_path(draft_id)
     if not p or not p.exists():
