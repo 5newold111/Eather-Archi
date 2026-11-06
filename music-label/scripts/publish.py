@@ -272,8 +272,13 @@ def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
         near = "・".join(f"{x['artist']}「{x['title']}」" for r, x in scored[:3] if r >= 0.5)
         return None, ("曲名が見つかりません（ファイル名を Suno の曲名のままにするか、曲名を含めてください）"
                       + (f"。近い曲：{near}" if near else ""))
+    if ties and len({(x["slug"], _songs.norm(x["title"])) for x in [best, *ties]}) == 1:
+        # 同じ組の同じ曲名が 2 つ以上（別の週のブリーフに同じ曲名が付いた）：まだ取り込んでいない、いちばん早い週の方にする（決定 154）
+        dup = sorted([best, *ties], key=lambda x: (bool(_songs.state(x).get("status")), x["week"]))
+        return dup[0], (f"同じ曲名の曲が {len(dup)} つあります（{'・'.join(x['id'] for x in dup)}）。"
+                        f"まだ取り込んでいない早い週の {dup[0]['id']} として取り込みます。別の曲にしたいときは publish.py take で --song に曲 ID を付けてください")
     if ties:
-        names = "・".join(f"{x['artist']}「{x['title']}」" for x in [best, *ties])
+        names = "・".join(f"{x['artist']}「{x['title']}」（{x['id']}）" for x in [best, *ties])
         return None, f"どの曲か決められません（{names}）。アーティスト名のフォルダに入れるか、ファイル名にアーティスト名を足してください"
     return best, ""
 
@@ -674,6 +679,11 @@ def cmd_scan(args) -> int:
         reg[_sig(f)] = {"song": song["id"], "at": datetime.now().isoformat(timespec="seconds")}
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    for key in list(picked):   # 手で選んで取り込んだテイク（publish.py take）は、自動では差し替えない（決定 154）
+        song, f = picked[key]
+        if _songs.state(song).get("manual_take"):
+            print(f"   ・{f.name}：{song['artist']}「{song['title']}」は手で選んだテイクがあるので、差し替えません")
+            picked.pop(key)
     for song, f in picked.values():
         take_in(song, f)   # ファイルの名前を <曲名>_<アーティスト名>_<生成日> にそろえ、登録簿にも足す
     import take_check   # 作曲の時点の質の確認：足りなければ案を自動で直して作曲待ちに戻す（決定 100）
@@ -705,7 +715,14 @@ def cmd_scan(args) -> int:
             print(f"－ 新しい曲はありませんでした（見ているところ：{'、'.join(str(b) for b in inboxes())}、ダウンロードの一番上）")
         wait = [s for s in songs if not _songs.state(s).get("status")]
         if wait:   # どの曲の取り込みを待っているか（ファイル名と見比べられるように。決定 152）
-            print("   取り込みを待っている曲（ファイル名にこの曲名が入っていれば取り込めます）：" + "／".join(f"{s['artist']}「{s['title']}」" for s in wait[:12]))
+            print("   取り込みを待っている曲（ファイル名にこの曲名が入っていれば取り込めます）：" + "／".join(f"{s['artist']}「{s['title']}」（{s['id']}）" for s in wait[:12]))
+        seen_t: dict = {}
+        for s in songs:   # 同じ組の同じ曲名が 2 つ以上：あとの方の曲名を変えた方がよい（決定 154）
+            seen_t.setdefault((s["slug"], _songs.norm(s["title"])), []).append(s)
+        for v in seen_t.values():
+            if len(v) > 1:
+                print(f"   ⚠ 同じ曲名の曲が {len(v)} つあります：{v[0]['artist']}「{v[0]['title']}」（{'・'.join(x['id'] for x in v)}）。"
+                      "あとの週の曲名は、ダッシュボードで別の名前に変えてください")
     return 0
 
 
@@ -1441,6 +1458,9 @@ def cmd_take(args) -> int:
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     take_in(song, f)   # 名前をそろえ、曲のフォルダへ移す
+    st = _songs.state(song)
+    st["manual_take"] = True   # 自動の取り込みで、ほかのファイル（Handed Round (3) など）に差し替えない（決定 154）
+    _songs.save_state(song, st)
     import take_check
     if take_check.gate(song) == "retake":
         print("【結果】取り込みましたが、作曲の時点の確認で作り直しになりました（上の記録を見てください）")
