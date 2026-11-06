@@ -320,10 +320,16 @@ class Session:
         exe = os.environ.get("POSTDOG_BROWSER_EXECUTABLE")
         self.cdp = bool(chrome_path()) and not exe
         if self.cdp:   # ふつうに開いた専用の Chrome に、つなぎ口から入る（ログインが断られない）
-            try:
-                self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
-            except Exception as e:  # noqa: BLE001  つなげない：専用の Chrome を閉じて、開き直してから 1 回だけやり直す
-                print(f"   … 専用の Chrome につなげませんでした（{str(e).splitlines()[0][:120]}）。閉じて開き直します")
+            self.browser, err = None, None
+            for i in range(3):   # 開いたばかりの Chrome は、つなぎ口の準備が整う前だと断ることがある
+                try:             # （2026-11-06「Browser.setDownloadBehavior: Browser context management is not supported」）。
+                    self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")   # 閉じる前に、少し待って 2 回まで試し直す（決定 156）
+                    break
+                except Exception as e:  # noqa: BLE001
+                    err = e
+                    time.sleep(2 + 2 * i)
+            if self.browser is None:   # それでもつなげない：専用の Chrome を閉じて、開き直してから 1 回だけやり直す
+                print(f"   … 専用の Chrome につなげませんでした（{str(err).splitlines()[0][:120]}）。閉じて開き直します")
                 quit_chrome()
                 (PROFILE / "DevToolsActivePort").unlink(missing_ok=True)
                 try:
