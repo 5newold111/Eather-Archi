@@ -351,6 +351,9 @@ def to_song_folder(song: dict, f: Path) -> Path:
             dst = dst_dir / f"{f.stem}_{n}{f.suffix}"
             n += 1
         shutil.move(str(f), str(dst))
+        ad = f.with_name("._" + f.name)   # Mac が外付けのドライブに作る付き添いのファイル（音は入っていない）も一緒に（決定 153）
+        if ad.is_file():
+            shutil.move(str(ad), str(dst.with_name("._" + dst.name)))
     except OSError as e:
         print(f"   － 曲のフォルダへ移せませんでした（{e}）。元の場所のまま使います")
         return f
@@ -1401,6 +1404,56 @@ def cmd_artist_page(args) -> int:
     return 0
 
 
+def cmd_take(args) -> int:
+    """ファイルを指定して取り込む（オーナーの指示 2026-11-06。決定 153）。自動の取り込みで見分けられなかった曲を、手で 1 本ずつ入れる。
+    曲は --song（曲 ID か曲名）で決める。省くと、ファイル名からいちばん近い曲（決定 152 の見分け方）。
+    名前を <曲名>_<組>_<生成日> にそろえ、その曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/）へ移し、公開の準備まで進める"""
+    f = Path(args.file).expanduser()
+    if f.name.startswith("._"):   # Mac が外付けのドライブに作る、中身の無い付き添いのファイル。本体は「._」の無い同じ名前
+        real = f.with_name(f.name[2:])
+        print(f"   ・{f.name} は Mac が作る付き添いのファイル（音は入っていません）なので、本体の {real.name} を使います")
+        f = real
+    if not f.is_file():
+        print(f"【結果】ファイルが見つかりません：{f}")
+        return 2
+    if f.suffix.lower() not in AUDIO:
+        print(f"【結果】音源ではない種類です（{f.suffix}）。Suno で音（MP3・WAV など）としてダウンロードし直してください")
+        return 2
+    songs = [x for x in _songs.all_songs() if x.get("title") and _songs.state(x).get("status") not in DONE]
+    song, why = None, ""
+    if args.song:
+        want = _songs.norm(args.song)
+        song = _songs.by_id(args.song) or next((x for x in songs if want in [_songs.norm(t) for t in [x["title"], *x["alts"]] if t]), None)
+        if song is None:
+            why = f"「{args.song}」という曲 ID・曲名の曲が見つかりません"
+    else:
+        song, why = match(f, songs)
+    if song is None:
+        print(f"【結果】どの曲か決められません：{why}")
+        print("   取り込みを待っている曲（--song に曲 ID を付けて、もう一度）：")
+        for x in songs:
+            if not _songs.state(x).get("status"):
+                print(f"     {x['id']}　{x['artist']}「{x['title']}」")
+        return 2
+    print(f"▶ {f.name} を {song['artist']}「{song['title']}」（{song['id']}）として取り込みます" + (f"（{why}）" if why else ""))
+    reg = read_json(REGISTRY) if REGISTRY.exists() else {}
+    reg[_sig(f)] = {"song": song["id"], "manual": True, "at": datetime.now().isoformat(timespec="seconds")}
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
+    take_in(song, f)   # 名前をそろえ、曲のフォルダへ移す
+    import take_check
+    if take_check.gate(song) == "retake":
+        print("【結果】取り込みましたが、作曲の時点の確認で作り直しになりました（上の記録を見てください）")
+        return 2
+    now = advance(song)
+    store_set(song)
+    if now == "ready":
+        notify("公開の準備ができました", f"{song['artist']}「{song['title']}」を DistroKid に登録できます")
+    _book()
+    print(f"【結果】{song['artist']}「{song['title']}」を取り込みました（いま：{STATUS_JA.get(now, now)}）")
+    return 0
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Suno の曲を取り込み、DistroKid の登録ボタンを押すだけの状態まで進める")
     sub = ap.add_subparsers(dest="cmd")
@@ -1437,12 +1490,15 @@ def main() -> None:
     p.add_argument("--choose", type=int, help="選んだ候補の番号")
     p.add_argument("--reason", default="", help="選んだ理由（一言。次からの自動選択の好みに使う）／--redo のとき：作り直す理由（6 案の条件に入れる。決定 127）")
     p.add_argument("--redo", action="store_true", help="候補を作り直す")
+    p = sub.add_parser("take", help="ファイルを指定して取り込む（自動で見分けられなかった曲を手で。決定 153）")
+    p.add_argument("file", help="取り込む音源のファイル（Finder からターミナルにドラッグすると入る）")
+    p.add_argument("--song", default="", help="曲 ID か曲名（省くとファイル名からいちばん近い曲）")
     p = sub.add_parser("suno", help="Suno に貼る内容のページを作る")
     p.add_argument("--open", action="store_true", help="ブラウザで開く")
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
           "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
-          "artist-page": cmd_artist_page, "artist-pages": cmd_artist_pages, "live": cmd_live, "cover": cmd_cover}.get(args.cmd)
+          "artist-page": cmd_artist_page, "artist-pages": cmd_artist_pages, "live": cmd_live, "cover": cmd_cover, "take": cmd_take}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return
