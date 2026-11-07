@@ -1695,7 +1695,7 @@ def archive_song_sets(song: dict) -> list[Path]:
 
 
 def upload_files(song: dict) -> tuple[Path | None, Path | None, str]:
-    """DistroKid に入れる音源とジャケット（決定 129・151）。(音源, ジャケット, 説明)。
+    """DistroKid に入れる音源とジャケット（決定 129・151・158・163）。(音源, ジャケット, 説明)。Chrome にはいつも Mac の中の写しを渡す。
     ⓪ 曲のフォルダ（SSD の 02_アーティスト/<組>/04_楽曲/<曲名>/）→ ① 公開セット（ローカル保存・SSD）のもの → ② 無ければ公開セットを作り直す → ③ それでも無ければ元のファイル
     （音量を整えた音源 master.wav・仕上がったジャケット cover_final.jpg）を、公開セットと同じ名前で写して使う。
     前は公開セットに無いと空のまま進み、音源とジャケットが入らなかった（ジャケットや曲名を変えたあと、公開セットが古いままのとき）"""
@@ -1731,13 +1731,35 @@ def upload_files(song: dict) -> tuple[Path | None, Path | None, str]:
     src_cover = _songs.cover_source(song)
     if cover is None and src_cover is not None:
         cover, how = _upload_copy(song, src_cover, cover_name or f"{_songs.cover_stem(song)}.jpg"), "元のファイルから"
+    # Chrome には、いつも Mac の中の写し（out/distrokid_upload/<曲>/）を渡す（決定 163）。SSD（/Volumes）の上のファイルは、
+    # Mac の決まり（外付けのドライブを読む許可）で Chrome が読めず、音源・ジャケットが入らないことがある
+    try:
+        if audio is not None and OUT not in audio.parents:
+            audio = _upload_copy(song, audio, audio.name)
+        if cover is not None and OUT not in cover.parents:
+            cover = _upload_copy(song, cover, cover.name)
+        _tidy_uploads()
+    except OSError as e:
+        print(f"   － Mac の中に写せませんでした（{e}）。元の場所のファイルを使います")
     return audio, cover, how
+
+
+def _tidy_uploads(days: int = 30) -> None:
+    """DistroKid に渡すための写しのうち、30 日より前のものを片付ける"""
+    root = OUT / "distrokid_upload"
+    if not root.is_dir():
+        return
+    import shutil
+    for d in root.iterdir():
+        if d.is_dir() and time.time() - d.stat().st_mtime > days * 86400:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 def distrokid_fields(song: dict) -> list[dict]:
     import publish
     f = publish.draft_fields(song)
     a_up, c_up, _how = upload_files(song)   # 音源とジャケットは、無ければ公開セットを作り直す・元のファイルを使う（決定 129）
+    print(f"   ・音源：{a_up.name if a_up else '見つかりません'}／ジャケット：{c_up.name if c_up else '見つかりません'}（{_how}。決定 163）", flush=True)
     audio_path = a_up or Path(f["音源ファイル"])
     cover_path = c_up or (Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None)
     rel = date.today().isoformat() if "いちばん早い" in f["Release date"] else f["Release date"]
