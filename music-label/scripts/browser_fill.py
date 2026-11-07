@@ -2877,23 +2877,34 @@ def meta_no(song: dict) -> list[str]:
     return [n for n, k in META_RADIOS.items() if not pages.get(k)]
 
 
+def _pick_no(c: DK, items: list[tuple[str, str]]) -> None:
+    """Artist already in の「No」を 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す。
+    2 回目からは、丸ではなく「No - …」の文字そのものを人と同じように押す（丸が隠れている・スクリプトで押すと戻る作り。決定 70・71・157）"""
+    for item in items:
+        for t in range(4):
+            loc = c.sess.page.locator(item[1])
+            if not loc.count() or _visible_first(loc).is_checked():
+                break   # もう選ばれている丸は押さない（押し直すと取り消す作りがある）
+            if t:
+                print(f"   … {item[0]} が取り消されました。やり直します（{t} 回目）")
+            if t == 0:
+                set_radios(c.sess, [item])
+            else:
+                _click_no_text(c.sess, item[1])
+            confirm_new_page(c.sess, picked=True)
+            c.sess.page.wait_for_timeout(800)
+            if t:
+                c.sess.settle(1500)
+
+
 def _sec_ids_yes(c: DK) -> None:
     """デビュー済みの組：Artist already in 〜? は Spotify・Apple Music・YouTube Music が Yes（すでにあるページ）。Spotify は記録した ID を入れ、
     ほかのサービスは DistroKid が出す、前の曲のページを選ぶ（決定 140）。Instagram・Facebook はページを記録していなければ No（決定 150）"""
     _items, texts = artist_id_radios(c.song)
     no = meta_no(c.song)
-    for name in no:   # No（まだプロフィールが無い）を選び、確認の小窓（新しいページの話）に OK
-        css = f'input[type=radio][name="{name}"][value="new"]'
-        loc = c.sess.page.locator(css)
-        if not loc.count() or _visible_first(loc).is_checked():
-            continue
-        set_radios(c.sess, [("", css)])
-        confirm_new_page(c.sess, picked=True)
-        c.sess.page.wait_for_timeout(500)
-        if not _visible_first(loc).is_checked():
-            _click_no_text(c.sess, css)
-            confirm_new_page(c.sess, picked=True)
-        print(f"   … Artist already in {dict(ARTIST_ID_RADIOS)[name]}? → No（ページを作っていない）")
+    # Instagram・Facebook：No（まだプロフィールが無い）。デビュー曲と同じく、取り消されたら選び直す（決定 150・157）
+    _pick_no(c, [(f"Artist already in {dict(ARTIST_ID_RADIOS)[n]}? → No（ページを作っていない）", f'input[type=radio][name="{n}"][value="new"]')
+                 for n in no])
     if no:   # DistroKid の検索が遅れて作り直しても、No を選び直す見張り
         try:
             c.sess.page.evaluate(GUARD_NO_JS, [no, [NEW_PAGE_CONFIRM, PICKED_CONTEXT, DANGER]])
@@ -2930,21 +2941,7 @@ def _sec_ids_do(c: DK) -> None:
         _sec_ids_yes(c)
         return
     items, texts = artist_id_radios(c.song)
-    for item in items:   # 1 つずつ選び、確認の小窓（新しいページの話）に OK を押してから次へ。取り消されたら 3 回までやり直す
-        for t in range(4):
-            loc = c.sess.page.locator(item[1])
-            if not loc.count() or _visible_first(loc).is_checked():
-                break   # もう選ばれている丸は押さない（押し直すと取り消す作りがある）
-            if t:
-                print(f"   … {item[0]} が取り消されました。やり直します（{t} 回目）")
-            if t == 0:
-                set_radios(c.sess, [item])
-            else:   # 2 回目から：丸ではなく「No - …」の文字そのものを人と同じように押す（丸が隠れている・スクリプトで押すと戻る作り。決定 70・71）
-                _click_no_text(c.sess, item[1])
-            confirm_new_page(c.sess, picked=True)
-            c.sess.page.wait_for_timeout(800)
-            if t:
-                c.sess.settle(1500)
+    _pick_no(c, items)
     for label, css, val in texts:   # 前の曲のページがわかっている組：「Yes」の下の欄にページの住所を入れる
         loc = c.sess.page.locator(css)
         if loc.count() and loc.first.is_visible():
@@ -2968,6 +2965,9 @@ def _sec_ids_ok(c: DK):
         except Exception:  # noqa: BLE001
             return None
         got = [x for x in st if x is not None]
+        bad = [f"{svc}（{'No' if n in no else 'Yes'} になっていません）" for (n, svc), x in zip(ARTIST_ID_RADIOS, st) if x is False]
+        if bad:   # どのサービスが違うか（決定 157）
+            c.notes["ids"] = "・".join(bad)
         return all(got) if got else None
     items, _ = artist_id_radios(c.song)
     states = []
