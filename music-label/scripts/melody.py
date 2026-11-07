@@ -407,7 +407,11 @@ def transcribe_melody(audio: Path, sheet: dict, out_name: str) -> tuple[dict, Pa
     return feat, mid
 
 
-if __name__ == "__main__":   # 試しに 1 曲：python3 scripts/melody.py <音源> [テンポ] [キー]
+if __name__ == "__main__" and len(sys.argv) == 5 and sys.argv[1] == "--json":   # 別の Python から 1 曲（決定 160）：--json <音源> <解析シート> <名前>
+    sh = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+    f, m = transcribe_melody(Path(sys.argv[2]), sh, sys.argv[4])
+    print("@@RESULT@@" + json.dumps({"feat": f, "mid": str(m) if m else None}, ensure_ascii=False))
+elif __name__ == "__main__":   # 試しに 1 曲：python3 scripts/melody.py <音源> [テンポ] [キー]
     p = Path(sys.argv[1])
     sh = {"groove": {"bpm": float(sys.argv[2])} if len(sys.argv) > 2 else {}, "_measure": {"key": sys.argv[3] if len(sys.argv) > 3 else None}}
     f, m = transcribe_melody(p, sh, p.stem)

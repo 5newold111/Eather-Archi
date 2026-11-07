@@ -2031,3 +2031,12 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 書き起こしの版を 2 にした。版 1（前のやり方）で起こした曲は起こし直しの対象になり、それまでは曲作り（write_brief）に渡さない
 - Mac に入れるもの：Basic Pitch（と、動かす部品の onnxruntime）・Demucs。入っていなければ前のやり方に戻るが、品質の確認で乱れたものは使わない
 - 試験：上の試験用の曲で比べた（Demucs は、この作業場所では部品のデータを取りに行けず試せなかった）。ばらばらの音の書き起こしを「乱れている」と見分けることも確かめた
+
+## 160. メロディーの解析は、音の解析用の別の Python（~/.postdog-audio）でも動かせるようにする（2026-11-07）
+
+- Mac の Python が新しい版（3.15）のため、onnxruntime（Basic Pitch を動かす部品）が入らず、Basic Pitch・Demucs がまとめて入らなかった
+  （pip の結果：No matching distribution found for onnxruntime）
+- ふだんの Python には手を入れず、音の解析用に Python 3.11 の置き場（~/.postdog-audio。uv で作る）を作り、そこに Basic Pitch・onnxruntime・Demucs を入れる
+- 部品を探す仕組み（_common.python_with）は ~/.postdog-audio/bin/python3 も探す。メロディーを起こすとき（reference_db.audio_melody）、
+  いまの Python に Basic Pitch が無く、~/.postdog-audio などにあれば、1 曲ずつその Python で melody.py --json を動かして結果を受け取る
+- 試験：melody.py --json で、試験用の曲の書き起こし（Basic Pitch・音域 G4〜G5・MIDI あり）が受け取れることを確かめた

@@ -672,6 +672,7 @@ def _melody_version() -> int:
 
 def audio_melody(limit: int = 0, quiet: bool = False) -> int:
     """既存楽曲のメロディーを起こす（1 回に limit 曲まで。0 なら全部）"""
+    import subprocess
     import melody
     pend = melody_pending()
     if not pend:
@@ -679,8 +680,15 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
             print("【結果】メロディーを起こす曲はありません（全部済んだか、SSD がつながっていません）")
         return 0
     run = pend[:limit] if limit > 0 else pend
-    how = ("Demucs で歌を取り出して" if melody.demucs_ready() else "librosa で歌を取り出して（Demucs を入れると正確になります）") + \
-        ("・Basic Pitch で音符に" if melody.basic_pitch_ready() else "・pYIN で音符に（Basic Pitch を入れると正確になります）")
+    other = None   # いまの Python に Basic Pitch が無ければ、入っている別の Python（~/.postdog-audio など）で起こす（決定 160）
+    if not melody.basic_pitch_ready():
+        import _common
+        other = _common.python_with("basic_pitch")
+    if other:
+        how = "音の解析用の Python で（Demucs・Basic Pitch）"
+    else:
+        how = ("Demucs で歌を取り出して" if melody.demucs_ready() else "librosa で歌を取り出して（Demucs を入れると正確になります）") + \
+            ("・Basic Pitch で音符に" if melody.basic_pitch_ready() else "・pYIN で音符に（Basic Pitch を入れると正確になります。docs/12 の決定 160）")
     print(f"▶ {len(pend)} 曲のうち {len(run)} 曲のメロディーを起こします（Mac の中で・{how}。1 曲 2〜5 分。料金はかかりません）")
     ok = 0
     for i, (p, f) in enumerate(run, 1):
@@ -689,7 +697,16 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
         name = f"{ref.get('artist_name') or '?'} - {ref.get('title') or f.stem}"
         print(f"【進み具合】{i}/{len(run)} 曲目：{name} のメロディーを起こしています", flush=True)
         try:
-            feat, mid = melody.transcribe_melody(f, d, name)
+            if other:
+                r = subprocess.run([other, str(Path(__file__).resolve().parent / "melody.py"), "--json", str(f), str(p), name],
+                                   capture_output=True, text=True, timeout=1800)
+                line = next((x for x in r.stdout.splitlines() if x.startswith("@@RESULT@@")), "")
+                if not line:
+                    raise RuntimeError((r.stderr or r.stdout).strip().splitlines()[-1][:200] if (r.stderr or r.stdout).strip() else "結果がありません")
+                res = json.loads(line[len("@@RESULT@@"):])
+                feat, mid = res["feat"], (Path(res["mid"]) if res.get("mid") else None)
+            else:
+                feat, mid = melody.transcribe_melody(f, d, name)
         except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
             print(f"   ✕ 起こせませんでした（{type(e).__name__}: {str(e)[:160]}）")
             continue

@@ -63,7 +63,8 @@ def python_with(module: str = "playwright") -> str | None:
     import subprocess
     if module in _PY_WITH:
         return _PY_WITH[module]
-    cands = [sys.executable, shutil.which("python3") or ""]
+    cands = [sys.executable, str(Path.home() / ".postdog-audio" / "bin" / "python3"),   # 音の解析用の Python（決定 160）
+             shutil.which("python3") or ""]
     for d in ("/opt/homebrew/bin", "/usr/local/bin", "/Library/Frameworks/Python.framework/Versions/Current/bin", "/usr/bin"):
         cands.append(f"{d}/python3")
         cands += sorted(glob.glob(f"{d}/python3.[0-9]*"), reverse=True)
