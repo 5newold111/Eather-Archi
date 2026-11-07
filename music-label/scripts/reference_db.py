@@ -656,9 +656,18 @@ def melody_pending() -> list[tuple[Path, Path]]:
             d = json.loads(p.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if f.is_file() and not d.get("melody"):
+        old = d.get("melody") and (d["melody"].get("version") or 1) < _melody_version()   # 前のやり方で起こした曲は起こし直す（決定 159）
+        if f.is_file() and (not d.get("melody") or old):
             out.append((p, f, d))
     return [(p, f) for p, f, _ in (out[i] for i in _influence_first([d for _, _, d in out]))]   # 影響を受けたアーティストの曲を先に
+
+
+def _melody_version() -> int:
+    try:
+        import melody
+        return melody.VERSION
+    except Exception:  # noqa: BLE001
+        return 1
 
 
 def audio_melody(limit: int = 0, quiet: bool = False) -> int:
@@ -670,7 +679,8 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
             print("【結果】メロディーを起こす曲はありません（全部済んだか、SSD がつながっていません）")
         return 0
     run = pend[:limit] if limit > 0 else pend
-    how = "Demucs で歌を取り出して" if melody.demucs_ready() else "librosa で歌を取り出して（Demucs を入れると正確になります）"
+    how = ("Demucs で歌を取り出して" if melody.demucs_ready() else "librosa で歌を取り出して（Demucs を入れると正確になります）") + \
+        ("・Basic Pitch で音符に" if melody.basic_pitch_ready() else "・pYIN で音符に（Basic Pitch を入れると正確になります）")
     print(f"▶ {len(pend)} 曲のうち {len(run)} 曲のメロディーを起こします（Mac の中で・{how}。1 曲 2〜5 分。料金はかかりません）")
     ok = 0
     for i, (p, f) in enumerate(run, 1):
@@ -697,15 +707,18 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
                   f"跳躍 {int(mo['leap_ratio'] * 100)}%・裏拍 {int(rh['offbeat_ratio'] * 100)}%・1 小節 {rh['notes_per_bar']} 音")
         else:
             print(f"   － {feat.get('note')}")
-        if mid:   # SSD にも、既存楽曲の隣のフォルダに MIDI を残す（GarageBand で開ける）
+        if mid:   # SSD にも、既存楽曲の隣のフォルダに MIDI を残す（GarageBand で開ける）。乱れた書き起こしは残さず、前の版も消す（決定 159）
             try:
                 tops = audio_dirs()
                 top = next((t for t in tops if f.is_relative_to(t)), None)
                 if top is not None:
                     dst = top.parent / f"{top.name}_メロディー（MIDI）" / mid.name
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    import shutil
-                    shutil.copy2(mid, dst)
+                    if feat.get("usable"):
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        import shutil
+                        shutil.copy2(mid, dst)
+                    elif dst.exists():
+                        dst.unlink()
             except OSError:
                 pass
     if ok:

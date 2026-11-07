@@ -13,6 +13,12 @@
      区切りごと（ヴァース・サビ）の輪郭（上がる・下がる・山なり・波）と最高音の位置／サビのリズムの骨格（音の高さなし）
 
 自動の旋律の書き起こしは「おおよそ」：はっきりした歌なら大まかな旋律は取れるが、こぶし・ビブラートで音が割れる・1 オクターブずれることがある。
+
+2026-11-07（決定 159。オーナー「クオリティが壊滅的」）：
+  ・音符の書き起こしは、Basic Pitch（Spotify が公開している、音から音符を起こす部品。無料・Mac の中）が入っていればそれを使う。
+    無ければ前のやり方（pYIN）
+  ・品質の確認：音が細かく割れすぎ・音域が広すぎ・跳びすぎの書き起こしは「乱れている」として usable=False（曲作りに渡さない・SSD に MIDI を残さない）
+  ・Demucs が無いと歌の取り出しが粗く、伴奏が混ざって乱れやすい（入れ方は docs/12 の決定 159）
 """
 from __future__ import annotations
 
@@ -28,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT  # noqa: E402
 
 MELODY_DIR = OUT / "reference_db" / "melody"
+VERSION = 2   # 書き起こしのやり方の版（上がると、前の版で起こした曲を起こし直す。決定 159）
 NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 DEGREES = ["1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7"]   # 主音からの度数（キーに対する位置）
 
@@ -42,6 +49,99 @@ def demucs_ready() -> bool:
         return True
     except ImportError:
         return False
+
+
+def basic_pitch_ready() -> bool:
+    try:
+        import basic_pitch  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def notes_basic_pitch(y, sr: int, bpm: float | None) -> tuple[list[dict], float, str]:
+    """Basic Pitch で歌の波形から音符を起こす（決定 159）。同じ時刻に音が重なれば大きい方（旋律）を残す"""
+    import librosa
+    import numpy as np
+    import soundfile as sf
+    from basic_pitch.inference import predict
+    with tempfile.TemporaryDirectory() as d:
+        wav = Path(d) / "vocals.wav"
+        sf.write(str(wav), y, sr)
+        _out, _midi, events = predict(str(wav), onset_threshold=0.5, frame_threshold=0.3, minimum_note_length=110,
+                                      minimum_frequency=70, maximum_frequency=1100, melodia_trick=True)
+    ev = sorted(((float(a), float(b), int(p), float(v)) for a, b, p, v, *_ in events), key=lambda x: (x[0], -x[3]))
+    mono: list[list] = []
+    for a, b, p, v in ev:   # 重なり：大きい音を残し、小さい方は切る・捨てる
+        if mono and a < mono[-1][1]:
+            if v > mono[-1][3]:
+                if a - mono[-1][0] < 0.08:
+                    mono[-1] = [a, b, p, v]
+                    continue
+                mono[-1][1] = a
+            else:
+                if b > mono[-1][1] + 0.08:
+                    a = mono[-1][1]
+                else:
+                    continue
+        mono.append([a, b, p, v])
+    tempo = bpm
+    if not tempo:
+        t, _ = librosa.beat.beat_track(y=y, sr=sr)
+        tempo = float(np.atleast_1d(t)[0]) or 100.0
+    beat = 60.0 / tempo
+    if mono:   # 歌のよく使う高さから 14 半音より外れた音は、伴奏（ベース・和音）が混ざったものとして除く
+        mid = float(np.median([x[2] for x in mono]))
+        mono = [x for x in mono if abs(x[2] - mid) <= 14]
+    notes = []
+    for a, b, p, _v in mono:
+        if b - a < 0.09:
+            continue
+        sb = round(a / beat * 4) / 4
+        nb = max(0.25, round((b - a) / beat * 4) / 4)
+        if notes and abs(sb - notes[-1]["start_beat"]) < 1e-6:
+            continue
+        notes.append({"start_beat": sb, "beats": nb, "pitch": p})
+    _fix_octaves(notes)
+    for i in range(len(notes) - 1):
+        gap = notes[i + 1]["start_beat"] - notes[i]["start_beat"]
+        if notes[i]["beats"] > gap:
+            notes[i]["beats"] = max(0.25, gap)
+    return notes, float(tempo), f"音 {len(notes)} 個（Basic Pitch）"
+
+
+def _fix_octaves(notes: list[dict]) -> None:
+    """1 オクターブのずれを直す（前後とくらべて 12 半音近く飛ぶ音）"""
+    for i in range(1, len(notes) - 1):
+        a, b, c = notes[i - 1]["pitch"], notes[i]["pitch"], notes[i + 1]["pitch"]
+        for k in (-12, 12):
+            if abs(b + k - a) < abs(b - a) - 7 and abs(b + k - c) < abs(b - c) - 7:
+                notes[i]["pitch"] = b + k
+
+
+def quality(notes: list[dict]) -> str:
+    """書き起こしが乱れていれば、その理由（空なら使える。決定 159）"""
+    if len(notes) < 8:
+        return ""
+    ps = [n["pitch"] for n in notes]
+    sp = sorted(ps)
+    span = sp[int(len(sp) * 0.95) - 1] - sp[int(len(sp) * 0.05)]   # 外れた数音に引っぱられないよう、真ん中 9 割の幅
+    iv = sorted(abs(b - a) for a, b in zip(ps, ps[1:]))
+    med_iv = iv[len(iv) // 2] if iv else 0
+    bars = max(1.0, (notes[-1]["start_beat"] + notes[-1]["beats"] - notes[0]["start_beat"]) / 4)
+    npb = len(notes) / bars
+    tiny = sum(1 for n in notes if n["beats"] <= 0.25) / len(notes)
+    big = sum(1 for x in iv if x >= 7) / max(1, len(iv))
+    why = []
+    if npb > 12:
+        why.append(f"1 小節に {npb:.0f} 音（細かく割れすぎ）")
+    if tiny > 0.6:
+        why.append(f"16 分音符より短い音が {int(tiny * 100)}%")
+    if span > 26:
+        why.append(f"音域が {span} 半音（広すぎ）")
+    if med_iv > 5 or big > 0.35:
+        why.append(f"跳躍が多すぎ（5 度以上の跳びが {int(big * 100)}%）")
+    return "・".join(why)
 
 
 def vocals(path: Path, sr: int = 22050):
@@ -129,12 +229,7 @@ def notes_from(y, sr: int, bpm: float | None) -> tuple[list[dict], float, str]:
         if notes and abs(sb - notes[-1]["start_beat"]) < 1e-6:
             continue
         notes.append({"start_beat": sb, "beats": nb, "pitch": pitch})
-    # 1 オクターブのずれを直す（前後とくらべて 12 半音近く飛ぶ音）
-    for i in range(1, len(notes) - 1):
-        a, b, c = notes[i - 1]["pitch"], notes[i]["pitch"], notes[i + 1]["pitch"]
-        for k in (-12, 12):
-            if abs(b + k - a) < abs(b - a) - 7 and abs(b + k - c) < abs(b - c) - 7:
-                notes[i]["pitch"] = b + k
+    _fix_octaves(notes)
     # 重なりをなくす
     for i in range(len(notes) - 1):
         gap = notes[i + 1]["start_beat"] - notes[i]["start_beat"]
@@ -288,9 +383,21 @@ def transcribe_melody(audio: Path, sheet: dict, out_name: str) -> tuple[dict, Pa
     bpm = (sheet.get("groove") or {}).get("bpm") or None
     key = (sheet.get("_measure") or {}).get("key")
     y, sr, how = vocals(audio)
-    notes, tempo, note = notes_from(y, sr, bpm)
+    tool = "pyin"
+    if basic_pitch_ready():
+        try:
+            notes, tempo, note = notes_basic_pitch(y, sr, bpm)
+            tool = "basic_pitch"
+        except Exception as e:  # noqa: BLE001  Basic Pitch の動く部品が無いときなど：前のやり方へ
+            notes, tempo, note = notes_from(y, sr, bpm)
+            note += f"（Basic Pitch は動きませんでした：{type(e).__name__}）"
+    else:
+        notes, tempo, note = notes_from(y, sr, bpm)
     feat = features(notes, tempo, key, (sheet.get("structure") or {}).get("sections") or [])
-    feat.update({"separation": how, "bpm_used": round(tempo, 1), "detail": note})
+    bad = quality(notes)
+    if bad and feat.get("usable"):   # 乱れた書き起こしは曲作りに渡さない（決定 159）
+        feat = {"usable": False, "note": f"書き起こしが乱れているので使いません：{bad}"}
+    feat.update({"separation": how, "transcriber": tool, "version": VERSION, "bpm_used": round(tempo, 1), "detail": note})
     mid = None
     if notes:
         safe = re.sub(r'[\\/:*?"<>|]+', "_", out_name).strip() or "melody"
@@ -305,4 +412,4 @@ if __name__ == "__main__":   # 試しに 1 曲：python3 scripts/melody.py <音�
     sh = {"groove": {"bpm": float(sys.argv[2])} if len(sys.argv) > 2 else {}, "_measure": {"key": sys.argv[3] if len(sys.argv) > 3 else None}}
     f, m = transcribe_melody(p, sh, p.stem)
     print(json.dumps(f, ensure_ascii=False, indent=1))
-    print("MIDI:", m, "／ 歌の取り出し：", "Demucs" if demucs_ready() else "librosa")
+    print("MIDI:", m, "／ 歌の取り出し：", "Demucs" if demucs_ready() else "librosa", "／ 音符：", "Basic Pitch" if basic_pitch_ready() else "pYIN")

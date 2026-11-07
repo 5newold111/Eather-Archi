@@ -288,10 +288,10 @@ def slot_excerpts(brief: dict, refs_dir: Path | None) -> dict[str, dict]:
                 if sec == "lyrics" and isinstance(data, dict) and "key_words" in data:
                     data["key_words"] = [{"category": k.get("category")} for k in data["key_words"]]   # 語そのものは渡さない
                 if sec == "melody" and isinstance(data, dict):   # 旋律の特徴だけ（MIDI の場所・処理の記録は渡さない。決定 90）
-                    for k in ("midi_file", "detail", "separation", "bpm_used"):
-                        data.pop(k, None)
-                    if not data.get("usable"):
+                    if not data.get("usable") or (data.get("version") or 1) < 2:   # 前のやり方（版 1）の書き起こしは乱れが多いので渡さない（決定 159）
                         continue
+                    for k in ("midi_file", "detail", "separation", "bpm_used", "transcriber", "version"):
+                        data.pop(k, None)
                 if sec == "lyrics" and isinstance(data, dict):   # 聞き取った歌詞の文そのものは渡さない（形だけ。決定 86）
                     data.pop("transcript", None)
                     data.pop("web_check", None)
