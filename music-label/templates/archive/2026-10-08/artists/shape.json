@@ -1,0 +1,335 @@
+{
+  "_注意": "本体レーベル（ドライブ）。name は仮。配信登録前に重複確認（docs/03_artists.md）。",
+  "slug": "shape",
+  "axis": "shape",
+  "name": "GIRDER CLUB",
+  "name_status": "checked",
+  "name_candidates": [
+    "GIRDER CLUB",
+    "Pylon Parade",
+    "Overpass Social"
+  ],
+  "formation": "band",
+  "cadence": "weekly",
+  "debut_week": "LAUNCH_WEEK",
+  "persona": {
+    "members": [
+      {
+        "role": "vocal / guitar",
+        "description": "男性。よく通る中音域。歯切れがよく、笑いながら歌うような明るさ"
+      },
+      {
+        "role": "bass",
+        "description": "指弾き。うねるシンコペーションのライン"
+      },
+      {
+        "role": "drums",
+        "description": "生ドラム。跳ねるグルーヴ、タンバリン兼任"
+      },
+      {
+        "role": "keys",
+        "description": "エレピとシンセブラス。合いの手担当"
+      }
+    ],
+    "age_feel": "20 代後半の 4 人",
+    "story": "ワゴン 1 台で移動しながら、昼のハイウェイとサービスエリアで曲を作るバンド。橋・トンネル・標識の形を歌にする",
+    "drive_scene": "昼のハイウェイ、開放感、サービスエリア",
+    "origin": {
+      "birthplace": "湾岸の工業地帯と埋立地の町",
+      "upbringing": "巨大な橋脚と高架の下で育ち、構造物の幾何学を遊び場にしていた",
+      "landscape_words": [
+        "真上からの太陽に短くなる影",
+        "白いコンクリートの橋脚",
+        "入道雲",
+        "標識の緑"
+      ]
+    },
+    "influences": [
+      {
+        "name": "（bio のみ）",
+        "era": "1980s",
+        "genre": "シティポップ",
+        "what_was_taken": "跳ねる 16 ビートと、シンセブラスの合いの手",
+        "reference_id": null
+      },
+      {
+        "name": "（bio のみ）",
+        "era": "2000s〜2010s",
+        "genre": "インディーロック / ファンクポップ",
+        "what_was_taken": "カッティングギターと、全員コーラスの開放感",
+        "reference_id": null
+      }
+    ],
+    "formation_story": {
+      "started": "2022 年秋",
+      "how": "工業高校の同級生 3 人（ギター・ベース・鍵盤）が放課後に橋脚の下で練習していた。ドラマーだけ見つからず、サービスエリアの掲示板に貼った『ドラム募集・移動多め』の紙を見た長距離ドライバーの息子が加入して 4 人になった",
+      "inspired_by_pattern": "学校の仲間＋メンバー募集の貼り紙で最後の 1 人が加わる型（高校の友人で始まり、募集広告でドラマーが加入したバンドの定番の経緯）",
+      "first_release": "ワゴンの中で録った 4 曲入り。ジャケットは橋の図面",
+      "name_meaning": "girder（橋の桁）＋ club。構造物の下で集まる部活"
+    }
+  },
+  "vocal": {
+    "sex": "male",
+    "range": "mid",
+    "fixed_timbre": true,
+    "suno_persona_id": null,
+    "voice_spec": {
+      "comfortable_low": "A2",
+      "comfortable_high": "F#4",
+      "chest_voice_top": "G4",
+      "falsetto_switch_point": "A4",
+      "falsetto_quality": "明るく軽い。コーラスの最上段でだけ使う",
+      "strength": "言葉を刻むリズム感と、よく通る中音域。コーラスで厚く重なる",
+      "weakness": "ロングトーン。静かな曲"
+    },
+    "signature_techniques": {
+      "primary": "言葉を刻む（スタッカート。拍の前に突っ込む）",
+      "secondary": [
+        "全員コーラス（ユニゾン → 3 度に開く）",
+        "掛け合いの合いの手（Hey! / Alright）",
+        "裏声でコーラスの最上段"
+      ],
+      "avoid": [
+        "囁くようなウィスパー",
+        "語尾のフォール",
+        "ハミング",
+        "シャウト（歪ませる）"
+      ],
+      "wordless_style": "全員で「Hey!」「Oh-oh」",
+      "tics": [
+        {
+          "technique": "全員の「Hey!」",
+          "where": "サビ前の 1 拍",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "シンセブラスとボーカルの掛け合い（1 小節ずつ）",
+          "where": "2 番の後の間奏",
+          "frequency": "every_song"
+        },
+        {
+          "technique": "歌詞に構造物の形（橋 / トンネル / 標識 / 曲線）を 1 つ",
+          "where": "どこか",
+          "frequency": "every_song"
+        }
+      ]
+    },
+    "melodic_tendency": {
+      "motion": "ペンタトニックの跳躍が多い。同音連打でリズムを作る",
+      "chorus_peak": "切り替え点（A4）の下（G4）で地声を張る。頂点は 1 拍だけ",
+      "verse_register": "中音域（C3〜E4）で刻む"
+    },
+    "timbre_blend": {
+      "main": {
+        "reference_id": null,
+        "weight": 0.6,
+        "traits": []
+      },
+      "sub1": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
+      "sub2": {
+        "reference_id": null,
+        "weight": 0.2,
+        "traits": []
+      },
+      "synthesized": "（参考曲 DB が 10 曲以上たまったら、male・mid の 3 曲から 6:2:2 で合成）"
+    },
+    "guest_description": "よく通る中音域の男性ボイス。言葉を刻み、拍の前に突っ込む。コーラスで厚く重なる"
+  },
+  "composition_habits": {
+    "modulation": "ブリッジで 4 度上へ転調し、ラスサビで元に戻る",
+    "intro": "カッティングギターのリフ 2 小節 → ドラムのフィル → 全員（4 小節以内に歌）",
+    "outro": "全員が同じ 1 音を「Hey!」で止める。フェードしない",
+    "phrase_endings": "切る（スタッカート）",
+    "structure": "Riff → Verse → Pre → Chorus × 2 → 間奏（掛け合い）→ Bridge（転調）→ ラスサビ → Hey! で終わり",
+    "instruments_rule": "生ドラム・指弾きベース・カッティングギター・シンセブラスの 4 点を必ず",
+    "rhythm": "跳ねる 16 ビート。ベースはシンコペーション。タンバリンはサビだけ",
+    "lyrics_tic": "毎曲、構造物の形を 1 つ歌う",
+    "always": [
+      "25 秒以内にサビの要素",
+      "全員コーラス"
+    ],
+    "never": [
+      "打ち込みだけの質感",
+      "急な無音",
+      "ダークな展開",
+      "バラード"
+    ]
+  },
+  "sound": {
+    "genres": [
+      "city pop",
+      "indie rock",
+      "funk pop"
+    ],
+    "palette": [
+      "生ドラム",
+      "指弾きエレキベース",
+      "カッティングギター",
+      "エレピ",
+      "シンセブラス",
+      "タンバリン"
+    ],
+    "bpm_min": 115,
+    "bpm_max": 125,
+    "energy_curve_type": "5-6-8-6-8-5-10-5",
+    "dna_tags": [
+      "day",
+      "highway",
+      "groove",
+      "band",
+      "bright",
+      "funk"
+    ],
+    "forbidden": [
+      "打ち込みだけの質感",
+      "急な無音",
+      "ダークな展開"
+    ],
+    "drive_spec": {
+      "hook_within_sec": 25,
+      "length_sec_min": 150,
+      "length_sec_max": 210,
+      "no_sudden_silence": true
+    }
+  },
+  "lyrics": {
+    "themes": [
+      "仲間との移動",
+      "風景の形",
+      "直線と曲線",
+      "今日という日",
+      "サービスエリア"
+    ],
+    "point_of_view": "私たち",
+    "primary_language": "en",
+    "trend_language_ok": false,
+    "trend_language_max_ratio": 0.0,
+    "tone": "軽やか。ユーモアあり",
+    "forbidden_topics": [
+      "宗教",
+      "政治",
+      "特定の人物"
+    ],
+    "mode": "core_fixed",
+    "suno_share": 0.45,
+    "_mode": "full＝歌詞を全部こちらで書く / core_fixed＝核（サビ・決め台詞・タグ・構成）を固定し、A メロなどの節は Suno の歌詞生成に任せて合体 / instrumental＝歌なし。suno_share は Suno に任せる割合の目安",
+    "topic_only_ratio": 0.2,
+    "_topic_only": "たまに『お題だけ』モード：お題・構成・癖のタグ・禁止事項だけを渡し、歌詞は全部 Suno に書かせる。topic_only_ratio は週ごとの乱数で選ばれる割合（0.2＝5 曲に 1 曲）。write_brief.py --lyrics-mode topic_only で手動指定も可"
+  },
+  "visual": {
+    "space": "昼のハイウェイを走るワゴンの車内と、サービスエリアの屋外",
+    "light": "真上からの太陽光。影が短い",
+    "materials": [
+      "コンクリート",
+      "金属",
+      "白い雲"
+    ],
+    "palette": [
+      "白",
+      "スカイブルー",
+      "コンクリートグレー",
+      "差し色にオレンジ"
+    ],
+    "camera": "広角。構造物の幾何学を強調",
+    "cover_series_rule": "毎回『形』が主役（橋 / トンネル / 標識 / 高架）。写真風ではなく図面風",
+    "blend_file": null,
+    "face_concealment": {
+      "primary": "俯瞰（真上から、帽子とヘルメットの影）",
+      "secondary": [
+        "被り物（幾何学的な工事用ヘルメットの抽象化）",
+        "動きのブレ"
+      ],
+      "never": [
+        "逆光",
+        "窓フィルター"
+      ]
+    },
+    "logo": {
+      "concept": "橋の桁の断面（H 形）を単純化。文字は太い",
+      "mark_type": "文字＋記号",
+      "color_rule": "白地にスカイブルー、差し色オレンジ",
+      "typography": "太いジオメトリックサンセリフ、全部大文字"
+    },
+    "photo_direction": {
+      "taste": "デジタル、彩度高め、硬い光",
+      "composition": "対称、4 人を等間隔に",
+      "location_type": "屋外（橋脚の下・サービスエリア）",
+      "brightness": "明",
+      "contrast": "高",
+      "color_temperature": "中",
+      "background": "情報量多い（構造物）",
+      "positioning": "4 人横並び、カメラは真上",
+      "gesture": "歩いている、手はポケット"
+    }
+  },
+  "distribution": {
+    "spotify_uri": null,
+    "apple_artist_id": null,
+    "distrokid_artist_id": null,
+    "youtube_channel": null,
+    "instagram": null,
+    "tiktok": null,
+    "bio_en": "GIRDER CLUB is a virtual band from EtherArchi, a label where AI-generated music meets spatial design. Daylight highways, concrete and sky, four voices shouting Hey."
+  },
+  "collab": {
+    "preferred_partners": [
+      "light",
+      "self"
+    ],
+    "collab_style": "feat. で客演。光 の高い ooh とバンドの Hey! の掛け合い"
+  },
+  "profile": {
+    "hometown": "千葉県・湾岸の工業地帯（4 人とも）",
+    "height_cm": [
+      175,
+      181,
+      170,
+      172
+    ],
+    "weight_kg": [
+      64,
+      72,
+      60,
+      68
+    ],
+    "likes": [
+      "橋の図面",
+      "サービスエリアの食堂",
+      "高架の下での練習"
+    ],
+    "favorite_food": "サービスエリアの唐揚げ定食",
+    "dislikes": [
+      "渋滞の無音",
+      "打ち込みだけの音",
+      "暗い曲"
+    ],
+    "favorite_artists_real": [
+      "山下達郎",
+      "Vulfpeck",
+      "Phoenix",
+      "Tom Misch"
+    ],
+    "_注意": "favorite_artists_real は公開プロフィール（bio）と SNS 用。Suno・画像の指示文には絶対に渡さない（実名は模倣・規約の問題になる）。身長体重は編成の人数ぶんの配列"
+  },
+  "concept_history": {
+    "concept_version": 1,
+    "history": [],
+    "_説明": "方針転換の履歴。伸び悩みで転換したときに {version, date, reason, changes, photos_reshot} を追加。docs/06_growth.md の転換ルール"
+  },
+  "_debut_week": "本体 5 組は同時デビュー。LAUNCH_WEEK をレーベル立ち上げ週の月曜（YYYY-MM-DD）に一括置換する",
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "near",
+    "note": "Girder Music というレーベルが近い。混同は低い",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
+}

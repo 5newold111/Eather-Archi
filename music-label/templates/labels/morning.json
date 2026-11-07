@@ -1,0 +1,64 @@
+{
+  "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
+  "slug": "morning",
+  "name": "FIRST POUR",
+  "name_status": "checked",
+  "parent": "etherarchi",
+  "scene": "起きてからコーヒーを飲み終えるまで",
+  "sound_center": [
+    "ジャズホップ",
+    "ボサノバ",
+    "アコースティック"
+  ],
+  "expansion_path": [
+    "ソウル",
+    "ネオクラシカル（朝）",
+    "朝のシティポップ",
+    "ゴスペル寄りのコーラス"
+  ],
+  "scene_spec": {
+    "bpm_min": 75,
+    "bpm_max": 100,
+    "length_sec_min": 150,
+    "length_sec_max": 220,
+    "hook_within_sec": 30,
+    "no_sudden_silence": true
+  },
+  "automation_tier": "B",
+  "max_weekly_releases": 8,
+  "release_hour_et": 6,
+  "release_weekday": "monday",
+  "_release": "月曜 6:00 ET（日本 月曜 19:00/20:00）。米国の月曜の朝に新曲が届く",
+  "accounts": {
+    "distrokid_email": "morning-label",
+    "spotify_for_artists_team": "morning-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "キッチンのカウンター。朝日と湯気",
+    "palette": [
+      "生成り",
+      "蜂蜜色",
+      "淡い緑"
+    ],
+    "cover_series_rule": "毎回同じカウンター。カップと光の角度だけ変える"
+  },
+  "artists": [],
+  "name_candidates": [
+    "FIRST POUR"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "完全一致なし",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  }
+}
