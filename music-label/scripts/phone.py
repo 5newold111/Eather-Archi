@@ -183,7 +183,7 @@ def paste_section(song: dict) -> str:
             + "".join(out)
             + '<div class="pbar"><button id="pnext" class="primary">次を写す</button><div class="note" id="pnote"></div></div>'
             + '<ol class="how"><li>全部入れたら <b>Create</b> は Gon さんが押す（ロボット確認が出たら自分でチェック）</li>'
-              '<li>2 つを聴いて、気に入った方に<b>いいね</b> → その 1 本を SSD の「楽曲情報」に<b>ダウンロード</b>（WAV があれば WAV）。数分で自動で取り込まれ、SSD の「02_アーティスト/組/楽曲情報/曲名」のフォルダに入ります</li>'
+              '<li>2 つを聴いて、気に入った方に<b>いいね</b> → その 1 本を SSD の「楽曲情報」に<b>ダウンロード</b>（WAV があれば WAV）。数分で自動で取り込まれ、SSD の「02_アーティスト/組/04_楽曲/曲名」のフォルダに入ります</li>'
               '<li>2 つとも良くないときは、まず同じ入力のまま Create をもう一度。だめならダッシュボードの「Suno で作曲」で理由を選んで直す</li></ol>'
               '<p class="note"><button id="preset" class="ghost">最初からやり直す</button></p></section>')
 

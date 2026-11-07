@@ -22,12 +22,11 @@ SSD がつながっていないときは何もせず、その旨だけ表示す�
         01_情報/      設定書（json）・プロフィール（md）
         02_写真/      <アーティスト名>_photo.jpg・_photo2.jpg
         03_ジャケット/ <アーティスト名>_<曲名>_1.jpg（作り直すと _2・_3 …）
-        04_楽曲/<曲名>/ 公開セット：配信用の音源・ジャケット・DistroKid の下書き・選んだテイク・歌詞
-        楽曲情報/<曲名>/ Suno でいいねしてダウンロードした曲（取り込むとここへ移す）＋ 配信用/（DistroKid に入れる音源・ジャケット・下書き）。
-                        フォルダが無ければ作る（オーナーの指定 2026-11-06。決定 151）
+        04_楽曲/<曲名>/ その曲のすべて：Suno でいいねしてダウンロードした曲（取り込むとここへ移す。無ければ作る）・
+                        配信用の音源・ジャケット・DistroKid の下書き・歌詞。DistroKid の自動入力もここから取る（決定 151・158）
     03_作業書/      デビュー_<日付>/ 作業書（PDF）・曲の情報・画像の依頼文
     09_移行前/      Google から移したもの（オーナーが入れる。機械は触らない）
-    楽曲情報/       Suno からダウンロードした曲の受け口（Suno・専用の Chrome の保存先。取り込むと 02_アーティスト/<名前>/楽曲情報/<曲名>/ へ移す）
+    楽曲情報/       Suno からダウンロードした曲の受け口（Suno・専用の Chrome の保存先。取り込むと 02_アーティスト/<名前>/04_楽曲/<曲名>/ へ移す）
   前の並び（アーティスト情報・管理表・写真 など）で保管したものは、見つけしだい新しい名前へ移す。
 
 フォルダ名は、大文字・小文字、全角・半角、Mac の濁点の持ち方（NFD／NFC）の違いを同じ名前として扱う。
@@ -50,8 +49,8 @@ ARTIST_DIR = "02_アーティスト"
 KIT_DIR = "03_作業書"
 OLD_DIR = "09_移行前"
 INBOX_DIR = "楽曲情報"   # Suno からダウンロードした曲を入れるところ（publish.py が見張る。オーナーの指定 2026-10-21）
-SUBS = {"info": "01_情報", "photo": "02_写真", "cover": "03_ジャケット", "music": "04_楽曲", "inbox": INBOX_DIR}
-SONG_SET_DIR = "配信用"   # 楽曲情報/<曲名>/配信用/：DistroKid に入れる音源・ジャケット・下書き（決定 151）
+SUBS = {"info": "01_情報", "photo": "02_写真", "cover": "03_ジャケット", "music": "04_楽曲"}
+SONG_SET_DIR = "配信用"   # 前の作り（決定 151）の 楽曲情報/<曲名>/配信用/。見つけたら 04_楽曲/<曲名>/ にまとめる（決定 158）
 # 前の並びの名前 → 新しい名前
 _RENAME_TOP = {"管理表": BOOK_DIR, "アーティスト情報": ARTIST_DIR}
 _RENAME_SUB = {"情報": SUBS["info"], "写真": SUBS["photo"], "ジャケット": SUBS["cover"], "楽曲": SUBS["music"]}
@@ -104,6 +103,7 @@ def migrate(base: Path) -> None:
     _migrated.add(str(base))
     _mkdir(base / OLD_DIR)   # Google などから移すものを入れる場所（機械は触らない）
     child(base, INBOX_DIR)   # Suno のダウンロード先（同じ名前があればそれを使う）
+    _merge_artist_inboxes(base / ARTIST_DIR)   # 組ごとの「楽曲情報」（決定 151 の作り）は 04_楽曲 にまとめる（決定 158）
     for old, new in _RENAME_TOP.items():
         o = find_child(base, old)
         if o is not None and o.name != new:
@@ -156,7 +156,41 @@ def local_root() -> Path:
         downloads = Path.home() / "Downloads"   # Finder では「ダウンロード」と表示される
         base = child(child(_mkdir(downloads), LOCAL_PARENT), LOCAL_NAME)
     _migrate_local(base)
+    if str(base) + "#inbox" not in _migrated:
+        _migrated.add(str(base) + "#inbox")
+        _merge_artist_inboxes(base)
     return base
+
+
+def _merge_artist_inboxes(top: Path) -> None:
+    """<組>/楽曲情報/<曲名>/（と、その中の 配信用/）の中身を <組>/04_楽曲/<曲名>/ へ移し、空になった「楽曲情報」を消す（決定 158。オーナーの指定 2026-11-07）。
+    同じ名前のファイルが 04_楽曲 側にあれば、04_楽曲 側を残す（消さない）"""
+    if not top.is_dir():
+        return
+    for a in [a for a in top.iterdir() if a.is_dir()]:
+        inbox = find_child(a, INBOX_DIR)
+        if inbox is None:
+            continue
+        try:
+            for s in [s for s in inbox.iterdir() if s.is_dir()]:
+                for f in [f for f in s.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXT and not f.name.startswith(".")
+                          and not f.stem.endswith("_Suno元データ")]:   # ダウンロードした曲：公開セットと同じ「_Suno元データ」の名前に
+                    t = f.with_name(f"{f.stem}_Suno元データ{f.suffix.lower()}")
+                    if not t.exists():
+                        f.rename(t)
+                        ad = f.with_name("._" + f.name)
+                        if ad.is_file():
+                            ad.rename(t.with_name("._" + t.name))
+                ss = find_child(s, SONG_SET_DIR)
+                if ss is not None:
+                    _move_into(ss, s)
+                _move_into(s, child(child(a, SUBS["music"]), s.name))
+            for f in inbox.iterdir():   # Finder の .DS_Store・付き添いの ._ だけなら消して、空のフォルダを片付ける
+                if f.is_file() and f.name.startswith("."):
+                    f.unlink()
+            inbox.rmdir()
+        except OSError:
+            pass
 
 
 def _migrate_local(base: Path) -> None:
@@ -196,38 +230,23 @@ def artist_folder(artist_name: str, kind: str | None = None, week: str | None = 
     return _artist_path(child(base, ARTIST_DIR), artist_name, kind, week), how
 
 
-def song_folder(artist_name: str, title: str) -> Path:
-    """その曲のフォルダ：SSD の 02_アーティスト/<アーティスト名>/楽曲情報/<曲名>/（無ければ作る）。
-    SSD がつながっていなければ、ローカル保存の <アーティスト名>/楽曲情報/<曲名>/（次に SSD をつないだとき同じ並びで写る）（決定 151）"""
-    sf, _ = artist_folder(artist_name, "inbox", title)
-    return sf if sf is not None else local_folder(artist_name, "inbox", title)
+def song_folder(artist_name: str, sub: str) -> Path:
+    """その曲のフォルダ：SSD の 02_アーティスト/<アーティスト名>/04_楽曲/<曲名>/（無ければ作る）。
+    SSD がつながっていなければ、ローカル保存の <アーティスト名>/04_楽曲/<曲名>/（次に SSD をつないだとき同じ並びで写る）（決定 151・158）"""
+    sf, _ = artist_folder(artist_name, "music", sub)
+    return sf if sf is not None else local_folder(artist_name, "music", sub)
 
 
-def song_folders(artist_name: str, title: str) -> list[Path]:
-    """その曲のフォルダのうち、いまあるもの（SSD → ローカル保存の順。作らない）"""
+def song_folders(artist_name: str, sub: str) -> list[Path]:
+    """その曲のフォルダ（04_楽曲/<曲名>/）のうち、いまあるもの（SSD → ローカル保存の順。作らない）"""
     out = []
     base, _ = root()
     for top in ([find_child(base, ARTIST_DIR)] if base is not None else []) + [local_root()]:
         a = find_child(top, artist_name) if top is not None and top.is_dir() else None
-        i = find_child(a, INBOX_DIR) if a is not None else None
-        s = find_child(i, title) if i is not None else None
+        m = find_child(a, SUBS["music"]) if a is not None else None
+        s = find_child(m, sub) if m is not None else None
         if s is not None:
             out.append(s)
-    return out
-
-
-def artist_inboxes() -> list[Path]:
-    """組ごとの「楽曲情報」のフォルダ（SSD の 02_アーティスト/*/楽曲情報 と ローカル保存の */楽曲情報。あるものだけ）"""
-    out = []
-    base, _ = root()
-    tops = ([find_child(base, ARTIST_DIR)] if base is not None else []) + [local_root()]
-    for top in tops:
-        if top is None or not top.is_dir():
-            continue
-        for a in sorted(d for d in top.iterdir() if d.is_dir()):
-            i = find_child(a, INBOX_DIR)
-            if i is not None:
-                out.append(i)
     return out
 
 

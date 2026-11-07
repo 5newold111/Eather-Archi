@@ -87,10 +87,6 @@ def inboxes() -> list[Path]:
     if base is not None:
         out.append(archive.child(base, archive.INBOX_DIR))
     out.append(archive.child(archive._mkdir(Path.home() / "Downloads"), archive.LOCAL_PARENT))
-    try:   # 組ごとの「楽曲情報」（02_アーティスト/<組>/楽曲情報/<曲名>/ に直接ダウンロードした曲も取り込む。決定 151）
-        out += [b for b in archive.artist_inboxes() if b not in out]
-    except OSError:
-        pass
     return out
 
 
@@ -162,7 +158,7 @@ def new_files() -> list[Path]:
     # 見分けられなかったファイル（"why" の記録）は、次の取り込みでまた試す（前は一度「？」になると二度と見なかった。決定 152）
     seen = {k: v for k, v in seen.items() if not (isinstance(v, dict) and v.get("song") is None and "why" in v)}
     known = {(Path(k.split("|")[0]).name, *k.split("|")[1:3]) for k in seen if k.count("|") == 2}
-    skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み"), _songs.norm(archive.SONG_SET_DIR)}   # 配信用/ は取り込まない（決定 151）
+    skip_dirs = {_songs.norm(archive.LOCAL_NAME), _songs.norm("取り込み済み")}
     out = []
     for box in inboxes():
         if not box.is_dir():
@@ -189,7 +185,7 @@ def new_files() -> list[Path]:
 
 def downloads_top(seen: dict, known: set, already: list[Path]) -> list[Path]:
     """ダウンロード（~/Downloads）の一番上に、ふだんのブラウザで保存した曲（7 日以内）。作曲待ちの曲と名前が合うものだけ（決定 152）。
-    取り込むと、その曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/）へ移る"""
+    取り込むと、その曲のフォルダ（02_アーティスト/<組>/04_楽曲/<曲名>/）へ移る"""
     if os.environ.get("SUNO_INBOX", "").strip():
         return []
     d = Path.home() / "Downloads"
@@ -227,7 +223,7 @@ def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
     """ファイル名（とフォルダ名）から曲を見分ける。(曲, 理由)"""
     name = _clean(f.stem)
     folders = " ".join(_songs.norm(p) for p in f.parts[-4:-1])
-    in_song = _songs.norm(f.parent.name)   # 02_アーティスト/<組>/楽曲情報/<曲名>/ の中なら、フォルダの名前が曲名（決定 151）
+    in_song = _songs.norm(f.parent.name)   # 曲名のフォルダの中なら、フォルダの名前が曲名（決定 151）
     best, best_score, ties = None, 0, []
     for s in songs:
         titles = [t for t in [s["title"], *s["alts"]] if t]
@@ -292,7 +288,7 @@ def take_in(song: dict, f: Path) -> None:
     day = made_on(f)
     stem = _songs.audio_stem(song, day)
     f = rename_in_inbox(f, stem)
-    f = to_song_folder(song, f)   # 02_アーティスト/<組>/楽曲情報/<曲名>/ へ（無ければ作る。決定 151）
+    f = to_song_folder(song, f)   # 02_アーティスト/<組>/04_楽曲/<曲名>/ へ（無ければ作る。決定 151・158）
     dst = tdir / f"{stem}{f.suffix.lower()}"
     shutil.copy2(f, dst)
     sel_p = tdir / "selection.json"
@@ -333,6 +329,9 @@ def rename_in_inbox(f: Path, stem: str) -> Path:
         n += 1
     try:
         f.rename(new)
+        ad = f.with_name("._" + f.name)   # Mac が外付けのドライブに作る付き添いのファイルも、同じ名前に（決定 158）
+        if ad.is_file():
+            ad.rename(new.with_name("._" + new.name))
     except OSError:
         return f
     reg = read_json(REGISTRY) if REGISTRY.exists() else {}
@@ -344,16 +343,25 @@ def rename_in_inbox(f: Path, stem: str) -> Path:
 
 
 def to_song_folder(song: dict, f: Path) -> Path:
-    """取り込んだファイルを、その曲のフォルダ（SSD の 02_アーティスト/<組>/楽曲情報/<曲名>/。無ければ作る）へ移す（決定 151）。
-    もうそのフォルダの中なら動かさない。同じ名前があれば _2 を付ける。移せなければ元の場所のまま"""
+    """取り込んだファイルを、その曲のフォルダ（SSD の 02_アーティスト/<組>/04_楽曲/<曲名>/。無ければ作る）へ移す（決定 151・158）。
+    名前は公開セットの「Suno の元データ」と同じ <曲名>_<組>_<生成日>_Suno元データ.<拡張子>（同じものが 2 つできないように）。
+    もうそのフォルダの中なら動かさない。同じ名前で中身が違えば _2 を付ける。移せなければ元の場所のまま"""
     try:
-        dst_dir = archive.song_folder(song["artist"], song["title"])
+        dst_dir = archive.song_folder(song["artist"], _songs.folder_name(song))
         if f.parent.resolve() == dst_dir.resolve():
             return f
-        dst = dst_dir / f.name
+        name = f.name if f.stem.endswith("_Suno元データ") else f"{f.stem}_Suno元データ{f.suffix.lower()}"
+        dst = dst_dir / name
+        import filecmp
+        if dst.exists() and filecmp.cmp(f, dst, shallow=False):   # もう同じものがある：受け口の方を片付けるだけ
+            f.unlink()
+            ad = f.with_name("._" + f.name)
+            if ad.is_file():
+                ad.unlink()
+            return dst
         n = 2
         while dst.exists():
-            dst = dst_dir / f"{f.stem}_{n}{f.suffix}"
+            dst = dst_dir / f"{Path(name).stem}_{n}{f.suffix.lower()}"
             n += 1
         shutil.move(str(f), str(dst))
         ad = f.with_name("._" + f.name)   # Mac が外付けのドライブに作る付き添いのファイル（音は入っていない）も一緒に（決定 153）
@@ -368,26 +376,6 @@ def to_song_folder(song: dict, f: Path) -> Path:
     REGISTRY.write_text(json.dumps(reg, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"   ○ 曲のフォルダへ入れました：{archive.label(dst_dir) if archive.root()[0] else archive.local_label(dst_dir)}/{dst.name}")
     return dst
-
-
-def song_set(song: dict) -> list[str]:
-    """その曲のフォルダの 配信用/ に、DistroKid に入れる音源・ジャケット・下書き・配信用の歌詞をそろえる（決定 151）。
-    ローカル保存の公開セットから。ローカル保存の曲のフォルダは同じ実体（容量を使わない）、SSD は写す"""
-    folder, audio, cover = publish_folder(song)
-    srcs = [folder / audio, *([folder / cover] if cover else [])]
-    if (PUB / song["key"]).is_dir():
-        srcs += sorted(f for f in (PUB / song["key"]).iterdir() if f.is_file() and not f.name.startswith("."))
-    srcs = [s for s in srcs if s.exists()]
-    if not srcs:
-        return []
-    lines = []
-    local = archive.child(archive.local_folder(song["artist"], "inbox", song["title"]), archive.SONG_SET_DIR)
-    ssd, _ = archive.artist_folder(song["artist"], "inbox", song["title"])
-    for s in srcs:
-        lines.append(f"{s.name}：ローカル保存に{archive.save(s, local, s.name, link=True)}")
-        if ssd is not None:
-            lines.append(f"{s.name}：SSD に{archive.save(local / s.name, archive.child(ssd, archive.SONG_SET_DIR), s.name)}")
-    return lines
 
 
 def advance(song: dict) -> str:
@@ -653,11 +641,6 @@ def store_set(song: dict) -> None:
     subprocess.run([sys.executable, str(S / "archive_sync.py"), "--only", song["slug"]], capture_output=True, text=True)
     folder, audio, cover = publish_folder(song)
     print(f"   ○ 公開セット：{archive.local_label(folder)}/")
-    try:   # 曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/配信用/）にも、DistroKid に入れるものをそろえる（決定 151）
-        if song_set(song):
-            print(f"   ○ 曲のフォルダ：{archive.INBOX_DIR}/{song['title']}/{archive.SONG_SET_DIR}/ に音源・ジャケット・下書きをそろえました")
-    except OSError as e:
-        print(f"   － 曲のフォルダにそろえられませんでした（{e}）")
 
 
 def cmd_scan(args) -> int:
@@ -1435,7 +1418,7 @@ def cmd_artist_page(args) -> int:
 def cmd_take(args) -> int:
     """ファイルを指定して取り込む（オーナーの指示 2026-11-06。決定 153）。自動の取り込みで見分けられなかった曲を、手で 1 本ずつ入れる。
     曲は --song（曲 ID か曲名）で決める。省くと、ファイル名からいちばん近い曲（決定 152 の見分け方）。
-    名前を <曲名>_<組>_<生成日> にそろえ、その曲のフォルダ（02_アーティスト/<組>/楽曲情報/<曲名>/）へ移し、公開の準備まで進める"""
+    名前を <曲名>_<組>_<生成日> にそろえ、その曲のフォルダ（02_アーティスト/<組>/04_楽曲/<曲名>/）へ移し、公開の準備まで進める"""
     f = Path(args.file).expanduser()
     if f.name.startswith("._"):   # Mac が外付けのドライブに作る、中身の無い付き添いのファイル。本体は「._」の無い同じ名前
         real = f.with_name(f.name[2:])
