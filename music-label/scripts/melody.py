@@ -34,7 +34,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT  # noqa: E402
 
 MELODY_DIR = OUT / "reference_db" / "melody"
-VERSION = 2   # 書き起こしのやり方の版（上がると、前の版で起こした曲を起こし直す。決定 159）
+VERSION = 3   # 書き起こしのやり方の版（上がると、前の版で起こした曲を起こし直す。決定 159・161）
+STEMS = {"vocals": "ボーカル", "bass": "ベース", "drums": "ドラム", "other": "その他の楽器"}   # Demucs（htdemucs）の 4 つ
+GM_PROGRAM = {"vocals": 53, "bass": 33, "other": 0}   # MIDI の音色（Voice Oohs・Electric Bass・Piano）。ドラムは 10 チャンネル
+TRACK_NAME = {"vocals": "Vocals", "bass": "Bass", "drums": "Drums", "other": "Instruments"}   # MIDI のトラック名は英字だけ書ける
 NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 DEGREES = ["1", "b2", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "7"]   # 主音からの度数（キーに対する位置）
 
@@ -51,11 +54,145 @@ def demucs_ready() -> bool:
         return False
 
 
-def basic_pitch_ready() -> bool:
-    try:
-        import basic_pitch  # noqa: F401
+def separate(path: Path, out_dir: Path) -> tuple[dict[str, Path], str]:
+    """Demucs で 4 つ（ボーカル・ベース・ドラム・その他の楽器）に分ける（決定 161）。({名前: wav}, 説明)。できなければ ({}, 理由)"""
+    if not demucs_ready():
+        return {}, "Demucs が入っていません"
+    r = subprocess.run([sys.executable, "-m", "demucs", "-n", "htdemucs", "-o", str(out_dir), str(path)], capture_output=True, text=True)
+    got = {k: next(iter(out_dir.rglob(f"{k}.wav")), None) for k in STEMS}
+    if r.returncode or not all(got.values()):
+        tail = (r.stderr or r.stdout).strip().splitlines()
+        return {}, "Demucs で分けられませんでした：" + (tail[-1][:200] if tail else f"終了コード {r.returncode}")
+    return {k: v for k, v in got.items() if v}, "Demucs（htdemucs）で 4 つに分けました"
+
+
+def poly_notes(wav: Path, kind: str) -> list[tuple[float, float, int, int]]:
+    """Basic Pitch で、重なっている音も全部起こす（和音・ハモりもそのまま）。[(始まり秒, 終わり秒, 高さ, 強さ 1〜127)]"""
+    from basic_pitch.inference import predict
+    lo, hi = {"vocals": (70, 1400), "bass": (28, 400), "other": (40, None)}.get(kind, (None, None))
+    _o, _m, events = predict(str(wav), onset_threshold=0.5, frame_threshold=0.3, minimum_note_length=80,
+                             minimum_frequency=lo, maximum_frequency=hi, melodia_trick=True)
+    ns = [(float(a), float(b), int(p), max(1, min(127, int(round(float(v) * 127))))) for a, b, p, v, *_ in events if b > a]
+    return join_tails(drop_overtones(ns))
+
+
+def join_tails(ns: list[tuple[float, float, int, int]]) -> list[tuple[float, float, int, int]]:
+    """音の終わりの余韻が、同じ高さの短く弱い別の音として出たものを、前の音につなぐ"""
+    out: list[list] = []
+    for a, b, p, v in sorted(ns):
+        prev = next((x for x in reversed(out) if x[2] == p), None)
+        if prev and 0 <= a - prev[1] < 0.04 and b - a < 0.15 and v <= prev[3]:
+            prev[1] = max(prev[1], b)
+            continue
+        out.append([a, b, p, v])
+    return [tuple(x) for x in out]
+
+
+def drop_overtones(ns: list[tuple[float, float, int, int]]) -> list[tuple[float, float, int, int]]:
+    """倍音（同じ時に鳴る、もっと強い音の 1・2 オクターブ上や 12 度上）として出た弱い音を除く"""
+    out = []
+    for a, b, p, v in ns:
+        dur = b - a
+        over = False
+        for a2, b2, p2, v2 in ns:
+            if p - p2 in (12, 19, 24, 28, 31) and v2 >= v * 0.9:
+                ov = min(b, b2) - max(a, a2)
+                if ov > 0.6 * dur:
+                    over = True
+                    break
+        if not over:
+            out.append((a, b, p, v))
+    return out
+
+
+def drum_notes(wav: Path) -> list[tuple[float, float, int, int]]:
+    """ドラムの音を、キック（36）・スネア（38）・ハイハット（42）に分けて起こす（音の帯ごとの立ち上がりで見分ける）"""
+    import librosa
+    import numpy as np
+    y, sr = librosa.load(str(wav), sr=22050, mono=True)
+    S = np.abs(librosa.stft(y, n_fft=2048, hop_length=256))
+    freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
+    P = S ** 2
+    bands = {36: (20, 150), 38: (150, 2500), 42: (6000, 11000)}
+    power = {k: P[(freqs >= lo) & (freqs < hi)].sum(axis=0) for k, (lo, hi) in bands.items()}
+
+    def strongest_here(note: int, f: int) -> bool:   # その時の音の強さで確かめる：キックは低い帯、スネアは真ん中の帯がハイハットの帯より強い
+        g = slice(f, min(f + 4, P.shape[1]))
+        if note == 36:
+            return power[36][g].sum() > power[38][g].sum() * 0.5
+        if note == 38:
+            return power[38][g].sum() > power[42][g].sum() * 0.15 and power[38][g].sum() > power[36][g].sum() * 0.3
         return True
-    except ImportError:
+    out = []
+    for note, (lo, hi) in bands.items():
+        band = S[(freqs >= lo) & (freqs < hi)]
+        if not band.size:
+            continue
+        env = librosa.onset.onset_strength(S=librosa.amplitude_to_db(band, ref=np.max), sr=sr, hop_length=256)
+        on = librosa.onset.onset_detect(onset_envelope=env, sr=sr, hop_length=256, units="time", backtrack=False,
+                                        pre_max=3, post_max=3, pre_avg=10, post_avg=10, delta=0.35, wait=4)
+        peak = float(np.max(env)) or 1.0
+        frames = librosa.time_to_frames(on, sr=sr, hop_length=256)
+        last = -1.0
+        for t, f in zip(on, frames):
+            if t - last < 0.05 or not strongest_here(note, int(f)):
+                continue
+            last = t
+            v = int(40 + 87 * min(1.0, float(env[min(f, len(env) - 1)]) / peak))
+            out.append((float(t), float(t) + 0.1, note, v))
+    return sorted(out)
+
+
+def write_full_midi(tracks: dict[str, list[tuple[float, float, int, int]]], bpm: float, path: Path) -> None:
+    """全部の音を、楽器ごとのトラックに分けた MIDI（形式 1）に書く。時刻は曲の秒のまま（演奏の揺れもそのまま）。GarageBand・Logic で開ける"""
+    import pretty_midi
+    pm = pretty_midi.PrettyMIDI(initial_tempo=float(bpm or 120))
+    for kind in ("vocals", "other", "bass", "drums"):
+        ns = tracks.get(kind) or []
+        if not ns:
+            continue
+        inst = pretty_midi.Instrument(program=GM_PROGRAM.get(kind, 0), is_drum=(kind == "drums"), name=TRACK_NAME[kind])
+        inst.notes = [pretty_midi.Note(velocity=v, pitch=p, start=a, end=b) for a, b, p, v in ns]
+        pm.instruments.append(inst)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pm.write(str(path))
+
+
+def export_audio(src: list[Path], dst: Path) -> Path | None:
+    """分けた音を 1 つにまとめて書き出す（ffmpeg があれば m4a〔小さい〕、無ければ wav）"""
+    import shutil
+    import numpy as np
+    import soundfile as sf
+    mix, sr = None, 44100
+    for f in src:
+        y, sr = sf.read(str(f), always_2d=True)
+        mix = y if mix is None else mix[: min(len(mix), len(y))] + y[: min(len(mix), len(y))]
+    if mix is None:
+        return None
+    peak = float(np.max(np.abs(mix))) or 1.0
+    if peak > 0.99:
+        mix = mix / peak * 0.99
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as d:
+        wav = Path(d) / "x.wav"
+        sf.write(str(wav), mix, sr)
+        ff = shutil.which("ffmpeg") or next((x for x in ("/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg") if Path(x).exists()), None)
+        if ff:
+            out = dst.with_suffix(".m4a")
+            if subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(wav), "-c:a", "aac", "-b:a", "256k", str(out)]).returncode == 0:
+                return out
+        out = dst.with_suffix(".wav")
+        shutil.copy2(wav, out)
+        return out
+
+
+def basic_pitch_ready() -> bool:
+    """Basic Pitch が「動く」か（書き起こしの本体まで読み込めるか）。部品の名前だけ入っていて、中で使う部品（setuptools の
+    pkg_resources など）が無いと、前は黙って前のやり方に戻っていた（2026-11-07。決定 161）"""
+    try:
+        from basic_pitch.inference import predict  # noqa: F401
+        return True
+    except Exception:  # noqa: BLE001
         return False
 
 
@@ -379,10 +516,25 @@ def features(notes: list[dict], bpm: float, key: str | None, sections: list[dict
 
 
 def transcribe_melody(audio: Path, sheet: dict, out_name: str) -> tuple[dict, Path | None]:
-    """曲 1 つ：歌を取り出す → 音符 → MIDI → 特徴。(特徴, MIDI の場所)"""
+    """曲 1 つ（決定 161）：Demucs で ボーカル・ベース・ドラム・その他の楽器 に分ける → それぞれの全部の音を Basic Pitch で起こし、
+    楽器ごとのトラックの MIDI にする → ボーカルと演奏（ボーカル以外）の音も書き出す → 曲作りに渡す旋律の特徴はボーカルの主旋律から。
+    (特徴, 書き出したフォルダ〔MELODY_DIR/<曲>/〕)。Demucs か Basic Pitch が無ければ、前のやり方（主旋律だけの MIDI）"""
     bpm = (sheet.get("groove") or {}).get("bpm") or None
     key = (sheet.get("_measure") or {}).get("key")
-    y, sr, how = vocals(audio)
+    safe = re.sub(r'[\\/:*?"<>|]+', "_", out_name).strip() or "melody"
+    if demucs_ready() and basic_pitch_ready():
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            stems, how = separate(audio, tmp)
+            if stems:
+                return _transcribe_stems(stems, how, bpm, key, sheet, out_name, safe)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+    else:
+        how = "Demucs か Basic Pitch が入っていません"
+    y, sr, how2 = vocals(audio)
+    how = f"{how}（{how2} で歌だけを取り出しました）"
     tool = "pyin"
     if basic_pitch_ready():
         try:
@@ -400,17 +552,39 @@ def transcribe_melody(audio: Path, sheet: dict, out_name: str) -> tuple[dict, Pa
     feat.update({"separation": how, "transcriber": tool, "version": VERSION, "bpm_used": round(tempo, 1), "detail": note})
     mid = None
     if notes:
-        safe = re.sub(r'[\\/:*?"<>|]+', "_", out_name).strip() or "melody"
-        mid = MELODY_DIR / f"{safe}.mid"
+        mid = MELODY_DIR / safe / f"{safe}.mid"
         write_midi(notes, tempo, mid, out_name[:60])
         feat["midi_file"] = str(mid)
-    return feat, mid
+    return feat, (mid.parent if mid else None)
+
+
+def _transcribe_stems(stems: dict[str, Path], how: str, bpm, key, sheet: dict, out_name: str, safe: str) -> tuple[dict, Path]:
+    """分けた 4 つから：全部の音の MIDI・ボーカル／演奏の音・曲作りに渡す旋律の特徴（決定 161）"""
+    import librosa
+    folder = MELODY_DIR / safe
+    folder.mkdir(parents=True, exist_ok=True)
+    yv, sr = librosa.load(str(stems["vocals"]), sr=22050, mono=True)
+    lead, tempo, note = notes_basic_pitch(yv, sr, bpm)   # 曲作りに渡す特徴は、ボーカルの主旋律（1 本）から
+    tracks = {k: poly_notes(stems[k], k) for k in ("vocals", "bass", "other") if k in stems}
+    if "drums" in stems:
+        tracks["drums"] = drum_notes(stems["drums"])
+    write_full_midi(tracks, tempo, folder / f"{safe}.mid")
+    export_audio([stems["vocals"]], folder / f"{safe}_ボーカル")
+    export_audio([stems[k] for k in ("drums", "bass", "other") if k in stems], folder / f"{safe}_演奏")
+    feat = features(lead, tempo, key, (sheet.get("structure") or {}).get("sections") or [])
+    bad = quality(lead)
+    if bad and feat.get("usable"):
+        feat = {"usable": False, "note": f"主旋律の書き起こしが乱れているので、曲作りには使いません：{bad}"}
+    counts = "・".join(f"{STEMS[k]} {len(v)} 音" for k, v in tracks.items())
+    feat.update({"separation": how, "transcriber": "basic_pitch", "version": VERSION, "bpm_used": round(tempo, 1),
+                 "detail": f"{note}／全部の音の MIDI：{counts}", "midi_file": str(folder / f"{safe}.mid"), "folder": str(folder)})
+    return feat, folder
 
 
 if __name__ == "__main__" and len(sys.argv) == 5 and sys.argv[1] == "--json":   # 別の Python から 1 曲（決定 160）：--json <音源> <解析シート> <名前>
     sh = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
     f, m = transcribe_melody(Path(sys.argv[2]), sh, sys.argv[4])
-    print("@@RESULT@@" + json.dumps({"feat": f, "mid": str(m) if m else None}, ensure_ascii=False))
+    print("@@RESULT@@" + json.dumps({"feat": f, "folder": str(m) if m else None}, ensure_ascii=False))
 elif __name__ == "__main__":   # 試しに 1 曲：python3 scripts/melody.py <音源> [テンポ] [キー]
     p = Path(sys.argv[1])
     sh = {"groove": {"bpm": float(sys.argv[2])} if len(sys.argv) > 2 else {}, "_measure": {"key": sys.argv[3] if len(sys.argv) > 3 else None}}

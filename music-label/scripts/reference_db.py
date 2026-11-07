@@ -704,9 +704,9 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
                 if not line:
                     raise RuntimeError((r.stderr or r.stdout).strip().splitlines()[-1][:200] if (r.stderr or r.stdout).strip() else "結果がありません")
                 res = json.loads(line[len("@@RESULT@@"):])
-                feat, mid = res["feat"], (Path(res["mid"]) if res.get("mid") else None)
+                feat, out = res["feat"], (Path(res["folder"]) if res.get("folder") else None)
             else:
-                feat, mid = melody.transcribe_melody(f, d, name)
+                feat, out = melody.transcribe_melody(f, d, name)
         except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
             print(f"   ✕ 起こせませんでした（{type(e).__name__}: {str(e)[:160]}）")
             continue
@@ -724,25 +724,27 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
                   f"跳躍 {int(mo['leap_ratio'] * 100)}%・裏拍 {int(rh['offbeat_ratio'] * 100)}%・1 小節 {rh['notes_per_bar']} 音")
         else:
             print(f"   － {feat.get('note')}")
-        if mid:   # SSD にも、既存楽曲の隣のフォルダに MIDI を残す（GarageBand で開ける）。乱れた書き起こしは残さず、前の版も消す（決定 159）
+        print(f"   ・{feat.get('separation', '')}／{feat.get('detail', '')}")
+        if out and out.is_dir():   # SSD にも、既存楽曲の隣のフォルダに曲ごとに残す：全部の音の MIDI・ボーカル・演奏（決定 161）
             try:
                 tops = audio_dirs()
                 top = next((t for t in tops if f.is_relative_to(t)), None)
                 if top is not None:
-                    dst = top.parent / f"{top.name}_メロディー（MIDI）" / mid.name
-                    if feat.get("usable"):
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        import shutil
-                        shutil.copy2(mid, dst)
-                    elif dst.exists():
-                        dst.unlink()
+                    import shutil
+                    base = top.parent / f"{top.name}_メロディー（MIDI）"
+                    (base / f"{out.name}.mid").unlink(missing_ok=True)   # 前の版（主旋律だけの MIDI を並べていた）は消す
+                    dst = base / out.name
+                    dst.mkdir(parents=True, exist_ok=True)
+                    for x in out.iterdir():
+                        if x.is_file():
+                            shutil.copy2(x, dst / x.name)
             except OSError:
                 pass
     if ok:
         import subprocess
         subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
     left = len(pend) - len(run)
-    print(f"【結果】{ok} 曲のメロディーを起こしました（MIDI：{melody.MELODY_DIR} と、SSD の「既存楽曲_メロディー（MIDI）」。GarageBand で開けます）"
+    print(f"【結果】{ok} 曲を起こしました（SSD の「既存楽曲_メロディー（MIDI）」に曲ごとのフォルダ：全部の音の MIDI〔楽器ごとのトラック〕・ボーカル・演奏。GarageBand で開けます）"
           + (f"。まだ {left} 曲あります" if left > 0 else ""))
     return 0
 
