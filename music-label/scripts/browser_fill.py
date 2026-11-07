@@ -2717,6 +2717,17 @@ def _file_field(key: str, what: str):
     do, ok0 = _field(key)
 
     def ok(c: DK):
+        f = c.f.get(key) or {}
+        if not f.get("value"):   # システムが入れるファイルが無い：理由と、手で選ぶときのファイルを出す（決定 164）
+            if key == "audio":
+                import publish
+                st = _songs.state(c.song).get("status", "")
+                _d, aname, _c = publish.publish_folder(c.song)
+                c.notes[key] = (f"配信用の音源（{aname}）がまだできていません（いま：{publish.STATUS_JA.get(st, st)}）。"
+                                f"手で選ぶときは 04_楽曲/{_songs.folder_name(c.song)}/ の「{aname}」（「_Suno元データ」は音量を整える前なので選ばない）")
+            else:
+                c.notes[key] = "ジャケットがまだできていません（ダッシュボードのジャケットのマスから）"
+            return False
         r = ok0(c)
         if r is False:
             w = wrong_file(c, key)
@@ -3090,6 +3101,8 @@ def dk_sections(song: dict) -> list[dict]:
         {"key": "genre1", "name": "Primary genre", "do": _sec_genre1_do, "ok": _genre_ok("genre1", r"^(primary genre|genre)\b"), "again": True},
         {"key": "genre2", "name": "Secondary genre", "do": _sec_genre2_do, "ok": _genre_ok("genre2", r"^secondary genre"), "again": True},
         S_("cover", "ジャケット", _file_field("cover", "ジャケット"), again=False),
+        # ジャケットは AI（OpenAI の画像）で作っているので、正直に Yes（DistroKid の初めの選択は No。決定 61・164）
+        S_("artwork_ai", "ジャケットは AI で作った？ → Yes", _radio('input[type=radio][name="artworkAiGenerated"][value="1"]')),
         S_("title", "曲名", _field("title")),
         S_("feat", "曲名に featured artist を出す？ → No", _radio('input[type=radio][name^="feat_"][value="0"]')),
         S_("version", "バージョン → ふつうの版", _radio('input[type=radio][name^="version_"][value=""]')),

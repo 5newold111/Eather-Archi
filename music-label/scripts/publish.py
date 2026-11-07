@@ -350,7 +350,9 @@ def to_song_folder(song: dict, f: Path) -> Path:
         dst_dir = archive.song_folder(song["artist"], _songs.folder_name(song))
         if f.parent.resolve() == dst_dir.resolve():
             return f
-        name = f.name if f.stem.endswith("_Suno元データ") else f"{f.stem}_Suno元データ{f.suffix.lower()}"
+        import unicodedata   # Mac は「デ」などを別の形（濁点を分けた形）で持つことがあるので、そろえてから比べる（決定 164）
+        base = re.sub(r"(_Suno元データ)+$", "", unicodedata.normalize("NFC", f.stem))
+        name = f"{base}_Suno元データ{f.suffix.lower()}"
         dst = dst_dir / name
         import filecmp
         if dst.exists() and filecmp.cmp(f, dst, shallow=False):   # もう同じものがある：受け口の方を片付けるだけ

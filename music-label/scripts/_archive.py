@@ -174,8 +174,8 @@ def _merge_artist_inboxes(top: Path) -> None:
         try:
             for s in [s for s in inbox.iterdir() if s.is_dir()]:
                 for f in [f for f in s.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXT and not f.name.startswith(".")
-                          and not f.stem.endswith("_Suno元データ")]:   # ダウンロードした曲：公開セットと同じ「_Suno元データ」の名前に
-                    t = f.with_name(f"{f.stem}_Suno元データ{f.suffix.lower()}")
+                          and not unicodedata.normalize("NFC", f.stem).endswith("_Suno元データ")]:   # ダウンロードした曲：公開セットと同じ「_Suno元データ」の名前に
+                    t = f.with_name(f"{unicodedata.normalize('NFC', f.stem)}_Suno元データ{f.suffix.lower()}")
                     if not t.exists():
                         f.rename(t)
                         ad = f.with_name("._" + f.name)
