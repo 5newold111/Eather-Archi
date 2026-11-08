@@ -1763,6 +1763,9 @@ def distrokid_fields(song: dict) -> list[dict]:
     audio_path = a_up or Path(f["音源ファイル"])
     cover_path = c_up or (Path(f["ジャケット"]) if f["ジャケット"] != "（まだ）" else None)
     rel = date.today().isoformat() if "いちばん早い" in f["Release date"] else f["Release date"]
+    if rel < date.today().isoformat():   # 予定の配信日が過ぎている（遅れた曲）：過ぎた日は選べないので、いちばん早い日に（決定 165）
+        print(f"   ・予定の配信日 {rel} が過ぎているので、いちばん早い日にします", flush=True)
+        rel = date.today().isoformat()
     owner = os.environ.get("OWNER_LEGAL_NAME", "")
     # Songwriter の本名は名・ミドル・姓の 3 つの欄（ローマ字。例 OWNER_LEGAL_NAME=Taro Yamada）。本名は .env にだけ置く
     parts = owner.split()
@@ -2956,6 +2959,83 @@ def _sec_ids_yes(c: DK) -> None:
         loc = c.sess.page.locator(css)
         if loc.count() and loc.first.is_visible() and loc.first.input_value() != val:
             loc.first.fill(val)
+    ids = page_ids(c.song)
+    for name, svc in ARTIST_ID_RADIOS:   # YouTube Music・Apple Music：Yes の下の欄に、記録したページの ID・住所（決定 165）
+        if name in no or name == "spotifyArtistID":
+            continue
+        try:
+            cur = c.sess.page.evaluate(f"""() => {{ const r = [...document.querySelectorAll('input[type=radio][name="{name}"]')].find(x => x.checked); return r ? r.value : null; }}""")
+        except Exception:  # noqa: BLE001
+            continue
+        if cur != "":   # 候補のページ（値つき）を選んだとき・No のときは、ID の欄は要らない
+            continue
+        if name in ids:
+            try:
+                r = c.sess.page.evaluate(ID_TEXT_JS, [name, ids[name]])
+            except Exception:  # noqa: BLE001
+                r = {}
+            if r.get("filled"):
+                print(f"   … Artist already in {svc}? の欄に、記録したページを入れました（{ids[name][:40]}）")
+            elif not r.get("same"):
+                c.notes["ids"] = f"{svc}：Yes の下の欄が見つかりません。記録したページ（{ids[name]}）を貼ってください"
+        else:
+            c.notes["ids"] = (f"{svc} のページがまだ記録されていません。定期配信のタブの「🔔 アーティストのページ」で記録するか、"
+                              f"DistroKid の画面で Yes の下の欄に貼ってください")
+
+
+def _sec_release_do(c: DK) -> None:
+    """配信日を入れる。画面の日付の欄に選べる最初の日（min）があり、入れる日がそれより前なら、その日にする（決定 165）"""
+    f = c.f.get("release")
+    if not f or not f.get("value"):
+        return
+    try:
+        mn = c.sess.page.evaluate("() => (document.querySelector('input[name=releaseDate]') || {}).min || ''")
+    except Exception:  # noqa: BLE001
+        mn = ""
+    if mn and re.fullmatch(r"\d{4}-\d{2}-\d{2}", mn) and f["value"] < mn:
+        print(f"   ・配信日 {f['value']} は選べないので、選べる最初の日 {mn} にします")
+        f["value"] = mn
+    fill_fields(c.sess, "distrokid", [f], fresh=False)
+
+
+# Artist already in で Yes（ほかのリリースとまとめる）にしたとき、下に出る ID・住所の欄（決定 165）。
+# DistroKid：「Please enter a valid YouTube Music Channel ID … or choose "No"」「Please enter a valid Apple Artist URL … or choose "No"」
+ID_TEXT_JS = r"""([name, value]) => {
+  const vis = e => !!(e && (e.offsetWidth || e.offsetHeight || e.getClientRects().length));
+  const rs = [...document.querySelectorAll(`input[type=radio][name="${name}"]`)];
+  if (!rs.length) return {found: false};
+  let box = rs[0].parentElement;
+  for (let i = 0; i < 8 && box; i++, box = box.parentElement) {
+    const t = [...box.querySelectorAll('input[type=text], input:not([type])')].filter(e => vis(e) && !e.disabled);
+    if (t.length) {
+      const want = /channel|youtube|apple|artist|url|link|id/i;
+      const el = t.find(e => want.test([e.placeholder, e.name, e.id, e.className, e.getAttribute('aria-label')].join(' '))) || t[0];
+      if (el.value === value) return {found: true, same: true};
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+      set.call(el, value);
+      for (const ev of ['input', 'change', 'blur']) el.dispatchEvent(new Event(ev, {bubbles: true}));
+      return {found: true, filled: true, hint: (el.placeholder || el.name || '').slice(0, 60)};
+    }
+    if (box.querySelectorAll('input[type=radio]').length > rs.length + 6) break;   // ほかの質問まで広がった
+  }
+  return {found: true, filled: false};
+}"""
+
+
+def page_ids(song: dict) -> dict[str, str]:
+    """Yes のときに入れる、記録したページの ID・住所：YouTube Music はチャンネル ID（UC…）、Apple Music はアーティストの住所（決定 165）"""
+    try:
+        import publish
+        pages = publish.artist_pages(song["slug"])
+    except Exception:  # noqa: BLE001
+        return {}
+    out = {}
+    m = re.search(r"channel/(UC[\w-]{10,})", pages.get("youtube_music") or "")
+    if m:
+        out["googleArtistID"] = m.group(1)
+    if re.search(r"music\.apple\.com/.+/artist/.+/\d+", pages.get("apple_music") or ""):
+        out["appleArtistID"] = pages["apple_music"]
+    return out
 
 
 def _sec_ids_do(c: DK) -> None:
@@ -3096,7 +3176,7 @@ def dk_sections(song: dict) -> list[dict]:
         {"key": "artist", "name": "アーティスト名（デビュー済み：ドロップダウンから選ぶ／初めて：＋ new artist）", "do": _sec_artist_do,
          "ok": _sec_artist_ok, "again": False},
         {"key": "ids", "name": "Artist already in（Spotify・Apple Music・YouTube Music・Instagram・Facebook）", "do": _sec_ids_do, "ok": _sec_ids_ok, "again": True},
-        S_("release", "配信日", _field("release")),
+        {"key": "release", "name": "配信日", "do": _sec_release_do, "ok": _field("release")[1], "again": True},
         S_("language", "言語", _field("language")),
         {"key": "genre1", "name": "Primary genre", "do": _sec_genre1_do, "ok": _genre_ok("genre1", r"^(primary genre|genre)\b"), "again": True},
         {"key": "genre2", "name": "Secondary genre", "do": _sec_genre2_do, "ok": _genre_ok("genre2", r"^secondary genre"), "again": True},

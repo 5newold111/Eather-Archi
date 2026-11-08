@@ -2100,3 +2100,17 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   - 登録画面の項目に「ジャケットは AI で作った？ → Yes」を足した（ジャケットは OpenAI の画像で作っているため。正直に申告する。決定 61 と同じ考え）
   - 配信用の音源が見つからないときは、一覧の音源の行に「配信用の音源（<名前>）がまだできていません（いまの段階）。手で選ぶときは 04_楽曲/<曲名>/ の
     <名前>（_Suno元データ は選ばない）」と出す（前は「この画面に無い」と出ていた）
+
+## 165. DistroKid の差し戻し：配信日が過ぎていたら選べる日に／YouTube Music・Apple Music の Yes に記録したページの ID を入れる（2026-11-08）
+
+- DistroKid のエラー（2026-11-08）：
+  ・Please choose a valid release date.
+  ・Please enter a valid YouTube Music Channel ID in the "Artist already in YouTube Music?" section or choose "No".
+  ・Select a file for track 1.
+- 配信日：毎週の曲は予定の配信日を入れていたので、予定より遅れて登録すると過ぎた日になって選べなかった。予定の日が過ぎていれば今日にする。
+  さらに画面の日付の欄に「選べる最初の日」（min）があれば、それより前にしない
+- Artist already in：デビュー済みの組で Yes（ほかのリリースとまとめる）を選ぶと、下に ID・住所の欄が出る。いままで Spotify の ID しか入れていなかった。
+  YouTube Music はチャンネル ID（記録したページの住所の UC… の部分）、Apple Music はアーティストの住所を入れる（browser_fill.page_ids・ID_TEXT_JS）。
+  記録が無い組（例：TIDEWOOL の YouTube Music）は、一覧に「ページがまだ記録されていません。通知の小窓で記録するか、画面で貼ってください」と出す
+- 音源（Select a file for track 1）：決定 163・164 で、一覧の音源の行に入らなかった理由が出るようにしてある。その行を見て直す
+- 試験：試験用の画面（Yes の丸の下に ID の欄）で、DECLAN FAY の UC… と Apple Music の住所が正しい欄に入ることを確かめた（本物の画面の部品の名前はまだわからない）
