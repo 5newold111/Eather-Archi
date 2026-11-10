@@ -191,6 +191,11 @@ def _status_json() -> dict:
         acts = {**act_review.review(book), "index": act_review.acts_index(book)}
     except Exception as e:  # noqa: BLE001
         acts = {"acts": [], "pending": 0, "upcoming": [], "index": [], "error": str(e)}
+    try:   # 組を外す・外した組（決定 166）
+        import retire
+        acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
+    except Exception as e:  # noqa: BLE001
+        acts["retire"] = {"active": [], "list": [], "error": str(e)}
     try:   # 最後に自動で反映した更新（決定 108）
         upd = read_json(OUT / "update" / "last.json") if (OUT / "update" / "last.json").exists() else {}
         if (OUT / "update" / "skipped.json").exists():   # 反映を見送っている理由（決定 132）
@@ -232,7 +237,7 @@ def _page_remind() -> list[dict]:
     import _timeline
     import publish
     out = []
-    for a in _timeline.all_artists():
+    for a in _timeline.all_artists(include_retiring=True):
         slug = a.get("slug")
         try:
             if not slug or not _timeline.debut_done(slug):
@@ -258,7 +263,7 @@ def _flow(s: dict) -> str:
 # ---------------------------------------------------------------------------
 # ボタンで動かす仕事（決まったものだけ）
 def _slugs() -> set[str]:
-    return {a["slug"] for a in all_artists() if a.get("slug")}
+    return {a["slug"] for a in all_artists(include_retiring=True) if a.get("slug")}
 
 
 def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
@@ -332,6 +337,22 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         if song and ok(tr) and ok(ar):
             return [PY, str(S / "publish.py"), "live", song["id"], *(["--track", tr] if tr else []), *(["--artist", ar] if ar else [])], \
                 f"配信中の記録（{song['artist']}「{song['title']}」）"
+    if action == "retire":   # 組を外す（決定 166）
+        import retire
+        slug = str(p.get("slug") or "")
+        a = next((x for x in retire.active() if x["slug"] == slug), None)
+        if not a:
+            return None
+        doing = {d["id"] for d in retire.impact(slug).get("doing", [])}
+        keep = [k for k in str(p.get("keep") or "").split(",") if k in doing]
+        why = str(p.get("reason") or "").strip()[:300]
+        return [PY, str(S / "retire.py"), "retire", slug, "--keep", ",".join(keep), *(["--reason", why] if why else [])], f"{a['name']} を外す"
+    if action == "retire_restore":   # 外した組を元に戻す（30 日まで。決定 166）
+        import retire
+        r = next((x for x in retire.listing() if x["slug"] == p.get("slug") and x["can_restore"]), None)
+        if not r:
+            return None
+        return [PY, str(S / "retire.py"), "restore", r["slug"]], f"{r['name']} を元に戻す"
     if action == "artist_pages" and p.get("slug") in _slugs():   # アーティストのページ（定期配信のタブの通知・デビューの配信確認。決定 141・145・146）
         import publish
         args = []
@@ -375,7 +396,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "refresh_photos.py"), "--only", slug, "--force"], f"写真の刷新（{slug}）"
     if action == "open_artist" and slug:
         import _archive as archive
-        name = next((a.get("name") for a in all_artists() if a.get("slug") == slug), slug)
+        name = next((a.get("name") for a in all_artists(include_retiring=True) if a.get("slug") == slug), slug)
         return ["open", str(archive.local_folder(name))], f"フォルダを開く（{name}）"
     if action == "brief":
         week = str(p.get("week") or "this")
@@ -717,6 +738,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <div id="acts-upcoming"></div>
  <h2>承認待ちの組</h2><div id="acts-review"></div>
  <div class="panel act-only" id="acts-edit"></div>
+ <h2>組を外す・外した組</h2><div id="acts-retire"></div>
 </section>
 <h2>仕組みの詰まり</h2><div id="system"></div>
 <p class="sub act-only" id="upd-info"></p>
@@ -905,6 +927,11 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="quota_left"){p.left=(document.getElementById("quota-left")||{}).value||"";if(!/^\d+$/.test(p.left)){alert("Suno の画面の残りの曲数を数字で入れてください");return}}
   if(b.dataset.act==="suno_retake"){p.why=[...b.closest(".rt").querySelectorAll("input:checked")].map(x=>x.value).join(",");if(!p.why){alert("良くなかったところを 1 つ以上選んでください");return}}
+  if(b.dataset.act==="retire"){const dl=document.getElementById("dlg");   // 決定 166
+    p.keep=[...dl.querySelectorAll("input[name^=rt-]:checked")].filter(x=>x.value==="keep").map(x=>x.name.slice(3)).join(",");
+    p.reason=(document.getElementById("rt-reason")||{}).value||"";
+    if(!confirm(`${b.dataset.name} を外します。止める曲は「戻したもの」フォルダに移します（消しません）。${DATA.acts_review.retire.days||30} 日間は元に戻せます。よいですか？`))return;
+    if(dl.open)dl.close()}
   if(b.dataset.act==="artist_pages"){(b.dataset.fields||"").split(",").forEach(k=>{if(k)p[k]=(document.getElementById(`apg-${b.dataset.slug}-${k}`)||{}).value||""})}   // 決定 141
   if(b.dataset.act==="artist_page"){p.page=(document.getElementById("ap-"+b.dataset.slug)||{}).value||"";if(!p.page){alert("Spotify の URI か住所を貼ってください");return}}
   if(b.dataset.week)p.week=b.dataset.week;if(b.dataset.key)p.key=b.dataset.key;if(b.dataset.site)p.site=b.dataset.site;if(b.dataset.to)p.to=b.dataset.to;if(b.dataset.service)p.service=b.dataset.service;if(b.dataset.no)p.no=b.dataset.no;if(b.dataset.redo)p.redo=1;if(b.dataset.job)p.job=b.dataset.job;
@@ -998,7 +1025,29 @@ document.addEventListener("click",e=>{const pk=e.target.closest("[data-pick]");i
 document.addEventListener("keydown",e=>{const li=e.target.closest&&e.target.closest("li[data-draft]");if(li&&(e.key==="Enter"||e.key===" ")){e.preventDefault();openDraft(li.dataset.draft)}});
 // ---- アーティスト追加（決定 119）：承認待ちの組の項目ごとの要約と承認・デビューの知らせ・管理表を見て直す
 const RST={pending:["wait","● 承認待ち"],mixed:["wait","● 一部が承認待ち"],approved:["done","✓ 承認済み"],rejected:["ng","✕ 却下"]};
-function actsTab(){const A=DATA.acts_review||{acts:[],upcoming:[],index:[]},acts=A.acts||[],up=A.upcoming||[];
+function retireBox(){const R=(DATA.acts_review||{}).retire||{active:[],list:[]},el=document.getElementById("acts-retire");   // 決定 166
+  if(!el)return;
+  const ls=R.list||[];
+  el.innerHTML=`<div class="panel act-only"><p class="sub">所属している組を外します。配信中の曲はそのまま残り、これからの制作（毎週・不定期・毎日の持ち回り・SNS・コラボ）から外れます。作っている途中の曲は、曲ごとに「出し切る」か「止める」を選べます。外すと、空いた枠に新人の案が管理表に入ります（採用は Gon さん）。${R.days||30} 日間は元に戻せます。</p>
+   ${(R.active||[]).length?`<select id="rt-pick" aria-label="外す組を選ぶ">${R.active.map(a=>`<option value="${E(a.slug)}">${E(a.name)}</option>`).join("")}</select> <button class="ghost" id="rt-open">この組を外す…</button>`:`<p class="empty">所属している組はありません</p>`}</div>`
+   +(ls.length?`<ul class="list">${ls.map(r=>`<li><b>${E(r.name)}</b> <span class="sub">${r.status==="retiring"?`外す途中（出し切る曲 ${r.keep.length} 曲の登録を待っています）`:"外しました"}・${E(r.at)}${r.reason?`・理由：${E(r.reason)}`:""}${r.book_pending?"・管理表への書き込み待ち（SSD をつなぐと書き込みます）":""}</span>
+     <div class="act-only" style="margin-top:6px">${r.can_restore?`<button class="ghost" data-act="retire_restore" data-slug="${E(r.slug)}" data-confirm="${E(r.name)} を所属に戻しますか？（設定書を戻し、これからの制作を再開します。止めた曲は戻しません）">元に戻す（${E(r.restore_until)} まで）</button>`:`<span class="sub">元に戻せる期間（${E(r.restore_until)} まで）を過ぎました。記録とファイルは残っています</span>`}</div></li>`).join("")}</ul>`:"")}
+async function retireOpen(slug){const dl=document.getElementById("dlg"),body=document.getElementById("dlg-body");dl.classList.add("wide");
+  body.innerHTML="<p>読んでいます…</p>";if(!dl.open)dl.showModal();
+  let j;try{const r=await fetch("/api/retire/impact?slug="+encodeURIComponent(slug));j=await r.json();if(!r.ok)throw new Error(j.error||"読めませんでした")}
+  catch(e){body.innerHTML=`<p>${E(String(e.message||e))}</p>`;return}
+  const later=st=>["imported","waiting_ffmpeg","waiting_cover","ready"].includes(st);
+  body.innerHTML=`<h3 id="dlg-title">${E(j.name)} を外す</h3>
+   <h4>そのまま残るもの</h4><p>配信中・登録済みの曲 ${j.released.length} 曲（取り下げません。取り下げるときは DistroKid の画面で Gon さんが行います）・SSD の 02_アーティスト/${E(j.name)}/ のファイル・管理表の行（状態を「活動終了」にします）</p>
+   <h4>止まるもの</h4><p>${j.stops.map(E).join("・")}${j.drafts?`・不定期配信の作曲前の案 ${j.drafts} 件（やめます）`:""}</p>
+   <h4>作っている途中の曲（${j.doing.length} 曲）</h4>
+   ${j.doing.length?`<ul class="list">${j.doing.map(d=>`<li><b>${E(d.title)}</b> <span class="sub">${E(d.status_ja||"曲の案・Suno で作曲")}</span><div style="margin-top:4px">
+     <label><input type="radio" name="rt-${E(d.id)}" value="keep" ${later(d.status)?"checked":""}> 出し切る（最後まで作って配信）</label>　
+     <label><input type="radio" name="rt-${E(d.id)}" value="stop" ${later(d.status)?"":"checked"}> 止める（「戻したもの」に移す）</label></div></li>`).join("")}</ul>`:`<p class="sub">ありません</p>`}
+   <h4>外す理由（任意・記録に残ります）</h4><textarea id="rt-reason" rows="2" style="width:100%;box-sizing:border-box" maxlength="300"></textarea>
+   <div class="acts act-only" style="margin-top:10px"><button data-act="retire" data-slug="${E(j.slug)}" data-name="${E(j.name)}">この組を外す</button></div>`}
+document.addEventListener("click",e=>{if(e.target.closest("#rt-open")){const v=(document.getElementById("rt-pick")||{}).value;if(v)retireOpen(v)}});
+function actsTab(){retireBox();const A=DATA.acts_review||{acts:[],upcoming:[],index:[]},acts=A.acts||[],up=A.upcoming||[];
   const n=document.getElementById("n-acts"),soon=up.filter(u=>u.soon);
   n.textContent=(A.pending?`承認待ち ${A.pending}`:"")+(soon.length?`${A.pending?"・":""}★ デビュー間近 ${soon.length} 組`:"");
   n.classList.toggle("alert",!!(A.pending||soon.length));
@@ -1239,6 +1288,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, act_review.act_sheet(aid))
             except Exception as e:  # noqa: BLE001
                 return self._json(500, {"error": f"管理表を読めませんでした：{e}"})
+        if path == "/api/retire/impact":   # 組を外したときに起きること（確認の小窓。決定 166）
+            import retire
+            slug = (parse_qs(urlparse(self.path).query).get("slug") or [""])[0]
+            if slug not in {x["slug"] for x in retire.active()}:
+                return self._json(404, {"error": "その組は所属していません"})
+            return self._json(200, retire.impact(slug))
         if path == "/api/status":
             try:
                 return self._json(200, status_json())

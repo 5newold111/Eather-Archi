@@ -876,6 +876,12 @@ def cmd_registered(args) -> int:
         save_artist(a)
         print(f"   デビュー週を {a['debut_week']} にしました（2 曲目以降の毎週の制作がここから始まります）")
     _book()
+    try:   # 外す途中の組の「出し切る」曲が全部登録できたら、手続きを終える（決定 166）
+        import retire
+        if (load_artist(song["slug"], missing_ok=True) or {}).get("retire"):
+            retire.tick()
+    except Exception:  # noqa: BLE001
+        pass
     return 0
 
 
@@ -1405,7 +1411,7 @@ def cmd_artist_page(args) -> int:
     if not m:
         print("[エラー] Spotify のアーティストの URI（spotify:artist:…）か住所（https://open.spotify.com/artist/…）を貼ってください")
         return 2
-    if not any(a.get("slug") == args.slug for a in all_artists()):
+    if not any(a.get("slug") == args.slug for a in all_artists(include_retiring=True)):
         print(f"[エラー] 組 {args.slug} が見つかりません")
         return 2
     save_artist_link(args.slug, "spotify", m.group(1), f"https://open.spotify.com/artist/{m.group(1)}")

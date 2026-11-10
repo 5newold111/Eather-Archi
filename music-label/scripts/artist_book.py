@@ -282,7 +282,7 @@ def cmd_pull(a) -> None:
     data = book.read()
     snap = OUT / "artist_book" / "snapshots" / f"{datetime.now():%Y%m%d-%H%M%S}.json"
     write_json(snap, data)
-    olds = {x["slug"]: x for x in all_artists()}
+    olds = {x["slug"]: x for x in all_artists(include_retiring=True)}
     acts = adopted(data["acts"])
     if not acts:
         print("   採用の組がまだありません（『アーティスト』タブの状態を『採用』にすると、設定書が作られます）")
@@ -354,7 +354,7 @@ def template_for_prompt() -> dict:
 
 def existing_summary() -> list[dict]:
     out = []
-    for x in all_artists():
+    for x in all_artists(include_retiring=True):
         v = x.get("vocal") or {}
         out.append({"id": x["slug"], "name": x["name"], "label": x["label_slug"], "formation": x.get("formation"),
                     "voice": f"{v.get('sex')}/{v.get('range')}", "genres": (x.get("sound") or {}).get("genres"),
@@ -414,7 +414,7 @@ def validate_proposal(p: dict) -> list[str]:
     act = p.get("act") or {}
     if not act.get("id") or not str(act["id"]).replace("_", "").isalnum() or not str(act["id"]).islower():
         probs.append(f"ID の形が不正（{act.get('id')}）")
-    names = {x["name"].lower() for x in all_artists() if x["slug"] != act.get("id")}
+    names = {x["name"].lower() for x in all_artists(include_retiring=True) if x["slug"] != act.get("id")}
     if str(act.get("name", "")).lower() in names:
         probs.append(f"名前 {act.get('name')} は既にある")
     real = {str(i.get("author") or i.get("title") or "").lower() for i in p.get("influences", []) if str(i.get("kind", "")).startswith("音楽")}
@@ -477,7 +477,7 @@ Japanese for descriptive text. No real people's names."""
 def cmd_propose_update(a) -> None:
     from _claude import available, call_json_free, dry_run_file
     book = book_or_die(a.if_exists)
-    targets = [x for x in all_artists() if (a.all or x["slug"] == a.artist) and x.get("life")]
+    targets = [x for x in all_artists(include_retiring=True) if (a.all or x["slug"] == a.artist) and x.get("life")]
     if not targets:
         if a.if_exists:
             print("   管理表から読み込んだ組がまだ無いので飛ばします")

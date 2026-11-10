@@ -242,19 +242,28 @@ def load_artist(slug: str, label: str | None = None, missing_ok: bool = False) -
             if a.get("slug") == slug:
                 a["label_slug"] = lab
                 return a
+    r = ROOT / "templates" / "archive" / "retired" / f"{slug}.json"   # 外した組（決定 166）：曲の記録・配信の確認のために読めるようにする
+    if r.exists():
+        a = read_json(r)
+        a["label_slug"] = (a.get("retire") or {}).get("label_slug") or MAIN_LABEL
+        return a
     if missing_ok:
         return None
     sys.exit(f"[エラー] アーティスト {slug} の設定書が見つかりません（templates/artists か templates/labels を確認）")
 
 
-def all_artists() -> list[dict]:
-    """Postdog Records の 5 組 + 子レーベルの全アーティスト"""
+def all_artists(include_retiring: bool = False) -> list[dict]:
+    """Postdog Records の 5 組 + 子レーベルの全アーティスト。
+    外す手続き中の組（設定書に retire の印。決定 166）は、これからの制作・SNS・コラボ・新人の比べ先から外すため、ふだんは入れない。
+    include_retiring=True：出し切る曲の表示など、手続き中の組も入れる"""
     out = []
     for p in sorted((ROOT / "templates" / "artists").glob("*.json")):
         if p.stem.startswith("_"):
             continue
         a = read_json(p)
         a["label_slug"] = MAIN_LABEL
+        if a.get("retire") and not include_retiring:
+            continue
         out.append(a)
     for p in sorted((ROOT / "templates" / "labels").glob("*.json")):
         if p.stem.startswith("_"):
@@ -364,6 +373,8 @@ def production_status(artist: dict, production_monday) -> tuple[bool, str]:
     debut = as_date(artist.get("debut_week"))
     if artist.get("cadence") == "paused":
         return False, "休止中（cadence=paused）"
+    if artist.get("retire"):
+        return False, "外す手続き中（新しい曲は作らない。決定 166）"
     import _songs
     if _songs.debut_registered(artist.get("slug", "")) is False:
         return False, "デビュー曲の登録待ち（Suno の曲を DistroKid に登録すると、その配信週から毎週の制作が始まる）"

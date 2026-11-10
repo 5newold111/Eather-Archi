@@ -253,7 +253,13 @@ def main() -> None:
 
     if args.on_mount and archive.root()[0] is None:
         return   # つながったのは別のドライブ
-    acts = [a for a in all_artists() if a.get("slug") and (not args.only or a["slug"] == args.only)]
+    if not args.check and not args.only:   # 組を外す手続きの点検：出し切る曲が全部登録できた組を終える・管理表への書き込み待ちを書く（決定 166）
+        try:
+            import retire
+            retire.tick()
+        except Exception as e:  # noqa: BLE001
+            print(f"   － 組を外す手続きの点検ができませんでした（{e}）")
+    acts = [a for a in all_artists(include_retiring=True) if a.get("slug") and (not args.only or a["slug"] == args.only)]
     moved = []
     if archive.root()[0] is not None and not args.check:
         import publish

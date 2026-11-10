@@ -123,7 +123,7 @@ def in_regular(slug: str) -> bool:
 def debut_rows() -> list[dict]:
     today = date.today()
     rows = []
-    for a in all_artists():
+    for a in all_artists(include_retiring=True):
         slug = a.get("slug")
         song = next((s for s in _songs.debut_songs() if s["slug"] == slug), None) if slug else None
         if song is None:
@@ -161,7 +161,7 @@ def regular_rows(weeks_ahead: int = 4) -> list[dict]:
     today = date.today()
     this_monday = monday_of(today)
     rows = []
-    for a in all_artists():
+    for a in all_artists(include_retiring=True):
         slug = a.get("slug")
         if not slug:
             continue
@@ -215,7 +215,7 @@ def _weekly_row(a: dict, s: dict, rel: date | None, planned_only: bool = False) 
 def irregular_rows() -> list[dict]:
     """不定期配信の曲（作曲へ進めた案）。予定は作曲へ進めた日から：作曲 2 日 → 仕上げ 1 日 → 登録 1 日 → 配信待ち（決定 72）"""
     rows = []
-    arts = {a.get("slug"): a for a in all_artists()}
+    arts = {a.get("slug"): a for a in all_artists(include_retiring=True)}
     for s in _songs.weekly_songs():
         ir = s.get("irregular") or {}
         dl = s.get("daily") or {}   # 毎日配信の曲（決定 94）も同じ表に、決まった配信日で並べる

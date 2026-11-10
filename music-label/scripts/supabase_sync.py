@@ -74,7 +74,7 @@ def seed_rows() -> list[tuple[str, dict, list[str]]]:
             "spotify_team": acc.get("spotify_for_artists_team") or None,
             "sheet": {k: v for k, v in lab.items() if k != "artists"},
         }, ["slug"]))
-    for a in all_artists():
+    for a in all_artists(include_retiring=True):
         v, s, lyr = a.get("vocal") or {}, a.get("sound") or {}, a.get("lyrics") or {}
         dist = a.get("distribution") or {}
         main = a["label_slug"] == MAIN_LABEL
@@ -253,7 +253,7 @@ def visual_rows() -> tuple[list, list]:
     base = OUT / "visuals"
     if not base.exists():
         return rows, uploads
-    artists = {a["slug"]: a for a in all_artists()}
+    artists = {a["slug"]: a for a in all_artists(include_retiring=True)}
     for cand_path in sorted(base.glob("*/*/candidates.json")) + sorted(base.glob("*/cover/*/candidates.json")):
         rel_parts = cand_path.relative_to(base).parts
         slug = rel_parts[0]

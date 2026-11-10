@@ -134,7 +134,7 @@ def left(today: date | None = None, st: dict | None = None) -> int:
 # 2 予定を合わせる
 def _acts() -> list[dict]:
     import _songs
-    return sorted((a for a in all_artists() if a.get("cadence") != "paused" and _songs.debut_registered(a.get("slug", "")) is not False),
+    return sorted((a for a in all_artists(include_retiring=True) if a.get("cadence") != "paused" and _songs.debut_registered(a.get("slug", "")) is not False),
                   key=lambda a: a.get("slug", ""))
 
 

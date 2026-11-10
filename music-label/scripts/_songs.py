@@ -47,6 +47,9 @@ def debut_songs() -> list[dict]:
         kit = read_json(kit_json)
         for i, s in enumerate(kit.get("songs", []), 1):
             a = load_artist(s["slug"], None, missing_ok=True) or {}
+            sp = STATE_DIR / f"{kit_json.parent.name}_{s['slug']}.json"
+            if sp.exists() and read_json(sp).get("status") == "stopped":   # 組を外したときに止めたデビュー曲（決定 166）
+                continue
             out.append({
                 "id": f"PDR-{i:03d}", "kind": "debut", "key": f"{kit_json.parent.name}_{s['slug']}",
                 "slug": s["slug"], "label_slug": None, "artist": a.get("name") or s.get("artist") or s["slug"],

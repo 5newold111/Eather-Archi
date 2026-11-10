@@ -148,7 +148,7 @@ def blocker(steps: list[dict]) -> dict | None:
 
 def artists_overview() -> list[dict]:
     out = []
-    for a in all_artists():
+    for a in all_artists(include_retiring=True):
         if not a.get("slug"):
             continue
         steps = artist_steps(a)
