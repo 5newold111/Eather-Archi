@@ -1,0 +1,27 @@
+{
+  "_説明": "ビジュアル候補の採点基準。最初の 5 回はオーナーに聞き、その理由をここに反映する。locked が true になると自動選択。いつでも手で直してよい。",
+  "version": 1,
+  "locked": false,
+  "decisions_asked": 0,
+  "decisions_required_before_lock": 5,
+  "low_confidence_margin": 0.3,
+  "weights": {
+    "consistency": 0.3,
+    "symbolism": 0.25,
+    "scene_fit": 0.2,
+    "safety": 0.15,
+    "craft": 0.1
+  },
+  "_weights": "consistency＝設定書との一貫性 / symbolism＝象徴性 / scene_fit＝曲・場面との一致 / safety＝規約と顔の非表示 / craft＝仕上がり。合計 1.0",
+  "hard_rules": [
+    "顔が判別できる候補は 0 点（除外）",
+    "第三者のロゴ・商標・キャラクターに似ている候補は除外",
+    "URL・SNS 名・価格・宣伝文が写っている候補は除外",
+    "文字が入る場合、曲名 / アーティスト名と一致しないものは除外",
+    "実在の建物・看板が特定できる背景は除外"
+  ],
+  "preferences": [],
+  "_preferences": "オーナーの判断から学んだ好み。例：『余白が多い方を選ぶ』『文字なしを優先』『粒子感は控えめ』。Claude が 5 回の判断から書き足す",
+  "decisions": [],
+  "_decisions": "記録：{date, artist, kind, chosen, reason, scores_at_time}"
+}
