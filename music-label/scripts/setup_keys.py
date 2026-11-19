@@ -163,7 +163,7 @@ def check_notion():
     if code == 401:
         return "ng", "NOTION_TOKEN が違います（インテグレーションの『内部インテグレーションシークレット』を貼り直す）"
     if code == 404:
-        return "ng", "ページが見つかりません。ページ右上の『…』→『接続』（Connections）でインテグレーションを追加してください"
+        return "ng", "ページが見つかりません。開発者ポータルのコネクションの『Content access』→『Edit access』でこのページを選んでください（またはページ右上『…』→『接続』）"
     if code != 200:
         return "ng", f"ページを読めません（{code or body[:80]}）"
     return "ok", "接続できました（表を置くページも読めます）"
@@ -292,10 +292,12 @@ SERVICES = {
     "notion": {
         "title": "Notion（制作の状態を見る管理画面。決定 167）",
         "url": "https://www.notion.so/profile/integrations",
-        "steps": ["『新しいインテグレーション』：名前 Postdog Records 同期、種類『内部』、ワークスペースはいつものもの → 保存",
-                  "機能：コンテンツを読み取る・更新する・挿入する をオン（ユーザー情報は『なし』でよい）",
-                  "『内部インテグレーションシークレット』を表示してコピー（この後の NOTION_TOKEN に貼る。チャットには貼らない）",
-                  "Notion で新しいページ『Postdog Records 管理』を作る → 右上『…』→『接続』でいま作ったインテグレーションを追加",
+        "steps": ["開発者ポータル（Developer portal）を開く → 左の『Build』→『Internal connections』（作れるのはワークスペースのオーナーだけ）",
+                  "新しく作る：名前 Postdog Records 同期、ワークスペースはいつものもの → 作成",
+                  "機能の欄があれば『読み取る・更新する・挿入する』をオン（ユーザー情報は『なし』でよい）",
+                  "『Configuration』タブの鍵（トークン）をコピー（この後の NOTION_TOKEN に貼る。チャットには貼らない）",
+                  "Notion で新しいページ『Postdog Records 管理』を作る → ポータルの『Content access』→『Edit access』でそのページを選ぶ"
+                  "（またはページ右上『…』→『接続』で追加）",
                   "そのページの右上『…』→『リンクをコピー』（この後の NOTION_PARENT_PAGE に貼る）"],
         "keys": [("NOTION_TOKEN", True), ("NOTION_PARENT_PAGE", False)], "check": check_notion},
     "youtube": {

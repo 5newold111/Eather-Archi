@@ -517,7 +517,7 @@ def main() -> None:
     except NotionError as e:
         hint = {401: "NOTION_TOKEN が違います（インテグレーションのシークレットを入れ直す）",
                 403: "インテグレーションの権限が足りません（コンテンツの読み取り・更新・挿入をオンに）",
-                404: "置き場所のページが見つかりません。ページ右上の「…」→「接続」でインテグレーションを追加したか確かめてください"}.get(e.code, "")
+                404: "置き場所のページが見つかりません。開発者ポータルのコネクションの「Content access」→「Edit access」でこのページを選んだか確かめてください"}.get(e.code, "")
         print(f"   ✕ Notion に写せませんでした：{e}" + (f"\n     → {hint}" if hint else ""))
         sys.exit(1)
 
