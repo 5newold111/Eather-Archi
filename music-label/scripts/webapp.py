@@ -196,6 +196,11 @@ def _status_json() -> dict:
         acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
     except Exception as e:  # noqa: BLE001
         acts["retire"] = {"active": [], "list": [], "error": str(e)}
+    try:   # 仕上げた音を聴いて確かめるのを待っている曲（決定 169）
+        import listen
+        listen_st = listen.status()
+    except Exception as e:  # noqa: BLE001
+        listen_st = {"waiting": 0, "todos": [], "error": str(e)}
     try:   # Notion に写した状態（決定 167）
         import notion_sync
         notion = notion_sync.status()
@@ -209,7 +214,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion,
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -469,11 +474,35 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         return [PY, str(S / "browser_fill.py"), "lyrics", song["id"] if song else "all"], \
             "ブラウザで入力（歌詞" + (f"：{song['artist']}「{song['title']}」）" if song else "：まだ出していない曲を続けて）")
-    if action == "fill_distrokid_all":   # 残りの曲を続けて入れる（決定 51）
+    if action in ("listen_ok", "listen_undo"):   # 仕上げた音を聴いて確かめた（配信前の作業。決定 169）
+        song = _songs.by_id(str(p.get("id", "")))
+        if song:
+            if action == "listen_undo":
+                return [PY, str(S / "listen.py"), "undo", song["id"]], "聴いて確かめた印を外す"
+            import listen
+            checks = ",".join(k for k, _ in listen.CHECKS if p.get(k) is True)
+            return [PY, str(S / "listen.py"), "ok", song["id"], f"--note={str(p.get('note') or '')[:500]}", f"--checks={checks}"], \
+                f"聴いて確かめた（{song['artist']}「{song['title']}」）"
+        return None
+    if action == "remaster":   # 味付けと強さを選んで仕上げ直す（決定 168）
+        import mastering
+        song = _songs.by_id(str(p.get("id", "")))
+        style, strength = str(p.get("style") or ""), str(p.get("strength") or "")
+        if song and (not style or style in mastering.STYLES) and (not strength or strength in mastering.STRENGTHS):
+            return [PY, str(S / "mastering.py"), "song", song["id"], *(["--style", style] if style else []),
+                    *(["--strength", strength] if strength else []), *(["--save-default"] if p.get("save") is True else [])], \
+                f"仕上げ直す（{song['artist']}「{song['title']}」）"
+        return None
+    if action == "master_learn":   # 「既存楽曲」の音のバランスを測って、仕上げの目標にする（決定 168）
+        return [PY, str(S / "mastering.py"), "learn"], "仕上げの目標を既存楽曲から学ぶ"
+    if action == "fill_distrokid_all":   # 残りの曲を続けて入れる（決定 51）。聴いて確かめた曲だけ（決定 169）
         return [PY, str(S / "browser_fill.py"), "distrokid", "all"], "ブラウザで入力（DistroKid：残りの曲を続けて）"
     if action == "fill_distrokid":
         song = _songs.by_id(str(p.get("id", "")))
         if song:
+            import listen
+            if listen.needed(song):   # 先に聴いて確かめる（決定 169）
+                return [PY, str(S / "listen.py"), "need", song["id"]], f"先に聴いて確かめる（{song['artist']}「{song['title']}」）"
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
     if action == "back":   # 間違えて進めた工程を戻す（決定 38）
         import publish
@@ -1251,6 +1280,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/cover-trial":   # ジャケットの試し運転の結果（決定 125）
             import cover_trial
             return self._send(200, cover_trial.page(), extra=extra)
+        if path == "/listen":   # 仕上げた音を聴いて確かめる（決定 169）
+            import listen
+            return self._send(200, listen.page(TOKEN, (parse_qs(urlparse(self.path).query).get("id") or [""])[0] or None), extra=extra)
         if path == "/photos":
             import artist_photo
             return self._send(200, artist_photo.photos_page(TOKEN), extra=extra)
@@ -1279,6 +1311,18 @@ class Handler(BaseHTTPRequestHandler):
             ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
             if (parse_qs(urlparse(self.path).query).get("dl") or [""])[0] == "1":   # スマホに保存する（DistroKid で選ぶため）
                 extra["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(f.name)}"
+            size = f.stat().st_size
+            extra["Accept-Ranges"] = "bytes"
+            m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", "").strip())
+            if m and (m.group(1) or m.group(2)) and size:   # 音の途中から聴けるように（Safari は途中からの読み込みが要る。決定 169）
+                a = int(m.group(1)) if m.group(1) else max(0, size - int(m.group(2)))
+                b = min(int(m.group(2)), size - 1) if (m.group(1) and m.group(2)) else size - 1
+                if a > b or a >= size:
+                    return self._send(416, b"", ctype, extra={**extra, "Content-Range": f"bytes */{size}"})
+                with open(f, "rb") as fh:
+                    fh.seek(a)
+                    data = fh.read(b - a + 1)
+                return self._send(206, data, ctype, extra={**extra, "Content-Range": f"bytes {a}-{b}/{size}"})
             return self._send(200, f.read_bytes(), ctype, extra=extra)
         if path == "/api/busy":   # 自動の更新（self_update.py）が、動いている仕事を待つために見る（決定 108）
             now = datetime.now()   # 動いている時間（分）も返す：ブラウザの入力が長く待っているだけなら、更新を止めない（決定 132）

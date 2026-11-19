@@ -239,11 +239,24 @@ def _explain(row: dict, phase: dict) -> dict:
                             {"kind": "run", "label": "もう一度進める", "action": "scan", "primary": True}]}
 
     if name == "DistroKid に登録":
+        try:   # 先に、仕上げた音を聴いて確かめる（配信前の作業。決定 169）
+            import listen
+            song_l = _songs.by_id(str(row.get("id") or ""))
+            if song_l is not None and listen.needed(song_l):
+                return {"cause": f"{title}の音源・ジャケット・登録の内容がそろいました。DistroKid に入れる前に、仕上げた音を聴いて確かめます{_late(phase)}。",
+                        "steps": ["「聴いて確かめる」を押す → 仕上げ前と仕上げ後を切り替えて聴く（同じ音量にそろえてあります）",
+                                  "よければ「この仕上げで進める」→ DistroKid に入力できるようになります",
+                                  "気になるときは、同じページで味付け（あたたかく・明るく など）と強さを変えて「仕上げ直す」か、「Suno で作曲に戻す」"],
+                        "actions": [{"kind": "link", "label": "聴いて確かめる", "url": f"/listen?id={row.get('id')}", "primary": True},
+                                    {"kind": "link", "label": "公開の準備を見る（ジャケット・下書き・公開セット）", "url": f"/song/{row.get('id')}"}]}
+        except Exception:  # noqa: BLE001
+            pass
         acts = [{"kind": "link", "label": "公開の準備を見る（ジャケット・下書き・公開セット）", "url": f"/song/{row.get('id')}"},
                 {"kind": "run", "primary": True, "label": "DistroKid に入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": row.get("id")},
                 {"kind": "folder", "label": "公開セットのフォルダを開く", "id": row.get("id")},
                 {"kind": "run", "label": "DistroKid にログイン（初回だけ）", "action": "browser_login", "site": "distrokid"},
-                {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")}]
+                {"kind": "registered", "label": "DistroKid に登録した", "id": row.get("id")},
+                {"kind": "link", "label": "もう一度聴く・仕上げ直す", "url": f"/listen?id={row.get('id')}"}]
         try:   # システムが残した画面の写し（入れ終わったとき・差し戻されたとき・入れ直したあと。決定 69）
             import song_check
             from _common import OUT as _OUT

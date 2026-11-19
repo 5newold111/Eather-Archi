@@ -276,7 +276,8 @@ def design(song: dict) -> dict:
         length = (int(sp["length_sec_min"]) + int(sp["length_sec_max"])) // 2
         why_len = f"聴かれる場面の曲の長さ（{sp['length_sec_min']}〜{sp['length_sec_max']} 秒）のまん中"
     if length is not None:
-        length = max(10, min(360, int(length)))
+        length = max(200, min(280, int(length)))   # 3〜5 分に入るように、少し内側（3 分 20 秒〜4 分 40 秒）をねらう（決定 170）
+        why_len += "。3〜5 分に入るように内側をねらう（決定 170）"
     mapping.append(("間隔（曲の長さ）", _songs.fmt_len(length), why_len))
     lines_n = len([x for x in lyrics.splitlines() if x.strip() and not x.strip().startswith("[")])
     if length and lines_n and lines_n * 4.5 > length:

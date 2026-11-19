@@ -3274,6 +3274,14 @@ def waiting_for_distrokid() -> list[dict]:
     """DistroKid に登録する段階の曲（公開セットができて、まだ登録していない）。デビュー曲を先に、曲 ID の順。
     2 曲目からの曲は、その組の Spotify のアーティストのページがわかってから（決定 53）"""
     out = [x for x in _songs.all_songs() if _songs.state(x).get("status") == "ready"]
+    try:   # 仕上げた音を聴いて確かめた曲だけ（配信前の作業。決定 169）
+        import listen
+        unheard = [x for x in out if listen.needed(x)]
+    except Exception:  # noqa: BLE001
+        unheard = []
+    if unheard:
+        print("   ・まだ聴いて確かめていないので、あとにする曲（ダッシュボードの「聴いて確かめる」）：" + "・".join(f"{x['artist']}「{x['title']}」" for x in unheard))
+        out = [x for x in out if x not in unheard]
     held = [x for x in out if not same_page_ready(x)]
     if held:
         print("   ・Spotify のアーティストのページがまだわからないので、あとにする曲：" + "・".join(f"{x['artist']}「{x['title']}」" for x in held))

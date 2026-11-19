@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-選んだテイクの音量を配信向けに整える（マスタリングの最終段だけ）。
+選んだテイクを配信向けに仕上げる。ふだんは mastering.py の仕上げ（決定 168）を呼ぶ。下の説明は、部品が足りないときに使う「音量だけ」の仕上げ。
 
   目標：統合ラウドネス -14 LUFS（Spotify / YouTube の基準）・トゥルーピーク -1 dBTP
   出力：WAV 44.1kHz / 24bit（DistroKid に登録する形式）
@@ -44,7 +44,24 @@ def loudnorm_measure(src: Path) -> dict:
     return json.loads(m.group(0))
 
 
-def master(src: Path, dst: Path) -> dict:
+def master(src: Path, dst: Path, style: str | None = None, strength: str | None = None, slug: str | None = None) -> dict:
+    """配信用の音源を作る。ふだんは新しい仕上げ（mastering.py。決定 168）。部品が足りないときだけ、前の「音量だけ」の仕上げにする"""
+    if not shutil.which("ffmpeg"):
+        sys.exit("[エラー] ffmpeg が見つかりません。Mac なら  brew install ffmpeg  で入れてください")
+    try:
+        import mastering
+        why = mastering.need_tools()
+        if not why:
+            d = mastering.defaults(slug)
+            return mastering.master(src, dst, style or d["style"], strength or d["strength"], slug=slug)
+        print(f"   － 新しい仕上げが使えないので、音量だけ整えます：{why}")
+    except RuntimeError as e:
+        print(f"   － 新しい仕上げに失敗したので、音量だけ整えます：{e}")
+    return master_loudness_only(src, dst)
+
+
+def master_loudness_only(src: Path, dst: Path) -> dict:
+    """前の仕上げ（音量だけ。版 1）"""
     if not shutil.which("ffmpeg"):
         sys.exit("[エラー] ffmpeg が見つかりません。Mac なら  brew install ffmpeg  で入れてください")
     step(f"1 回目：{src.name} の音量を測っています")
@@ -63,7 +80,7 @@ def master(src: Path, dst: Path) -> dict:
     step("確認：書き出したファイルをもう一度測っています")
     after = ebur128(dst)
     ok = abs(after.get("lufs", 0) - TARGET_I) <= 1.0 and after.get("true_peak_db", 0) <= TARGET_TP + 0.3
-    report = {"source": str(src), "master": str(dst), "before": meas, "after": after,
+    report = {"version": 1, "style": "loudness", "strength": "", "moves": [], "source": str(src), "master": str(dst), "before": meas, "after": after,
               "target": {"lufs": TARGET_I, "true_peak_db": TARGET_TP}, "ok": ok}
     mark = "○" if ok else "✕"
     print(f"   {mark} 仕上がり {after.get('lufs')} LUFS / ピーク {after.get('true_peak_db')} dBTP")

@@ -73,6 +73,13 @@ def song_step(song: dict, name: str) -> dict:
     if s == "ready":
         since = _d(st.get("ready_at"))
         late = since and (today - since).days >= 3
+        try:   # 先に、仕上げた音を聴いて確かめる（配信前の作業。決定 169）
+            import listen
+            if listen.needed(song):
+                return _step(name, "ng" if late else "wait", YOU, f"{title}仕上げた音を聴いて確かめる（聴き比べ →「この仕上げで進める」）",
+                             f"ダッシュボードの「聴いて確かめる」（/listen?id={song['id']}）", since)
+        except Exception:  # noqa: BLE001
+            pass
         return _step(name, "ng" if late else "wait", YOU,
                      f"{title}DistroKid に登録（ダッシュボードの「DistroKid に入力する」で下書き → 最後のボタンはあなた）",
                      f"python3 scripts/publish.py draft {song['id']}", since)

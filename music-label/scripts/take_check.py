@@ -133,6 +133,8 @@ def check(song: dict) -> dict:
     artist = explore.relax(load_artist(song["slug"], song.get("label_slug")))
     spec = length_spec(artist, load_label(song.get("label_slug")))
     spec.update({k: v for k, v in (b.get("scene") or {}).items() if k in ("length_sec_min", "length_sec_max", "hook_within_sec", "no_sudden_silence")})
+    from _common import length_rule
+    length_rule(spec)   # 長さは 3〜5 分（決定 170）
     instrumental = b.get("language") == "none" or (artist.get("lyrics") or {}).get("mode") == "instrumental"
     m = stk.measure_audio(f, spec)
     transcript, how = (None, "歌なし") if instrumental else stk.transcribe(f)

@@ -120,7 +120,7 @@ def label_slug_of(value) -> str:
 SCENE_TYPES = {
     "live": {"name": "ライブハウス", "en": "live houses and small venues (band energy, sing-along choruses)",
              "words": ["ライブ", "live", "ステージ", "会場", "フェス", "バンドの音", "小箱"],
-             "spec": {"hook_within_sec": 45, "length_sec_min": 180, "length_sec_max": 270, "no_sudden_silence": False,
+             "spec": {"hook_within_sec": 45, "length_sec_min": 180, "length_sec_max": 300, "no_sudden_silence": False,
                       "notes": "生演奏で再現できる編成。サビは観客が一緒に歌える短い言葉。キメやブレイク（一瞬の無音）を使ってよい。ライブで伸ばせるイントロ・アウトロ"}},
     "party": {"name": "パーティ・クラブ", "en": "parties, clubs and pre-game playlists (danceable, steady groove)",
               "words": ["パーティ", "パーティー", "party", "クラブ", "club", "dj", "踊", "ダンスフロア", "宴", "フロア"],
@@ -128,11 +128,11 @@ SCENE_TYPES = {
                        "notes": "DJ がつなぎやすい 8〜16 小節のイントロ・アウトロ。テンポは一定。ブレイクからの盛り上げ（ドロップ）を使ってよい。踊れるグルーヴ"}},
     "personal": {"name": "ひとりで聴く", "en": "personal listening (headphones, alone in a room, late nights, walks)",
                  "words": ["ひとり", "一人", "ヘッドホン", "イヤホン", "部屋", "夜更かし", "散歩", "寝る前", "personal", "headphone"],
-                 "spec": {"hook_within_sec": 45, "length_sec_min": 150, "length_sec_max": 270, "no_sudden_silence": False,
+                 "spec": {"hook_within_sec": 45, "length_sec_min": 180, "length_sec_max": 300, "no_sudden_silence": False,
                           "notes": "ヘッドホンで気づく細部（息・部屋の響き・小さな音）。音量の起伏や静かな間を使ってよい。歌詞は 1 人に語りかける距離"}},
     "drive": {"name": "ドライブ", "en": "driving (morning highway, night drive, long distance)",
               "words": ["ドライブ", "運転", "車", "高速", "環状線", "海岸線", "drive", "highway"],
-              "spec": {"hook_within_sec": 30, "length_sec_min": 150, "length_sec_max": 210, "no_sudden_silence": True,
+              "spec": {"hook_within_sec": 30, "length_sec_min": 180, "length_sec_max": 300, "no_sudden_silence": True,
                        "notes": "車内の騒音でも聴き取れる中音域。急な無音・大きな音量差を作らない"}},
 }
 MAIN_SCENE = ("Postdog Records の組は、幅広い場面で聴かれる：ライブハウス・パーティやクラブ・ひとりで聴く（ヘッドホン・部屋・散歩）・ドライブ。"
@@ -280,10 +280,17 @@ def length_spec(artist: dict, label: dict) -> dict:
     spec = dict(label.get("scene_spec") or {})
     spec.update((artist.get("sound") or {}).get("drive_spec") or {})
     spec.update((artist.get("sound") or {}).get("scene_spec") or {})
-    spec.setdefault("length_sec_min", 150)
-    spec.setdefault("length_sec_max", 210)
     spec.setdefault("hook_within_sec", 30)
     spec.setdefault("no_sudden_silence", True)
+    return length_rule(spec)
+
+
+LENGTH_SEC = (180, 300)   # 曲の長さ：3 分〜5 分の間ならなんでもよい（オーナーの指示 2026-11-19。決定 170）
+
+
+def length_rule(spec: dict) -> dict:
+    """曲の長さの決まりを、どの組・どの場面でも 3〜5 分にそろえる（設定書・場面ごとの長さより優先）"""
+    spec["length_sec_min"], spec["length_sec_max"] = LENGTH_SEC
     return spec
 
 

@@ -392,23 +392,24 @@ def advance(song: dict) -> str:
     sel = read_json(sel_p)
     take = tdir / sel["decision"]["selected"]
     master_p = OUT / "masters" / song["key"] / "master.wav"
-    # 音量
-    if not (sel.get("master") or {}).get("ok") or not master_p.exists():
+    # 仕上げ（音のバランス・耳に痛い高音・低音の整理・音量。決定 168）。古い作り方（音量だけ）の仕上げは、登録する前なら仕上げ直す
+    if not (sel.get("master") or {}).get("ok") or not master_p.exists() or _old_master(song):
         if not shutil.which("ffmpeg"):
             st["status"] = "waiting_ffmpeg"
             _songs.save_state(song, st)
             print("   － 音量を整える道具（ffmpeg）がありません。ターミナルで  brew install ffmpeg  を 1 回実行してください")
             return st["status"]
         from master_track import master
-        step(f"{song['artist']}「{song['title']}」の音量を配信向けに整えています（-14 LUFS / -1 dBTP）")
+        step(f"{song['artist']}「{song['title']}」を配信向けに仕上げています（音のバランス・高音・低音・音量 -14 LUFS / -1 dBTP）")
         try:
-            rep = master(take, master_p)
+            rep = master(take, master_p, slug=song["slug"])
         except SystemExit as e:
             print(f"   ✕ 音量の調整に失敗しました：{e}")
             return st.get("status", "imported")
         (master_p.with_suffix(".report.json")).write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
         sel["master"] = {"path": str(master_p), "ok": rep["ok"], "lufs": rep["after"].get("lufs"),
-                         "true_peak_db": rep["after"].get("true_peak_db")}
+                         "true_peak_db": rep["after"].get("true_peak_db"), "style": rep.get("style", ""),
+                         "strength": rep.get("strength", ""), "version": rep.get("version", 1)}
         sel_p.write_text(json.dumps(sel, ensure_ascii=False, indent=1), encoding="utf-8")
     # ジャケット
     cover = _songs.cover_source(song)
@@ -438,6 +439,24 @@ def advance(song: dict) -> str:
     st["ready_at"] = st.get("ready_at") or datetime.now().isoformat(timespec="seconds")
     _songs.save_state(song, st)
     return "ready"
+
+
+def _old_master(song: dict) -> bool:
+    """古い作り方の仕上げ（音量だけ）のままか。新しい仕上げが使えるときだけ仕上げ直す"""
+    try:
+        import mastering
+        return mastering.outdated(song) and not mastering.need_tools()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def after_remaster(song: dict) -> None:
+    """仕上げ直したあと：下書きと公開セットを新しい音に合わせる。聴いて確かめた印は、音が変わったので外れる（決定 169）"""
+    st = _songs.state(song)
+    if st.get("status") == "ready":
+        write_draft(song, st)
+    store_set(song)
+    _book()
 
 
 def publish_folder(song: dict) -> tuple[Path, str, str]:
@@ -685,7 +704,8 @@ def cmd_scan(args) -> int:
     ready = []
     for song in songs:
         st = _songs.state(song)
-        if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover") or (song["key"] in picked and st.get("status")):
+        if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover") or (song["key"] in picked and st.get("status")) \
+                or (st.get("status") == "ready" and _old_master(song)):   # 登録前の曲は、新しい仕上げに直す（決定 168）
             now = advance(song)
             store_set(song)   # 音源ができた時点で、公開セットのフォルダにも入れておく（SSD が無くても Mac に残る）
             if now == "ready":

@@ -353,6 +353,8 @@ def main() -> None:
     spec = length_spec(artist, label)
     spec.update({k: v for k, v in (brief.get("scene") or {}).items()   # その曲の聴かれる場面の決まり（決定 30）
                  if k in ("length_sec_min", "length_sec_max", "hook_within_sec", "no_sudden_silence")})
+    from _common import length_rule
+    length_rule(spec)   # 長さは 3〜5 分（決定 170）
     tier = args.tier or label.get("automation_tier", "B")
     instrumental = (artist.get("lyrics") or {}).get("mode") == "instrumental"
 
