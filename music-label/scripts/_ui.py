@@ -20,8 +20,9 @@ import json
 
 E = html.escape
 
-# 上の帯の行き先（ダッシュボードの作り直しで増やす。決定 176）
-NAV = [("/", "ホーム"), ("/listen", "聴いて確かめる"), ("/pitch", "ピッチ"), ("/plays", "再生数"), ("/money", "お金"), ("/keys", "鍵と見守り")]
+# 上の帯の行き先（ダッシュボード本体と同じ並び。決定 176）
+NAV = [("/", "ホーム"), ("/#make", "制作"), ("/#acts", "アーティスト"), ("/plays", "再生数"), ("/money", "お金"), ("/keys", "設定"), ("/#tools", "道具")]
+PARENT = {"/listen": "/#make", "/pitch": "/#make", "/check": "/#make", "/suno": "/#make", "/photos": "/#acts", "/phone": "/#tools"}   # 帯に無いページが属する所
 
 CSS = """
 :root{--bg:#f4f5f4;--card:#fff;--ink:#1b2024;--sub:#5d6770;--line:#d9dedb;--soft:#e9edeb;--accent:#23786b;--accent-ink:#fff;
@@ -83,11 +84,19 @@ if(__AUTO__){setInterval(()=>{if([...document.querySelectorAll("audio")].every(a
 
 
 def page(title: str, body: str, token: str, active: str = "", auto: bool = False, head: str = "", script: str = "") -> str:
+    active = PARENT.get(active, active)
     nav = "".join(f'<a href="{href}" class="{"on" if href == active else ""}">{E(name)}</a>' for href, name in NAV)
     return (f'<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>{E(title)}</title><style>{CSS}</style>{head}</head><body>'
             f'<header class="top"><nav><b>Postdog Records</b>{nav}</nav></header><main>{body}</main><div id="job"></div>'
             f'<script>{JS.replace("__TOKEN__", token).replace("__AUTO__", "true" if auto else "false")}{script}</script></body></html>')
+
+
+def nav_html(active: str = "") -> str:
+    """古い作りの別ページ（公開の準備・写真など）にも同じ帯を付ける"""
+    active = PARENT.get(active, active)
+    return ('<header class="top"><nav><b>Postdog Records</b>'
+            + "".join(f'<a href="{href}" class="{"on" if href == active else ""}">{E(name)}</a>' for href, name in NAV) + "</nav></header>")
 
 
 def btn(spec: dict, primary: bool = False, fields: dict | None = None, post: str | None = None, cls: str = "") -> str:

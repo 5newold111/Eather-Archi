@@ -697,15 +697,15 @@ def start_job(cmd: list[str], label: str) -> str:
 
 # ---------------------------------------------------------------------------
 PAGE = r"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Label Dashboard</title><style>
-:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--muted:#9a948a;--line:#e2ddd2;--grid:#efebe3;--wk:#f1ede5;--accent:#a07a3c;
---good:#0ca30c;--warn:#fab219;--crit:#d03b3b;--good-t:rgba(12,163,12,.16);--warn-t:rgba(250,178,25,.22);--crit-t:rgba(208,59,59,.16);--plan-t:rgba(110,106,96,.07)}
-@media (prefers-color-scheme:dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--muted:#7d786f;--line:#34322d;--grid:#2a2926;--wk:#1f1e1b;--accent:#d2ad6b;
---good-t:rgba(12,163,12,.26);--warn-t:rgba(250,178,25,.22);--crit-t:rgba(208,59,59,.30);--plan-t:rgba(236,232,223,.05)}}
+<title>Postdog Records</title><style>
+:root{--bg:#f4f5f4;--card:#fff;--ink:#1b2024;--sub:#5d6770;--muted:#98a2a9;--line:#d9dedb;--grid:#eceeed;--wk:#f0f2f1;--accent:#23786b;--accent-ink:#fff;--soft:#e9edeb;
+--good:#2e9a5a;--warn:#d99a1c;--crit:#c9503a;--good-t:rgba(46,154,90,.14);--warn-t:rgba(217,154,28,.18);--crit-t:rgba(201,80,58,.14);--plan-t:rgba(93,103,112,.07)}
+@media (prefers-color-scheme:dark){:root{--bg:#121518;--card:#1a1f23;--ink:#e7ecea;--sub:#9aa5ae;--muted:#6f7a82;--line:#2e363c;--grid:#232a2f;--wk:#171c20;--accent:#5cc3b1;--accent-ink:#0d1a18;--soft:#22292e;
+--good:#6cc593;--warn:#e3b25a;--crit:#f08a72;--good-t:rgba(108,197,147,.20);--warn-t:rgba(227,178,90,.20);--crit-t:rgba(240,138,114,.22);--plan-t:rgba(231,236,234,.05)}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
-header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
 .bar{max-width:1280px;margin:0 auto;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.bar h1{font-size:17px;font-weight:500;letter-spacing:.04em;margin:0 auto 0 0}.bar a{color:var(--ink);text-decoration:none;font-size:14px}
+.bar h1{font-size:15px;font-weight:700;margin:0 6px 0 0}.bar #upd{margin-left:auto}nav.nav{display:flex;gap:2px 14px;flex-wrap:wrap;align-items:center}nav.nav a{color:var(--sub);text-decoration:none;font-size:14px;padding:4px 2px;border-bottom:2px solid transparent;white-space:nowrap}nav.nav a.on{color:var(--ink);border-color:var(--accent);font-weight:600}nav.nav .n{font-size:11px;margin-left:4px;background:var(--crit);color:#fff;border-radius:99px;padding:0 6px;font-weight:700}nav.nav .n:empty{display:none}
 main{max-width:1280px;margin:0 auto;padding:12px 16px 64px}
 h2{font-weight:500;font-size:16px;margin:24px 0 10px}.sub{color:var(--sub);font-size:12px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 12px}
@@ -721,7 +721,7 @@ dialog.wide{max-width:min(900px,calc(100vw - 32px))}.fld{margin:8px 0}.fld>label
 .gl.first{border-top:1px solid var(--line)}.gh{position:sticky;top:0;z-index:3;background:var(--card);border-bottom:1px solid var(--line)}
 .gt{position:relative;border-bottom:1px solid var(--grid)}.day{position:absolute;top:0;bottom:0;border-left:1px solid var(--grid)}.day.we{background:var(--wk)}
 .hd{position:absolute;top:0;font-size:11px;color:var(--sub);padding:3px 0 0 3px;white-space:nowrap}.hd.mon{color:var(--ink);font-weight:600}
-.today{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:1}.todaylab{position:absolute;top:0;font-size:10px;color:#fff;background:var(--accent);padding:0 4px;border-radius:3px;transform:translateX(-50%);z-index:4}
+.today{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);z-index:1}.todaylab{position:absolute;top:0;font-size:10px;color:var(--accent-ink);background:var(--accent);padding:0 4px;border-radius:3px;transform:translateX(-50%);z-index:4}
 .b{position:absolute;height:20px;border-radius:4px;border:1.5px solid;font-size:11px;line-height:17px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:var(--ink);z-index:2}
 .b:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .b.done{background:var(--good-t);border-color:var(--good)}.b.wait{background:var(--warn-t);border-color:var(--warn)}.b.ng{background:var(--crit-t);border-color:var(--crit);font-weight:600}
@@ -734,7 +734,7 @@ img.zoomable{cursor:zoom-in}#zoom{width:fit-content;max-width:min(96vw,1100px)}#
 .panel{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 14px;margin:12px 0}
 .panel.ng{border-left-color:var(--crit)}.panel.done{border-left-color:var(--good)}
 code{font-size:12px;color:var(--sub);word-break:break-all}
-button{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+button{background:var(--accent);color:var(--accent-ink);border:0;border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}button:disabled{opacity:.5;cursor:default}
 .tools{display:flex;gap:8px;flex-wrap:wrap}ul.list{list-style:none;padding:0;margin:0}ul.list li{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;padding:8px 12px;margin:6px 0;font-size:14px}
 ul.list li.ng{border-left-color:var(--crit)}ul.list li.run{border-left-color:var(--muted)}.who{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-right:6px;color:var(--sub)}
@@ -767,20 +767,47 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 .ja-box{margin:8px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}.ja-box .ja-text{white-space:pre-wrap;font-size:13px;line-height:1.6;margin-top:6px}.irr-row{display:flex;gap:12px;flex-wrap:wrap}.irr-f label.chk{display:flex;gap:8px;align-items:center;margin:10px 0 2px;font-weight:600}.irr-f label.chk input{width:auto;margin:0}.irr-row>div{flex:1 1 220px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.chips button{font-size:12px;padding:2px 10px}.irr-note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:13px;white-space:pre-wrap}
 .redo{border:1.5px dashed var(--crit);border-radius:10px;padding:8px 12px;margin:14px 0 4px}
+
+.view>h2:first-child{margin-top:8px}.hello{display:flex;gap:10px 16px;flex-wrap:wrap;align-items:baseline;margin:10px 0 6px}.hello h2{margin:0;font-size:20px;font-weight:700}
+.hchips{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}.hchip{display:inline-flex;gap:6px;align-items:center;font-size:12px;border:1px solid var(--line);border-radius:99px;padding:2px 10px;background:var(--card);color:var(--sub);text-decoration:none}
+.hchip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}.hchip.ok i{background:var(--good)}.hchip.warn i{background:var(--warn)}.hchip.ng i{background:var(--crit)}.hchip b{color:var(--ink);font-weight:600}
+ul.inbox{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+ul.inbox li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px 12px;align-items:center;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:10px 14px}
+ul.inbox li.ng{border-left-color:var(--crit)}ul.inbox li.soon{border-left-color:var(--crit)}ul.inbox li.info{border-left-color:var(--muted)}
+ul.inbox .tx{display:grid;gap:1px;min-width:0}ul.inbox .tx b{font-size:14.5px}ul.inbox .tx span{font-size:13px;color:var(--sub);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+ul.inbox .go{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}a.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+@media (max-width:640px){ul.inbox li{grid-template-columns:minmax(0,1fr)}ul.inbox .go{justify-content:flex-start}}
+.allclear{background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:18px;display:grid;gap:2px}.allclear span{color:var(--sub);font-size:13px}
+.home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}@media (max-width:760px){.home-grid{grid-template-columns:1fr}}
+.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px}#quota{margin-top:10px;align-items:center;font-size:14px}#quota input{font:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);width:8em}.num{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:1px;text-decoration:none;color:var(--ink)}
+.num span{font-size:12px;color:var(--sub)}.num b{font-size:22px;font-variant-numeric:tabular-nums;line-height:1.25}.num i{font-style:normal;font-size:11.5px;color:var(--sub)}
+ul.next{list-style:none;margin:0;padding:0;background:var(--card);border:1px solid var(--line);border-radius:10px}ul.next li{display:flex;gap:10px;padding:7px 12px;border-bottom:1px solid var(--soft);font-size:13.5px}ul.next li:last-child{border-bottom:0}
+ul.next time{font-variant-numeric:tabular-nums;color:var(--sub);min-width:3.2em}ul.next .pl{color:var(--sub);font-size:12px}
+.tgroup{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0}.tgroup h3{margin:0 0 2px;font-size:14px}.tgroup p{margin:0 0 8px}
+.mk-links{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}.mk-links .n{font-size:11px;margin-left:5px;background:var(--crit);color:#fff;border-radius:99px;padding:0 6px;font-weight:700}.mk-links .n:empty{display:none}
 </style></head><body>
-<header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
+<header><div class="bar"><h1>Postdog Records</h1>
+<nav class="nav" aria-label="画面の切り替え"><a href="#home" data-view="home">ホーム<span class="n" id="n-home"></span></a><a href="#make" data-view="make">制作</a><a href="#acts" data-view="acts">アーティスト<span class="n" id="n-acts"></span></a><a href="/plays">再生数</a><a href="/money">お金</a><a href="/keys">設定</a><a href="#tools" data-view="tools">道具</a></nav>
+<span class="sub" id="upd"></span></div></header>
 <main>
-<div class="tools act-only">
- <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button><button data-act="notion_sync" class="ghost" id="notion-sync" title="いまの制作の状態を Notion の表に写します（30 分ごとにも自動で写します）">Notion に写す</button><a class="btn ghost" id="notion-open" href="#" target="_blank" rel="noopener" hidden>Notion を開く ↗</a>
- <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button>
-</div>
-<div class="tools act-only" id="quota" hidden></div>
 <div id="jobs"></div>
+<section id="view-home" class="view">
+ <div class="hello"><h2>今日やること</h2><span class="sub" id="home-sub"></span></div>
+ <div class="hchips" id="home-chips"></div>
+ <div id="home-inbox"></div>
+ <div class="home-grid">
+  <div><h2>これからの配信</h2><div id="home-next"></div></div>
+  <div><h2>いまの数字</h2><div id="home-nums"></div></div>
+ </div>
+ <details id="home-auto-box"><summary>自動で進行中<span class="sub" id="n-auto"></span></summary><div id="home-auto"></div></details>
+</section>
+<section id="view-make" class="view" hidden>
+ <div class="tools act-only"><button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button><span class="mk-links"><a class="btn" href="/listen">聴いて確かめる<span class="n" id="n-listen"></span></a><a class="btn" href="/pitch">ピッチ<span class="n" id="n-pitch"></span></a></span></div>
+ <div class="tools act-only" id="quota" hidden></div>
 <div class="tabs" role="tablist">
  <button class="tab" role="tab" id="tab-regular" aria-controls="pane-regular">定期配信<span class="n" id="n-regular"></span></button>
  <button class="tab" role="tab" id="tab-irregular" aria-controls="pane-irregular">不定期・毎日配信<span class="n" id="n-irregular"></span></button>
  <button class="tab" role="tab" id="tab-debut" aria-controls="pane-debut">デビュー<span class="n" id="n-debut"></span></button>
- <button class="tab" role="tab" id="tab-acts" aria-controls="pane-acts">アーティスト追加<span class="n" id="n-acts"></span></button>
 </div>
 <div class="legend" aria-label="凡例">
  <span><i class="sw" style="background:var(--good-t);border-color:var(--good)"></i>✓ 済み</span>
@@ -817,16 +844,23 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
  <details><summary>曲の一覧</summary><div id="songs-debut"></div></details>
  <details id="debut-done-box"><summary>デビューが終わった組のデビュー曲（作り直す・登録をやり直すときに戻す）</summary><div id="debut-done"></div></details>
 </section>
-<section id="pane-acts" role="tabpanel" aria-labelledby="tab-acts" hidden>
+</section>
+<section id="view-acts" class="view" hidden>
+<div id="pane-acts">
  <p class="sub">新しくデビューする組の、管理表の項目（人物・メンバー・音・見た目など）を 1 つずつ要約して並べます。読んで「承認」か「却下」を押してください。全部の項目を決めると「この組をデビューさせる」が押せます（デビュー日の予約まで自動）。新しい組の案ができたり、デビューが近づいたりすると、このタブに知らせが出ます。</p>
  <div id="acts-upcoming"></div>
  <h2>承認待ちの組</h2><div id="acts-review"></div>
  <div class="panel act-only" id="acts-edit"></div>
  <h2>組を外す・外した組</h2><div id="acts-retire"></div>
+</div>
 </section>
+<section id="view-tools" class="view" hidden>
+ <h2>道具</h2><p class="sub">ふだんは自動で動くものを、手で動かしたいとき・調べたいときに使います。</p>
+<div class="tgroup act-only"><h3>保管と写し</h3><p class="sub">SSD とローカルへの保管、Notion への写し。ふだんは自動で動きます。</p><div class="tools"><button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="notion_sync" class="ghost" id="notion-sync" title="いまの制作の状態を Notion の表に写します（30 分ごとにも自動で写します）">Notion に写す</button><a class="btn ghost" id="notion-open" href="#" target="_blank" rel="noopener" hidden>Notion を開く ↗</a></div></div><div class="tgroup act-only"><h3>参考曲（既存楽曲）</h3><p class="sub">SSD の「既存楽曲」を解析して参考曲にします。歌詞・メロディー・足りない項目もここから。</p><div class="tools"><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="master_learn" class="ghost" data-confirm="SSD の「既存楽曲」の曲を 1 曲ずつ測って、仕上げ（マスタリング）の音のバランスの目標にします（1 曲 数秒・料金なし。測った曲は次から飛ばします）。始めますか？">仕上げの目標を既存楽曲から学ぶ</button></div></div><div class="tgroup act-only"><h3>方向性とアーティスト</h3><p class="sub">影響を受けたアーティスト・方向性の探り具合・コラボの相性・アートの好み。</p><div class="tools"><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button></div></div><div class="tgroup act-only"><h3>ジャケット</h3><p class="sub">新しい作り方を、曲の状態を変えずに試します。</p><div class="tools"><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a></div></div><div class="tgroup act-only"><h3>診断</h3><p class="sub">うまくいかないときに。</p><div class="tools"><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="alert_watch" class="ghost">いま見回る（見守り）</button></div></div><div class="tgroup"><h3>ページ</h3><p class="sub">工程ごとの専用のページ。</p><div class="tools"><a class="btn" href="/listen">聴いて確かめる</a><a class="btn" href="/pitch">Spotify へのピッチ</a><a class="btn" href="/check">公開の準備</a><a class="btn" href="/suno">Suno に貼る内容</a><a class="btn" href="/photos">アーティスト写真</a><a class="btn" href="/phone">スマホで進める</a><a class="btn" href="/plays">再生数</a><a class="btn" href="/money">お金</a><a class="btn" href="/keys">鍵と見守り</a></div></div>
 <h2>仕組みの詰まり</h2><div id="system"></div>
 <p class="sub act-only" id="upd-info"></p>
 <details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
+</section>
 </main>
 <div id="tip" role="tooltip"></div>
 <dialog id="zoom" aria-label="ジャケットの候補を大きく見る"><div class="z-in" id="zoom-body"></div></dialog>
@@ -851,11 +885,22 @@ function dailyBox(){const el=document.getElementById("daily-box"),D=DATA.daily||
   el.innerHTML=`<b>毎日配信：${E(D.start)}〜${E(D.end)}（${D.days} 日）</b><p class="sub">曲がある日 ${D.filled}/${D.days}。持ち回り：${(D.order||[]).map(E).join(" → ")}。${nx}</p>`
     +`<button data-act="daily_make" data-confirm="21 日先までの、曲がまだ無い日の曲を作ります（参考曲の割り当て → Claude が書く。1 曲 約 30 円）。始めますか？">毎日配信の曲を作る（21 日先まで）</button> `
     +`<button class="ghost" data-act="daily_stop" data-confirm="毎日配信を止めて、ふだんの毎週の制作に戻します（作った曲と配信日はそのまま）。止めますか？">毎日配信を止める</button>`+sns}
-const ALLTABS=[...TABS,"acts"];   // 「アーティスト追加」はガントチャートの無いタブ（決定 119）
-function selectTab(t){TAB=t;for(const k of ALLTABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}
-  if(!location.hash.startsWith("#"+t))history.replaceState(null,"","#"+t)}
-for(const k of ALLTABS)document.getElementById("tab-"+k).onclick=()=>selectTab(k);
-selectTab(ALLTABS.find(k=>location.hash.startsWith("#"+k))||"regular");
+const VIEWS=["home","make","acts","tools"];let VIEW=null,PICKED=false;   // 上の帯の画面（決定 176）。制作の中にタブ（定期・不定期・デビュー）
+function selectTab(t){TAB=t;for(const k of TABS){document.getElementById("tab-"+k).setAttribute("aria-selected",k===t);document.getElementById("pane-"+k).hidden=k!==t}}
+function showView(v,tab){const changed=VIEW!==v;VIEW=v;for(const k of VIEWS)document.getElementById("view-"+k).hidden=k!==v;
+  document.querySelectorAll("nav.nav a[data-view]").forEach(a=>a.classList.toggle("on",a.dataset.view===v));
+  if(v==="make"){if(tab)PICKED=true;   // 自分で選ぶまでは、曲のあるタブを開く
+    const has=k=>DATA&&DATA.timeline[k].rows.some(r=>!r.planned);
+    selectTab(tab||(!PICKED&&DATA&&!has(TAB)?TABS.find(has):null)||TAB||"regular")}
+  const h=v==="make"?TAB:v;if(!location.hash.startsWith("#"+h))history.replaceState(null,"","#"+h);if(changed)window.scrollTo(0,0)}
+function route(){const h=location.hash.slice(1),m=h.match(/open=([a-z]+):/);
+  const tab=TABS.find(k=>h.startsWith(k))||(m&&TABS.includes(m[1])?m[1]:null);
+  if(tab)return showView("make",tab);showView(VIEWS.find(k=>h.startsWith(k))||"home")}
+for(const k of TABS)document.getElementById("tab-"+k).onclick=()=>showView("make",k);
+document.querySelectorAll("nav.nav a[data-view]").forEach(a=>a.onclick=e=>{e.preventDefault();showView(a.dataset.view)});
+window.addEventListener("hashchange",route);route();
+document.addEventListener("click",e=>{const b=e.target.closest("[data-home-view],[data-home-fn]");if(!b)return;
+  if(b.dataset.homeFn==="pageRemindOpen")return pageRemindOpen();showView(b.dataset.homeView,b.dataset.homeTab||undefined)});
 const OPEN={};
 function gantt(key){
   const sec=DATA.timeline[key],el=document.getElementById("g-"+key);
@@ -1221,6 +1266,7 @@ function render(){
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
   irrForm();irrDrafts();dailyBox();quotaBox();actsTab();debutDone();pageRemind();
+  try{home()}catch(e){console.error(e)}
   {const n=DATA.notion||{},b=document.getElementById("notion-sync"),a=document.getElementById("notion-open");   // Notion（決定 167）
    if(b){b.textContent=n.ready?"Notion に写す":"Notion をつなぐ（鍵の設定）";b.dataset.act=n.ready?"notion_sync":"terminal";b.dataset.key="notion";
      b.title=n.ready?`いまの制作の状態を Notion の表に写します（30 分ごとにも自動）${(n.last||{}).at?"・最後に写した："+n.last.at.replace("T"," "):""}`:"ターミナルが開いて、Notion の鍵の入れ方を順に案内します"}
@@ -1252,6 +1298,62 @@ function render(){
   document.getElementById("tracker").innerHTML=t.rows.length?`<div class="tbl"><table><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr>${t.rows.map(r=>`<tr>${cols.map(c=>`<td>${E(r[c])}</td>`).join("")}</tr>`).join("")}</table></div><p class="sub">読んだ場所：${E(t.src)}</p>`:`<p class="empty">完了していない項目はありません（${E(t.src)}）</p>`;
   if(!STATIC)DATA.jobs.filter(j=>j.state==="running"&&!watching[j.id]).forEach(j=>watch(j.id));
 }
+function homeItems(){const items=[];   // 「今日やること」：どの流れの曲も、Gon さんの番と止まっている所を 1 つの一覧に（決定 176）
+  const songs=[];   // 1 曲につき 1 枚（いちばん手前の工程）。同じ原因で止まっている曲は 1 枚にまとめる
+  for(const key of TABS){DATA.timeline[key].rows.forEach((r,ri)=>{if(r.planned)return;
+    const ps=r.phases.map((p,pi)=>[p,pi]).filter(([p])=>!p.milestone&&["wait","ng"].includes(p.state));if(!ps.length)return;
+    const [p,pi]=ps[0],g=p.guide||{},pa=(g.actions||[]).find(a=>a.kind==="link"&&a.primary);
+    const what=`${p.name}：${WHO(g.cause||p.detail)}`+(ps.length>1?`（ほか ${ps.length-1} つの工程も）`:"");
+    songs.push({sev:p.state==="ng"?0:2,who:WHO(p.who)||"—",artist:r.artist,title:`${r.artist} ${r.sub||""}`,what,gid:`${key}:${ri}:${pi}`,link:pa,
+      same:pa?null:what.replace(/「[^」]*」/g,"").replace(/（ほか.*$/,"")})})}
+  const groups={};for(const x of songs){if(x.same)(groups[x.same]=groups[x.same]||[]).push(x)}
+  for(const x of songs){const g=x.same&&groups[x.same];if(!g||g.length<2){items.push(x);continue}
+    if(g[0]!==x)continue;items.push({...x,sev:Math.min(...g.map(y=>y.sev)),title:`${g.length} 組：${g.map(y=>y.artist).join("・")}`,what:x.same})}
+  for(const t of ((DATA.pitch||{}).todos||[])){if(!["todo","soon"].includes(t.state))continue;
+    items.push({sev:t.state==="soon"?1:2,title:`${t.artist}「${t.title}」`,what:`Spotify にピッチする（${t.deadline} まで・あと ${t.days_left} 日）`,link:{url:`/pitch?id=${encodeURIComponent(t.id)}`,label:"ピッチの下書きを開く"}})}
+  const A=DATA.acts_review||{};if(A.pending)items.push({sev:2,title:`新しい組の承認（${A.pending} 項目）`,what:"項目ごとの要約を読んで、承認か却下を押す",view:"acts"});
+  const nd=((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length;
+  if(nd)items.push({sev:2,title:`曲の案（${nd} 件）`,what:"案を見て直すか、「この案で作曲へ進む」を押す",view:"make",tab:"irregular"});
+  for(const t of (DATA.weekly_todos||[]))items.push({sev:t.sev==="ng"?0:2,title:t.what,what:(t.who||[]).join("、"),view:"make",tab:"regular"});
+  const pr=(DATA.page_remind||[]).length;if(pr)items.push({sev:3,title:`アーティストのページ（${pr} 組）`,what:"Spotify・Apple Music・YouTube Music のアーティストページの住所を貼る",fn:"pageRemindOpen"});
+  for(const t of (DATA.photo_todos||[]))items.push({sev:3,title:t.artist,what:`アーティスト写真を各サイトに入れる（${(t.services||[]).map(x=>x.name).join("、")}）`,link:{url:"/photos",label:"写真のページを開く"}});
+  const lt=(DATA.lyric_todos||[]).length;if(lt)items.push({sev:3,title:`歌詞（${lt} 曲）`,what:"DistroKid に登録した曲の歌詞を出す（入力は自動・Submit は Gon さん）",act:"fill_lyrics",label:"歌詞を続けて入れる"});
+  for(const x of (DATA.system||[]))items.push({sev:x.sev==="ng"?-1:3,who:"仕組み",title:x.what,what:(x.acts||[]).length?"":x.how,acts:x.acts||[],view:(x.acts||[]).length?null:"tools"});
+  for(const x of ((DATA.watch||{}).problems||[]))items.push({sev:1,who:"見守り",title:typeof x==="string"?x:(x.title||x.what||"気になること"),what:typeof x==="string"?"":(x.message||x.why||""),link:{url:"/keys",label:"設定を開く"}});
+  for(const x of ((DATA.health||{}).needs_owner||[]))items.push({sev:x.sev==="ng"?0:2,who:"点検",title:x.what,what:x.why||"",view:"tools"});
+  return items.sort((a,b)=>a.sev-b.sev)}
+function home(){const box=document.getElementById("home-inbox");if(!box)return;const items=homeItems(),cls={"-1":"ng",0:"ng",1:"soon",2:"wait",3:"info"};
+  const urgent=items.filter(x=>x.sev<=2).length;document.getElementById("n-home").textContent=urgent||"";
+  document.getElementById("home-sub").textContent=items.length?`${urgent} 件が Gon さんの番${items.length>urgent?`・ほか ${items.length-urgent} 件`:""}`:"";
+  box.innerHTML=items.length?`<ul class="inbox">${items.map(x=>`<li class="${cls[x.sev]}"><span class="who">${E(x.who||"Gon さん")}</span>`
+    +`<div class="tx"><b>${E(x.title)}</b><span>${E(x.what)}</span></div><div class="go">`
+    +(x.link?`<a class="btn primary" href="${E(x.link.url)}">${E(x.link.label)}</a>`:"")
+    +(x.gid?`<button class="${x.link?"ghost":""}" data-g2="${x.gid}">やることを見る</button>`:"")
+    +(x.fn?`<button data-home-fn="${x.fn}">開く</button>`:"")
+    +(x.view?`<button class="ghost" data-home-view="${x.view}"${x.tab?` data-home-tab="${x.tab}"`:""}>開く</button>`:"")
+    +(x.act?`<button class="act-only" data-act="${x.act}">${E(x.label)}</button>`:"")+(x.acts||[]).map((a,i)=>actHTML(a,i,{})).join("")+`</div></li>`).join("")}</ul>`
+   :`<div class="allclear"><b>いま Gon さんの番の作業はありません</b><span>自動で進んでいます。番が来たら、ここに出ます。</span></div>`;
+  const W=DATA.watch||{},V=W.vault||{},Q=DATA.quota||{},N=DATA.notion||{},chips=[];   // 状態の印
+  chips.push(["Mac の見守り",W.healthcheck?(W.heartbeat_ok?"ok":"warn"):"",W.healthcheck?(W.heartbeat_ok?"動いています":"合図がまだ"):"未設定","/keys"]);
+  chips.push(["スマホへの知らせ",W.ntfy?"ok":"",W.ntfy?"オン":"未設定","/keys"]);
+  chips.push(["鍵の金庫",V.ready?(V.env_changed_since?"warn":"ok"):"",V.ready?(V.env_changed_since?"預け直し待ち":"預けてあります"):"未設定","/keys"]);
+  chips.push(["Notion",N.ready?"ok":"",N.ready?((N.last||{}).at?N.last.at.slice(5,16).replace("T"," ")+" に写した":"オン"):"未設定",N.songs_url||"/keys"]);
+  if(Q.on)chips.push(["Suno の枠",Q.left>0?"ok":"warn",`残り ${Q.left??"—"} 曲`,"#make"]);
+  document.getElementById("home-chips").innerHTML=chips.map(([n,c,t,u])=>`<a class="hchip ${c}" href="${E(u)}"${String(u).startsWith("http")?' target="_blank" rel="noopener"':""}><i></i>${E(n)} <b>${E(t)}</b></a>`).join("");
+  const today=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),next=[];   // これからの配信
+  for(const key of TABS)for(const r of DATA.timeline[key].rows)for(const p of r.phases)if(p.milestone&&p.state!=="done"&&p.start>=today)next.push([p.start,r]);
+  next.sort((a,b)=>a[0]<b[0]?-1:1);const md=s=>{const d=new Date(s+"T00:00:00");return `${d.getMonth()+1}/${d.getDate()}`};
+  document.getElementById("home-next").innerHTML=next.length?`<ul class="next">${next.slice(0,8).map(([d,r])=>`<li><time>${md(d)}</time><span><b>${E(r.artist)}</b> ${r.title?`「${E(r.title)}」`:""}${r.planned?' <span class="pl">これから作る曲</span>':""}</span></li>`).join("")}</ul>`:`<p class="empty">配信日の決まった曲はまだありません</p>`;
+  const S=DATA.songs||[],live=S.filter(x=>x.status==="live").length,reg=S.filter(x=>x.status==="registered").length,mk=S.filter(x=>!["live","registered"].includes(x.status)).length;   // いまの数字
+  const P=DATA.plays||{},M=(DATA.money||{}).month||{},nf=v=>v==null||isNaN(v)?"—":Math.round(v).toLocaleString("ja-JP");
+  const tiles=[["配信中",`${live} 曲`,"","#make"],["配信待ち（登録済み）",`${reg} 曲`,"","#make"],["制作中",`${mk} 曲`,"","#make"],
+    ["再生（直近 7 日）",nf(P.plays_7d),P.last?`合計 ${nf(P.total_plays)}`:"まだ集めていません","/plays"],["今月の差し引き",M.profit==null?"—":"¥"+nf(M.profit),M.income!=null?`収入 ¥${nf(M.income)}・費用 ¥${nf(M.expense)}`:"","/money"]];
+  document.getElementById("home-nums").innerHTML=`<div class="nums">${tiles.map(([l,v,n,u])=>`<a class="num" href="${u}"><span>${E(l)}</span><b>${E(v)}</b>${n?`<i>${E(n)}</i>`:""}</a>`).join("")}</div>`;
+  const auto=[];for(const key of TABS)for(const r of DATA.timeline[key].rows){if(r.planned)continue;for(const p of r.phases)if(p.state==="run"&&!p.milestone)auto.push(`<li class="run"><b>${E(r.artist)}</b> ${E(r.sub||"")}　… <b>${E(p.name)}</b>：${E(WHO(p.detail))}</li>`)}   // 自動で進行中
+  document.getElementById("n-auto").textContent=auto.length?`（${auto.length} 件）`:"";document.getElementById("home-auto-box").hidden=!auto.length;
+  document.getElementById("home-auto").innerHTML=`<ul class="list">${auto.join("")}</ul>`;
+  const nl=(DATA.listen||{}).waiting||0,np=((DATA.pitch||{}).open||0)+((DATA.pitch||{}).soon||0);
+  document.getElementById("n-listen").textContent=nl||"";document.getElementById("n-pitch").textContent=np||""}
 let opened=false;
 function deepLink(){if(opened)return;opened=true;const m=location.hash.match(/open=([a-z]+:\d+:\d+)/);if(m)try{openGuide(m[1])}catch(e){}}
 let VER0=null;   // 最初に読んだ版。新しい版になったら（自動で更新を反映したら）読み直す（決定 108）

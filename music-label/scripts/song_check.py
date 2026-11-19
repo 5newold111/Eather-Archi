@@ -155,8 +155,11 @@ def steps(song: dict) -> list[dict]:
 
 PAGE = """<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>公開の準備</title><style>
-:root{--bg:#f6f4ef;--card:#fff;--ink:#22201c;--sub:#6f6a60;--line:#e2ddd2;--accent:#a07a3c;--good:#0c8a0c;--warn:#b07a00;--crit:#c03030}
-@media (prefers-color-scheme:dark){:root{--bg:#181715;--card:#22211e;--ink:#ece8df;--sub:#a49e92;--line:#34322d;--accent:#d2ad6b;--good:#3ccf3c;--warn:#f0b429;--crit:#ff6b6b}}
+:root{--bg:#f4f5f4;--card:#fff;--ink:#1b2024;--sub:#5d6770;--line:#d9dedb;--accent:#23786b;--accent-ink:#fff;--good:#2e7d4f;--warn:#b7791f;--crit:#c2513a}
+@media (prefers-color-scheme:dark){:root{--bg:#121518;--card:#1a1f23;--ink:#e7ecea;--sub:#9aa5ae;--line:#2e363c;--accent:#5cc3b1;--accent-ink:#0d1a18;--good:#6cc593;--warn:#e3b25a;--crit:#f08a72}}
+header.top{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+header.top nav{max-width:900px;margin:auto;padding:8px 16px;display:flex;gap:4px 14px;flex-wrap:wrap;align-items:center}header.top b{font-size:15px;margin-right:8px}
+header.top a{color:var(--sub);text-decoration:none;font-size:13.5px;padding:4px 2px;border-bottom:2px solid transparent}header.top a.on{color:var(--ink);border-color:var(--accent);font-weight:600}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,"Hiragino Sans","Noto Sans JP",sans-serif}
 main{max-width:900px;margin:auto;padding:16px} a{color:var(--accent)} .sub{color:var(--sub);font-size:13px}
 section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:12px 0}
@@ -166,9 +169,9 @@ img.cover{width:min(320px,100%);border-radius:8px;border:1px solid var(--line);d
 table.kv{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px} .kv th,.kv td{border-top:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
 .kv th{white-space:nowrap;color:var(--sub);font-weight:500;width:30%} code{font-size:12px;word-break:break-all} ul.files{margin:4px 0;padding-left:1.2em;font-size:13px}
 button{font:inherit;border-radius:8px;padding:6px 14px;cursor:pointer;border:1px solid var(--accent);background:var(--card);color:var(--ink);margin:8px 8px 0 0}
-button.primary{background:var(--accent);color:#fff} #job{margin-top:8px;font-size:13px;color:var(--sub)}
-</style></head><body><main>
-<p><button type="button" onclick="history.length>1?history.back():location.href='/'" style="margin:0 8px 0 0">← 前の画面へ</button><a href="/">ダッシュボードへ</a>　<a href="/check">公開の準備の一覧</a></p>
+button.primary{background:var(--accent);color:var(--accent-ink);font-weight:600} #job{margin-top:8px;font-size:13px;color:var(--sub)}
+</style></head><body>__NAV__<main>
+<p><button type="button" onclick="history.length>1?history.back():location.href='/'" style="margin:0 8px 0 0">← 前の画面へ</button><a href="/check">公開の準備の一覧</a></p>
 __BODY__
 <div id="job"></div></main>
 <script>
@@ -183,6 +186,12 @@ document.addEventListener("click",e=>{const b=e.target.closest("button[data-p]")
 // 進行中は 5 秒ごとに新しくする（音を聴いている間は待つ）
 if(__AUTO__){setInterval(()=>{if([...document.querySelectorAll("audio")].every(a=>a.paused))location.reload()},5000)}
 </script></body></html>"""
+
+try:   # 上の帯は、ダッシュボード本体・新しい別ページと同じ（決定 176）
+    import _ui
+    PAGE = PAGE.replace("__NAV__", _ui.nav_html("/check"))
+except Exception:  # noqa: BLE001
+    PAGE = PAGE.replace("__NAV__", "")
 
 LABEL = {"done": "✓ 済み", "run": "… 進行中", "ng": "！ 止まっています", "wait": "○ まだ"}
 
