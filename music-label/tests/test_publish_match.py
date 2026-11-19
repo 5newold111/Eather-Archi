@@ -347,7 +347,6 @@ class GoBackTest(unittest.TestCase):
     def test_back_to_suno_from_imported(self):
         self._back_to_suno("imported")
 
-    @unittest.expectedFailure
     def test_back_to_suno_from_ready(self):
         """【不具合】登録の準備ができた曲を Suno で作曲に戻すと、途中で落ちる（publish.py の _stash）。
         out/takes/<キー>・out/masters/<キー>・out/publish/<キー> は同じ名前のフォルダなので、3 つ目を「戻したもの」へ移すときに

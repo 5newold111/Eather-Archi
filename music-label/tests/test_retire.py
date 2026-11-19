@@ -124,7 +124,6 @@ class RetireFlowTest(unittest.TestCase):
         self.assertNotIn("tidewool", [s["slug"] for s in self.p.mod("_songs").debut_songs()])
         self.assertTrue((self.p.root / "debut_kit").exists(), "作業セットは消さない")
 
-    @unittest.expectedFailure
     def test_stop_ready_song(self):
         """【不具合】登録の準備ができた曲を「止める」と途中で落ちる（retire.py の _stash。publish.py の _stash と同じ原因）。
         out/takes/<キー>・out/masters/<キー>・out/publish/<キー> が同じ名前のフォルダなので、3 つ目を移すときに shutil.Error になる"""

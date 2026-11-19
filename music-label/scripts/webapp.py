@@ -196,6 +196,11 @@ def _status_json() -> dict:
         acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
     except Exception as e:  # noqa: BLE001
         acts["retire"] = {"active": [], "list": [], "error": str(e)}
+    try:   # 毎日の自動点検（決定 173）
+        import health
+        health_st = health.status()
+    except Exception as e:  # noqa: BLE001
+        health_st = {"needs_owner": [], "auto_fixed_today": [], "auto_pending": [], "error": str(e)}
     try:   # 再生数（決定 172）
         import plays
         plays_st = plays.status()
@@ -237,7 +242,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st, "pitch": pitch_st, "money": money_st, "watch": watch, "plays": plays_st,
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st, "pitch": pitch_st, "money": money_st, "watch": watch, "plays": plays_st, "health": health_st,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -299,7 +304,20 @@ def _slugs() -> set[str]:
     return {a["slug"] for a in all_artists(include_retiring=True) if a.get("slug")}
 
 
+def _job_names() -> set[str]:
+    """やり直せる定期実行（schedule.py にある仕事ならどれでも。決定 173）"""
+    try:
+        import schedule
+        return set(schedule.JOBS)
+    except Exception:  # noqa: BLE001
+        return {"intake", "release", "backup", "auto", "brief"}
+
+
 def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
+    if action == "health_heal":   # 点検して、安全なものだけ自動で直す（決定 173）
+        return [PY, str(S / "health.py"), "heal"], "点検して自動で直す"
+    if action == "health_check":
+        return [PY, str(S / "health.py"), "check"], "点検だけする（何も変えない）"
     if action == "scan":
         return [PY, str(S / "publish.py"), "scan"], "曲の取り込み"
     if action == "track":
@@ -308,9 +326,9 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "notion_sync.py")], "Notion に写す"
     if action == "ref_audio":   # SSD の「既存楽曲」の音源を全部解析して、参考曲に登録する（決定 76）
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
-    if action == "ack_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 直したので表示を消す（決定 89）
+    if action == "ack_job" and p.get("job") in _job_names():   # 直したので表示を消す（決定 89）
         return [PY, str(S / "schedule.py"), "ack", p["job"]], f"定期実行のエラーの表示を消す（{p['job']}）"
-    if action == "rerun_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 定期実行をいま動かし直す（決定 81）
+    if action == "rerun_job" and p.get("job") in _job_names():   # 定期実行をいま動かし直す（決定 81）
         return [PY, str(S / "schedule.py"), "run", p["job"]], f"定期実行をもう一度（{p['job']}）"
     if action == "ref_melody":   # 既存楽曲のメロディーを起こして MIDI に残す（無料。決定 90）
         return [PY, str(S / "reference_db.py"), "--audio-melody", "15"], "既存楽曲のメロディーを起こす"
@@ -857,7 +875,7 @@ ul.next time{font-variant-numeric:tabular-nums;color:var(--sub);min-width:3.2em}
 </section>
 <section id="view-tools" class="view" hidden>
  <h2>道具</h2><p class="sub">ふだんは自動で動くものを、手で動かしたいとき・調べたいときに使います。</p>
-<div class="tgroup act-only"><h3>保管と写し</h3><p class="sub">SSD とローカルへの保管、Notion への写し。ふだんは自動で動きます。</p><div class="tools"><button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="notion_sync" class="ghost" id="notion-sync" title="いまの制作の状態を Notion の表に写します（30 分ごとにも自動で写します）">Notion に写す</button><a class="btn ghost" id="notion-open" href="#" target="_blank" rel="noopener" hidden>Notion を開く ↗</a></div></div><div class="tgroup act-only"><h3>参考曲（既存楽曲）</h3><p class="sub">SSD の「既存楽曲」を解析して参考曲にします。歌詞・メロディー・足りない項目もここから。</p><div class="tools"><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="master_learn" class="ghost" data-confirm="SSD の「既存楽曲」の曲を 1 曲ずつ測って、仕上げ（マスタリング）の音のバランスの目標にします（1 曲 数秒・料金なし。測った曲は次から飛ばします）。始めますか？">仕上げの目標を既存楽曲から学ぶ</button></div></div><div class="tgroup act-only"><h3>方向性とアーティスト</h3><p class="sub">影響を受けたアーティスト・方向性の探り具合・コラボの相性・アートの好み。</p><div class="tools"><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button></div></div><div class="tgroup act-only"><h3>ジャケット</h3><p class="sub">新しい作り方を、曲の状態を変えずに試します。</p><div class="tools"><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a></div></div><div class="tgroup act-only"><h3>診断</h3><p class="sub">うまくいかないときに。</p><div class="tools"><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="alert_watch" class="ghost">いま見回る（見守り）</button></div></div><div class="tgroup"><h3>ページ</h3><p class="sub">工程ごとの専用のページ。</p><div class="tools"><a class="btn" href="/listen">聴いて確かめる</a><a class="btn" href="/pitch">Spotify へのピッチ</a><a class="btn" href="/check">公開の準備</a><a class="btn" href="/suno">Suno に貼る内容</a><a class="btn" href="/photos">アーティスト写真</a><a class="btn" href="/phone">スマホで進める</a><a class="btn" href="/plays">再生数</a><a class="btn" href="/money">お金</a><a class="btn" href="/keys">鍵と見守り</a></div></div>
+<div class="tgroup act-only"><h3>保管と写し</h3><p class="sub">SSD とローカルへの保管、Notion への写し。ふだんは自動で動きます。</p><div class="tools"><button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="notion_sync" class="ghost" id="notion-sync" title="いまの制作の状態を Notion の表に写します（30 分ごとにも自動で写します）">Notion に写す</button><a class="btn ghost" id="notion-open" href="#" target="_blank" rel="noopener" hidden>Notion を開く ↗</a></div></div><div class="tgroup act-only"><h3>参考曲（既存楽曲）</h3><p class="sub">SSD の「既存楽曲」を解析して参考曲にします。歌詞・メロディー・足りない項目もここから。</p><div class="tools"><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="master_learn" class="ghost" data-confirm="SSD の「既存楽曲」の曲を 1 曲ずつ測って、仕上げ（マスタリング）の音のバランスの目標にします（1 曲 数秒・料金なし。測った曲は次から飛ばします）。始めますか？">仕上げの目標を既存楽曲から学ぶ</button></div></div><div class="tgroup act-only"><h3>方向性とアーティスト</h3><p class="sub">影響を受けたアーティスト・方向性の探り具合・コラボの相性・アートの好み。</p><div class="tools"><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button></div></div><div class="tgroup act-only"><h3>ジャケット</h3><p class="sub">新しい作り方を、曲の状態を変えずに試します。</p><div class="tools"><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a></div></div><div class="tgroup act-only"><h3>診断</h3><p class="sub">うまくいかないときに。</p><div class="tools"><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="health_heal" class="ghost">点検して自動で直す</button><button data-act="health_check" class="ghost">点検だけする</button><button data-act="alert_watch" class="ghost">いま見回る（見守り）</button></div></div><div class="tgroup"><h3>ページ</h3><p class="sub">工程ごとの専用のページ。</p><div class="tools"><a class="btn" href="/listen">聴いて確かめる</a><a class="btn" href="/pitch">Spotify へのピッチ</a><a class="btn" href="/check">公開の準備</a><a class="btn" href="/suno">Suno に貼る内容</a><a class="btn" href="/photos">アーティスト写真</a><a class="btn" href="/phone">スマホで進める</a><a class="btn" href="/plays">再生数</a><a class="btn" href="/money">お金</a><a class="btn" href="/keys">鍵と見守り</a></div></div>
 <h2>仕組みの詰まり</h2><div id="system"></div>
 <p class="sub act-only" id="upd-info"></p>
 <details><summary>管理表の「詰まっているところ」</summary><div id="tracker"></div></details>
@@ -1321,7 +1339,9 @@ function homeItems(){const items=[];   // 「今日やること」：どの流�
   const lt=(DATA.lyric_todos||[]).length;if(lt)items.push({sev:3,title:`歌詞（${lt} 曲）`,what:"DistroKid に登録した曲の歌詞を出す（入力は自動・Submit は Gon さん）",act:"fill_lyrics",label:"歌詞を続けて入れる"});
   for(const x of (DATA.system||[]))items.push({sev:x.sev==="ng"?-1:3,who:"仕組み",title:x.what,what:(x.acts||[]).length?"":x.how,acts:x.acts||[],view:(x.acts||[]).length?null:"tools"});
   for(const x of ((DATA.watch||{}).problems||[]))items.push({sev:1,who:"見守り",title:typeof x==="string"?x:(x.title||x.what||"気になること"),what:typeof x==="string"?"":(x.message||x.why||""),link:{url:"/keys",label:"設定を開く"}});
-  for(const x of ((DATA.health||{}).needs_owner||[]))items.push({sev:x.sev==="ng"?0:2,who:"点検",title:x.what,what:x.why||"",view:"tools"});
+  for(const x of ((DATA.health||{}).needs_owner||[])){const a=x.action||{};
+    items.push({sev:x.sev==="ng"?0:x.sev==="warn"?2:3,who:"点検",title:x.what,what:x.why||"",link:a.url?{url:a.url,label:a.label||"開く"}:null,
+      acts:a.action?[{kind:"run",label:a.label||"直す",...a}]:[],view:(a.url||a.action)?null:"tools"})}
   return items.sort((a,b)=>a.sev-b.sev)}
 function home(){const box=document.getElementById("home-inbox");if(!box)return;const items=homeItems(),cls={"-1":"ng",0:"ng",1:"soon",2:"wait",3:"info"};
   const urgent=items.filter(x=>x.sev<=2).length;document.getElementById("n-home").textContent=urgent||"";
@@ -1339,6 +1359,7 @@ function home(){const box=document.getElementById("home-inbox");if(!box)return;c
   chips.push(["スマホへの知らせ",W.ntfy?"ok":"",W.ntfy?"オン":"未設定","/keys"]);
   chips.push(["鍵の金庫",V.ready?(V.env_changed_since?"warn":"ok"):"",V.ready?(V.env_changed_since?"預け直し待ち":"預けてあります"):"未設定","/keys"]);
   chips.push(["Notion",N.ready?"ok":"",N.ready?((N.last||{}).at?N.last.at.slice(5,16).replace("T"," ")+" に写した":"オン"):"未設定",N.songs_url||"/keys"]);
+  {const H=DATA.health||{},nf=(H.auto_fixed_today||[]).length;if(H.checked_at)chips.push(["自動の点検",H.worst==="ng"?"ng":H.worst==="warn"?"warn":"ok",nf?`今日 ${nf} 件を自動で直した`:"問題なし","#tools"])}
   if(Q.on)chips.push(["Suno の枠",Q.left>0?"ok":"warn",`残り ${Q.left??"—"} 曲`,"#make"]);
   document.getElementById("home-chips").innerHTML=chips.map(([n,c,t,u])=>`<a class="hchip ${c}" href="${E(u)}"${String(u).startsWith("http")?' target="_blank" rel="noopener"':""}><i></i>${E(n)} <b>${E(t)}</b></a>`).join("");
   const today=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10),next=[];   // これからの配信

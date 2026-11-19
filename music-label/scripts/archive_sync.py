@@ -158,7 +158,7 @@ def seed_book(base: Path, check: bool) -> None:
 def sync_kits(base: Path, check: bool) -> int:
     """デビュー用の作業セットの書類（作業書の PDF・曲の情報・依頼文）を 03_作業書/デビュー_<日付>/ へ"""
     n = 0
-    for kit in sorted(p for p in KIT_ROOT.iterdir() if p.is_dir()):
+    for kit in sorted(p for p in KIT_ROOT.iterdir() if p.is_dir()) if KIT_ROOT.is_dir() else []:
         files = [f for f in kit.iterdir() if f.suffix.lower() in (".pdf", ".json", ".md")]
         if not files:
             continue

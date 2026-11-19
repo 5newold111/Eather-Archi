@@ -266,7 +266,7 @@ def check_duplicates(songs: list[dict]) -> list[dict]:
         if len(v) > 1:
             v.sort(key=lambda x: x["week"])
             out.append(_f(f"dup:{slug}:{v[0]['id']}", "warn", f"{v[0]['artist']}「{v[0]['title']}」という曲名の曲が {len(v)} つあります（{'・'.join(x['id'] for x in v)}）",
-                          f"あとの週の曲（{v[-1]['id']}）の曲名を、ダッシュボードで別の名前に変えてください。同じままだと、ダウンロードした曲は早い週の方に入ります", "owner"))
+                          f"あとの週の曲（{v[-1]['id']}）の曲名を別の名前に変えてください。同じままだと、ダウンロードした曲は早い週の方に入ります（決定 154）", "owner"))
     return out
 
 

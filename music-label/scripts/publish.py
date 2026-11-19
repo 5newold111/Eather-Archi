@@ -1256,7 +1256,9 @@ def _stash(paths: list[Path], song: dict) -> Path | None:
     for p in paths:
         if p.exists():
             dest.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(p), str(dest / p.name))
+            # takes・masters・publish は中のフォルダ名が同じ（曲の番号）なので、ぶつかるときは元の置き場所の名前を前に付ける（決定 173）
+            name = p.name if not (dest / p.name).exists() else f"{p.parent.name}_{p.name}"
+            shutil.move(str(p), str(dest / name))
             moved = True
     return dest if moved else None
 

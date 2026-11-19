@@ -59,9 +59,9 @@ PATH_ENV = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"   # 
 
 # 仕事の中身：(説明, 実行するコマンドの並び)
 JOBS: dict[str, tuple[str, list[list[str]]]] = {
-    "post":    ("SNS 投稿（配信時刻を過ぎたもの）と管理画面の更新",
+    "post":    ("SNS 投稿（配信時刻を過ぎたもの）",
                 [["post_social.py", "daily", "--if-on"],   # 毎日の投稿の案（3 日先まで。作ってあれば何もしない。決定 94）
-                 ["post_social.py", "post", "--week", "all"], ["dashboard.py"]]),
+                 ["post_social.py", "post", "--week", "all"]]),
     "trends":  ("今週の話題曲・トレンド言語", [["fetch_trends.py", "--week", "this"]]),
     "brief":   ("アーティスト管理表の読み込み → 今週のブリーフ（全組）",
                 [["artist_book.py", "pull", "--if-exists"], ["suno_quota.py", "plan", "--quiet"], ["run_week.py", "brief", "--week", "this"],
@@ -69,7 +69,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "auto":    ("歌詞・テイク・仕上げ・登録シート・DB・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
     "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"],
                                           ["explore.py", "report"]]),   # 方向性の伸びを学んで、次の曲のくじに返す（決定 96）
-    "backup":  ("外付け SSD への保管と R2 への予備保管", [["archive_sync.py"], ["backup_r2.py"]]),
+    "backup":  ("外付け SSD への保管と R2 への予備保管・管理画面の写し", [["archive_sync.py"], ["backup_r2.py"], ["dashboard.py"]]),   # 写しは 1 日 1 回（決定 173）
     "monthly": ("新しい組と来月の近況の提案（管理表へ）・曲数の確認・Instagram の鍵の延長・四半期の EP 計画",
                 [["artist_book.py", "pull", "--if-exists"], ["expand_label.py", "check", "--apply"],
                  ["artist_book.py", "propose-update", "--all", "--if-exists"],
@@ -85,6 +85,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "notion":  ("制作の状態を Notion に写す（鍵があるときだけ。決定 167）", [["notion_sync.py", "--if-ready"]]),
     "plays":   ("配信が始まった曲の再生数を集める（Spotify・YouTube Music・Spotify for Artists・ダウンロードした明細。決定 172）",
                 [["plays.py", "collect", "--quiet"]]),
+    "health":  ("毎日の自動点検：記録とファイルの食い違いを見つけ、安全なものだけ自動で直す（決定 173）", [["health.py", "heal", "--quiet"]]),
     "watch":   ("見回り：鍵を金庫に預け直す・Mac の合図を送る・問題をスマホに知らせる（決定 174）",
                 [["vault.py", "backup", "--if-changed"], ["alert.py", "watch"]]),
 }
@@ -125,6 +126,8 @@ def calendar(job: str) -> dict:
         return {"StartCalendarInterval": [{"Hour": 12, "Minute": 5}]}
     if job == "plays":   # 毎日 10:40（配信の確認 10:15 のあと。決定 172）
         return {"StartCalendarInterval": [{"Hour": 10, "Minute": 40}]}
+    if job == "health":   # 1 時間ごと（決定 173）
+        return {"StartInterval": 3600}
     if job == "watch":   # 10 分ごと（決定 174）
         return {"StartInterval": 600}
     if job == "notion":   # 30 分ごと（変わった行だけ書き直す。決定 167）
@@ -137,7 +140,7 @@ def calendar(job: str) -> dict:
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
         "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *", "retry": "5 12 * * *",
-        "notion": "20,50 * * * *", "watch": "*/10 * * * *", "plays": "40 10 * * *"}
+        "notion": "20,50 * * * *", "watch": "*/10 * * * *", "plays": "40 10 * * *", "health": "40 * * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）
@@ -182,13 +185,28 @@ def status() -> None:
         print(f"  ○ {j:<8} 登録済み（{'動いている' if state == 'running' else '待機中'}" + (f"・前回の終了コード {code}" if code and code != "0" and code != "(never exited)" else "") + "）")
 
 
+def _alive(lock: Path) -> bool:
+    """鍵を置いた実行が、まだ動いているか。Mac が眠った・再起動したあとに残った鍵では、仕事を飛ばさない（決定 173）"""
+    try:
+        pid = int(lock.read_text().strip())
+    except (OSError, ValueError):
+        return True   # 読めないときは、これまでどおり待つ
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def run_job(job: str, only: list[int] | None = None, title: str = "") -> int:
     """仕事を 1 つ実行してログに残す。まだ無いスクリプトは飛ばす。only：この番号の手順だけ（やり直し。決定 113）"""
     desc, cmds = JOBS[job]
     log = OUT / "logs" / f"{job}.log"
     log.parent.mkdir(parents=True, exist_ok=True)
     lock = OUT / "logs" / f"{job}.lock"
-    if lock.exists() and (datetime.now().timestamp() - lock.stat().st_mtime) < 3 * 3600:
+    if lock.exists() and (datetime.now().timestamp() - lock.stat().st_mtime) < 3 * 3600 and _alive(lock):
         print(f"   {job} は前回の実行がまだ終わっていないので飛ばします")
         return 0
     lock.write_text(str(os.getpid()))

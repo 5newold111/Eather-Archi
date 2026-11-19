@@ -1381,6 +1381,7 @@ def dk_done_page(sess: Session, st: dict) -> str:
             f = publish.draft_fields(song)
             rel = str(f.get("Release date") or "")
             day = rel[:10] if re.fullmatch(r"\d{4}-\d{2}-\d{2}.*", rel) else date.today().isoformat()
+            day = max(day, date.today().isoformat())   # 過ぎた日は記録しない（画面では選べる日に直して入れている。決定 165・173）
             r = subprocess.run([sys.executable, str(S / "publish.py"), "registered", song["id"], "--date", day], capture_output=True, text=True)
             print(r.stdout.strip())
             print(f"   ○ DistroKid の登録が終わった画面に {song['artist']}「{song['title']}」が出ていたので、登録したと記録しました（配信日 {day}）")
