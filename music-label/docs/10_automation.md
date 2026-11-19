@@ -13,6 +13,7 @@ Mac に定期実行を 1 回登録すると（`python3 scripts/schedule.py insta
 | 15 分ごと | post | 配信時刻を過ぎた SNS 投稿を出す（YouTube は前もって公開予約） | `post_social.py post --week all` |
 | 木 10:00 | growth | 成績を集める → 成長分析（重み・ヒント・転換の提案）→ 転換を管理表の『変更の提案』に足す（頻度の切り替えだけは直接） | `collect_metrics.py --analyze` → `apply_pivot.py --from-growth` |
 | 毎日 03:30 | backup | 音源・ジャケット・記録を Cloudflare R2 に予備保管（変わったものだけ） | `backup_r2.py` |
+| 30 分ごと | notion | 制作の状態（アーティスト・楽曲の工程）を Notion の表に写す（変わった行だけ。Notion の鍵があるときだけ。決定 167） | `notion_sync.py --if-ready` |
 | 毎月 1 日 | monthly | 週の曲数の確認（上限超えで隔週へ）・新しい組の提案（管理表へ）・採用された組のデビュー予約・各組の来月の近況と歌の種の提案・Instagram の鍵の延長・四半期の EP 計画 | `expand_label.py check --apply`・`artist_book.py propose-update --all` ほか |
 
 ログは `out/logs/<仕事>.log`。止めるときは `python3 scripts/schedule.py uninstall`。

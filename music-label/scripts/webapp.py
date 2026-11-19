@@ -196,6 +196,11 @@ def _status_json() -> dict:
         acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
     except Exception as e:  # noqa: BLE001
         acts["retire"] = {"active": [], "list": [], "error": str(e)}
+    try:   # Notion に写した状態（決定 167）
+        import notion_sync
+        notion = notion_sync.status()
+    except Exception as e:  # noqa: BLE001
+        notion = {"ready": False, "error": str(e)}
     try:   # 最後に自動で反映した更新（決定 108）
         upd = read_json(OUT / "update" / "last.json") if (OUT / "update" / "last.json").exists() else {}
         if (OUT / "update" / "skipped.json").exists():   # 反映を見送っている理由（決定 132）
@@ -204,7 +209,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(), "page_remind": _page_remind(),
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -271,6 +276,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         return [PY, str(S / "publish.py"), "scan"], "曲の取り込み"
     if action == "track":
         return [PY, str(S / "publish.py"), "track"], "配信の確認"
+    if action == "notion_sync":   # 制作の状態を Notion に写す（決定 167）
+        return [PY, str(S / "notion_sync.py")], "Notion に写す"
     if action == "ref_audio":   # SSD の「既存楽曲」の音源を全部解析して、参考曲に登録する（決定 76）
         return [PY, str(S / "reference_db.py"), "--audio-limit", "0"], "参考曲の解析（既存楽曲の WAV・MP3・M4A）"
     if action == "ack_job" and p.get("job") in ("intake", "release", "backup", "auto", "brief"):   # 直したので表示を消す（決定 89）
@@ -497,6 +504,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
 
 # ターミナルで始める作業（鍵の入力など、Gon さんが打ち込む必要があるもの）
 TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthropic": [PY, "scripts/setup_keys.py", "--only", "anthropic"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
+            "notion": [PY, "scripts/setup_keys.py", "--only", "notion"],   # 決定 167
             "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
             # ブラウザで自動入力する部品（Playwright）と、Chrome が無いとき用のブラウザ
             # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
@@ -687,7 +695,7 @@ dialog::backdrop{background:rgba(0,0,0,.35)}.dlg-in{padding:18px 20px 20px}.dlg-
 <header><div class="bar"><h1>Postdog Records</h1><a href="/suno" class="act-only">Suno に貼る内容</a> <a href="/check" class="act-only">公開の準備</a> <a href="/phone" class="act-only">スマホで進める</a> <a href="/photos" class="act-only">アーティスト写真</a><span class="sub" id="upd"></span></div></header>
 <main>
 <div class="tools act-only">
- <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button>
+ <button data-act="fill_suno">作曲待ちの曲を Suno に入力する</button><a class="btn ghost" href="/paste" target="_blank" rel="noopener">予備：写して貼る ↗</a><button data-act="scan" class="ghost">曲を取り込む</button><button data-act="track" class="ghost">配信を確かめる</button><button data-act="notion_sync" class="ghost" id="notion-sync" title="いまの制作の状態を Notion の表に写します（30 分ごとにも自動で写します）">Notion に写す</button><a class="btn ghost" id="notion-open" href="#" target="_blank" rel="noopener" hidden>Notion を開く ↗</a>
  <button data-act="sync" class="ghost">保管する（ローカル・SSD）</button><button data-act="ref_audio" class="ghost" data-confirm="SSD の「既存楽曲」の WAV・MP3・M4A を解析して、参考曲に登録します（1 曲 10〜30 秒。解析済みの曲は飛ばします）。始めますか？">既存楽曲を解析する（参考曲に登録）</button><button data-act="ref_health" class="ghost">参考曲の取り込みを診断する</button><button data-act="ref_ensure" class="ghost" data-confirm="SSD の中の解析シートを探して Mac に読み込み、解析シートが無い既存楽曲を全部解析して、SSD の「既存楽曲_解析シート」に保存します（1 曲 10〜30 秒・料金なし。曲が多いと時間がかかります）。始めますか？">解析シートを SSD に作る（無い曲は全部解析）</button><button data-act="ref_audio_report" class="ghost">解析できていない曲を調べる</button><button data-act="ref_lyrics" class="ghost" id="ref-lyrics" hidden>歌詞を聞き取る</button><button data-act="terminal" data-key="whisper" class="ghost" id="ref-whisper" hidden>歌詞を聞き取る部品を入れる（ターミナルが開きます）</button><button data-act="ref_melody" class="ghost" id="ref-melody" hidden>メロディーを起こす</button><button data-act="terminal" data-key="demucs" class="ghost" id="ref-demucs" hidden>メロディーを正確にする部品を入れる（任意・約 2 GB・ターミナルが開きます）</button><button data-act="ref_enrich" class="ghost" id="ref-enrich" hidden>足りない項目を埋める（無料）</button><button data-act="terminal" data-key="tagger" class="ghost" id="ref-tagger" hidden>曲を聞いて判定する部品を入れる（約 1 GB・ターミナルが開きます）</button><button data-act="terminal" data-key="claude_code" class="ghost" id="ref-cc" hidden>Claude Code を入れて月額プランでログインする（ターミナルが開きます）</button><button data-act="ref_import" class="ghost" id="ref-import" hidden>調べた答えを取り込む</button><button data-act="influences" class="ghost" id="ref-infl" data-confirm="SSD のデータベース（SSDDB）にいるアーティストの中から、デビューしている組ごとに、影響を受けたアーティストを 3 組まで選びます。&#10;管理表の「影響」タブに『採用』で足して設定書を作り直し、その人たちの曲の歌詞・メロディーを先に起こして、今後の曲の参考に優先して使います。&#10;SSD をつないでおいてください。料金の目安：Claude に選んでもらう分 5 組で 20〜60 円。&#10;始めますか？">影響を受けたアーティストを選ぶ（SSDDB から）</button><button data-act="influences_analyze" class="ghost" id="ref-infl-an" hidden>影響を受けたアーティストの曲を解析する</button><button data-act="explore_report" class="ghost">方向性の探り具合を見る</button><button data-act="collab_fit" class="ghost" data-confirm="まだ吟味していない組の組み合わせのコラボの相性を、Claude が吟味して管理表の「コラボの相性」タブに書きます（1 組み合わせ 約 5〜10 円）。SSD をつないでおいてください。始めますか？">コラボの相性を吟味する</button><button data-act="send_diag" class="ghost" data-confirm="ブラウザの自動入力（DistroKid・Suno など）の直近 3 回の記録と最後のエラーを、Claude が見られる場所（GitHub）に送ります。&#10;本名・Mac の利用者名・メールアドレス・鍵は伏せ字にします。画面の写真と .env の値は送りません。&#10;送りますか？">診断の記録を Claude に送る</button><button data-act="cover_trial" class="ghost" data-confirm="ジャケットの新しい作り方（曲の印象的なシーン 6 つ・案ごとに印象の違うデザイン・文字入り）を、いちばん新しい毎週の曲で、実際に Claude と OpenAI を使って試します。&#10;本物の曲の状態は変えません（選択・仕上げ・登録には進みません）。&#10;数分かかります。料金の目安：1 回 約 150〜300 円。&#10;始めますか？">ジャケットの試し運転（実際に API を使う）</button><a class="btn ghost" href="/cover-trial" target="_blank" rel="noopener">試し運転の結果を見る ↗</a><button data-act="art_taste" class="ghost" data-confirm="まだ行の無い組の「アートの好み」（好きな画材・絵柄・テイスト・グラフィック・好きな写真家・漫画・映画〔実在〕）を、Claude が下書きして管理表の「アートの好み」タブに書きます（1 組 約 5〜10 円）。管理表で直してよく、直した値がジャケットに使われます。SSD をつないでおいてください。始めますか？">組ごとのアートの好みを書く</button>
 </div>
 <div class="tools act-only" id="quota" hidden></div>
@@ -1137,6 +1145,10 @@ function render(){
     const nd=k==="irregular"?((DATA.irregular||{}).drafts||[]).filter(d=>d.status==="proposed").length:0;
     document.getElementById("n-"+k).textContent=k==="debut"?`${nArt} 組`:k==="irregular"?`${rs.length} 曲${nd?`・案 ${nd}`:""}`:`${nArt} 組・${rs.filter(r=>!r.planned).length} 曲`;board(k);gantt(k);todoList(k);songsTable(k)}
   irrForm();irrDrafts();dailyBox();quotaBox();actsTab();debutDone();pageRemind();
+  {const n=DATA.notion||{},b=document.getElementById("notion-sync"),a=document.getElementById("notion-open");   // Notion（決定 167）
+   if(b){b.textContent=n.ready?"Notion に写す":"Notion をつなぐ（鍵の設定）";b.dataset.act=n.ready?"notion_sync":"terminal";b.dataset.key="notion";
+     b.title=n.ready?`いまの制作の状態を Notion の表に写します（30 分ごとにも自動）${(n.last||{}).at?"・最後に写した："+n.last.at.replace("T"," "):""}`:"ターミナルが開いて、Notion の鍵の入れ方を順に案内します"}
+   if(a){a.hidden=!n.songs_url;if(n.songs_url)a.href=n.songs_url}}
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
      +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")

@@ -80,6 +80,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "refs":    ("既存楽曲に入った曲の解析 → 参考曲に登録", [["reference_db.py", "--watch"]]),
     "update":  ("push された更新を取り込んで反映（決定 108）", [["self_update.py"]]),
     "retry":   ("止まった週 1・月 1 の仕事の、失敗した手順だけを 1 日 1 回やり直す（決定 113）", [["schedule.py", "retry-failed"]]),
+    "notion":  ("制作の状態を Notion に写す（鍵があるときだけ。決定 167）", [["notion_sync.py", "--if-ready"]]),
 }
 RETRY_JOBS = {"trends": "話題曲の調査", "brief": "ブリーフ", "auto": "毎週の制作", "growth": "成長分析", "monthly": "月 1 の仕事"}
 RETRY_AFTER_HOURS = 20   # 失敗してからこの時間はやり直さない（その仕事の決まった時刻の実行・自分の毎時の実行に任せる）
@@ -116,6 +117,8 @@ def calendar(job: str) -> dict:
         return {**({"WatchPaths": dirs} if dirs else {}), "StartOnMount": True, "StartInterval": 1800}
     if job == "retry":   # 毎日 1 回（決定 113）
         return {"StartCalendarInterval": [{"Hour": 12, "Minute": 5}]}
+    if job == "notion":   # 30 分ごと（変わった行だけ書き直す。決定 167）
+        return {"StartInterval": 1800}
     if job == "update":   # 10 分ごとに GitHub の更新を確かめる（決定 108）
         return {"StartInterval": 600}
     raise KeyError(job)
@@ -123,7 +126,8 @@ def calendar(job: str) -> dict:
 
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
-        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *", "retry": "5 12 * * *"}
+        "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *", "retry": "5 12 * * *",
+        "notion": "20,50 * * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）

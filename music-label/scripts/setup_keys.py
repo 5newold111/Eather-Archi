@@ -7,9 +7,10 @@
   python3 scripts/setup_keys.py              # 上から順に（設定済みで接続できるものは飛ばす）
   python3 scripts/setup_keys.py --check      # 全部を実際に接続して確認するだけ（値は表示しない）
   python3 scripts/setup_keys.py --only supabase,r2
+  python3 scripts/setup_keys.py --only notion    # Notion に制作の状態を写す（決定 167）
   python3 scripts/setup_keys.py --redo youtube   # 設定済みでもやり直す
 
-順番：Claude → OpenAI → Supabase → Cloudflare R2 → YouTube → Instagram → TikTok
+順番：Claude → OpenAI → Supabase → Cloudflare R2 → Notion → YouTube → Instagram → TikTok
 （DistroKid と Suno は鍵ではなくプランの契約。docs/11_plans_and_costs.md）
 
 鍵はこのファイルにも画面にも表示しない。.env は Git に入らない。
@@ -149,6 +150,25 @@ def check_r2():
     return "ng", f"接続できません（{code or body[:80]}）"
 
 
+def check_notion():
+    tok, page = env("NOTION_TOKEN"), env("NOTION_PARENT_PAGE")
+    if not tok:
+        return "none", "未設定"
+    hdr = {"Authorization": f"Bearer {tok}", "Notion-Version": "2022-06-28"}
+    from notion_sync import parent_id
+    pid = parent_id(page)
+    if not pid:
+        return "ng", "NOTION_PARENT_PAGE が読めません（表を置くページの住所を、ページ右上の『…』→『リンクをコピー』で貼る）"
+    code, body = get(f"https://api.notion.com/v1/pages/{pid}", hdr)   # 鍵とページの共有を 1 回で確かめる
+    if code == 401:
+        return "ng", "NOTION_TOKEN が違います（インテグレーションの『内部インテグレーションシークレット』を貼り直す）"
+    if code == 404:
+        return "ng", "ページが見つかりません。ページ右上の『…』→『接続』（Connections）でインテグレーションを追加してください"
+    if code != 200:
+        return "ng", f"ページを読めません（{code or body[:80]}）"
+    return "ok", "接続できました（表を置くページも読めます）"
+
+
 def check_youtube():
     from post_social import cred, http
     if not cred("YOUTUBE_REFRESH_TOKEN", "-", "-"):
@@ -269,6 +289,15 @@ SERVICES = {
                   "Account ID（右側）、Access Key ID、Secret Access Key をコピー"],
         "keys": [("R2_ACCOUNT_ID", False), ("R2_ACCESS_KEY_ID", True), ("R2_SECRET_ACCESS_KEY", True), ("R2_BUCKET", False)],
         "check": check_r2},
+    "notion": {
+        "title": "Notion（制作の状態を見る管理画面。決定 167）",
+        "url": "https://www.notion.so/profile/integrations",
+        "steps": ["『新しいインテグレーション』：名前 Postdog Records 同期、種類『内部』、ワークスペースはいつものもの → 保存",
+                  "機能：コンテンツを読み取る・更新する・挿入する をオン（ユーザー情報は『なし』でよい）",
+                  "『内部インテグレーションシークレット』を表示してコピー（この後の NOTION_TOKEN に貼る。チャットには貼らない）",
+                  "Notion で新しいページ『Postdog Records 管理』を作る → 右上『…』→『接続』でいま作ったインテグレーションを追加",
+                  "そのページの右上『…』→『リンクをコピー』（この後の NOTION_PARENT_PAGE に貼る）"],
+        "keys": [("NOTION_TOKEN", True), ("NOTION_PARENT_PAGE", False)], "check": check_notion},
     "youtube": {
         "title": "YouTube（ショート動画の投稿・再生数）",
         "url": "https://console.cloud.google.com/projectcreate",
@@ -368,6 +397,9 @@ def run_service(key: str, redo: bool) -> tuple[str, str]:
         print(f"   {MARK[state]} {msg}")
         if state == "ok" or input("   もう一度確かめますか？（直したら y）[y/N]: ").strip().lower() != "y":
             break
+    if key == "notion" and state == "ok":
+        print("   ▶ Notion に表を作って、いまの状態を写しています（数分かかることがあります）")
+        subprocess.run([sys.executable, str(ROOT / "scripts" / "notion_sync.py")], check=False)
     if key == "supabase" and state == "ok":
         print("   ▶ アーティストとレーベルをデータベースに登録しています")
         subprocess.run([sys.executable, str(ROOT / "scripts" / "supabase_sync.py"), "seed", "--apply"], check=False)
@@ -399,7 +431,7 @@ def write_status(results: dict) -> Path:
 def main() -> None:
     ap = argparse.ArgumentParser(description="鍵の一括設定ウィザード")
     ap.add_argument("--check", action="store_true", help="接続の確認だけ")
-    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,youtube,instagram,tiktok）")
+    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,notion,youtube,instagram,tiktok）")
     ap.add_argument("--redo", default="", help="設定済みでもやり直すサービス（カンマ区切り）")
     a = ap.parse_args()
     keys = [k for k in (a.only.split(",") if a.only else SERVICES) if k in SERVICES]
