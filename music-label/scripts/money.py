@@ -56,6 +56,7 @@ from _common import OUT, ROOT, all_artists, read_json, step  # noqa: E402
 # 置き場所（試すときだけ、環境変数 MONEY_DIR・MONEY_DOWNLOADS・MONEY_INBOX で別の場所に向けられる）
 DIR = Path(os.environ.get("MONEY_DIR") or OUT / "money")
 DOWNLOADS = Path(os.environ.get("MONEY_DOWNLOADS") or Path.home() / "Downloads")
+PLAYS_IMPORTED = Path(os.environ.get("MONEY_PLAYS") or OUT / "plays" / "imported")   # 再生数の取り込みが明細を片付ける先
 INBOX = Path(os.environ.get("MONEY_INBOX") or OUT / "metrics" / "inbox")   # collect_metrics.py の受け取り箱（読み終わりは done/ に移る）
 BOOK_NAME = "収支.xlsx"
 
@@ -380,9 +381,10 @@ def is_distrokid(p: Path) -> bool:
 
 
 def find_statements() -> list[Path]:
-    """明細らしいファイルを探す：ダウンロードフォルダ（直下だけ）・成績の受け取り箱・その読み終わり"""
+    """明細らしいファイルを探す：ダウンロードフォルダ（直下だけ）・成績の受け取り箱・その読み終わり・
+    再生数の取り込み（plays.py）が片付けた先（ダウンロードから out/plays/imported/ に移される。決定 172）"""
     out = []
-    for d in (DOWNLOADS, INBOX, INBOX / "done"):
+    for d in (DOWNLOADS, INBOX, INBOX / "done", PLAYS_IMPORTED):
         if not d.is_dir():
             continue
         for p in sorted(d.iterdir()):

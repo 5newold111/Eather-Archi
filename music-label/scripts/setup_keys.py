@@ -169,6 +169,18 @@ def check_notion():
     return "ok", "接続できました（表を置くページも読めます）"
 
 
+def check_youtube_key():
+    key = env("YOUTUBE_API_KEY")
+    if not key:
+        return "none", "未設定（SNS 投稿用の YouTube の許可があれば、無くても集められます）"
+    code, body = get("https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=" + urllib.parse.quote(key))
+    if code == 200:
+        return "ok", "接続できました"
+    if "accessNotConfigured" in body:
+        return "ng", "Google Cloud で『YouTube Data API v3』を有効にしてください"
+    return "ng", "YOUTUBE_API_KEY が違うか、使える API が制限されています（API キーを作り直す）"
+
+
 def check_ntfy():
     import alert
     return alert.check("ntfy")       # 実際に試しの知らせを 1 通送る
@@ -311,6 +323,14 @@ SERVICES = {
                   "そのページの右上「•••」→「リンクをコピー」（この後の NOTION_PARENT_PAGE に貼る）",
                   "※ ブラウザの翻訳で名前が少し違うことがある（かっこの中が元の英語）"],
         "keys": [("NOTION_TOKEN", True), ("NOTION_PARENT_PAGE", False)], "check": check_notion},
+    "youtube_key": {
+        "title": "YouTube の API キー（YouTube Music の再生数を集める。任意。決定 172）",
+        "url": "https://console.cloud.google.com/apis/credentials",
+        "steps": ["Google Cloud のプロジェクトを選ぶ（無ければ『プロジェクトを作成』：名前 etherarchi-label）",
+                  "『API とサービス』→『ライブラリ』→ YouTube Data API v3 →『有効にする』",
+                  "『認証情報』→『認証情報を作成』→『API キー』→ 表示されたキーをコピー（この後の YOUTUBE_API_KEY に貼る。チャットには貼らない）",
+                  "できれば『キーを制限』→ API の制限で YouTube Data API v3 だけにする"],
+        "keys": [("YOUTUBE_API_KEY", True)], "check": check_youtube_key},
     "ntfy": {
         "title": "スマホへの知らせ（ntfy）",
         "url": "https://ntfy.sh/app",
@@ -460,7 +480,7 @@ def write_status(results: dict) -> Path:
 def main() -> None:
     ap = argparse.ArgumentParser(description="鍵の一括設定ウィザード")
     ap.add_argument("--check", action="store_true", help="接続の確認だけ")
-    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,notion,ntfy,healthcheck,youtube,instagram,tiktok）")
+    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,notion,youtube_key,ntfy,healthcheck,youtube,instagram,tiktok）")
     ap.add_argument("--redo", default="", help="設定済みでもやり直すサービス（カンマ区切り）")
     a = ap.parse_args()
     keys = [k for k in (a.only.split(",") if a.only else SERVICES) if k in SERVICES]

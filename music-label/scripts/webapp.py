@@ -196,6 +196,11 @@ def _status_json() -> dict:
         acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
     except Exception as e:  # noqa: BLE001
         acts["retire"] = {"active": [], "list": [], "error": str(e)}
+    try:   # 再生数（決定 172）
+        import plays
+        plays_st = plays.status()
+    except Exception as e:  # noqa: BLE001
+        plays_st = {"error": str(e)}
     try:   # 見守りと鍵の金庫（決定 174）
         import alert
         import vault
@@ -232,7 +237,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st, "pitch": pitch_st, "money": money_st, "watch": watch,
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st, "pitch": pitch_st, "money": money_st, "watch": watch, "plays": plays_st,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -492,6 +497,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         return [PY, str(S / "browser_fill.py"), "lyrics", song["id"] if song else "all"], \
             "ブラウザで入力（歌詞" + (f"：{song['artist']}「{song['title']}」）" if song else "：まだ出していない曲を続けて）")
+    if action == "plays_collect":   # 再生数を集める（決定 172）
+        return [PY, str(S / "plays.py"), "collect"], "再生数を集める"
     if action == "vault_backup":   # 鍵の金庫・見守り（決定 174）
         return [PY, str(S / "vault.py"), "backup"], "鍵を金庫に預ける"
     if action == "alert_test":
@@ -571,6 +578,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
 # ターミナルで始める作業（鍵の入力など、Gon さんが打ち込む必要があるもの）
 TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthropic": [PY, "scripts/setup_keys.py", "--only", "anthropic"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
             "notion": [PY, "scripts/setup_keys.py", "--only", "notion"],   # 決定 167
+            "youtube_key": [PY, "scripts/setup_keys.py", "--only", "youtube_key"],   # 決定 172
             "vault_init": [PY, "scripts/vault.py", "init"], "vault_kit": [PY, "scripts/vault.py", "kit"],   # 決定 174
             "ntfy": [PY, "scripts/setup_keys.py", "--only", "ntfy"], "healthcheck": [PY, "scripts/setup_keys.py", "--only", "healthcheck"],
             "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
@@ -1319,6 +1327,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/cover-trial":   # ジャケットの試し運転の結果（決定 125）
             import cover_trial
             return self._send(200, cover_trial.page(), extra=extra)
+        if path == "/plays":   # 再生数（決定 172）
+            import plays
+            return self._send(200, plays.page(TOKEN), extra=extra)
         if path == "/keys":   # 鍵と見守り（決定 174）
             import keys_page
             return self._send(200, keys_page.page(TOKEN), extra=extra)

@@ -83,6 +83,8 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "update":  ("push された更新を取り込んで反映（決定 108）", [["self_update.py"]]),
     "retry":   ("止まった週 1・月 1 の仕事の、失敗した手順だけを 1 日 1 回やり直す（決定 113）", [["schedule.py", "retry-failed"]]),
     "notion":  ("制作の状態を Notion に写す（鍵があるときだけ。決定 167）", [["notion_sync.py", "--if-ready"]]),
+    "plays":   ("配信が始まった曲の再生数を集める（Spotify・YouTube Music・Spotify for Artists・ダウンロードした明細。決定 172）",
+                [["plays.py", "collect", "--quiet"]]),
     "watch":   ("見回り：鍵を金庫に預け直す・Mac の合図を送る・問題をスマホに知らせる（決定 174）",
                 [["vault.py", "backup", "--if-changed"], ["alert.py", "watch"]]),
 }
@@ -121,6 +123,8 @@ def calendar(job: str) -> dict:
         return {**({"WatchPaths": dirs} if dirs else {}), "StartOnMount": True, "StartInterval": 1800}
     if job == "retry":   # 毎日 1 回（決定 113）
         return {"StartCalendarInterval": [{"Hour": 12, "Minute": 5}]}
+    if job == "plays":   # 毎日 10:40（配信の確認 10:15 のあと。決定 172）
+        return {"StartCalendarInterval": [{"Hour": 10, "Minute": 40}]}
     if job == "watch":   # 10 分ごと（決定 174）
         return {"StartInterval": 600}
     if job == "notion":   # 30 分ごと（変わった行だけ書き直す。決定 167）
@@ -133,7 +137,7 @@ def calendar(job: str) -> dict:
 CRON = {"post": "*/15 * * * *", "trends": "30 23 * * 1", "brief": "0 6 * * 2", "auto": "5 8-23 * * 2-4",
         "growth": "0 10 * * 4", "backup": "30 3 * * *", "monthly": "0 9 1 * *", "intake": "*/10 * * * *",
         "release": "15 10 * * *", "ssd": "*/30 * * * *", "refs": "*/30 * * * *", "update": "*/10 * * * *", "retry": "5 12 * * *",
-        "notion": "20,50 * * * *", "watch": "*/10 * * * *"}
+        "notion": "20,50 * * * *", "watch": "*/10 * * * *", "plays": "40 10 * * *"}
 
 
 # 動かしたままにする仕事（決まった時刻に動く仕事とは別）
