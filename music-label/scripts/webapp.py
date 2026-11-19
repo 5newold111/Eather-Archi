@@ -514,7 +514,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         sub = action.split("_", 1)[1]
         return [PY, str(S / "pitch.py"), sub, str(p["id"])], {"build": "ピッチの下書きを作る", "done": "ピッチした（記録）",
                                                               "skip": "ピッチを見送る（記録）", "undo": "ピッチの記録を取り消す"}[sub]
-    if action.startswith("money_"):   # お金の記録（決定 175）。値の確かめは money.web_command
+    if action in ("money_add", "money_delete", "money_import", "money_export", "money_apply", "money_recurring_add",
+                  "money_recurring_stop", "money_set_rate"):   # お金の記録（決定 175）。値の確かめは money.web_command
         import money
         found = money.web_command(action, p)
         return ([PY, str(S / "money.py"), *found[0]], found[1]) if found else None

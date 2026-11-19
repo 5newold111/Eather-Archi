@@ -14,6 +14,11 @@ Mac に定期実行を 1 回登録すると（`python3 scripts/schedule.py insta
 | 木 10:00 | growth | 成績を集める → 成長分析（重み・ヒント・転換の提案）→ 転換を管理表の『変更の提案』に足す（頻度の切り替えだけは直接） | `collect_metrics.py --analyze` → `apply_pivot.py --from-growth` |
 | 毎日 03:30 | backup | 音源・ジャケット・記録を Cloudflare R2 に予備保管（変わったものだけ） | `backup_r2.py` |
 | 30 分ごと | notion | 制作の状態（アーティスト・楽曲の工程）を Notion の表に写す（変わった行だけ。Notion の鍵があるときだけ。決定 167） | `notion_sync.py --if-ready` |
+| 10 分ごと | watch | 鍵を金庫に預け直す（変わったときだけ）・Mac の合図・問題をスマホに知らせる（決定 174） | `vault.py backup --if-changed` → `alert.py watch` |
+| 毎日 10:40 | plays | 配信が始まった曲の再生数を集める（Spotify・YouTube Music・Spotify for Artists・ダウンロードした明細。決定 172） | `plays.py collect` |
+| 毎日 10:15 | release | 配信の確認と ISRC・UPC・配信 URL の記録 → Spotify へのピッチの下書き（決定 171） | `publish.py track` → `pitch.py auto` |
+| 既存楽曲が増えたとき・30 分ごと | refs | 既存楽曲の解析 → 参考曲に登録 → 仕上げの目標を学ぶ（決定 168） | `reference_db.py --watch` → `mastering.py learn` |
+| 毎月 1 日（monthly の最後） | — | 固定費の記録 → DistroKid の明細の取り込み → 収支の書き出し（決定 175） | `money.py monthly` |
 | 毎月 1 日 | monthly | 週の曲数の確認（上限超えで隔週へ）・新しい組の提案（管理表へ）・採用された組のデビュー予約・各組の来月の近況と歌の種の提案・Instagram の鍵の延長・四半期の EP 計画 | `expand_label.py check --apply`・`artist_book.py propose-update --all` ほか |
 
 ログは `out/logs/<仕事>.log`。止めるときは `python3 scripts/schedule.py uninstall`。

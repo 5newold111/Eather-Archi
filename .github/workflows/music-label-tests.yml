@@ -1,0 +1,74 @@
+# music-label の自動テスト（決定 173）
+#   いつ：music-label/ の中身か、このファイルを変えて push したとき（ほかの人のフォークからのプルリクエストでも）
+#   何を：python3 -m unittest discover -s tests（鍵は要らない。本物の Suno・DistroKid・Notion・R2 にはつながない）
+#   時間：5 分以内。重い部品（librosa・faster-whisper・torch）は入れない（それを使う試験は自分で飛ばす）
+name: music-label tests
+
+on:
+  push:
+    paths:
+      - "music-label/**"
+      - ".github/workflows/music-label-tests.yml"
+  pull_request:
+    paths:
+      - "music-label/**"
+      - ".github/workflows/music-label-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: music-label-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    # 同じリポジトリのブランチは push で 1 回だけ動かす（プルリクエストでもう 1 回動かさない）
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: music-label
+    env:
+      PYTHONUTF8: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: music-label/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: 音の道具（ffmpeg）を入れる
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg libsndfile1
+
+      - name: Python の部品を入れる（軽いものだけ）
+        # requirements.txt のうち、試験に要るもの。librosa・faster-whisper（重い）は入れない
+        run: python -m pip install -q numpy scipy soundfile openpyxl pillow fonttools certifi
+
+      - name: ブラウザの自動入力の試験用（Playwright と Chromium）
+        # DistroKid に似せた画面で、入れ方・選び直し・「押さないもの」を確かめる（tests/test_browser_fill_logic.py の FormTest）
+        run: |
+          python -m pip install -q playwright
+          python -m playwright install --with-deps chromium
+
+      - name: テスト
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -v 2>&1 | tee ../test.log
+
+      - name: 失敗したときの記録を残す
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-label-test-log
+          path: test.log
+          retention-days: 14

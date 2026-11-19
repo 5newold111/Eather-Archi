@@ -44,7 +44,15 @@
 | 楽曲分析を API なしで | 声・楽器・ジャンル・ムードは曲を聞いて Mac の中で判定、テーマ・世界観は Claude Code（月額プラン）で Web を調べる。ダッシュボードの「足りない項目を埋める（無料）」（`audio_tags.py`・`reference_db.py --free`。決定 103） |
 | デビュー 5 曲の作業書・ChatGPT の依頼文 | SSD の「Postdog Records／03_作業書／デビュー_2026-10-11／」（作業書の PDF・kit.json・chatgpt_prompts.json）。元は `music-label/debut_kit/2026-10-11/`。Google ドキュメントは移行前の版 |
 | コピーボタン付きの作業台 | https://claude.ai/artifact/7WEKVdVL4Bg2HSN9Dfmkbq |
-| 決めたこと | `docs/12_decisions.md`（1〜167） |
+| ダッシュボードの画面 | 上の帯：ホーム（今日やること）・制作・アーティスト・再生数・お金・設定・道具（決定 176）。別ページの枠は `scripts/_ui.py` |
+| 仕上げ（マスタリング）・聴いて確かめる | `mastering.py`（曲を測って手当て。味付けと強さ）→ /listen で仕上げ前後を聴き比べ、「この仕上げで進める」まで DistroKid に入力しない（決定 168・169）。曲の長さは 3〜5 分（決定 170） |
+| Spotify へのピッチ | 配信の 7 日前まで。/pitch に項目と紹介文の下書き（`pitch.py`。貼るのと送信は Gon さん。決定 171） |
+| 再生数 | /plays（`plays.py`。毎日 10:40。Spotify for Artists は専用の Chrome でログイン 1 回。決定 172） |
+| 自動テスト・毎日の点検 | `python3 -m unittest discover -s tests`（GitHub に送るたびにも自動で動く）・`health.py`（決定 173） |
+| 鍵の金庫・見守り・復旧 | /keys（鍵の入れ直し）・`vault.py`（.env を暗号にして R2 へ。復旧キットは「パスワード」アプリに）・`alert.py`（ntfy と healthchecks.io）・`restore_r2.py`（決定 174） |
+| お金の記録 | /money（`money.py`。収入・費用・固定費・按分・DistroKid の明細。SSD の 01_管理表/収支.xlsx。決定 175） |
+| Notion | 段階 1：状態を写す（`notion_sync.py`。30 分ごと。決定 167）。つなぐ作業の途中（内部コネクションの作成待ち） |
+| 決めたこと | `docs/12_decisions.md`（1〜176） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |
