@@ -896,6 +896,11 @@ def cmd_registered(args) -> int:
         save_artist(a)
         print(f"   デビュー週を {a['debut_week']} にしました（2 曲目以降の毎週の制作がここから始まります）")
     _book()
+    try:   # Spotify へのピッチの下書きを用意する（配信の 7 日前までに出す。決定 171）
+        import pitch
+        pitch.build(song, quiet=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"   － ピッチの下書きは作れませんでした：{e}")
     try:   # 外す途中の組の「出し切る」曲が全部登録できたら、手続きを終える（決定 166）
         import retire
         if (load_artist(song["slug"], missing_ok=True) or {}).get("retire"):

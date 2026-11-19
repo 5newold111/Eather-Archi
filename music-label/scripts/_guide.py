@@ -92,6 +92,17 @@ def back_actions(song: dict | None) -> list[dict]:
 def explain(row: dict, phase: dict) -> dict:
     # 戻すボタンは、工程ごとではなく曲の行ごとに、ポップアップの上の「← 戻る」の欄に出す（webapp.py の rows[].back）
     g = _explain(row, phase)
+    if phase["name"] == "配信待ち" and phase["state"] != "done" and row.get("id"):   # Spotify へのピッチ（配信の 7 日前まで。決定 171）
+        try:
+            import pitch
+            song = _songs.by_id(str(row["id"]))
+            pi = pitch.info(song) if song else None
+            if pi and pi["state"] in ("todo", "soon"):
+                g = {**g, "steps": [f"Spotify にピッチする（{pi['deadline']} まで・あと {pi['days_left']} 日）：「ピッチの下書きを開く」→ 項目と紹介文を貼って送信 →「ピッチした」",
+                                    *g.get("steps", [])],
+                     "actions": [{"kind": "link", "label": "ピッチの下書きを開く", "url": f"/pitch?id={row['id']}"}, *g.get("actions", [])]}
+        except Exception:  # noqa: BLE001
+            pass
     fwd = forward_actions(row, phase)
     if fwd:   # 同じボタンは下の並びから外す（日付・住所の欄が 2 つにならないように）
         kinds = {a["kind"] for a in fwd}

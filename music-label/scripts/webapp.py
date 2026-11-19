@@ -196,6 +196,24 @@ def _status_json() -> dict:
         acts["retire"] = {"active": retire.active(), "list": retire.listing(), "days": retire.RESTORE_DAYS}
     except Exception as e:  # noqa: BLE001
         acts["retire"] = {"active": [], "list": [], "error": str(e)}
+    try:   # 見守りと鍵の金庫（決定 174）
+        import alert
+        import vault
+        vs = vault.status()
+        watch = {**alert.status(), "vault": {k: vs.get(k) for k in ("ready", "initialized", "last_backup", "env_changed_since", "kit_saved")},
+                 "keys_set": sum(1 for k in vs["keys"] if k["set"]), "keys_all": len(vs["keys"])}
+    except Exception as e:  # noqa: BLE001
+        watch = {"problems": [], "error": str(e)}
+    try:   # Spotify へのピッチ（締め切りの近い順。決定 171）
+        import pitch
+        pitch_st = {**pitch.status(), "todos": pitch.todos()}
+    except Exception as e:  # noqa: BLE001
+        pitch_st = {"open": 0, "soon": 0, "late": 0, "todos": [], "error": str(e)}
+    try:   # お金の記録（今月・今年の合計と、やっておくこと。決定 175）
+        import money
+        money_st = money.status()
+    except Exception as e:  # noqa: BLE001
+        money_st = {"needs": [], "error": str(e)}
     try:   # 仕上げた音を聴いて確かめるのを待っている曲（決定 169）
         import listen
         listen_st = listen.status()
@@ -214,7 +232,7 @@ def _status_json() -> dict:
         upd = {}
     return {"generated": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "version": VERSION, "update": upd,
             "artists": arts, "timeline": tl, "irregular": irr, "ref_enrich": ref_enrich, "quota": quota, "acts_review": acts,
-            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st,
+            "debut_done": _debut_done_rows(), "page_remind": _page_remind(), "notion": notion, "listen": listen_st, "pitch": pitch_st, "money": money_st, "watch": watch,
             "daily": dly,
             "weekly_todos": weekly, "photo_todos": photo_todos, "lyric_todos": lyric_todos,
             "system": [{"sev": a, "what": b, "how": c, "acts": _fix_buttons(c)} for a, b, c in _status.system_blockers()],
@@ -474,6 +492,25 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         song = _songs.by_id(str(p.get("id", ""))) if p.get("id") else None
         return [PY, str(S / "browser_fill.py"), "lyrics", song["id"] if song else "all"], \
             "ブラウザで入力（歌詞" + (f"：{song['artist']}「{song['title']}」）" if song else "：まだ出していない曲を続けて）")
+    if action == "vault_backup":   # 鍵の金庫・見守り（決定 174）
+        return [PY, str(S / "vault.py"), "backup"], "鍵を金庫に預ける"
+    if action == "alert_test":
+        return [PY, str(S / "alert.py"), "test"], "スマホに試しの知らせを送る"
+    if action == "alert_watch":
+        return [PY, str(S / "alert.py"), "watch"], "見回り"
+    if action == "keys_check":
+        import vault
+        if p.get("service") in vault.services():
+            return [PY, str(S / "vault.py"), "check", p["service"]], f"接続を確かめる（{p['service']}）"
+        return None
+    if action in ("pitch_build", "pitch_done", "pitch_skip", "pitch_undo") and _songs.by_id(str(p.get("id") or "")):   # Spotify へのピッチ（決定 171）
+        sub = action.split("_", 1)[1]
+        return [PY, str(S / "pitch.py"), sub, str(p["id"])], {"build": "ピッチの下書きを作る", "done": "ピッチした（記録）",
+                                                              "skip": "ピッチを見送る（記録）", "undo": "ピッチの記録を取り消す"}[sub]
+    if action.startswith("money_"):   # お金の記録（決定 175）。値の確かめは money.web_command
+        import money
+        found = money.web_command(action, p)
+        return ([PY, str(S / "money.py"), *found[0]], found[1]) if found else None
     if action in ("listen_ok", "listen_undo"):   # 仕上げた音を聴いて確かめた（配信前の作業。決定 169）
         song = _songs.by_id(str(p.get("id", "")))
         if song:
@@ -534,6 +571,8 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
 # ターミナルで始める作業（鍵の入力など、Gon さんが打ち込む必要があるもの）
 TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthropic": [PY, "scripts/setup_keys.py", "--only", "anthropic"], "spotify": [PY, "scripts/setup_keys.py", "--only", "spotify"],
             "notion": [PY, "scripts/setup_keys.py", "--only", "notion"],   # 決定 167
+            "vault_init": [PY, "scripts/vault.py", "init"], "vault_kit": [PY, "scripts/vault.py", "kit"],   # 決定 174
+            "ntfy": [PY, "scripts/setup_keys.py", "--only", "ntfy"], "healthcheck": [PY, "scripts/setup_keys.py", "--only", "healthcheck"],
             "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
             # ブラウザで自動入力する部品（Playwright）と、Chrome が無いとき用のブラウザ
             # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
@@ -1280,6 +1319,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/cover-trial":   # ジャケットの試し運転の結果（決定 125）
             import cover_trial
             return self._send(200, cover_trial.page(), extra=extra)
+        if path == "/keys":   # 鍵と見守り（決定 174）
+            import keys_page
+            return self._send(200, keys_page.page(TOKEN), extra=extra)
+        if path == "/pitch":   # Spotify へのピッチ（決定 171）
+            import pitch
+            return self._send(200, pitch.page(TOKEN, (parse_qs(urlparse(self.path).query).get("id") or [""])[0] or None), extra=extra)
+        if path == "/money":   # お金の記録（決定 175）
+            import money
+            return self._send(200, money.page(TOKEN, (parse_qs(urlparse(self.path).query).get("year") or [""])[0]), extra=extra)
         if path == "/listen":   # 仕上げた音を聴いて確かめる（決定 169）
             import listen
             return self._send(200, listen.page(TOKEN, (parse_qs(urlparse(self.path).query).get("id") or [""])[0] or None), extra=extra)
@@ -1363,6 +1411,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._allowed() or not secrets.compare_digest(self.headers.get("X-Label-Token", ""), TOKEN):
             return self._json(403, {"error": "このページを開き直してから押してください"})
+        if urlparse(self.path).path == "/api/keys/save":   # 鍵を 1 つ入れる（決定 174）
+            return self._keys_save()
         if urlparse(self.path).path == "/api/upload":
             return self._upload()
         if urlparse(self.path).path == "/api/irregular":
@@ -1386,6 +1436,19 @@ class Handler(BaseHTTPRequestHandler):
                 if j["state"] == "running" and j["label"].startswith("ブラウザで入力"):
                     stop_job(j["id"])
         return self._json(200, {"job": start_job(*found)})
+
+    def _keys_save(self):
+        """鍵を 1 つ .env に入れる（この Mac 自身か Tailscale からだけ。値は記録しない・返さない。決定 174）"""
+        import vault
+        if not vault.client_ok(self.client_address[0]):
+            return self._json(403, {"error": "鍵は、この Mac のブラウザか Tailscale でつないだ端末からだけ入れられます"})
+        try:
+            n = min(int(self.headers.get("Content-Length", "0")), 10000)
+            p = json.loads(self.rfile.read(n) or b"{}")
+        except (ValueError, json.JSONDecodeError):
+            return self._json(400, {"error": "内容が読めません"})
+        r = vault.save_key(p.get("name"), p.get("value"))
+        return self._json(200 if r["ok"] else 400, r)
 
     def _book_save(self):
         """管理表の 1 行（縦型のタブは 1 列）を書き換えて、設定書に取り込み直す（決定 119）"""

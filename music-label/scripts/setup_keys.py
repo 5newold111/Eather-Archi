@@ -169,6 +169,16 @@ def check_notion():
     return "ok", "接続できました（表を置くページも読めます）"
 
 
+def check_ntfy():
+    import alert
+    return alert.check("ntfy")       # 実際に試しの知らせを 1 通送る
+
+
+def check_healthcheck():
+    import alert
+    return alert.check("healthcheck")
+
+
 def check_youtube():
     from post_social import cred, http
     if not cred("YOUTUBE_REFRESH_TOKEN", "-", "-"):
@@ -301,6 +311,22 @@ SERVICES = {
                   "そのページの右上「•••」→「リンクをコピー」（この後の NOTION_PARENT_PAGE に貼る）",
                   "※ ブラウザの翻訳で名前が少し違うことがある（かっこの中が元の英語）"],
         "keys": [("NOTION_TOKEN", True), ("NOTION_PARENT_PAGE", False)], "check": check_notion},
+    "ntfy": {
+        "title": "スマホへの知らせ（ntfy）",
+        "url": "https://ntfy.sh/app",
+        "steps": ["スマホに ntfy アプリを入れる（App Store で「ntfy」。アカウントは作らなくてよい）",
+                  "トピック名を決める：他人に当てられない長い名前（例 postdog-でたらめな英数字 16 文字）。知っている人はだれでも読めるので、合言葉のつもりで",
+                  "アプリの「＋」→ Subscribe to topic にそのトピック名を入れる",
+                  "同じトピック名を、この後の NTFY_TOPIC に入れる（NTFY_URL・NTFY_TOKEN は Enter だけで空のまま）"],
+        "keys": [("NTFY_TOPIC", False), ("NTFY_URL", False), ("NTFY_TOKEN", True)], "check": check_ntfy},
+    "healthcheck": {
+        "title": "Mac の見守り（healthchecks.io）",
+        "url": "https://healthchecks.io/accounts/signup/",
+        "steps": ["無料で登録（メールアドレスだけ）→ 最初からある Check を開く（無ければ Add Check）",
+                  "名前 Postdog Mac、Period（合図の間隔）10 minutes、Grace Time（待つ時間）20 minutes にして保存",
+                  "「How to Ping」に出ている https://hc-ping.com/… の URL をコピー（この後の HEALTHCHECK_URL に貼る）",
+                  "Integrations で、知らせ先（メール。スマホの ntfy も足せる）を確かめる"],
+        "keys": [("HEALTHCHECK_URL", True)], "check": check_healthcheck},
     "youtube": {
         "title": "YouTube（ショート動画の投稿・再生数）",
         "url": "https://console.cloud.google.com/projectcreate",
@@ -434,7 +460,7 @@ def write_status(results: dict) -> Path:
 def main() -> None:
     ap = argparse.ArgumentParser(description="鍵の一括設定ウィザード")
     ap.add_argument("--check", action="store_true", help="接続の確認だけ")
-    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,notion,youtube,instagram,tiktok）")
+    ap.add_argument("--only", help="カンマ区切り（spotify,owner,anthropic,openai,supabase,r2,notion,ntfy,healthcheck,youtube,instagram,tiktok）")
     ap.add_argument("--redo", default="", help="設定済みでもやり直すサービス（カンマ区切り）")
     a = ap.parse_args()
     keys = [k for k in (a.only.split(",") if a.only else SERVICES) if k in SERVICES]
