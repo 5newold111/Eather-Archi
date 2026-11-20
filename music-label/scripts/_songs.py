@@ -62,7 +62,88 @@ def debut_songs() -> list[dict]:
     return out
 
 
+def meta_path(song: dict) -> Path:
+    """登録データ（写し）の置き場所"""
+    return OUT / "distrokid" / str(song["week"]) / f"{song['slug']}.metadata.json"
+
+
+META_STATUS = {"registered": "uploaded", "live": "live"}   # 曲の記録の状態 → 登録データの状態
+
+
+def sync_meta(song: dict, st: dict | None = None) -> bool:
+    """登録データ（out/distrokid/<週>/<組>.metadata.json）を、正本に合わせて書き直す（決定 177）。
+    正本は 2 つだけ：曲名＝ブリーフ（デビュー曲は作業セットの kit.json）、配信の記録（状態・配信日・ISRC・UPC・住所）＝曲の記録。
+    登録データは、成績集め・四半期の計画・SNS の準備が読む「写し」で、人も機械もここを直接は書き換えない。変わったら True"""
+    if song.get("kind") != "weekly":
+        return False
+    st = state(song) if st is None else st
+    p, status = meta_path(song), st.get("status", "")
+    if not p.exists() and status not in META_STATUS:
+        return False   # 登録するまでは、登録シートづくり（distrokid_sheet.py）が作る
+    old = read_json(p) if p.exists() else {"artist_slug": song["slug"], "label_slug": song.get("label_slug"), "week_start": song["week"],
+                                           "brief": str(song.get("brief") or ""), "ai_disclosed": True}
+    new = dict(old)
+    if song.get("title"):
+        new["title"] = song["title"]
+    for k in ("isrc", "upc", "url"):
+        if st.get(k):
+            new[k] = st[k]
+    if status in META_STATUS:
+        new["status"] = META_STATUS[status]
+    elif old.get("status") in ("uploaded", "live"):
+        new["status"] = "planned"   # 登録を取り消した
+    base = str(old.get("release_at_utc") or song.get("release_at") or "")
+    day = str(st.get("released") or st.get("release_date") or "")[:10]
+    if day:
+        new["release_at_utc"] = day + (base[10:] if len(base) > 10 else "T21:00:00Z")
+    elif base and not new.get("release_at_utc"):
+        new["release_at_utc"] = base
+    if new == old or not new.get("release_at_utc"):
+        return False
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(new, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return True
+
+
+def migrate_meta() -> int:
+    """1 回だけ：これまで登録データにだけあった曲名・ISRC・UPC を、正本（ブリーフ・曲の記録）へ写す（決定 177）。
+    前は「登録データの曲名」がブリーフの曲名より優先されていたので、いま見えている曲名が変わらないようにする。写した数を返す"""
+    mark = OUT / "publish" / "meta_migrated.json"
+    if mark.exists() or not (OUT / "distrokid").is_dir():
+        return 0
+    n = 0
+    for p in sorted((OUT / "briefs").glob("*.json")):
+        if p.name.startswith("2000-") or "." in p.stem or "_" not in p.stem:
+            continue
+        b = read_json(p)
+        if "artist_slug" not in b or "week_start" not in b:
+            continue
+        mp = OUT / "distrokid" / str(b["week_start"]) / f"{b['artist_slug']}.metadata.json"
+        if not mp.exists():
+            continue
+        m = read_json(mp)
+        t = m.get("title")
+        if t and not str(t).startswith("（") and b.get("title") != t:
+            b["title"] = t
+            p.write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            n += 1
+        sp = STATE_DIR / f"{p.stem}.json"
+        st = read_json(sp) if sp.exists() else {}
+        got = {k: m[k] for k in ("isrc", "upc") if m.get(k) and not st.get(k)}
+        if got:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
+            sp.write_text(json.dumps({**st, **got}, ensure_ascii=False, indent=1), encoding="utf-8")
+            n += 1
+    mark.parent.mkdir(parents=True, exist_ok=True)
+    mark.write_text(json.dumps({"moved": n}, ensure_ascii=False), encoding="utf-8")
+    return n
+
+
 def weekly_songs() -> list[dict]:
+    try:
+        migrate_meta()
+    except OSError:
+        pass
     out = []
     for p in sorted((OUT / "briefs").glob("*.json")):
         if p.name.startswith("2000-") or "." in p.stem or "_" not in p.stem:
@@ -74,10 +155,8 @@ def weekly_songs() -> list[dict]:
         if a is None:
             continue
         week, slug = b["week_start"], b["artist_slug"]
-        meta_p = OUT / "distrokid" / week / f"{slug}.metadata.json"
-        meta = read_json(meta_p) if meta_p.exists() else {}
         cands = list(b.get("title_candidates") or [])
-        title = meta.get("title") if meta.get("title") not in (None, "", "（未定）") else (b.get("title") or (cands[0] if cands else ""))
+        title = b.get("title") or (cands[0] if cands else "")   # 曲名の正本はブリーフ（登録データは写し。決定 177）
         lyr = p.with_suffix(".lyrics_final.txt")
         out.append({
             "id": p.stem, "kind": "weekly", "key": p.stem, "slug": slug, "label_slug": b.get("label_slug"),
@@ -167,6 +246,10 @@ def state(song: dict) -> dict:
 def save_state(song: dict, st: dict) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     (STATE_DIR / f"{song['key']}.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
+    try:   # 登録データ（写し）も合わせる（決定 177）
+        sync_meta(song, st)
+    except OSError:
+        pass
 
 
 def debut_registered(slug: str) -> bool | None:

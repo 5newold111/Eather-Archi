@@ -131,6 +131,8 @@ def _status_json() -> dict:
                 try:
                     song = _songs.by_id(r["id"])
                     r["back"] = _guide.back_actions(song)
+                    # 曲名を変える（DistroKid に登録する前の曲だけ。決定 177）
+                    r["rename"] = bool(song) and _songs.state(song).get("status", "") not in ("registered", "live")
                     # もう一度入力する（前の入力が残っていても止めて入り直す。決定 47）
                     stt = _songs.state(song).get("status", "") if song else "live"
                     r["redo"] = ([{"kind": "run", "label": "Suno にもう一度入力する（ブラウザが開きます）", "action": "fill_suno", "id": r["id"]}]
@@ -567,6 +569,12 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
             if listen.needed(song):   # 先に聴いて確かめる（決定 169）
                 return [PY, str(S / "listen.py"), "need", song["id"]], f"先に聴いて確かめる（{song['artist']}「{song['title']}」）"
             return [PY, str(S / "browser_fill.py"), "distrokid", song["id"]], f"ブラウザで入力（DistroKid：{song['artist']}「{song['title']}」）"
+    if action == "rename":   # 曲名を変える（登録する前の曲。決定 177）
+        song = _songs.by_id(str(p.get("id", "")))
+        title = re.sub(r"\s+", " ", str(p.get("title") or "")).strip()
+        if song and title and len(title) <= 120:
+            return [PY, str(S / "publish.py"), "rename", song["id"], f"--title={title}"], f"曲名を変える（{song['artist']}「{song['title']}」→「{title}」）"
+        return None
     if action == "back":   # 間違えて進めた工程を戻す（決定 38）
         import publish
         song = _songs.by_id(str(p.get("id", "")))
@@ -994,6 +1002,7 @@ function openGuide(gid){const[k,ri,pi]=gid.split(":");const r=DATA.timeline[k].r
    <span class="badge ${p.state}">${E(LABEL[p.state])}${cur&&p.who?`・${E(WHO(p.who))}`:""}${d?`・${d} 日`:""}</span> <span class="sub">${p.state==="plan"?"予定 ":""}${dates}</span>
    ${(g.forward||[]).length?`<div class="fwdbox"><b>→ 次に進める（うまくいったとき）</b><span class="sub">　表が進んでいないときに押すと、記録して次の工程へ進めます</span><div class="acts">${g.forward.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    ${(r.redo||[]).length?`<div class="backbox"><b>↻ もう一度入力する</b><span class="sub">　前の入力が残っていても、止めてから入り直します</span><div class="acts">${r.redo.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
+   ${r.rename&&r.id?`<details class="backbox act-only"><summary><b>✎ 曲名を変える</b><span class="sub">　いま：「${E(r.title||"")}」</span></summary><div class="acts"><input type="text" id="rn-${E(r.id)}" value="${E(r.title||"")}" maxlength="120" aria-label="新しい曲名" style="flex:1;min-width:12em;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><button data-act="rename" data-id="${E(r.id)}" data-confirm="曲名を変えます。ブリーフ・曲のフォルダ・ジャケットの文字・DistroKid の下書き・管理表を新しい曲名にそろえます（音源はそのまま。聴いて確かめた印も残ります）。よいですか？">この名前に変える</button></div><p class="sub" style="margin:6px 0 0">DistroKid に登録する前の曲だけ変えられます。前の曲名は別案に残るので、前の名前でダウンロードしたファイルも取り込めます。</p></details>`:""}
    ${(r.back||[]).length?`<div class="backbox"><b>← 戻る（間違えて進めたとき）</b><span class="sub">　前の工程に戻します。消さずに「戻したもの」に移すので、あとから取り出せます</span><div class="acts">${r.back.map((a,i)=>actHTML(a,i,r)).join("")}</div></div>`:""}
    <h4>${p.state==="ng"?"止まっている原因":"いまの状態"}</h4><p>${E(WHO(g.cause))}</p>
    ${(g.steps||[]).length?`<h4>Gon さんがやること</h4><ol>${g.steps.map(x=>`<li>${E(WHO(x))}</li>`).join("")}</ol>`:""}
@@ -1071,6 +1080,7 @@ async function watch(id){watching[id]=true;const box=document.getElementById("jo
 document.addEventListener("click",e=>{const b=e.target.closest("button[data-act]");if(!b)return;
   const p={};if(b.dataset.slug)p.slug=b.dataset.slug;if(b.dataset.id)p.id=b.dataset.id;
   if(b.dataset.act==="registered"){p.date=document.getElementById("d-"+b.dataset.id).value;if(!confirm(`DistroKid に登録した（配信日 ${p.date}）と記録しますか？`))return}
+  if(b.dataset.act==="rename"){p.title=(document.getElementById("rn-"+b.dataset.id)||{}).value||""}   // 決定 177
   if(b.dataset.act==="mark_live"){p.track=(document.getElementById("lt-"+b.dataset.id)||{}).value||"";p.artist=(document.getElementById("la-"+b.dataset.id)||{}).value||"";
     if(!confirm("配信が始まったと記録しますか？"+(p.artist?"":"\n（アーティストの住所が無いと、2 曲目からの登録は待ちのままです）")))return}
   if(b.dataset.act==="quota_left"){p.left=(document.getElementById("quota-left")||{}).value||"";if(!/^\d+$/.test(p.left)){alert("Suno の画面の残りの曲数を数字で入れてください");return}}

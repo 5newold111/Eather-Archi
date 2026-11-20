@@ -193,9 +193,10 @@ def stage_finish(week: date, a) -> None:
         _ = artist
     step("DistroKid 登録シートを作っています")
     run([S / "distrokid_sheet.py", "--week", week.isoformat()])
-    has_db = bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
-    step("データベースへの登録内容を作っています" + ("（直接登録します）" if has_db else "（鍵が無いので SQL を書き出します）"))
-    run([S / "supabase_sync.py", "week", "--week", week.isoformat()] + (["--apply"] if has_db else []))
+    # Supabase のデータベースへの写し（supabase_sync.py week）は、ここでは動かさない（決定 177）：
+    # 毎時、曲の記録・音源・ジャケットを Supabase に上げていたが、ダッシュボード・管理表・Notion・成長分析のどれも読んでいなかった。
+    # 予備保管は R2（backup_r2.py）、見る場所は Notion。Instagram に動画を渡すときの一時置き場（post_social.py）だけは、これまでどおり Supabase を使う。
+    # 手で写したいときは  python3 scripts/supabase_sync.py week --week <週> --apply
     step("SNS 投稿の準備（縦動画と説明文）をしています")
     run([S / "post_social.py", "plan", "--week", week.isoformat()])
     step("外付け SSD に保管しています（つながっていなければ飛ばします）")

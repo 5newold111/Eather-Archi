@@ -125,8 +125,7 @@ def todos() -> list[tuple[str, str, list[str], str]]:
         elif m.get("status") in ("planned", "mastered") and 0 <= days <= 16:
             add("ng" if days <= 9 else "normal", f"DistroKid に登録（制作週 {mp.parent.name}）", f"{who}「{m.get('title')}」（あと {days} 日）",
                 f"out/distrokid/{mp.parent.name}/sheet.md")
-        if m.get("status") in ("uploaded", "live") and not m.get("isrc"):
-            add("normal", "登録後の ISRC を書く", f"{who}「{m.get('title')}」", "out/distrokid/<週>/<組>.metadata.json")
+        # ISRC は配信が始まると自動で記録される（曲の記録が正本。登録データは写し。決定 177）
     for a in all_artists():
         d = as_date(a.get("debut_week"))
         if d and d > date.today() and a.get("expansion"):

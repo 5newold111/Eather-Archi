@@ -455,7 +455,7 @@ def after_remaster(song: dict) -> None:
     st = _songs.state(song)
     if st.get("status") == "ready":
         write_draft(song, st)
-    store_set(song)
+    store_set(song, force=True)
     _book()
 
 
@@ -657,14 +657,193 @@ def write_draft(song: dict, st: dict) -> None:
         (d / "エピソード.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def store_set(song: dict) -> None:
-    """公開セットをローカル保存（と、あれば SSD）にまとめる"""
-    subprocess.run([sys.executable, str(S / "archive_sync.py"), "--only", song["slug"]], capture_output=True, text=True)
+def _set_sig(song: dict) -> str:
+    """公開セットに入るものの印（音源・ジャケット・下書きなどの大きさと時刻、曲名、状態）。これが変わったときだけ作り直す（決定 177）"""
+    import hashlib
+    files = [OUT / "masters" / song["key"] / "master.wav", _songs.cover_source(song)]
+    for d in (PUB / song["key"], OUT / "takes" / song["key"]):
+        if d.is_dir():
+            files += sorted(f for f in d.rglob("*") if f.is_file())
+    parts = [song.get("title", ""), _songs.state(song).get("status", "")]
+    for f in files:
+        if f and Path(f).exists():
+            st = Path(f).stat()
+            parts.append(f"{f}|{st.st_size}|{int(st.st_mtime)}")
+    return hashlib.sha1("\n".join(parts).encode()).hexdigest()[:16]
+
+
+def store_set(song: dict, force: bool = False) -> bool:
+    """公開セットをローカル保存（と、あれば SSD）にまとめる。中身が前と同じなら何もしない（作り直したら True）。
+    前は、ジャケット選びなどを待っている曲ごとに、10 分ごとの取り込みのたびに保管の部品を丸ごと動かしていた
+    （2 日待つと 約 288 回。Mac と SSD を無駄に動かすだけで、中身は変わらない）。SSD をつないだとき・毎日の保管では、これまでどおり全部を写す"""
+    sig = _set_sig(song)
+    st = _songs.state(song)
     folder, audio, cover = publish_folder(song)
+    if not force and st.get("set_sig") == sig and folder.is_dir():
+        return False
+    subprocess.run([sys.executable, str(S / "archive_sync.py"), "--only", song["slug"]], capture_output=True, text=True)
+    st = _songs.state(song)
+    if st:   # まだ記録の無い曲（作曲前）には、印を付けない
+        st["set_sig"] = sig
+        _songs.save_state(song, st)
     print(f"   ○ 公開セット：{archive.local_label(folder)}/")
+    return True
+
+
+# ---------------------------------------------------------------------------
+# 曲名を変える（DistroKid に登録する前の曲。決定 177）
+RENAMES = PUB / "renames.json"   # SSD がつながっていない間に変えた曲名（つないだときに SSD のフォルダも直す）
+
+
+def _move_folder(old: Path, new: Path, old_safe: str, new_safe: str, artist_safe: str) -> bool:
+    """曲のフォルダの名前を変え、中のファイル名（<曲名>_<アーティスト名>_…・<アーティスト名>_<曲名>_…）も新しい曲名に直す。消さない"""
+    import unicodedata
+    if not old.is_dir():
+        return False
+    if not new.exists():
+        old.rename(new)
+    else:   # 先に新しい名前のフォルダができていた（保管が先に動いた）：無いものだけ移す
+        for c in sorted(old.iterdir()):
+            if not (new / c.name).exists():
+                shutil.move(str(c), str(new / c.name))
+        try:
+            old.rmdir()
+        except OSError:
+            pass
+    for f in sorted(new.rglob("*"), key=lambda x: -len(x.parts)):
+        name = unicodedata.normalize("NFC", f.name)
+        if name.startswith(old_safe + "_") or name.startswith(old_safe + "."):
+            t = new_safe + name[len(old_safe):]
+        elif name.startswith(f"{artist_safe}_{old_safe}") and name[len(artist_safe) + 1 + len(old_safe):][:1] in ("_", "."):
+            t = f"{artist_safe}_{new_safe}" + name[len(artist_safe) + 1 + len(old_safe):]
+        else:
+            continue
+        if not f.with_name(t).exists():
+            f.rename(f.with_name(t))
+    return True
+
+
+def _rename_folders(artist: str, old_name: str, new_name: str, old_title: str, new_title: str) -> int:
+    n = 0
+    for f in archive.song_folders(artist, old_name):
+        try:
+            n += _move_folder(f, f.with_name(new_name), _songs.safe(old_title), _songs.safe(new_title), _songs.safe(artist))
+        except OSError as e:
+            print(f"   － フォルダの名前を変えられませんでした（{f}）：{e}")
+    return n
+
+
+def apply_pending_renames() -> int:
+    """SSD がつながっていない間に変えた曲名を、つないだときに SSD のフォルダにも反映する"""
+    if not RENAMES.exists():
+        return 0
+    todo = read_json(RENAMES).get("pending", [])
+    if not todo or archive.root()[0] is None:
+        return 0
+    n = sum(_rename_folders(r["artist"], r["old_name"], r["new_name"], r["old"], r["new"]) for r in todo)
+    RENAMES.write_text(json.dumps({"pending": []}, ensure_ascii=False), encoding="utf-8")
+    return n
+
+
+def rename_song(song: dict, new: str) -> str:
+    """曲名を変えて、ブリーフ（デビュー曲は作業セット）・フォルダ・ジャケットの文字・下書き・公開セット・管理表をそろえる。結果の一文を返す"""
+    new = re.sub(r"\s+", " ", str(new or "")).strip()
+    old = song.get("title") or ""
+    st = _songs.state(song)
+    if st.get("status") in DONE:
+        raise ValueError("この曲はもう DistroKid に登録済みなので、ここでは変えられません（登録した名前と食い違うため）。"
+                         "どうしても変えるときは、DistroKid の画面で曲名を直し、ダッシュボードの「← DistroKid の登録を取り消す」で戻してから変えてください")
+    if not new:
+        raise ValueError("新しい曲名が空です")
+    if len(new) > 120 or re.search(r"[\x00-\x1f]", new):
+        raise ValueError("曲名は 120 文字まで・改行なしで入れてください")
+    if new == old:
+        raise ValueError("いまと同じ曲名です")
+    dup = [s for s in _songs.all_songs() if s["slug"] == song["slug"] and s["key"] != song["key"] and _songs.norm(s["title"]) == _songs.norm(new)]
+    if dup:
+        raise ValueError(f"{song['artist']} には、もう「{dup[0]['title']}」という曲があります（{dup[0]['id']}）。別の名前にしてください")
+    try:
+        import irregular
+        hit = irregular._banned({"artist_slug": song["slug"], "label_slug": song.get("label_slug")}, new)
+    except Exception:  # noqa: BLE001
+        hit = []
+    if hit:
+        raise ValueError("実在のアーティスト名などが入っています（" + "・".join(hit[:3]) + "）。別の名前にしてください")
+    old_name = _songs.folder_name(song)
+    # 1 正本を書き換える（前の曲名は別案に残す：前の名前でダウンロードしたファイルも、この曲として取り込める）
+    if song["kind"] == "debut":
+        kp = Path(song["kit"]) / "kit.json"
+        kit = read_json(kp)
+        for s in kit.get("songs", []):
+            if s.get("slug") == song["slug"]:
+                alt = [a for a in (s.get("title_alt") or []) if a != new]
+                s["title"], s["title_alt"] = new, (alt + [old] if old and old not in alt else alt)
+        kp.write_text(json.dumps(kit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    else:
+        bp = Path(song["brief"])
+        b = read_json(bp)
+        cands = [c for c in (b.get("title_candidates") or []) if c != new]
+        b["title"], b["title_candidates"] = new, [new] + (cands + [old] if old and old not in cands else cands)
+        bp.write_text(json.dumps(b, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _songs.thaw()
+    now = _songs.by_id(song["id"])
+    new_name = _songs.folder_name(now)
+    notes = []
+    # 2 曲のフォルダ（ローカル保存・SSD）と、中のファイル名
+    if old and old_name != new_name:
+        moved = _rename_folders(song["artist"], old_name, new_name, old, new)
+        if moved:
+            notes.append(f"曲のフォルダ {moved} つの名前を変えました")
+        if archive.root()[0] is None:   # SSD のフォルダは、つないだときに直す
+            todo = (read_json(RENAMES).get("pending", []) if RENAMES.exists() else []) + [
+                {"artist": song["artist"], "old_name": old_name, "new_name": new_name, "old": old, "new": new, "at": datetime.now().isoformat(timespec="seconds")}]
+            RENAMES.parent.mkdir(parents=True, exist_ok=True)
+            RENAMES.write_text(json.dumps({"pending": todo}, ensure_ascii=False, indent=1), encoding="utf-8")
+            notes.append("SSD のフォルダは、次につないだときに直します")
+        fix = lambda v: (v.replace(f"/{old_name}/{_songs.safe(old)}_", f"/{new_name}/{_songs.safe(new)}_").replace(f"/{old_name}/", f"/{new_name}/")  # noqa: E731
+                         if isinstance(v, str) else v)
+        st = {k: fix(v) for k, v in st.items()}
+    # 3 ジャケットの文字（文字なしの版から入れ直す）
+    cover = _songs.cover_source(now)
+    if cover is not None:
+        ok_text, why = ensure_cover_text(now, cover)
+        notes.append("ジャケットの曲名を入れ直しました" if ok_text else f"ジャケットの曲名は入れ直せませんでした（{why}）。ジャケットを選び直してください")
+        if not ok_text and st.get("status") == "ready":
+            st["status"] = "waiting_cover"
+    if st:
+        _songs.save_state(now, st)
+    # 4 下書き・公開セット・登録データ（写し）・管理表
+    if st.get("status") == "ready":
+        write_draft(now, st)
+    _songs.sync_meta(now)
+    if st.get("status"):
+        store_set(now, force=True)
+    _book()
+    extra = "" if st.get("status") else " まだ作曲前なので、Suno に入れる曲名も新しい名前になります。"
+    return f"{song['artist']}：曲名を「{old}」→「{new}」に変えました。" + "。".join(notes) + ("。" if notes else "") + extra
+
+
+def cmd_rename(args) -> int:
+    song = _songs.by_id(args.song)
+    if song is None:
+        print(f"【結果】曲が見つかりません：{args.song}")
+        return 1
+    try:
+        msg = rename_song(song, args.title)
+    except ValueError as e:
+        print(f"【結果】曲名は変えていません：{e}")
+        return 2
+    print(f"【結果】{msg}")
+    return 0
 
 
 def cmd_scan(args) -> int:
+    try:   # SSD が無い間に変えた曲名を、SSD のフォルダにも反映する（決定 177）
+        n = apply_pending_renames()
+        if n:
+            print(f"   ○ 曲名を変えた曲のフォルダを SSD でも直しました（{n} つ）")
+    except Exception as e:  # noqa: BLE001
+        print(f"   － SSD のフォルダの名前は直せませんでした：{e}")
     songs = [s for s in _songs.all_songs() if s.get("title") and _songs.state(s).get("status") not in DONE]
     files = new_files()
     reg = read_json(REGISTRY) if REGISTRY.exists() else {}
@@ -727,7 +906,7 @@ def cmd_scan(args) -> int:
         for v in seen_t.values():
             if len(v) > 1:
                 print(f"   ⚠ 同じ曲名の曲が {len(v)} つあります：{v[0]['artist']}「{v[0]['title']}」（{'・'.join(x['id'] for x in v)}）。"
-                      "あとの週の曲名は、ダッシュボードで別の名前に変えてください")
+                      "あとの週の曲名は、ダッシュボードの曲のポップアップの「曲名を変える」で別の名前に変えてください")
     return 0
 
 
@@ -1522,6 +1701,9 @@ def main() -> None:
     p.add_argument("slug")
     for k, _n, _r in ARTIST_PAGES:
         p.add_argument("--" + k.replace("_", "-"), dest=k, default="")
+    p = sub.add_parser("rename", help="曲名を変える（DistroKid に登録する前の曲。フォルダ・ジャケットの文字・下書きもそろえる。決定 177）")
+    p.add_argument("song")
+    p.add_argument("--title", required=True)
     p = sub.add_parser("back", help="間違えて進めた工程を戻す")
     p.add_argument("id")
     p.add_argument("--to", choices=list(BACK_TO), help="戻り先（省くと 1 つ前）")
@@ -1547,7 +1729,7 @@ def main() -> None:
     args = ap.parse_args()
     fn = {"scan": cmd_scan, "status": cmd_status, "draft": cmd_draft, "registered": cmd_registered,
           "track": cmd_track, "suno": cmd_suno, "suno-request": cmd_suno_request, "back": cmd_back,
-          "artist-page": cmd_artist_page, "artist-pages": cmd_artist_pages, "live": cmd_live, "cover": cmd_cover, "take": cmd_take}.get(args.cmd)
+          "artist-page": cmd_artist_page, "artist-pages": cmd_artist_pages, "live": cmd_live, "cover": cmd_cover, "take": cmd_take, "rename": cmd_rename}.get(args.cmd)
     if fn is None:
         ap.print_help()
         return

@@ -210,6 +210,13 @@ def main() -> None:
             b = read_json(bp)
             b["title"] = titles[r["artist_slug"]]
             write_json(bp, b)
+        try:   # ISRC・UPC・状態・配信日は曲の記録が正本（ここの登録データは写し。決定 177）
+            import _songs
+            s = _songs.by_key(bp.stem)
+            if s:
+                _songs.sync_meta(s)
+        except Exception:  # noqa: BLE001
+            pass
 
     rows.sort(key=lambda r: (r["label_slug"] != "drive", r["label_slug"], r["artist"]))
     name = f"sheet_{args.label}" if args.label else "sheet"     # レーベルを絞ったときは別ファイル（全体のシートを上書きしない）

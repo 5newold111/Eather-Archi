@@ -204,10 +204,7 @@ def main() -> None:
         tail = [l for l in (r.stdout + r.stderr).splitlines() if l.strip()][-2:]
         print("     " + " / ".join(t.strip() for t in tail))
 
-    step("データベースへの登録内容を書き出しています")
-    has_db_key = bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_SERVICE_ROLE_KEY"))
-    subprocess.run([sys.executable, str(ROOT / "scripts" / "supabase_sync.py"), "seed"] + (["--apply"] if has_db_key else []),
-                   check=False)
+    # Supabase のデータベースへの写し（supabase_sync.py seed）は、ここでは動かさない（どこからも読まれていないため。決定 177）
 
     path = OUT / "debut" / week.isoformat() / "readiness.md"
     ng = write_readiness(path, [load_artist(a["slug"], a["label_slug"]) for a in arts])

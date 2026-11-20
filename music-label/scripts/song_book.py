@@ -152,8 +152,8 @@ def weekly_rows() -> list[dict]:
         stored = (f"{archive.ARTIST_DIR}/{name}/{archive.SUBS['music']}/{_songs.folder_name(song)}/"
                   if song and (OUT / "masters" / p.stem / "master.wav").exists() else "")
         rows.append({
-            "曲 ID": p.stem, "アーティスト": name, "曲名": meta.get("title") or (titles[0] if titles else ""),
-            "曲名の別案": _join(titles[1:]), "フェーズ": phase, "制作週": week,
+            "曲 ID": p.stem, "アーティスト": name, "曲名": (song or {}).get("title") or meta.get("title") or (titles[0] if titles else ""),   # 正本はブリーフ（決定 177）
+            "曲名の別案": _join((song or {}).get("alts") if song else titles[1:]), "フェーズ": phase, "制作週": week,
             "配信予定日": str(b.get("release_at") or "")[:10],
             "BPM": meta.get("bpm", ""), "ジャンル": _join(meta.get("genre") or [meta.get("primary_genre"), meta.get("secondary_genre")] if meta else ""),
             "言語": meta.get("language", ""), "Suno の指示（スタイル）": b.get("suno_style_prompt", ""),

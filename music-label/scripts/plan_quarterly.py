@@ -99,7 +99,7 @@ def main() -> None:
         lines += [f"## EP：{ep['artist']} — {ep['title']}", "", "| # | 曲 | Featured | ISRC | 音源 |", "|---|---|---|---|---|"]
         for i, t in enumerate(ep["tracks"], 1):
             feat = load_artist(t["featured_artist_slug"])["name"] if t.get("featured_artist_slug") else "—"
-            lines.append(f"| {i} | {t['title']} | {feat} | {t.get('isrc') or '⚠ 未記入（metadata.json に書く）'} | `{t['audio']}` |")
+            lines.append(f"| {i} | {t['title']} | {feat} | {t.get('isrc') or '⚠ まだ（配信が始まると自動で入ります）'} | `{t['audio']}` |")
         lines.append("")
     for label, items in comps.items():
         if len(items) < 3:
