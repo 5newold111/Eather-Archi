@@ -9,7 +9,7 @@ Mac に定期実行を 1 回登録すると（`python3 scripts/schedule.py insta
 |---|---|---|---|
 | 月 23:30 | trends | Claude が Web で今週のチャートを調べ、トレンド言語を決め、場面ごとの話題曲を参考曲フォルダに置く | `fetch_trends.py` |
 | 火 06:00 | brief | アーティスト管理表の読み込み → 全組の参考曲の割り当て（その組が選んだ参考曲を優先）・今週の歌のもと（近況 → 歌の種）→ コラボの組み合わせ → Claude がブリーフを書く | `artist_book.py pull` → `run_week.py brief` |
-| 火〜木 8〜23 時の毎時 | auto | Suno の節が置かれたら歌詞を合体 → テイクが置かれたら計測 → 選ばれたら音量・ジャケット・登録シート・SNS の準備（Supabase への写しはやめた。決定 177） | `run_week.py auto` |
+| 火〜木 8〜23 時の毎時 | auto | Suno の節が置かれたら歌詞を合体 → 手で置いたテイクがあれば計測 → 登録データ（写し）と登録シート → SNS の準備。仕上げ（音・ジャケット・下書き・公開セット・保管）は取り込み（intake）が行う（決定 178） | `run_week.py auto` |
 | 15 分ごと | post | 配信時刻を過ぎた SNS 投稿を出す（YouTube は前もって公開予約） | `post_social.py post --week all` |
 | 木 10:00 | growth | 成績を集める → 成長分析（重み・ヒント・転換の提案）→ 転換を管理表の『変更の提案』に足す（頻度の切り替えだけは直接） | `collect_metrics.py --analyze` → `apply_pivot.py --from-growth` |
 | 毎日 03:30 | backup | 音源・ジャケット・記録を Cloudflare R2 に予備保管（変わったものだけ） | `backup_r2.py` |

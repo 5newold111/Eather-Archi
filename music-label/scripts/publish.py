@@ -441,6 +441,30 @@ def advance(song: dict) -> str:
     return "ready"
 
 
+def adopt_selected(song: dict) -> bool:
+    """取り込みの外で選ばれたテイク（out/takes/<曲>/ に手で置き、select_takes.py で選んだもの）を、取り込みの流れに乗せる（決定 178）。
+    前は毎時の制作（run_week.py）が別の道で仕上げていた。仕上げの道を 1 本にしたので、ここで「取り込み済み」にして同じ道を通す。
+    作り直しに戻した曲・Suno に戻した曲は、テイクを別の場所へよけてあるので、ここでは拾わない。引き継いだら True"""
+    st = _songs.state(song)
+    if st.get("status"):
+        return False
+    tdir = OUT / "takes" / song["key"]
+    sel_p = tdir / "selection.json"
+    if not sel_p.exists():
+        return False
+    dec = read_json(sel_p).get("decision") or {}
+    name = dec.get("selected")
+    if not name or not (tdir / name).is_file():
+        return False
+    f = tdir / name
+    st.update({"status": "imported", "take": name, "source": str(f), "adopted": True,
+               "imported_at": dec.get("at") or datetime.now().isoformat(timespec="seconds"),
+               "generated_on": st.get("generated_on") or date.fromtimestamp(f.stat().st_mtime).isoformat()})
+    _songs.save_state(song, st)
+    print(f"   ○ {song['artist']}「{song['title']}」：選んであったテイク（{name}）を引き継いで、仕上げに進めます")
+    return True
+
+
 def _old_master(song: dict) -> bool:
     """古い作り方の仕上げ（音量だけ）のままか。新しい仕上げが使えるときだけ仕上げ直す"""
     try:
@@ -879,9 +903,10 @@ def cmd_scan(args) -> int:
                 song_check.open_window(song)   # 公開の準備の確認ページを開く（進み具合が目で見える）
         except Exception as e:  # noqa: BLE001
             print(f"   － 確認ページを開けませんでした：{e}")
-    # 取り込んだ曲・待っている曲を進める
+    # 取り込んだ曲・待っている曲を進める（手で選んであったテイクも、ここで同じ道に乗せる。決定 178）
     ready = []
     for song in songs:
+        adopt_selected(song)
         st = _songs.state(song)
         if st.get("status") in ("imported", "waiting_ffmpeg", "waiting_cover") or (song["key"] in picked and st.get("status")) \
                 or (st.get("status") == "ready" and _old_master(song)):   # 登録前の曲は、新しい仕上げに直す（決定 168）

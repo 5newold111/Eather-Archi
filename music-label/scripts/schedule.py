@@ -66,7 +66,7 @@ JOBS: dict[str, tuple[str, list[list[str]]]] = {
     "brief":   ("アーティスト管理表の読み込み → 今週のブリーフ（全組）",
                 [["artist_book.py", "pull", "--if-exists"], ["suno_quota.py", "plan", "--quiet"], ["run_week.py", "brief", "--week", "this"],
                  ["daily.py", "make", "--if-active"], ["suno_quota.py", "plan", "--quiet"]]),   # Suno のダウンロード枠に合わせる（決定 105）   # 毎日配信の 21 日先までの曲（決定 94）
-    "auto":    ("歌詞・テイク・仕上げ・登録シート・SNS 準備", [["run_week.py", "auto", "--week", "this"]]),
+    "auto":    ("歌詞の合体・手で置いたテイクの計測・登録データ・SNS 準備（仕上げは取り込みが行う。決定 178）", [["run_week.py", "auto", "--week", "this"]]),
     "growth":  ("成績の回収と成長分析・方針転換", [["collect_metrics.py", "--analyze"], ["apply_pivot.py", "--from-growth"],
                                           ["explore.py", "report"]]),   # 方向性の伸びを学んで、次の曲のくじに返す（決定 96）
     "backup":  ("外付け SSD への保管と R2 への予備保管・管理画面の写し", [["archive_sync.py"], ["backup_r2.py"], ["dashboard.py"]]),   # 写しは 1 日 1 回（決定 173）

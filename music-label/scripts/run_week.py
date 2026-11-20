@@ -5,7 +5,8 @@
   brief   話題曲の取得 → SSD の参考データベースの取り込み → 参考曲の割り当て（Postdog Records＋子レーベル）→ コラボの組み合わせ → Claude がブリーフを書く
   lyrics  Suno が書いた節（<ブリーフ名>.verses.txt）があれば核と合体して最終歌詞に
   takes   Suno のテイク（out/takes/<ブリーフ名>/）があれば計測して選ぶ（Tier A/B/C）
-  finish  音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備 → 外付け SSD に保管
+  finish  登録データ（写し）と登録シート → SNS 投稿の準備（仕上げ・ジャケット・保管は、取り込み〔publish.py scan〕が行う。決定 178）
+          前の説明：音量調整 → ジャケット（生成・3000×3000）→ DistroKid 登録シート → データベース → SNS 投稿の準備 → 外付け SSD に保管
   status  組ごとの進み具合を一覧にする（out/weeks/<週>/status.md）
   auto    lyrics → takes → finish → status（ブリーフは作らない。毎時の定期実行向け。変化が無ければほぼ何もしない）
   all     brief → lyrics → takes → finish を順に。準備ができていない組は飛ばす
@@ -24,7 +25,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 import subprocess
 import sys
 from datetime import date, timedelta
@@ -166,41 +166,17 @@ def stage_takes(week: date, a) -> None:
 
 
 def stage_finish(week: date, a) -> None:
+    """毎時の制作の「まとめ」：SNS 投稿の案と、その元になる登録データ（写し）・登録シートだけ（決定 178）。
+    仕上げ（音）・ジャケット・DistroKid の下書き・公開セット・保管は、取り込み（publish.py scan）の 1 本にまとめた。
+    前は、ここでも同じ仕上げ・ジャケットづくりをして、毎時 SSD への保管を丸ごと動かしていた（二度手間）。
+    out/takes/<ブリーフ名>/ に手で置いて選んだテイクは、取り込みが 10 分以内に引き継いで仕上げる（publish.adopt_selected）"""
     if not briefs_of(week):
         print("  この週のブリーフがありません")
         return
-    has_openai = bool(os.environ.get("OPENAI_API_KEY"))
-    for p in briefs_of(week):
-        b = read_json(p)
-        sel_path = OUT / "takes" / p.stem / "selection.json"
-        sel = read_json(sel_path) if sel_path.exists() else {}
-        if not sel.get("decision", {}).get("selected"):
-            continue
-        if not sel.get("master", {}).get("ok"):
-            step(f"{p.stem}：音量を整えています")
-            run([S / "master_track.py", p])
-        artist = load_artist(b["artist_slug"], b.get("label_slug"))
-        cover_dir = OUT / "visuals" / b["artist_slug"] / "cover" / b["week_start"]
-        if not (cover_dir / "candidates.json").exists() and has_openai:
-            step(f"{p.stem}：ジャケットの候補を作っています")
-            cmd = [S / "generate_visuals.py", "--artist", b["artist_slug"], "--kind", "cover", "--brief", p]
-            if b.get("label_slug") and b["label_slug"] != MAIN_LABEL:
-                cmd += ["--label", b["label_slug"]]
-            run(cmd, quiet=True)
-        if (cover_dir / "selection_cover.json").exists() and not (cover_dir / "cover_final.jpg").exists():
-            step(f"{p.stem}：ジャケットを 3000×3000 に仕上げています")
-            run([S / "finalize_cover.py", p])
-        _ = artist
-    step("DistroKid 登録シートを作っています")
+    step("登録データ（SNS 投稿の案が読む写し）と登録シートを合わせています")
     run([S / "distrokid_sheet.py", "--week", week.isoformat()])
-    # Supabase のデータベースへの写し（supabase_sync.py week）は、ここでは動かさない（決定 177）：
-    # 毎時、曲の記録・音源・ジャケットを Supabase に上げていたが、ダッシュボード・管理表・Notion・成長分析のどれも読んでいなかった。
-    # 予備保管は R2（backup_r2.py）、見る場所は Notion。Instagram に動画を渡すときの一時置き場（post_social.py）だけは、これまでどおり Supabase を使う。
-    # 手で写したいときは  python3 scripts/supabase_sync.py week --week <週> --apply
     step("SNS 投稿の準備（縦動画と説明文）をしています")
     run([S / "post_social.py", "plan", "--week", week.isoformat()])
-    step("外付け SSD に保管しています（つながっていなければ飛ばします）")
-    run([S / "archive_sync.py"])
 
 
 # ---------------------------------------------------------------------------

@@ -205,7 +205,8 @@ def main() -> None:
                     lyrics_language=None if r["instrumental"] else (load_artist(r["artist_slug"], r["label_slug"]).get("lyrics") or {}).get("primary_language", "en"),
                     isrc=old.get("isrc"), upc=old.get("upc"), distrokid_release_id=old.get("distrokid_release_id"),
                     status=old.get("status", "planned"))
-        write_json(meta_path, meta)
+        if {**old, **meta} != old:   # 変わったときだけ書く。毎時書き直すと、これより古い縦動画が毎時作り直される（決定 178）
+            write_json(meta_path, {**old, **meta})
         if titles.get(r["artist_slug"]):
             b = read_json(bp)
             b["title"] = titles[r["artist_slug"]]
