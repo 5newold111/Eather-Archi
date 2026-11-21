@@ -1,0 +1,12 @@
+# 診断の記録 2026-11-21T15:41:32
+システムの版：52e784b
+Playwright の入った Python：あり
+OWNER_LEGAL_NAME：なし
+POSTDOG_CHROME：なし
+POSTDOG_BROWSER_PROFILE：なし
+POSTDOG_BROWSER_EXECUTABLE：なし
+POSTDOG_CHROME_ARGS：なし
+POSTDOG_DISTROKID_URL：なし
+POSTDOG_AUTOCONTINUE：なし
+
+## ブラウザの自動入力の記録：まだありません（ダッシュボードから自動入力を 1 回動かしてから送ってください）
