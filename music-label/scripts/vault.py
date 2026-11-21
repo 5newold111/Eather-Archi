@@ -329,6 +329,14 @@ def save_key(name: str, value: str, backup_after: str | bool = "thread") -> dict
         return {"ok": False, "error": "値が空です"}
     if len(value) > 4096 or any(c in value for c in "\r\n\0"):
         return {"ok": False, "error": "値に改行が入っているか、長すぎます（鍵だけを貼ってください）"}
+    try:   # 形の確かめ（R2 の Account ID にメールアドレス・Claude の鍵に鍵の ID など。決定 180）。住所を貼ったときは中身を取り出す
+        import setup_keys
+        got, note = setup_keys.tidy(name, value)
+        if got is None:
+            return {"ok": False, "error": note.lstrip("✕ ")}
+        value = got
+    except ImportError:
+        pass
     with _LOCK:
         _write_env(name, value)
         os.environ[name] = value

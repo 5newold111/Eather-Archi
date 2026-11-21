@@ -286,7 +286,7 @@ SERVICES = {
         "title": "Claude（ブリーフ・話題曲・画像の採点・新人の下書き）",
         "url": "https://console.anthropic.com/settings/keys",
         "steps": ["Create Key を押す → 名前を付ける（例 etherarchi-label）",
-                  "表示された sk-ant- で始まる鍵をコピー（画面を閉じると二度と見られない）",
+                  "作った直後に 1 回だけ出る、sk-ant- で始まる長い鍵をコピー（一覧の apikey_… は鍵の ID なので使えない。画面を閉じると二度と見られない）",
                   "Settings → Billing に残高があるか確認（月 2,000〜3,000 円が目安）"],
         "keys": [("ANTHROPIC_API_KEY", True)], "check": check_anthropic},
     "openai": {
@@ -308,7 +308,8 @@ SERVICES = {
         "url": "https://dash.cloudflare.com/?to=/:account/r2/overview",
         "steps": ["R2 を有効にする → Create bucket：名前 label-backup、公開アクセスはオフのまま",
                   "Manage R2 API Tokens → Create API token：権限 Object Read & Write、対象 label-backup だけ",
-                  "Account ID（右側）、Access Key ID、Secret Access Key をコピー"],
+                  "Account ID（R2 の画面の右側。英数字 32 文字。メールアドレスではありません）、Access Key ID、Secret Access Key をコピー。"
+                  "Account ID の代わりに S3 API の住所（https://…r2.cloudflarestorage.com/…）を貼っても大丈夫"],
         "keys": [("R2_ACCOUNT_ID", False), ("R2_ACCESS_KEY_ID", True), ("R2_SECRET_ACCESS_KEY", True), ("R2_BUCKET", False)],
         "check": check_r2},
     "notion": {
@@ -376,7 +377,46 @@ SERVICES = {
 MARK = {"ok": "○", "ng": "✕", "none": "－"}
 
 
+HIDE = {"OWNER_LEGAL_NAME"}   # 鍵ではないが、画面に残さない（ターミナルの表示をそのまま人に送っても、本名が出ないように。決定 180）
+HEX32 = re.compile(r"[0-9a-f]{32}")
+
+
+def tidy(name: str, v: str) -> tuple[str | None, str]:
+    """貼られた値を整える。(使う値〔形が違えば None〕, 画面に出す説明)"""
+    if name == "R2_ACCOUNT_ID":
+        m = re.search(r"([0-9a-f]{32})\.r2\.cloudflarestorage\.com", v.lower()) or HEX32.fullmatch(v.lower())
+        if m:
+            got = m.group(1) if m.groups() else m.group(0)
+            return got, ("（住所から、アカウント ID の 32 文字だけを取り出しました）" if got != v.lower() else "")
+        why = "メールアドレスではなく、" if "@" in v else ""
+        return None, (f"✕ {why}Account ID（英数字 32 文字）を入れてください。R2 の画面の右側の「Account ID」、"
+                      "または「S3 API」の住所（https://〈32 文字〉.r2.cloudflarestorage.com/…）をそのまま貼っても大丈夫です")
+    if name == "R2_BUCKET" and "cloudflarestorage.com/" in v:
+        return v.rstrip("/").rsplit("/", 1)[-1], "（住所から、バケットの名前だけを取り出しました）"
+    if name == "ANTHROPIC_API_KEY" and not v.startswith("sk-ant-"):
+        return None, ("✕ これは鍵ではありません（" + (f"{len(v)} 文字・先頭 {v[:3]}…" if v else "空") + "）。"
+                      "Create Key を押した直後に 1 回だけ出る、sk-ant- で始まる長い文字列（100 文字ほど）をコピーしてください。"
+                      "一覧に出ている apikey_… や名前は、鍵の ID なので使えません。見逃したら、もう 1 つ Create Key で作り直します")
+    return v, ""
+
+
 def ask_key(name: str, secret: bool) -> str | None:
+    for _ in range(3):   # 形が違えば、その場で入れ直してもらう（3 回まで）
+        v = _ask_key(name, secret)
+        if v is None:
+            return None
+        got, note = tidy(name, v)
+        if note:
+            print("   " + note)
+        if got:
+            if name in HIDE:
+                print(f"   （{len(got)} 文字を受け取りました。画面には出しません）")
+            return got
+    return None
+
+
+def _ask_key(name: str, secret: bool) -> str | None:
+    secret = secret or name in HIDE
     current = env(name)
     note = "（設定済み。Enter だけで今の値のまま）" if current else ""
     if name == "R2_BUCKET" and not current:
@@ -391,7 +431,7 @@ def ask_key(name: str, secret: bool) -> str | None:
     if unit:
         print(f"   （同じ値が {len(v) // len(unit)} 回貼られていたので 1 回分にしました）")
         v = unit
-    want = PREFIX.get(name)
+    want = PREFIX.get(name) if name != "ANTHROPIC_API_KEY" else None   # Claude の鍵は tidy() が確かめて、入れ直してもらう
     if want and not v.startswith(want):
         print(f"   ⚠ 先頭が {want} ではありません（{len(v)} 文字、先頭 {v[:3]}…）。鍵の ID や別の文字列を貼っていないか確認")
         if input("   このまま保存しますか？ (y/N): ").strip().lower() != "y":
@@ -441,11 +481,21 @@ def run_service(key: str, redo: bool) -> tuple[str, str]:
         load_dotenv()
         for k, v in _read_env().items():
             os.environ[k] = v
-    for attempt in range(2):
+    for attempt in range(3):
         state, msg = s["check"]()
         print(f"   {MARK[state]} {msg}")
-        if state == "ok" or input("   もう一度確かめますか？（直したら y）[y/N]: ").strip().lower() != "y":
+        if state == "ok":
             break
+        ans = input("   入れ直しますか？（y で入れ直す・Enter でこのサービスは後回し）: ").strip()
+        if not ans or ans.lower() in ("n", "no", "s"):
+            break
+        if ans.lower() not in ("y", "yes"):
+            print("   （ここには y か Enter を入れます。値は、このあとの欄に入れてください）")
+        for name, secret in s["keys"]:   # 入れ直す（Enter だけなら、いまの値のまま）
+            v = ask_key(name, secret)
+            if v:
+                save_env(name, v)
+                os.environ[name] = v
     if key == "notion" and state == "ok":
         print("   ▶ Notion に表を作って、いまの状態を写しています（数分かかることがあります）")
         subprocess.run([sys.executable, str(ROOT / "scripts" / "notion_sync.py")], check=False)
