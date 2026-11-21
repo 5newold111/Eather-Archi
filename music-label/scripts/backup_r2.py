@@ -11,7 +11,8 @@
     ・アーティスト管理表（artists.xlsx）と提案（proposals/）、管理表の読み込みの記録
     ・外付け SSD（DS72）の保管庫の中身すべて … 管理表（アーティスト情報.xlsx・楽曲管理.xlsx）・写真・ジャケット・楽曲・作業書
       （SSD がつながっているときだけ。09_移行前 と _old の写しは上げない）
-  上げないもの：鍵（.env）、没テイクの音源、ログ
+    ・曲ごとの進み具合の記録（out/publish/state/）・下書き・ピッチ・各種の設定と記録（決定 179。Mac の初期化・買い替えに備える）
+  上げないもの：鍵（.env。鍵は金庫 vault.py が暗号にして預ける）、没テイクの音源、ログ
 
   R2 側の置き場所：<バケット>/label/<music-label からの相対パス>、SSD の中身は <バケット>/label/ssd/<保管庫からの相対パス>
 
@@ -53,6 +54,15 @@ PATTERNS = [
     "out/references/*.json", "out/collabs/*.json", "out/social/*/*/plan.json",
     "templates/**/*.json",
     "artists.xlsx", "proposals/**/*.json", "proposals/**/*.md", "out/artist_book/snapshots/*.json",
+    # Mac の中にしか無い「記録」（決定 179）：これが無いと、Mac を初期化・買い替えたときに、どの曲がどこまで進んだか（登録済み・配信中・ISRC・
+    # 聴いて確かめた印）が分からなくなる。前はここに入っていなかった
+    "out/publish/state/*.json", "out/publish/imported.json", "out/publish/renames.json", "out/publish/meta_migrated.json",
+    "out/publish/*/DistroKid下書き.json", "out/publish/*/DistroKid下書き.md", "out/publish/*/ピッチ.md", "out/publish/*/pitch.json",
+    "out/visuals/*/cover/*/cover_final_notext.jpg", "out/visuals/*/cover/*/cover_final.text.json",
+    "out/knowledge/*.json", "out/reference_db/influences.json", "out/irregular/drafts/*.json",
+    "out/daily/settings.json", "out/social/daily_settings.json", "out/explore/settings.json", "out/suno/*.json",
+    "out/mastering/settings.json", "out/mastering/targets.json", "out/money/*.json", "out/plays/snapshots.json",
+    "out/notion/map.json", "out/lyrics_ja/*.json", "debut_kit/*/kit.json", "debut_kit/*/images/*.jpg",
 ]
 CTYPE = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".jpg": "image/jpeg", ".png": "image/png", ".json": "application/json",
          ".md": "text/markdown; charset=utf-8", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv; charset=utf-8",

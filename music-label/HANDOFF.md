@@ -54,7 +54,7 @@
 | Notion | 段階 1：状態を写す（`notion_sync.py`。30 分ごと。決定 167）。つなぐ作業の途中（内部コネクションの作成待ち） |
 | 曲名と配信の記録の正本 | 曲名＝ブリーフの title（デビュー曲は作業セットの kit.json）、状態・配信日・ISRC・UPC・住所＝曲の記録（out/publish/state）。登録データ（metadata.json）は自動の写しで、直接は書き換えない。曲名を変えるのは、曲のポップアップの「曲名を変える」（`publish.py rename`。決定 177） |
 | 仕上げの流れは 1 本 | 曲を仕上げるのは取り込み（`publish.py scan`：見分け → 質の確認 → 仕上げ → ジャケット → 下書き → 公開セット）だけ。毎時の制作（`run_week.py auto`）は、歌詞の合体と SNS の準備だけ（決定 178） |
-| 決めたこと | `docs/12_decisions.md`（1〜178） |
+| 決めたこと | `docs/12_decisions.md`（1〜179） |
 | 管理表の使い方 | `docs/13_artist_book.md` |
 | 保管の現状と見直す点（SSD） | `docs/14_storage.md` |
 | 参考データベースの組ごとの近い曲 | `out/reference_db/artists.md`（`python3 scripts/reference_db.py --artists` で作り直し。決定 27） |
