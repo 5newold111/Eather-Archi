@@ -1,0 +1,37 @@
+# 診断の記録 2026-10-29T15:57:23
+システムの版：bd04e16
+Playwright の入った Python：あり
+OWNER_LEGAL_NAME：あり（ローマ字の名 姓）
+POSTDOG_CHROME：なし
+POSTDOG_BROWSER_PROFILE：なし
+POSTDOG_BROWSER_EXECUTABLE：なし
+POSTDOG_CHROME_ARGS：なし
+POSTDOG_DISTROKID_URL：なし
+POSTDOG_AUTOCONTINUE：なし
+
+## ブラウザの自動入力の記録：20261029-155259.txt
+ブラウザで入力（DistroKid：DECLAN FAY「Either Side」）（incomplete）
+~/Eather-Archi/music-label/scripts/browser_fill.py:1356: SyntaxWarning: "\/" is an invalid escape sequence. Such sequences will not work in the future. Did you mean "\\/"? A raw string is also an option.
+  upload_words: /upload|new release|add a track|artist\/band name/i.test(t)};
+【進み具合】1/1 曲目：DECLAN FAY「Either Side」
+【工程】0/23：DistroKid の登録画面を開いています
+【結果】まだ終わっていません：Spotify のアーティストのページがわかるまで待ちます
+
+## 最後のエラー（2026-10-25T18:05:16）
+about:blank
+Traceback (most recent call last):
+  File "~/Eather-Archi/music-label/scripts/browser_fill.py", line 3176, in main
+    code = run_photo(sess, a.args[0], a.args[1])
+  File "~/Eather-Archi/music-label/scripts/browser_fill.py", line 3020, in run_photo
+    imgs = artist_photo.prepare(slug)
+  File "~/Eather-Archi/music-label/scripts/artist_photo.py", line 80, in prepare
+    from PIL import Image
+ModuleNotFoundError: No module named 'PIL'
+
+
+## 覚えた画面の部品（DistroKid）
+{
+ "distrokid": {
+  "genre1": "#albumuuid"
+ }
+}
