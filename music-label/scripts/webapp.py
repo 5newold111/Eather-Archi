@@ -623,7 +623,9 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
                           f" && {shlex.quote(PY)} -m playwright install chromium",
             "schedule": [PY, "scripts/schedule.py", "install"],
             # 歌詞を聞き取る部品（決定 86）。最初の聞き取りのときに、モデル（約 500 MB）を自動でダウンロードする
-            "whisper": f"{{ {shlex.quote(PY)} -m pip install --user faster-whisper || {shlex.quote(PY)} -m pip install --user --break-system-packages faster-whisper; }}",
+            "whisper": (f"{shlex.quote(PY)} -m pip install av ctranslate2 tokenizers huggingface-hub tqdm && {shlex.quote(PY)} -m pip install --no-deps faster-whisper"
+                        if sys.version_info >= (3, 15) else   # 3.15：onnxruntime（声の区間を見つける部品）にまだ 3.15 版が無いので外して入れる（決定 180）
+                        f"{{ {shlex.quote(PY)} -m pip install faster-whisper || {shlex.quote(PY)} -m pip install --user faster-whisper || {shlex.quote(PY)} -m pip install --user --break-system-packages faster-whisper; }}"),
             # メロディーを起こすときに歌を正確に取り出す部品（任意。約 2 GB。決定 90）
             "demucs": f"{{ {shlex.quote(PY)} -m pip install --user demucs || {shlex.quote(PY)} -m pip install --user --break-system-packages demucs; }}",
             # 曲を聞いて声・楽器・ジャンル・ムードを判定する部品（約 1 GB。判定モデル 約 350 MB は最初の判定のときに取ってくる。決定 103）

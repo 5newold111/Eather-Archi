@@ -505,7 +505,13 @@ def transcribe(f: Path) -> dict:
     from faster_whisper import WhisperModel
     if _WM is None:
         _WM = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
-    segs, info = _WM.transcribe(str(f), vad_filter=True, beam_size=5, condition_on_previous_text=False)
+    try:   # 声の区間を見つける機能（onnxruntime が要る）。Python 3.15 ではまだ入らないので、無ければ使わずに聞き取る（決定 180）
+        import onnxruntime  # noqa: F401
+        vad = True
+    except ImportError:
+        vad = False
+    segs, info = _WM.transcribe(str(f), vad_filter=vad, beam_size=5, condition_on_previous_text=False,
+                                **({} if vad else {"no_speech_threshold": 0.5, "log_prob_threshold": -0.8}))   # 区間を見ないぶん、声の無い所の聞き違いを強めに落とす
     segs = [x for x in segs if (x.text or "").strip()]
     lines, prev_end = [], None
     for x in segs:

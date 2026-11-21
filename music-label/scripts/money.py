@@ -877,7 +877,7 @@ def main() -> None:
     a.add_argument("--item", required=True)
     a.add_argument("--amount", required=True)
     a.add_argument("--currency", default="JPY")
-    a.add_argument("--pct", default="100", help="事業の割合 %（費用だけ）")
+    a.add_argument("--pct", default="100", help="事業の割合 %%（費用だけ）")
     a.add_argument("--artist", default="")
     a.add_argument("--memo", default="")
     d = sub.add_parser("delete", help="1 件取り消す")

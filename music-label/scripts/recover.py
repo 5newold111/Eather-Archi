@@ -451,7 +451,7 @@ def check_parts() -> dict:
         for line in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
             line = line.split("#", 1)[0].strip()
             m = re.match(r"[A-Za-z0-9_.\-]+", line)
-            if m:
+            if m and m.group(0) not in names:
                 names.append(m.group(0))
     except OSError:
         pass

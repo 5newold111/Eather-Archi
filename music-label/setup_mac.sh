@@ -8,8 +8,8 @@
 #   すること（上から順に。何度流しても安全。もう入っているものは飛ばす）
 #     1 開発者ツール（git など）    … 無ければ、入れる命令を表示して止まる（画面のボタンを押す操作が要るため）
 #     2 Homebrew（道具を入れる仕組み）… 無ければ、入れる命令を表示して止まる（Mac のパスワードの入力が要るため）
-#     3 ffmpeg（音を扱う道具）と Python 3.12 … Homebrew で入れる
-#          Mac に最初から入っている Python（3.9）は古く、出たばかりの版（3.15 など）は部品がまだ対応していない
+#     3 ffmpeg（音を扱う道具）と新しい Python（Homebrew の最新。いまは 3.15）… Homebrew で入れる
+#          Mac に最初から入っている Python（3.9）は古くて、この仕組みは動かない
 #     4 Python の部品（requirements.txt）… この仕組み専用の置き場（music-label/.venv）を作って、そこに入れる
 #     5 Chrome があるかを見る
 #     6 立て直しの点検（python3 scripts/recover.py check）を出す
@@ -84,13 +84,16 @@ else
   say "   ✕ ffmpeg がありません（仕上げ・解析・縦動画づくりに要ります）"
 fi
 
-# Python の版：部品（音の解析・歌詞の聞き取りなど）は、出たばかりの版にはまだ対応していないことが多い（3.15 では入らなかった）。
-# 実績のある版（3.12 → 3.13 → 3.11 → 3.14 の順）を使う。それより新しい版しか無ければ、3.12 を入れる（決定 180）
-py_ok() { [ -x "$1" ] && "$1" -c 'import sys; sys.exit(0 if (3, 10) <= sys.version_info[:2] <= (3, 14) else 1)' 2>/dev/null; }
-find_py() {
+# Python の版：Homebrew の最新の Python（2026-11 時点で 3.15）を使う。3.10 より古いもの（Mac に最初から入っている 3.9）は使わない（決定 180）
+py_ok() { [ -x "$1" ] && "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; }
+py_ver() { "$1" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null; }
+find_py() {   # Homebrew の python3（いちばん新しい版）→ 版の番号つきのもの（新しい順）→ いま python3 と打って動くもの
   PREFIX=""
   [ -n "$BREW" ] && PREFIX="$("$BREW" --prefix 2>/dev/null)"
-  for v in 3.12 3.13 3.11 3.14 3.10; do
+  for d in "$PREFIX/bin" /opt/homebrew/bin /usr/local/bin; do
+    if [ -n "$d" ] && py_ok "$d/python3"; then printf '%s' "$d/python3"; return 0; fi
+  done
+  for v in 3.15 3.14 3.13 3.12 3.11 3.10; do
     for d in "$PREFIX/bin" /opt/homebrew/bin /usr/local/bin; do
       if [ -n "$d" ] && py_ok "$d/python$v"; then printf '%s' "$d/python$v"; return 0; fi
     done
@@ -101,24 +104,24 @@ find_py() {
 }
 BASEPY="$(find_py || true)"
 if [ -z "$BASEPY" ] && [ -n "$BREW" ] && [ $CHECK = 0 ]; then
-  say "   ・Python 3.12 を入れています（Mac に最初から入っている 3.9 は古く、いちばん新しい版は部品がまだ対応していないため。数分かかります）"
-  "$BREW" install python@3.12 || say "   ✕ Python を入れられませんでした（上の表示を見てください）"
+  say "   ・新しい Python を入れています（Mac に最初から入っている 3.9 は古いため。数分かかります）"
+  "$BREW" install python || say "   ✕ Python を入れられませんでした（上の表示を見てください）"
   BASEPY="$(find_py || true)"
 fi
 if [ -n "$BASEPY" ]; then
   say "   ○ $("$BASEPY" --version 2>&1)（${BASEPY}）"
 else
-  say "   ✕ 使える Python（3.10〜3.14）がありません。いまあるもの：$(python3 --version 2>&1 || echo なし)"
+  say "   ✕ 新しい Python（3.10 以上）がありません。いまあるもの：$(python3 --version 2>&1 || echo なし)"
 fi
 
 # ---- 4 Python の部品（この仕組み専用の置き場 .venv に入れる。Mac のほかの Python には手を入れない）
 head_ "4. Python の部品（requirements.txt）"
 VENV="$PWD/.venv"
 PY=""
-if [ -x "$VENV/bin/python3" ] && py_ok "$VENV/bin/python3"; then
-  PY="$VENV/bin/python3"
+if [ -x "$VENV/bin/python3" ] && py_ok "$VENV/bin/python3" && { [ -z "$BASEPY" ] || [ "$(py_ver "$VENV/bin/python3")" = "$(py_ver "$BASEPY")" ]; }; then
+  PY="$VENV/bin/python3"     # 置き場の Python の版が、使う Python と同じなら、そのまま使う
 elif [ -n "$BASEPY" ] && [ $CHECK = 0 ]; then
-  [ -d "$VENV" ] && rm -rf "$VENV"      # 版が合わない古い置き場は作り直す（中身は部品だけ。記録や鍵は入っていない）
+  [ -d "$VENV" ] && say "   ・置き場の Python の版が変わったので、作り直します" && rm -rf "$VENV"   # 中身は部品だけ（記録や鍵は入っていない）
   say "   ・この仕組み専用の部品の置き場（.venv）を作っています"
   if "$BASEPY" -m venv "$VENV"; then PY="$VENV/bin/python3"; else say "   ✕ 置き場を作れませんでした（上の表示を見てください）"; fi
 fi
@@ -140,6 +143,17 @@ else
       if "$PY" -m pip install --quiet "$pkg" >/dev/null 2>&1; then say "     ○ ${pkg}"; else say "     ✕ ${pkg}"; FAILED="$FAILED $pkg"; fi
     done < requirements.txt
     if [ -z "$FAILED" ]; then say "   ○ 部品が入りました"; else say "   ✕ 入らなかった部品：${FAILED}（この行をそのまま伝えてください）"; fi
+  fi
+  # 歌詞の聞き取りの部品（faster-whisper）：Python 3.15 では、頼っている onnxruntime（声の区間を見つける部品）にまだ 3.15 版が無い。
+  # onnxruntime を外して入れる（聞き取りは onnxruntime が無くても動く）。3.14 までは上の一覧で、ふつうに入る
+  if ! "$PY" -c 'import faster_whisper' >/dev/null 2>&1; then
+    say "   ・歌詞の聞き取りの部品を、この Python の版に合わせて入れています"
+    if "$PY" -m pip install --quiet av ctranslate2 tokenizers huggingface-hub tqdm && "$PY" -m pip install --quiet --no-deps faster-whisper \
+       && "$PY" -c 'import faster_whisper' >/dev/null 2>&1; then
+      say "     ○ faster-whisper（声の区間を見つける部品は、3.15 版が出るまで使わずに聞き取ります）"
+    else
+      say "     ✕ faster-whisper（歌詞の聞き取りだけが使えません。ほかは動きます）"
+    fi
   fi
   if [ $MAC = 1 ]; then    # 新しいターミナルで python3 と打つと、この置き場の Python になるように（1 回だけ書く）
     PROFILE="$HOME/.zprofile"
