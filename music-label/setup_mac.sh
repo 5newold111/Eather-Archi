@@ -62,7 +62,7 @@ if [ -z "$BREW" ]; then
       '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
   fi
 else
-  say "   ○ $("$BREW" --version 2>/dev/null | head -1)（$BREW）"
+  say "   ○ $("$BREW" --version 2>/dev/null | head -1)（${BREW}）"
   eval "$("$BREW" shellenv 2>/dev/null)"   # この台本の中で、Homebrew の道具を使えるようにする
   if [ $MAC = 1 ] && [ $CHECK = 0 ]; then    # 新しいターミナルでも python3・ffmpeg が Homebrew のものになるように（1 回だけ書く）
     PROFILE="$HOME/.zprofile"
@@ -104,7 +104,7 @@ if [ -z "$PY" ] && [ -n "$BREW" ] && [ $CHECK = 0 ]; then
   PY="$(find_py || true)"
 fi
 if [ -n "$PY" ]; then
-  say "   ○ $("$PY" --version 2>&1)（$PY）"
+  say "   ○ $("$PY" --version 2>&1)（${PY}）"
 else
   say "   ✕ 新しい Python（3.10 以上）がありません。いまあるもの：$(python3 --version 2>&1 || echo なし)"
 fi
