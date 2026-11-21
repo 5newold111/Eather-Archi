@@ -93,6 +93,12 @@ class RecoverFromSsdTest(unittest.TestCase):
         p.reload()
         sb = p.mod("song_book")
         rows = sb.merge(sb.debut_rows() + sb.weekly_rows(), {})
+        # 同じアーティスト・同じ曲名の行（実機の台帳にあった形）：配信中のデビュー曲と同じ曲名の「取り込み」の行と、登録前の曲の古い週の行
+        ready_row = next(r for r in rows if r["曲名"] == "Low Tide")
+        side_b = next(r for r in rows if r["曲名"] == "Side B")
+        cls.dup_live = {**ready_row, "曲 ID": f"{p.week(-3)}_declan_fay", "アーティスト": side_b["アーティスト"], "曲名": "Side B", "ISRC": "", "UPC": "", "配信 URL": ""}
+        cls.dup_old = {**ready_row, "曲 ID": f"{p.week(-4)}_tidewool"}
+        rows = rows + [cls.dup_live, cls.dup_old]
         book = p.ssd / "01_管理表" / "楽曲管理.xlsx"
         try:
             import openpyxl  # noqa: F401
@@ -160,7 +166,7 @@ class RecoverFromSsdTest(unittest.TestCase):
 
     def test_check_counts_the_ssd(self):
         inv = self.before["inventory"]
-        self.assertEqual(inv["book_rows"], 6)
+        self.assertEqual(inv["book_rows"], len(self.rows))
         self.assertEqual({a["name"]: a["songs"] for a in inv["artists"]}, {"DECLAN FAY": 2, "HOLLOWPLAN": 2, "TIDEWOOL": 2})
         self.assertEqual(sum(x["count"] for x in inv["refs"]["audio"]), 1)
         self.assertEqual(sum(x["count"] for x in inv["refs"]["melody"]), 1, "名前が二重になった MIDI のフォルダも数える")
@@ -220,6 +226,25 @@ class RecoverFromSsdTest(unittest.TestCase):
         images = self.p.root / "debut_kit" / KIT_DAY / "images"
         self.assertTrue((images / "declan_fay_cover.jpg").exists(), "デビュー曲のジャケット（GitHub に入らない画像）")
         self.assertTrue((images / "declan_fay_photo.jpg").exists(), "デビュー用の写真")
+
+    def test_same_title_is_restored_only_once(self):
+        """同じ曲名の行は、いちばん進んだ 1 行だけ戻す（配信中の曲を、もう一度登録の流れに乗せない）"""
+        held = {h["id"]: h for h in self.res["held"]}
+        self.assertIn(self.dup_live["曲 ID"], held)
+        self.assertEqual(held[self.dup_live["曲 ID"]]["kept_id"], next(r["曲 ID"] for r in self.rows if r["曲名"] == "Side B"))
+        self.assertIn(self.dup_old["曲 ID"], held, "同じ段階なら、新しい週の行を残す")
+        self.assertEqual(held[self.dup_old["曲 ID"]]["kept_id"], self.ready)
+        for sid in (self.dup_live["曲 ID"], self.dup_old["曲 ID"]):
+            self.assertFalse((self.p.out / "publish" / "state" / f"{sid}.json").exists())
+            self.assertFalse((self.p.out / "briefs" / f"{sid}.json").exists())
+            self.assertFalse((self.p.out / "takes" / sid).exists())
+        self.assertEqual(self.p.state(self.debut)["status"], "live")
+        self.assertEqual(self.p.state(self.ready)["status"], "imported")
+        self.assertEqual(self.res["rows"], len(self.rows))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.rec.print_from_ssd(self.dry)
+        self.assertIn("同じ曲名の行（2 行）：戻しません", out.getvalue())
 
     def test_registered_song_keeps_its_release_date(self):
         st = self.p.state(self.reg)

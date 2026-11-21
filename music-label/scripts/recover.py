@@ -675,6 +675,7 @@ class Plan:
         self.kept = 0                # もうあるので触らなかった数
         self.audio = True            # 登録済み・配信中の曲の、配信用の音源も写すか
         self.used: set = set()       # 台帳の行と結び付いた、SSD の曲のフォルダ
+        self.held: list = []         # 同じ曲名の行が 2 つ以上あって、戻さなかった行
 
     def copy(self, src: Path, dst: Path) -> bool:
         """無いときだけ写す（もうあれば触らない）。写した・写す予定なら True"""
@@ -696,6 +697,32 @@ class Plan:
             dst.parent.mkdir(parents=True, exist_ok=True)
             dst.write_text(data if isinstance(data, str) else json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         return True
+
+
+def _rank(row: dict) -> tuple:
+    """台帳の行の進み具合（大きいほど先）：フェーズの番号 → ISRC があるか → 制作週（新しいほう）"""
+    ph = _text(row.get("フェーズ"))[:1]
+    return (int(ph) if ph.isdigit() else 0, 1 if _text(row.get("ISRC")) else 0, _text(row.get("曲 ID")))
+
+
+def _one_per_title(rows: list) -> tuple:
+    """同じアーティスト・同じ曲名の行が 2 つ以上あれば、いちばん進んだ 1 行だけを戻す（決定 180）。
+    配信中の曲と同じ曲名の行を「取り込み済み」で戻すと、仕上げ直し → 下書き → DistroKid への登録へ進み、同じ曲を二重に配信しかねないため。
+    返り値：(戻す行, [(戻さない行, 代わりに戻す行)])"""
+    groups: dict = {}
+    for r in rows:
+        k = (_norm(r.get("アーティスト")), _norm(r.get("曲名")))
+        groups.setdefault(k, []).append(r)
+    keep, held = [], []
+    winners = {id(max(g, key=_rank)): g for k, g in groups.items() if k[1]}
+    for r in rows:
+        k = (_norm(r.get("アーティスト")), _norm(r.get("曲名")))
+        g = groups[k]
+        if not k[1] or len(g) == 1 or id(r) in winners:
+            keep.append(r)
+        else:
+            held.append((r, max(g, key=_rank)))
+    return keep, held
 
 
 def _target_status(row: dict, files: dict) -> str:
@@ -967,6 +994,10 @@ def from_ssd(apply: bool = False, ssd: str | None = None, audio: bool = True) ->
     _restore_artists(plan, base, common)
     debut = songs_m.debut_songs()
     seen_keys = set()
+    rows, held = _one_per_title(rows)
+    for row, winner in held:   # 同じアーティスト・同じ曲名の 2 行目以降：戻さない（もう一度登録して、同じ曲を二重に配信しないため）
+        plan.held.append({"id": _text(row.get("曲 ID")), "artist": _text(row.get("アーティスト")), "title": _text(row.get("曲名")),
+                          "phase": _text(row.get("フェーズ")), "kept_id": _text(winner.get("曲 ID")), "kept_phase": _text(winner.get("フェーズ"))})
     for row in rows:
         sid, artist, title = _text(row.get("曲 ID")), _text(row.get("アーティスト")), _text(row.get("曲名"))
         m = re.match(r"^(\d{4}-\d{2}-\d{2})_(.+)$", sid)
@@ -1010,7 +1041,7 @@ def from_ssd(apply: bool = False, ssd: str | None = None, audio: bool = True) ->
             plan.review.append(f"{_nfc(adir.name)}：SSD に曲のフォルダはありますが、台帳（{BOOK_NAME}）に行が無い曲 → " + "・".join(loose)
                                + "（記録は作りません。配信中の曲なら、台帳に行を足してからもう一度）")
     sheets = _restore_sheets(plan, inv)
-    res = {"apply": apply, "base": str(base), "rows": len(rows), "songs": plan.songs, "artists": plan.artists, "failed": plan.failed,
+    res = {"apply": apply, "base": str(base), "rows": len(rows) + len(plan.held), "held": plan.held, "songs": plan.songs, "artists": plan.artists, "failed": plan.failed,
            "review": plan.review, "sheets": sheets, "written": plan.written, "kept": plan.kept, "inbox": inv["inbox"], "never": NEVER, "at": now}
     if apply:
         log = RESTORE / f"from_ssd_{stamp}.json"
@@ -1039,6 +1070,14 @@ def print_from_ssd(res: dict) -> None:
     for s in res["songs"]:
         counts[s["status"]] = counts.get(s["status"], 0) + 1
     print("   段階ごと：" + ("・".join(f"{STATUS_JA.get(k, k).split('（')[0]} {v} 曲" for k, v in counts.items()) or "—"))
+    if res.get("held"):
+        print(f"\n■ 同じ曲名の行（{len(res['held'])} 行）：戻しません")
+        print("   同じアーティスト・同じ曲名の行が台帳に 2 つ以上ありました。いちばん進んだ行だけを戻します。")
+        print("   （配信中の曲と同じ曲を「仕上げ直し」で戻すと、DistroKid にもう一度登録して、二重に配信しかねないため）")
+        for h in res["held"]:
+            print(f"   ・{h['artist']}「{h['title']}」 {h['id']}（{h['phase'] or 'フェーズなし'}） → 戻さない"
+                  f"／代わりに戻す行：{h['kept_id']}（{h['kept_phase'] or 'フェーズなし'}）")
+        print("   別の新しい曲だった場合は、SSD の楽曲管理.xlsx でその行の曲名を変えてから、もう一度流すと戻ります")
     print(f"\n■ アーティスト（{len(res['artists'])} 組）")
     for a in res["artists"]:
         print(f"   {'○' if a['got'] else '・'} {a['name']}：" + ("・".join(a["got"]) if a["got"] else "戻すものはありません（設定書は GitHub にあります）"))
@@ -1065,7 +1104,7 @@ def print_from_ssd(res: dict) -> None:
         print("   － " + l)
     if res["apply"]:
         print(f"\n   記録：{res.get('log', '')}")
-        print("【次にすること】ダッシュボードの「点検して自動で直す」（ターミナルなら  python3 scripts/health.py heal ）を 1 回。"
+        print("【次にすること】鍵を入れたあと、ダッシュボードの「点検して自動で直す」（ターミナルなら  python3 scripts/health.py heal ）を 1 回。"
               "登録前の曲の仕上げ直しと、下書きの作り直しが動きます。そのあと  python3 scripts/recover.py cloud")
         print(f"【結果】{res['written']} 件を戻しました（もうあったので触らなかったもの {res['kept']} 件・戻せなかった行 {len(res['failed'])} 件）")
     else:

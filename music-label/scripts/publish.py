@@ -1273,9 +1273,45 @@ def find_on_spotify(token: str, song: dict) -> dict | None:
     return None
 
 
+FILL_KEYS = ("isrc", "upc", "url")   # 配信中の曲で、空いていれば Spotify から埋める（決定 180）
+
+
+def fill_live(token: str) -> bool:
+    """配信中なのに ISRC・UPC・配信の住所が空の曲（SSD の台帳から立て直した曲など）を、Spotify から埋める。
+    空いている欄だけ書く（書いてある値は変えない）。通知はしない"""
+    changed = False
+    for song in _songs.all_songs():
+        st = _songs.state(song)
+        if st.get("status") != "live" or all(st.get(k) for k in FILL_KEYS):
+            continue
+        last = str(st.get("fill_checked_at") or "")
+        if last and (date.today() - date.fromisoformat(last[:10])).days < 7:   # 見つからなかった曲は、1 週間あけて確かめ直す
+            continue
+        try:
+            found = find_on_spotify(token, song)
+        except Exception as e:  # noqa: BLE001
+            print(f"   － {song['artist']}「{song['title']}」：ISRC などを確かめられませんでした（{e}）")
+            continue
+        if not found:
+            print(f"   ・{song['artist']}「{song['title']}」：Spotify で見つからず、ISRC などを埋められませんでした（曲名かアーティスト名の違い？）")
+            st["fill_checked_at"] = date.today().isoformat()
+            _songs.save_state(song, st)
+            continue
+        add = {k: v for k, v in found.items() if v and not st.get(k)}
+        if not add:
+            continue
+        st.update(add)
+        _songs.save_state(song, st)
+        changed = True
+        print(f"   ○ {song['artist']}「{song['title']}」：空いていた " + "・".join(k.upper() if k != "url" else "配信の住所" for k in add if k in FILL_KEYS + ("released",))
+              + " を埋めました")
+    return changed
+
+
 def cmd_track(args) -> int:
     waiting = [s for s in _songs.all_songs() if _songs.state(s).get("status") == "registered"]
-    if not waiting:
+    gaps = any(_songs.state(s).get("status") == "live" and not all(_songs.state(s).get(k) for k in FILL_KEYS) for s in _songs.all_songs())
+    if not waiting and not gaps:
         if not args.quiet:
             print("－ 配信待ちの曲はありません")
         return 0
@@ -1285,8 +1321,8 @@ def cmd_track(args) -> int:
         print(f"－ Spotify につながりませんでした：{e}")
         return 0
     if not token:   # 鍵が無いとき：Apple Music・Deezer・song.link・Spotify の曲のページ（・Claude の Web 検索）で確かめる（決定 57）
-        return track_without_key(waiting, args)
-    changed = False
+        return track_without_key(waiting, args) if waiting else 0
+    changed = fill_live(token)
     for song in waiting:
         try:
             found = find_on_spotify(token, song)
