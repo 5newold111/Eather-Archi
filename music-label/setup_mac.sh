@@ -8,9 +8,9 @@
 #   すること（上から順に。何度流しても安全。もう入っているものは飛ばす）
 #     1 開発者ツール（git など）    … 無ければ、入れる命令を表示して止まる（画面のボタンを押す操作が要るため）
 #     2 Homebrew（道具を入れる仕組み）… 無ければ、入れる命令を表示して止まる（Mac のパスワードの入力が要るため）
-#     3 ffmpeg（音を扱う道具）と、新しい Python … Homebrew で入れる
-#          Mac に最初から入っている Python（3.9）は古くて、この仕組みは動かない（3.10 以上が要る）
-#     4 Python の部品（requirements.txt）… 足りないものを入れる
+#     3 ffmpeg（音を扱う道具）と Python 3.12 … Homebrew で入れる
+#          Mac に最初から入っている Python（3.9）は古く、出たばかりの版（3.15 など）は部品がまだ対応していない
+#     4 Python の部品（requirements.txt）… この仕組み専用の置き場（music-label/.venv）を作って、そこに入れる
 #     5 Chrome があるかを見る
 #     6 立て直しの点検（python3 scripts/recover.py check）を出す
 #
@@ -84,45 +84,69 @@ else
   say "   ✕ ffmpeg がありません（仕上げ・解析・縦動画づくりに要ります）"
 fi
 
-py_ok() { [ -x "$1" ] && "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; }
-find_py() {   # Homebrew の Python を先に、無ければいま python3 と打って動くもの（3.10 以上のものだけ）
+# Python の版：部品（音の解析・歌詞の聞き取りなど）は、出たばかりの版にはまだ対応していないことが多い（3.15 では入らなかった）。
+# 実績のある版（3.12 → 3.13 → 3.11 → 3.14 の順）を使う。それより新しい版しか無ければ、3.12 を入れる（決定 180）
+py_ok() { [ -x "$1" ] && "$1" -c 'import sys; sys.exit(0 if (3, 10) <= sys.version_info[:2] <= (3, 14) else 1)' 2>/dev/null; }
+find_py() {
   PREFIX=""
   [ -n "$BREW" ] && PREFIX="$("$BREW" --prefix 2>/dev/null)"
-  if [ -n "$PREFIX" ]; then
-    for v in 3 3.14 3.13 3.12 3.11 3.10; do
-      if py_ok "$PREFIX/bin/python$v"; then printf '%s' "$PREFIX/bin/python$v"; return 0; fi
+  for v in 3.12 3.13 3.11 3.14 3.10; do
+    for d in "$PREFIX/bin" /opt/homebrew/bin /usr/local/bin; do
+      if [ -n "$d" ] && py_ok "$d/python$v"; then printf '%s' "$d/python$v"; return 0; fi
     done
-  fi
+  done
   c="$(command -v python3 2>/dev/null || true)"
   if [ -n "$c" ] && py_ok "$c"; then printf '%s' "$c"; return 0; fi
   return 1
 }
-PY="$(find_py || true)"
-if [ -z "$PY" ] && [ -n "$BREW" ] && [ $CHECK = 0 ]; then
-  say "   ・新しい Python を入れています（Mac に最初から入っている 3.9 は古いため。数分かかります）"
-  "$BREW" install python || say "   ✕ Python を入れられませんでした（上の表示を見てください）"
-  PY="$(find_py || true)"
+BASEPY="$(find_py || true)"
+if [ -z "$BASEPY" ] && [ -n "$BREW" ] && [ $CHECK = 0 ]; then
+  say "   ・Python 3.12 を入れています（Mac に最初から入っている 3.9 は古く、いちばん新しい版は部品がまだ対応していないため。数分かかります）"
+  "$BREW" install python@3.12 || say "   ✕ Python を入れられませんでした（上の表示を見てください）"
+  BASEPY="$(find_py || true)"
 fi
-if [ -n "$PY" ]; then
-  say "   ○ $("$PY" --version 2>&1)（${PY}）"
+if [ -n "$BASEPY" ]; then
+  say "   ○ $("$BASEPY" --version 2>&1)（${BASEPY}）"
 else
-  say "   ✕ 新しい Python（3.10 以上）がありません。いまあるもの：$(python3 --version 2>&1 || echo なし)"
+  say "   ✕ 使える Python（3.10〜3.14）がありません。いまあるもの：$(python3 --version 2>&1 || echo なし)"
 fi
 
-# ---- 4 Python の部品
+# ---- 4 Python の部品（この仕組み専用の置き場 .venv に入れる。Mac のほかの Python には手を入れない）
 head_ "4. Python の部品（requirements.txt）"
+VENV="$PWD/.venv"
+PY=""
+if [ -x "$VENV/bin/python3" ] && py_ok "$VENV/bin/python3"; then
+  PY="$VENV/bin/python3"
+elif [ -n "$BASEPY" ] && [ $CHECK = 0 ]; then
+  [ -d "$VENV" ] && rm -rf "$VENV"      # 版が合わない古い置き場は作り直す（中身は部品だけ。記録や鍵は入っていない）
+  say "   ・この仕組み専用の部品の置き場（.venv）を作っています"
+  if "$BASEPY" -m venv "$VENV"; then PY="$VENV/bin/python3"; else say "   ✕ 置き場を作れませんでした（上の表示を見てください）"; fi
+fi
 if [ -z "$PY" ]; then
-  say "   － 新しい Python が入ってから"
+  [ $CHECK = 1 ] && say "   － 調べるだけなので、置き場（.venv）は作りません" || say "   － 使える Python が入ってから"
 elif [ $CHECK = 1 ]; then
   say "   － 調べるだけなので入れません（入っているかは、下の点検に出ます）"
 else
-  say "   ・足りない部品を入れています（初回は数分かかります）"
-  # Homebrew の Python は「自分用の場所（--user）に入れる」と言わないと断るので、その言い方を順に試す
-  if "$PY" -m pip install --user --quiet -r requirements.txt 2>/dev/null \
-     || "$PY" -m pip install --user --quiet --break-system-packages -r requirements.txt; then
+  say "   ・足りない部品を入れています（初回は 5〜15 分かかります）"
+  "$PY" -m pip install --quiet --upgrade pip >/dev/null 2>&1
+  if "$PY" -m pip install --quiet -r requirements.txt; then
     say "   ○ 部品が入りました"
   else
-    say "   ✕ 入らなかった部品があります（上の表示を見てください。もう一度流すと、続きから入ります）"
+    say "   ・まとめては入らなかったので、1 つずつ入れます"
+    FAILED=""
+    while IFS= read -r line; do
+      pkg="$(printf '%s' "$line" | sed 's/#.*//' | tr -d '[:space:]')"
+      [ -z "$pkg" ] && continue
+      if "$PY" -m pip install --quiet "$pkg" >/dev/null 2>&1; then say "     ○ ${pkg}"; else say "     ✕ ${pkg}"; FAILED="$FAILED $pkg"; fi
+    done < requirements.txt
+    if [ -z "$FAILED" ]; then say "   ○ 部品が入りました"; else say "   ✕ 入らなかった部品：${FAILED}（この行をそのまま伝えてください）"; fi
+  fi
+  if [ $MAC = 1 ]; then    # 新しいターミナルで python3 と打つと、この置き場の Python になるように（1 回だけ書く）
+    PROFILE="$HOME/.zprofile"
+    if ! grep -qF "$VENV/bin" "$PROFILE" 2>/dev/null; then
+      printf '\n# Postdog Records の仕組みの Python（部品入り）を先に使う（setup_mac.sh が書きました）\nexport PATH="%s/bin:$PATH"\n' "$VENV" >> "$PROFILE"
+      say "   ○ ターミナルの設定（~/.zprofile）に、この置き場の Python を先に使う 1 行を足しました"
+    fi
   fi
 fi
 
@@ -146,6 +170,6 @@ else
 fi
 
 if [ -n "$PY" ] && [ "$ORIG_PY" != "$PY" ] && [ $MAC = 1 ]; then
-  printf '\n※ ターミナルの窓をいちど閉じて、開き直してください。そのあとの python3 は、新しい Python（%s）になります。\n' "$PY"
+  printf '\n※ ターミナルの窓をいちど閉じて、開き直してください。そのあとの python3 は、部品の入った Python（%s）になります。\n' "$PY"
 fi
 printf '\n鍵・パスワードには、この台本は触れていません。鍵は、点検の「次にすること」に出る命令で入れます（チャットには貼りません）。\n'

@@ -1152,5 +1152,14 @@ def main() -> int:
     return 0
 
 
+
+def _use_venv() -> None:
+    """用意の台本が作った専用の置き場（.venv）があれば、そちらの Python で動き直す。
+    ターミナルの窓を開き直す前は、python3 と打つと部品の入っていない Python が動くため（決定 180）"""
+    v = ROOT / ".venv" / "bin" / "python3"
+    if sys.prefix == sys.base_prefix and v.is_file() and not os.environ.get("POSTDOG_NO_VENV"):
+        os.execv(str(v), [str(v)] + sys.argv)
+
 if __name__ == "__main__":
+    _use_venv()
     sys.exit(main())

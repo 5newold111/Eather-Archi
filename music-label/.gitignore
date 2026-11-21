@@ -30,3 +30,4 @@ artists_old.xlsx
 
 # SSD と同じ並びの手元の保管庫（音源・画像。archive_sync.py）
 ローカル保管庫/
+.venv/
