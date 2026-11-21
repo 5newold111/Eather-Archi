@@ -144,12 +144,23 @@ def audio_dirs() -> list[Path]:
     for top in (base.parent, base):
         for c in _walk(top, 3):
             if c.is_dir() and any(norm(h) in norm(c.name) for h in AUDIO_DIR_HINTS) and not any(c.is_relative_to(f) for f in found) \
-                    and not any(x in c.name for x in DERIVED_DIRS):   # 解析シート・MIDI の置き場は「既存楽曲」ではない
+                    and not any(x in unicodedata.normalize("NFC", c.name) for x in DERIVED_DIRS):   # 解析シート・MIDI の置き場は「既存楽曲」ではない
+                # （SSD の中では「デ」などの濁点が 2 文字に分かれて入ることがあるので、そろえてから比べる。決定 180）
                 found.append(c)
     return found
 
 
 DERIVED_DIRS = ("_解析シート", "_メロディー")
+
+
+def melody_dirs(top: Path) -> list[Path]:
+    """SSD の MIDI の置き場（既存楽曲の隣で、名前が「<既存楽曲>_メロディー…」のフォルダ。前の版が作った二重の名前のものも含む）"""
+    want = unicodedata.normalize("NFC", top.name)
+    try:
+        found = [c for c in top.parent.iterdir() if c.is_dir() and unicodedata.normalize("NFC", c.name).startswith(want + "_メロディー")]
+    except OSError:
+        return []
+    return sorted(found, key=lambda c: len(c.name))
 
 
 def sheet_dir(top: Path) -> Path:
@@ -731,7 +742,7 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
                 top = next((t for t in tops if f.is_relative_to(t)), None)
                 if top is not None:
                     import shutil
-                    base = top.parent / f"{top.name}_メロディー（MIDI）"
+                    base = (melody_dirs(top) or [top.parent / f"{top.name}_メロディー（MIDI）"])[0]
                     (base / f"{out.name}.mid").unlink(missing_ok=True)   # 前の版（主旋律だけの MIDI を並べていた）は消す
                     dst = base / out.name
                     dst.mkdir(parents=True, exist_ok=True)
@@ -746,6 +757,134 @@ def audio_melody(limit: int = 0, quiet: bool = False) -> int:
     left = len(pend) - len(run)
     print(f"【結果】{ok} 曲を起こしました（SSD の「既存楽曲_メロディー（MIDI）」に曲ごとのフォルダ：全部の音の MIDI〔楽器ごとのトラック〕・ボーカル・演奏。GarageBand で開けます）"
           + (f"。まだ {left} 曲あります" if left > 0 else ""))
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# 深い分析（決定 180）：コード進行・楽器の出入り・ドラムの型・ベース・音の多さ・テンション・音づくり・楽譜
+# ---------------------------------------------------------------------------
+def _safe_name(d: dict, f: Path) -> str:
+    ref = d.get("reference") or {}
+    name = f"{ref.get('artist_name') or '?'} - {ref.get('title') or f.stem}"
+    return re.sub(r'[\\/:*?"<>|]+', "_", name).strip() or "melody"
+
+
+def find_midi(d: dict, f: Path) -> Path | None:
+    """その曲の「全部の音の MIDI」を探す：Mac の中 → SSD の MIDI の置き場（Mac を作り直したあとは SSD にだけある）"""
+    safe = _safe_name(d, f)
+    cands = []
+    mf = (d.get("melody") or {}).get("midi_file")
+    if mf:
+        cands.append(Path(mf))
+    cands.append(DIGEST_DIR / "melody" / safe / f"{safe}.mid")
+    for top in audio_dirs():
+        try:
+            if f.is_relative_to(top):
+                cands += [base / safe / f"{safe}.mid" for base in melody_dirs(top)]
+        except ValueError:
+            pass
+    for c in cands:
+        try:
+            if c.is_file() and c.stat().st_size > 200:
+                return c
+        except OSError:
+            continue
+    return None
+
+
+def _deep_version() -> int:
+    try:
+        import deep_analysis
+        return deep_analysis.VERSION
+    except Exception:  # noqa: BLE001
+        return 1
+
+
+def deep_pending() -> list[tuple[Path, Path]]:
+    """深い分析がまだの曲・前の版で測った曲・あとから MIDI ができた曲"""
+    index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
+    out = []
+    ver = _deep_version()
+    for p in sorted(AUDIO_CACHE.glob("aud-*.json")) if AUDIO_CACHE.exists() else []:
+        f = Path((index.get(p.stem) or {}).get("file", ""))
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not f.is_file():
+            continue
+        dp = d.get("deep") or {}
+        late_midi = dp and "MIDI" not in str(dp.get("source")) and d.get("melody") and find_midi(d, f) is not None
+        if not dp or (dp.get("version") or 0) < ver or late_midi:
+            out.append((p, f, d))
+    return [(p, f) for p, f, _ in (out[i] for i in _influence_first([d for _, _, d in out]))]
+
+
+def audio_deep(limit: int = 0, quiet: bool = False) -> int:
+    """既存楽曲を深く測る（1 回に limit 曲まで。0 なら全部）。Mac の中で・無料。1 曲 20〜60 秒"""
+    import deep_analysis
+    pend = deep_pending()
+    if not pend:
+        if not quiet:
+            print("【結果】深い分析をする曲はありません（全部済んだか、SSD がつながっていません）")
+        return 0
+    run = pend[:limit] if limit > 0 else pend
+    print(f"▶ {len(pend)} 曲のうち {len(run)} 曲を深く測ります（コード進行・楽器の出入り・ドラムの型・音の多さ・盛り上がり・楽譜。Mac の中で・無料。1 曲 20〜60 秒）")
+    ok = 0
+    for i, (p, f) in enumerate(run, 1):
+        d = json.loads(p.read_text(encoding="utf-8"))
+        ref = d.get("reference") or {}
+        name = f"{ref.get('artist_name') or '?'} - {ref.get('title') or f.stem}"
+        print(f"【進み具合】{i}/{len(run)} 曲目：{name} を深く測っています", flush=True)
+        try:
+            mid = find_midi(d, f)
+            tracks = deep_analysis.read_midi(mid) if mid else None
+            stems = None
+            if mid and (mid.parent / "stems.json").is_file():
+                stems = json.loads((mid.parent / "stems.json").read_text(encoding="utf-8"))
+            deep = deep_analysis.analyze(f, d, tracks, stems)
+        except Exception as e:  # noqa: BLE001  1 曲うまくいかなくても次へ
+            print(f"   ✕ 測れませんでした（{type(e).__name__}: {str(e)[:160]}）")
+            continue
+        if tracks:   # 楽譜（旋律＋コード名＋ベース）を、MIDI と同じフォルダに書く
+            try:
+                safe = mid.parent.name
+                sheet_music = deep_analysis.write_leadsheet(mid.parent / f"{safe}_楽譜.musicxml", name[:80], tracks, deep)
+                if sheet_music:
+                    deep["score_file"] = str(sheet_music)
+                    for top in audio_dirs():   # Mac の中に書いたときは、SSD の MIDI の置き場にも写す
+                        if f.is_relative_to(top) and not any(sheet_music.is_relative_to(b) for b in melody_dirs(top)):
+                            import shutil
+                            dst = (melody_dirs(top) or [top.parent / f"{top.name}_メロディー（MIDI）"])[0] / safe
+                            dst.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(sheet_music, dst / sheet_music.name)
+            except (OSError, ValueError) as e:
+                print(f"   ・楽譜は書けませんでした（{type(e).__name__}）")
+        g = d.setdefault("groove", {})
+        old, new = g.get("bpm"), (deep.get("groove") or {}).get("bpm")
+        if new and (not old or (abs(float(new) / float(old) - 1) < 0.045 and float(new) != float(old))):
+            if old:
+                g["bpm_coarse"] = old     # 前の測り方は刻みが粗く、120 が 117.5 や 123 になることがあった（決定 180）
+            g["bpm"] = new
+        elif new and old and float(new) != float(old):
+            deep["groove"]["bpm_note"] = f"解析シートの BPM は {old}（倍か半分に聞こえる取り方の違いかもしれないので、シートの値はそのまま）"
+        deep_analysis.to_sheet(d, deep)
+        p.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+        ok += 1
+        print("   ○ " + deep_analysis.summary_line(deep))
+        dr = deep.get("drums") or {}
+        if dr.get("labels"):
+            print("   ・ドラム：" + "・".join(dr["labels"]))
+        parts = (deep.get("instruments") or {}).get("parts") or []
+        if parts:
+            print("   ・楽器：" + "・".join(f"{x['name']}（{int(x['active'] * 100)}%）" for x in parts[:7]))
+        else:
+            print("   ・楽器ごとの出入りは、メロディーの書き起こし（MIDI）ができてから測ります")
+    if ok:
+        import subprocess
+        subprocess.run([sys.executable, str(Path(__file__)), "--audio-limit", "0"], capture_output=True)   # 参考曲に登録し直す
+    left = len(pend) - len(run)
+    print(f"【結果】{ok} 曲を深く測りました（解析シートの「deep」に入り、曲作りには枠ごとの部分だけが渡ります）" + (f"。まだ {left} 曲あります" if left > 0 else ""))
     return 0
 
 
@@ -1977,6 +2116,8 @@ def main() -> None:
                     help="既存楽曲の歌詞を Mac の中で聞き取って、解析シートに入れる（N 曲まで。省くと全部。無料。決定 86）")
     ap.add_argument("--audio-melody", type=int, metavar="N", nargs="?", const=0,
                     help="既存楽曲のメロディーを起こして MIDI に残し、旋律の特徴を解析シートに入れる（N 曲まで。省くと全部。無料。決定 90）")
+    ap.add_argument("--audio-deep", type=int, metavar="N", nargs="?", const=0,
+                    help="既存楽曲を深く測る：コード進行・楽器の出入り・ドラムの型・音の多さ・盛り上がり・楽譜（N 曲まで。省くと全部。無料。決定 180）")
     ap.add_argument("--audio-tags", type=int, metavar="N", nargs="?", const=0,
                     help="既存楽曲を聞いて、声・楽器・ジャンル・ムードを Mac の中で判定する（N 曲まで。省くと全部。無料。決定 103）")
     ap.add_argument("--enrich-sub", type=int, metavar="N", nargs="?", const=40,
@@ -1998,6 +2139,8 @@ def main() -> None:
         sys.exit(audio_lyrics(args.audio_lyrics))
     if args.audio_melody is not None:
         sys.exit(audio_melody(args.audio_melody))
+    if args.audio_deep is not None:
+        sys.exit(audio_deep(args.audio_deep))
     if args.audio_tags is not None:
         sys.exit(audio_tags_run(args.audio_tags))
     if args.enrich_sub is not None:
@@ -2030,6 +2173,8 @@ def main() -> None:
             audio_melody(3, quiet=True)
         if tags_pending():   # 曲を聞いて判定がまだの曲：1 回に 5 曲ずつ（部品が入っているときだけ。決定 103）
             audio_tags_run(5, quiet=True)
+        if deep_pending():   # 深い分析がまだの曲：1 回に 6 曲ずつ（決定 180）
+            audio_deep(6, quiet=True)
         return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}

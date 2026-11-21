@@ -631,6 +631,11 @@ def _transcribe_stems(stems: dict[str, Path], how: str, bpm, key, sheet: dict, o
     if "drums" in stems:
         tracks["drums"] = drum_notes(stems["drums"])
     write_full_midi(tracks, tempo, folder / f"{safe}.mid")
+    try:   # 分けた音はこのあと消すので、楽器ごとの音量（1 秒ごと・全体に占める割合）だけ残す。深い分析が使う（決定 180）
+        import deep_analysis
+        (folder / "stems.json").write_text(json.dumps(deep_analysis.stem_levels(stems), ensure_ascii=False), encoding="utf-8")
+    except Exception:  # noqa: BLE001  残せなくても、書き起こしは続ける
+        pass
     export_audio([stems["vocals"]], folder / f"{safe}_ボーカル")
     export_audio([v for k, v in stems.items() if k != "vocals"], folder / f"{safe}_演奏")
     feat = features(lead, tempo, key, (sheet.get("structure") or {}).get("sections") or [])

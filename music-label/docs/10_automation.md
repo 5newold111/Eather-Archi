@@ -59,3 +59,19 @@ Mac に定期実行を 1 回登録すると（`python3 scripts/schedule.py insta
 
 どの仕事も、鍵が無い部分は飛ばすか「Claude に渡すはずだった内容」「SQL」などのファイルを書き出して止まる。
 エラーで全体が止まることはない。鍵の入れ方は `docs/09_auth_batch.md`。
+
+## Mac を初期化・買い替えたとき（決定 180）
+
+定期実行も鍵も Mac の中にしか無いので、初期化すると全部止まります。戻す順番は `docs/14_storage.md` の 6 章。
+`bash setup_mac.sh`（道具）→ `python3 scripts/recover.py check`（どこまで戻ったか。「次にすること」が 1 つ出る）→ `recover.py from-ssd --apply`（SSD から曲の記録）→ 鍵 → `schedule.py install` → `recover.py cloud`。
+`recover.py check` だけは、Mac に最初から入っている古い Python（3.9）でも動きます。
+
+
+## 参考曲の深い分析（決定 180）
+
+- 参考曲の見張り（`refs`。30 分ごと・SSD をつないだとき）が、まだ測っていない曲を 1 回に 6 曲ずつ深く測ります（Mac の中で・無料）
+- 測るもの：テンポと拍・コード進行（度数）・音の多さ・盛り上がりの曲線・音づくり。メロディーの書き起こし（MIDI）がある曲は、
+  楽器の出入り・ドラムの型・ベースの動き・ボーカル・楽譜（MusicXML）まで
+- 見る所：ダッシュボードの「道具」→「深い分析を見る」（`/deep`）。いますぐ進めるときは「深く測る」
+- 手で動かす：`python3 scripts/reference_db.py --audio-deep 30`／1 曲だけ：`python3 scripts/deep_analysis.py <音源> --midi <MIDI>`
+- 2 曲の近さ（答え合わせ）：`python3 scripts/deep_analysis.py compare <A.json> <B.json>`

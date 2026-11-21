@@ -120,3 +120,33 @@ Postdog Records/
 | 6 | 古い版は `_old` の 1 つだけ | 未定（R2 にも写しがあるので、まずはこのまま） |
 | 7 | SSD の形式 | 未確認（Mac だけなら APFS、Windows とも使うなら exFAT。Finder で SSD を選んで「情報を見る」） |
 | 8 | Google の移行前の版 | `09_移行前/` に入れる。移し終えたら Google 側の名前の先頭に「【旧】」を付けるか消す |
+
+## 6. Mac を初期化・買い替えたとき（SSD から立て直す。決定 180）
+
+プログラムは GitHub から、**曲の記録は SSD から**戻します。鍵（`.env`）は SSD にも GitHub にも入れていないので、入れ直します（復旧キットを控えてあれば `vault.py restore`）。
+
+| 順 | すること | ターミナルで（`music-label` フォルダの中） |
+|---|---|---|
+| 1 | 道具をそろえる（Homebrew・新しい Python・ffmpeg・Python の部品）。Mac 付属の Python 3.9 では動かない | `bash setup_mac.sh` |
+| 2 | どこまで戻っているかを見る（何も変えない。「次にすること」が 1 つ出る） | `python3 scripts/recover.py check` |
+| 3 | SSD から何を戻すかを見る（何も書かない） | `python3 scripts/recover.py from-ssd` |
+| 4 | 戻す（Mac にもうある記録は上書きしない。SSD には書かない） | `python3 scripts/recover.py from-ssd --apply` |
+| 5 | 鍵を入れる → 定期実行を登録する | `python3 scripts/setup_keys.py` → `python3 scripts/schedule.py install` |
+| 6 | 細かい食い違いを直す（登録前の曲の仕上げ直し・下書きの作り直し） | ダッシュボードの「点検して自動で直す」 |
+| 7 | R2 の予備と Notion を作り直す・鍵の金庫を作る | `python3 scripts/recover.py cloud` → `python3 scripts/vault.py init` |
+
+ダッシュボードの「道具」→「立て直し」からも、2〜4 と 7 を動かせます。
+
+| SSD のどこから | Mac のどこへ | 中身 |
+|---|---|---|
+| `01_管理表/楽曲管理.xlsx` | `out/publish/state/<曲>.json` | 段階（7 → 登録済み・8 → 配信中）・配信日・ISRC・UPC・配信の住所・選んだテイク |
+| 同上（毎週の曲の行） | `out/briefs/<曲>.json` | 曲名・別案・Suno の指示・歌詞・配信予定日だけの最小限の指示（`restored` の印つき） |
+| `04_楽曲/<曲名>/…_Suno元データ.wav` | `out/takes/<曲>/` | 登録前の曲だけ。「取り込み済み」に戻し、仕上げ・下書きはいつもの取り込みが作り直す |
+| `04_楽曲/<曲名>/<曲名>_<名前>_<日付>.wav` | `out/masters/<曲>/master.wav` | 登録済み・配信中の曲だけ（`--no-audio` で省ける） |
+| `04_楽曲/<曲名>/<名前>_<曲名>_<番号>.jpg`（無ければ `03_ジャケット/`） | 毎週の曲 `out/visuals/<組>/cover/<週>/cover_final.jpg`・デビュー曲 `debut_kit/<日付>/images/<組>_cover.jpg` | いちばん大きい番号の 1 枚。「文字は入っている」の印（`.text.json`）も付ける |
+| `04_楽曲/<曲名>/…_歌詞_配信用.txt` など | `out/publish/<曲>/` | 配信用の歌詞・日本語訳・エピソード |
+| `01_情報/<名前>_プロフィール.*`・`02_写真/<名前>_photo*.jpg` | `out/profiles/`・`debut_kit/<日付>/images/` | 設定書は GitHub を正とし、SSD と違う所だけ知らせる |
+| `既存楽曲_解析シート/aud-*.json` | `out/reference_db/audio/` | 音源が SSD に残っている曲のシートだけ。解析し直さない |
+
+戻せないもの：聴いて確かめた印・作曲の指示の細部（除外する言葉・場面・参考曲の割り当て）・ジャケットの候補・再生数とお金の記録・仕上げの設定・曲の案・SNS の予定・Chrome のログイン。これらは決定 179 から R2 にも預けているので、R2 に予備があれば `restore_r2.py` が先です（SSD からの作り直しは、R2 に無い分を埋めます）。
+

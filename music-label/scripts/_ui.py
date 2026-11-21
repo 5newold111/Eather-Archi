@@ -22,7 +22,7 @@ E = html.escape
 
 # 上の帯の行き先（ダッシュボード本体と同じ並び。決定 176）
 NAV = [("/", "ホーム"), ("/#make", "制作"), ("/#acts", "アーティスト"), ("/plays", "再生数"), ("/money", "お金"), ("/keys", "設定"), ("/#tools", "道具")]
-PARENT = {"/listen": "/#make", "/pitch": "/#make", "/check": "/#make", "/suno": "/#make", "/photos": "/#acts", "/phone": "/#tools"}   # 帯に無いページが属する所
+PARENT = {"/listen": "/#make", "/pitch": "/#make", "/check": "/#make", "/suno": "/#make", "/photos": "/#acts", "/phone": "/#tools", "/deep": "/#tools"}   # 帯に無いページが属する所
 
 CSS = """
 :root{--bg:#f4f5f4;--card:#fff;--ink:#1b2024;--sub:#5d6770;--line:#d9dedb;--soft:#e9edeb;--accent:#23786b;--accent-ink:#fff;

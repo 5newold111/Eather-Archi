@@ -187,6 +187,24 @@ Hard rules (never break):
    (b) vocal_instruction says where the peak sits and how endings are held; (c) the lyrics follow the rhythm: lines of the chorus
    carry about notes_per_phrase syllables, verses follow notes_per_bar density, and pickups become short lead-in words. Never write
    pitch sequences. Rule 5 still applies to what is kept from a phrase.
+15b. Measured details (a slot excerpt has "measured"): numbers measured from that slot's reference recording, already limited
+   to what that slot may borrow. Use them concretely, in plain producer language, only for that slot's aspect:
+   - instruments slot: which parts play, how much of the song each is active, where each enters, what is added or dropped per
+     section, how many layers sound at once, the tonal balance and stereo width. Write the arrangement into the section tags
+     (e.g. "[Verse 1: drums and bass only, keys enter in bar 5]") and the instrument list of suno_style_prompt.
+   - groove slot: tempo steadiness, meter, the 16-step drum pattern (x = usually hit, o = sometimes, . = rest, ? = not read)
+     and its labels. Describe the pattern in words in suno_style_prompt ("four-on-the-floor kick, off-beat hi-hats").
+   - harmony slot: the key mode, the loop written in scale degrees (Roman numerals), how often chords change, chords outside the
+     key, modulations. Describe the harmonic character ("looping four-bar minor progression, one chord per bar, lift a whole
+     step for the last chorus"); keep the mode and degrees but transpose to a key that fits THIS act's range.
+   - structure slot: bars per section and the tension curve (0-100), where the biggest rise and the peak fall. Shape the
+     song's energy map with them.
+   - performance slot: note density (onsets per bar, how full the 16th grid is) and the bass habit (root-following or moving,
+     note length, relation to the kick).
+   - vocal_main slot: how much of the song is sung, where the voice enters, layering (single voice or stacked harmonies),
+     where the highest and longest notes fall.
+   Never copy these numbers into the output as a list, and never treat them as a recipe to rebuild that one recording: each
+   slot comes from a different song (rule 1), and the act's own sheet wins on conflict.
 16. Lyric format (owner's rules, from the DistroKid / Apple Music lyric guidelines) for suno_lyrics and every core line:
    - Lyrics only: no singer's name or speaker label ("Isla:"), no notes, no links. Section and performance tags in [ ]
      stay (they are for Suno and are removed automatically for the stores); never write a section name as plain text.
@@ -296,6 +314,13 @@ def slot_excerpts(brief: dict, refs_dir: Path | None) -> dict[str, dict]:
                     data.pop("transcript", None)
                     data.pop("web_check", None)
                 entry[sec] = data
+            try:   # 深い分析のうち、その枠の測りものだけ（コード進行は和声の枠、ドラムの型はグルーヴの枠…。再現カードは渡さない。決定 180）
+                import deep_analysis
+                measured = deep_analysis.for_slot(sheet.get("deep"), slot)
+                if measured:
+                    entry["measured"] = measured
+            except Exception:  # noqa: BLE001  測りものが無くても、ブリーフは作れる
+                pass
         else:
             entry["note"] = "解析シートなし。タイトルと組の固定制約から推定すること（具体的な模倣は禁止）"
         out[slot] = entry
