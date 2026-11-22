@@ -54,6 +54,23 @@ def ssl_context():
 _PY_WITH: dict[str, str | None] = {}
 
 
+VENV_PY = ROOT / ".venv" / "bin" / "python3"   # 用意の台本（setup_mac.sh）が作る、部品の入った Python（決定 180）
+
+
+def use_venv() -> None:
+    """部品の入った Python（.venv）があるのに、別の Python で動いていたら、そちらで動き直す。
+    定期実行の登録（schedule.py install）がこの Python を登録するので、ここで取り違えると、毎日の仕事が部品の無い Python で落ちる"""
+    import os
+    if os.environ.get("POSTDOG_NO_VENV") or not VENV_PY.is_file():
+        return
+    try:
+        if Path(sys.executable).resolve() == VENV_PY.resolve() or Path(sys.prefix).resolve() == VENV_PY.parent.parent.resolve():
+            return
+    except OSError:
+        return
+    os.execv(str(VENV_PY), [str(VENV_PY)] + sys.argv)
+
+
 def pip_install(py: str, *pkgs: str) -> str:
     """部品を入れるシェルの命令（決定 180）。どの Python でも通る順に試す：
     ふつうに入れる（この仕組み専用の置き場 .venv はこれで入る）→ 自分用の場所（--user）→ Homebrew の Python が断るときの書き方"""

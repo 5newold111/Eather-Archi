@@ -302,6 +302,8 @@ def trim(log: Path, keep: int = 4000) -> None:
 
 
 def main() -> None:
+    import _common
+    _common.use_venv()   # 登録する Python を、部品の入った Python（.venv）にそろえる（決定 180）
     ap = argparse.ArgumentParser(description="定期実行の設定（Mac の launchd）")
     ap.add_argument("command", choices=["list", "write", "install", "uninstall", "run", "ack", "cron", "status", "retry-failed"])
     ap.add_argument("job", nargs="?", help="run のときの仕事の名前")

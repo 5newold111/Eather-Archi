@@ -73,5 +73,25 @@ class Requirements(unittest.TestCase):
         self.assertEqual(recover.IMPORT_NAME["faster-whisper"], "faster_whisper")
 
 
+class LaunchdPython(unittest.TestCase):
+    def test_plist_with_other_python_is_found(self):
+        """定期実行が、部品の入っていない Python で登録されていたら見つける（決定 180）"""
+        import plistlib
+        import tempfile
+        import recover
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            venv = d / "music-label" / ".venv" / "bin" / "python3"
+            venv.parent.mkdir(parents=True)
+            venv.write_text("")
+            agents = d / "LaunchAgents"
+            agents.mkdir()
+            (agents / "jp.x.a.plist").write_bytes(plistlib.dumps({"ProgramArguments": [str(venv), "s.py"]}))
+            self.assertEqual(recover.plist_python_mismatch(agents, "jp.x", venv), "")
+            (agents / "jp.x.b.plist").write_bytes(plistlib.dumps({"ProgramArguments": ["/opt/homebrew/bin/python3", "s.py"]}))
+            self.assertEqual(recover.plist_python_mismatch(agents, "jp.x", venv), "/opt/homebrew/bin/python3")
+            self.assertEqual(recover.plist_python_mismatch(agents, "jp.x", d / "none" / "python3"), "", "置き場が無ければ見ない")
+
+
 if __name__ == "__main__":
     unittest.main()

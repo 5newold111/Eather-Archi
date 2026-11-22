@@ -595,6 +595,22 @@ def check_r2(offline: bool = False) -> dict:
     return _sec("r2", "クラウドの予備（R2）", ok, lines, "" if ok else "いまの内容を R2 に預け直す", "" if ok else "python3 scripts/recover.py cloud")
 
 
+def plist_python_mismatch(agents: Path, prefix: str, venv: Path | None = None) -> str:
+    """登録された定期実行の Python が、部品の入った Python（.venv）でなければ、その Python の場所を返す（決定 180）"""
+    import plistlib
+    venv = venv or (ROOT / ".venv" / "bin" / "python3")
+    if not venv.is_file() or not agents.is_dir():
+        return ""
+    for p in sorted(agents.glob(f"{prefix}.*.plist")):
+        try:
+            args = plistlib.loads(p.read_bytes()).get("ProgramArguments") or []
+        except Exception:  # noqa: BLE001
+            continue
+        if args and Path(args[0]) != venv and not str(args[0]).startswith(str(venv.parent.parent)):
+            return str(args[0])
+    return ""
+
+
 def check_launchd() -> dict:
     if platform.system() != "Darwin":
         return _sec("launchd", "定期実行（常駐）", None, ["－ Mac だけの項目です"])
@@ -605,6 +621,11 @@ def check_launchd() -> dict:
     want = [*getattr(sched, "JOBS", {}), *getattr(sched, "SERVICES", {})] if sched is not None else []
     missing = [j for j in want if f"{prefix}.{j}.plist" not in have]
     lines = [f"登録されている定期実行 {len(have)} 個" + (f"（全部で {len(want)} 個）" if want else "")]
+    wrong = plist_python_mismatch(agents, prefix)
+    if wrong:
+        lines.append(f"✕ 定期実行が、部品の入っていない Python（{wrong}）で登録されています。毎日の仕事が部品の不足で止まります")
+        return _sec("launchd", "定期実行（常駐）", False, lines, "部品の入った Python で登録し直す",
+                    f"{ROOT / '.venv' / 'bin' / 'python3'} scripts/schedule.py install")
     if sched is None:
         lines.append(f"－ 定期実行の一覧が読めません（{why}）")
     if missing:
