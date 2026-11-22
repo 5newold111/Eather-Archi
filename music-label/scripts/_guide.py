@@ -182,7 +182,8 @@ def _explain(row: dict, phase: dict) -> dict:
         sid = row.get("id") or ""
         # 標準は専用の Chrome への自動入力（オーナーの指示 2026-10-27。決定 106）。ロボット確認が続くときは、ふだんのブラウザで写して貼る（決定 104）
         acts = [{"kind": "run", "primary": True, "label": "Suno に入力する（ブラウザが開きます）", "action": "fill_suno", "id": row.get("id")},
-                {"kind": "retake", "id": row.get("id"), "reasons": list(take_check.MANUAL)},   # 2 曲とも良くないとき（決定 100）
+                *([{"kind": "retake", "id": row.get("id"), "reasons": list(take_check.MANUAL)}]   # 2 曲とも良くないとき（決定 100）
+                  if row.get("type") != "debut" and not str(row.get("id", "")).startswith("PDR-") else []),   # デビュー曲はブリーフが無い（決定 180）
                 {"kind": "run", "label": "曲を取り込む", "action": "scan"},
                 {"kind": "link", "label": "予備：ふだんのブラウザで写して貼る（ロボット確認が続くとき）", "url": f"/paste/{sid}" if sid else "/paste"},
                 {"kind": "run", "label": "Suno にログイン（初回だけ）", "action": "browser_login", "site": "suno"},

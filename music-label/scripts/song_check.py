@@ -123,7 +123,7 @@ def steps(song: dict) -> list[dict]:
         fields = read_json(dp)
         rows = "".join(f"<tr><th>{E(str(k))}</th><td>{E(str(v))}</td></tr>" for k, v in fields.items())
         out.append({"name": "DistroKid の下書き", "state": "done", "text": "DistroKid の登録画面に入れる内容です（「DistroKid に入力する」で自動で入ります）。",
-                    "html": f'<table class="kv">{rows}</table>'})
+                    "html": f'<div style="overflow-x:auto"><table class="kv">{rows}</table></div>'})
     else:
         out.append({"name": "DistroKid の下書き", "state": "wait", "text": "音量とジャケットがそろうと作られます。"})
 
@@ -166,7 +166,7 @@ section{background:var(--card);border:1px solid var(--line);border-radius:12px;p
 h1{font-size:20px;margin:8px 0} h2{font-size:16px;margin:0 0 6px;display:flex;gap:8px;align-items:center} h4{margin:10px 0 4px;font-size:13px;font-weight:600}
 .badge{font-size:12px;border-radius:99px;padding:1px 10px;border:1px solid}.done{color:var(--good)}.ng{color:var(--crit)}.run,.wait{color:var(--warn)}
 img.cover{width:min(320px,100%);border-radius:8px;border:1px solid var(--line);display:block;margin-top:8px} audio{width:100%;margin-top:8px}
-table.kv{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px} .kv th,.kv td{border-top:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+table.kv{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px} .kv td{overflow-wrap:anywhere} .kv th,.kv td{border-top:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
 .kv th{white-space:nowrap;color:var(--sub);font-weight:500;width:30%} code{font-size:12px;word-break:break-all} ul.files{margin:4px 0;padding-left:1.2em;font-size:13px}
 button{font:inherit;border-radius:8px;padding:6px 14px;cursor:pointer;border:1px solid var(--accent);background:var(--card);color:var(--ink);margin:8px 8px 0 0}
 button.primary{background:var(--accent);color:var(--accent-ink);font-weight:600} #job{margin-top:8px;font-size:13px;color:var(--sub)}
@@ -240,8 +240,13 @@ def song_page(song_id: str, token: str) -> str | None:
         secs.append(f'<section><h2>{i}. {E(s["name"])} <span class="badge {s["state"]}">{LABEL[s["state"]]}</span></h2>'
                     f'<p>{E(s["text"])}</p>{s.get("html", "")}{acts}</section>')
     all_done = len(ss) == 5 and all(s["state"] == "done" for s in ss)
+    st_now = _songs.state(song).get("status", "")
+    if st_now in ("registered", "live"):   # 登録済み・配信中の曲に「DistroKid に入力する」を出さない（二重の登録を防ぐ。決定 180）
+        all_done = False
     head = (f'<h1>{E(song["artist"])}「{E(song["title"])}」の公開の準備</h1>'
             f'<p class="sub">{E(song["id"])}・' + ("ここまで全部できています。中身を確かめて、DistroKid に進んでください。" if all_done
+                                                  else "この曲は配信中です。DistroKid への登録は済んでいます。" if st_now == "live"
+                                                  else "この曲は DistroKid に登録済みです（配信が始まるのを待っています）。" if st_now == "registered"
                                                   else "自動で進んでいます。このページは 5 秒ごとに新しくなります。") + "</p>")
     if all_done:
         head += "<section><h2>次にやること</h2><p>中身を確かめたら、DistroKid の登録画面に自動で入れます（最後の登録ボタンは Gon さんが押します）。</p>" + \

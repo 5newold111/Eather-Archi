@@ -139,7 +139,7 @@ def _status_json() -> dict:
                     r["redo"] = ([{"kind": "run", "label": "Suno にもう一度入力する（ブラウザが開きます）", "action": "fill_suno", "id": r["id"]}]
                                  if stt == "" else []) + \
                         ([{"kind": "run", "label": "DistroKid にもう一度入力する（ブラウザが開きます）", "action": "fill_distrokid", "id": r["id"]}]
-                         if stt in ("ready", "registered") else [])
+                         if stt == "ready" else [])   # 登録済み・配信中の曲には出さない（二重の登録を防ぐ。決定 180）
                 except Exception:  # noqa: BLE001
                     r["back"], r["redo"] = [], []
             for ph in r["phases"]:
@@ -166,7 +166,8 @@ def _status_json() -> dict:
         n_en = len(reference_db.enrich_pending())
         ref_enrich = {"pending": n_en, "yen": [n_en * reference_db.YEN_PER_SONG[0], n_en * reference_db.YEN_PER_SONG[1]],
                       "lyrics": len(reference_db.lyrics_pending()), "whisper": reference_db.whisper_ready(),
-                      "melody": len(reference_db.melody_pending()), "demucs": __import__("melody").demucs_ready(),
+                      "melody": len(reference_db.melody_pending()),
+                      "demucs": __import__("melody").demucs_ready() or bool(_common.python_with("demucs")),   # 音の解析用の置き場も見る（決定 180）
                       "deep": len(reference_db.deep_pending()),   # 深い分析がまだの曲（決定 180）
                       "infl": reference_db.influence_pending(),   # 影響を受けたアーティストの曲で、まだ済んでいない数（決定 91）
                       "infl_picked": sum(len(v.get("picks", [])) for v in __import__("influences").load().values() if (v or {}).get("applied")),
@@ -519,7 +520,7 @@ def command_for(action: str, p: dict) -> tuple[list[str], str] | None:
         import take_check
         song = _songs.by_id(str(p.get("id", "")))
         why = [w for w in str(p.get("why") or "").split(",") if w in take_check.MANUAL]
-        if song and why:
+        if song and why and song.get("brief"):   # デビュー曲はブリーフが無い（作業セットの指示を直す）。決定 180
             return [PY, str(S / "take_check.py"), song["id"], "--redo", ",".join(why)], f"Suno の入力を直す（{song['artist']}「{song['title']}」）"
         return None
     if action == "fill_lyrics":   # 登録した曲の歌詞を DistroKid の歌詞の画面に入れる（決定 52）
@@ -627,7 +628,8 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
                         if sys.version_info >= (3, 15) else   # 3.15：onnxruntime（声の区間を見つける部品）にまだ 3.15 版が無いので外して入れる（決定 180）
                         _common.pip_install(PY, "faster-whisper")),
             # メロディーを起こすときに歌を正確に取り出す部品（任意。約 2 GB。決定 90）
-            "demucs": _common.pip_install(PY, "demucs"),
+            # Demucs・Basic Pitch は新しい Python（3.15）にまだ入らないので、音の解析用の置き場（~/.postdog-audio・Python 3.11）に入れる（決定 160・180）
+            "demucs": f"cd {shlex.quote(str(ROOT))} && bash setup_audio.sh",
             # 曲を聞いて声・楽器・ジャンル・ムードを判定する部品（約 1 GB。判定モデル 約 350 MB は最初の判定のときに取ってくる。決定 103）
             "tagger": _common.pip_install(PY, "torch", "transformers"),
             # Claude Code（月額プランで、楽曲分析の調べ物を API の料金なしで。決定 103）。.env の鍵は渡さない（渡すと API の料金になる）

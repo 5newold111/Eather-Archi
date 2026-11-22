@@ -3499,6 +3499,11 @@ def run_distrokid(sess: Session, song_id: str, nxt: str = "") -> int:
     song = _songs.by_id(song_id)
     if song is None:
         sys.exit(f"[エラー] 曲 {song_id} が見つかりません")
+    st_now = _songs.state(song).get("status", "")
+    if st_now in ("registered", "live"):   # 登録済み・配信中の曲は入れない（同じ曲を二重に登録しないため。決定 180）
+        print(f"【結果】{song['artist']}「{song['title']}」は、もう DistroKid に登録してあります（{'配信中' if st_now == 'live' else '登録済み'}）。"
+              "入力しませんでした。登録をやり直すときは、先にダッシュボードの「戻す」で登録の前に戻してください")
+        return 2
     step(0, len(dk_sections(song)) + 2, "DistroKid の登録画面を開いています")
     sess.goto(SITES["distrokid"])
     if not sess.ensure_login("distrokid"):

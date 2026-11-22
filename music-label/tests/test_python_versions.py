@@ -128,5 +128,65 @@ class SweepFixes(unittest.TestCase):
             p.close()
 
 
+    def _project(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _fixture import Project
+        return Project()
+
+    def test_live_song_is_not_sent_to_distrokid_again(self):
+        """配信中・登録済みの曲に「DistroKid に入力する」を出さず、入力の本体も断る（二重の登録を防ぐ）"""
+        p = self._project()
+        try:
+            k = p.weekly("hollowplan", p.week(-6), "After Nights", stage="registered", days_ago=20)
+            p.set_state(k, status="live", released="2026-10-21")
+            p.reload()
+            songs = p.mod("_songs")
+            song = next(x for x in songs.all_songs() if x["key"] == k)
+            html = p.mod("song_check").song_page(song["id"], "tok") or ""
+            self.assertNotIn("fill_distrokid", html)
+            self.assertIn("配信中", html)
+            bf = p.mod("browser_fill")
+            self.assertEqual(bf.run_distrokid(None, song["id"]), 2, "ブラウザを開く前に断る")
+            web = p.mod("webapp")
+            tl = web.status_json() if hasattr(web, "status_json") else None
+            if tl:
+                for key in ("debut", "regular", "irregular"):
+                    for r in tl["timeline"][key]["rows"]:
+                        if r.get("id") == song["id"]:
+                            self.assertFalse([a for a in r.get("redo") or [] if a.get("action") == "fill_distrokid"])
+        finally:
+            p.close()
+
+    def test_chorus_start_without_measure(self):
+        """SSD から戻した曲（テイクの測った値が無い）でも、SNS の投稿案が落ちない"""
+        import json
+        p = self._project()
+        try:
+            k = p.weekly("tidewool", p.week(-1), "Half", stage="ready")
+            sel = p.out / "takes" / k / "selection.json"
+            d = json.loads(sel.read_text(encoding="utf-8"))
+            for t in d["takes"]:
+                t.pop("measure", None)
+            sel.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            p.reload()
+            week, slug = k.split("_", 1)
+            self.assertEqual(p.mod("post_social").chorus_start(week, slug), 45.0)
+        finally:
+            p.close()
+
+    def test_debut_song_has_no_retake_form(self):
+        """デビュー曲（ブリーフが無い）では、Suno の作り直しを受け付けない"""
+        p = self._project()
+        try:
+            k = p.debut("declan_fay", "Side B", stage="brief")
+            p.reload()
+            song = next(x for x in p.mod("_songs").all_songs() if x["key"] == k)
+            web = p.mod("webapp")
+            self.assertIsNone(web.command_for("suno_retake", {"id": song["id"], "why": "サビが弱い"}))
+            self.assertEqual(p.mod("take_check").fix_brief(song, ["サビが弱い"], ["x"], "test"), (False, ""))
+        finally:
+            p.close()
+
+
 if __name__ == "__main__":
     unittest.main()

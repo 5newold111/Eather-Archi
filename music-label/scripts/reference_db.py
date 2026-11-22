@@ -806,6 +806,11 @@ def _deep_version() -> int:
         return 1
 
 
+def registered_count() -> int:
+    """参考曲（out/references）に登録してある、既存楽曲の解析の数"""
+    return len(list(REF_DIR.glob(f"{PREFIX}aud-*.json"))) if REF_DIR.exists() else 0
+
+
 def deep_pending() -> list[tuple[Path, Path]]:
     """深い分析がまだの曲・前の版で測った曲・あとから MIDI ができた曲"""
     index = json.loads(AUDIO_INDEX.read_text(encoding="utf-8")) if AUDIO_INDEX.exists() else {}
@@ -2181,7 +2186,9 @@ def main() -> None:
             audio_tags_run(5, quiet=True)
         if deep_pending():   # 深い分析がまだの曲：1 回に 6 曲ずつ（決定 180）
             audio_deep(6, quiet=True)
-        return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
+        if registered_count() or not audio:
+            return   # 新しい曲が無い：登録し直さない（見張りは 30 分ごとにも動くので、ふだんは何もしない）
+        # 解析シートはあるのに、参考曲に 1 曲も登録されていない（Mac を立て直した直後など）：このまま登録まで進める（決定 180）
     if not paths and audio:   # データベースのフォルダは無いが、既存楽曲の解析はある
         res = {"sheets": [], "tables": [], "texts": [], "audio": 0, "skipped": [], "analysis": audio}
         n, d = write_outputs(res, "SSD の既存楽曲", [])

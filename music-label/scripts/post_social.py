@@ -196,9 +196,10 @@ def chorus_start(week: str, slug: str, duration_guess: float = 180) -> float:
     if sel.exists():
         d = read_json(sel)
         t = next((x for x in d.get("takes", []) if x["take"] == d.get("decision", {}).get("selected")), None)
-        if t and t["measure"].get("first_peak_sec") is not None:
-            dur = t["measure"].get("duration_sec", duration_guess)
-            return max(0.0, min(t["measure"]["first_peak_sec"] - 1, dur - CLIP_SEC - 1))
+        m = (t or {}).get("measure") or {}   # SSD から戻した曲の記録には、測った値が無いことがある（決定 180）
+        if m.get("first_peak_sec") is not None:
+            dur = m.get("duration_sec", duration_guess)
+            return max(0.0, min(m["first_peak_sec"] - 1, dur - CLIP_SEC - 1))
     return 45.0
 
 

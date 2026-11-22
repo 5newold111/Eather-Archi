@@ -148,6 +148,8 @@ def check(song: dict) -> dict:
 
 def fix_brief(song: dict, keys: list[str], reasons: list[str], source: str) -> tuple[bool, str]:
     """ブリーフを直す（お金を使わない順）。(直したか, 何をしたか)。回数切れなら (False, "")"""
+    if not song.get("brief"):   # デビュー曲（作業セットの指示）は、ここでは直さない（決定 180）
+        return False, ""
     bp = Path(song["brief"])
     b = read_json(bp)
     n = int((b.get("retake") or {}).get("round") or 0)
