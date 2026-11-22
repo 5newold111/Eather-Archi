@@ -28,6 +28,7 @@ class FillLive(unittest.TestCase):
                 return {"isrc": "QZNEW0000001", "url": "https://open.spotify.com/track/1", "released": "2026-10-20", "upc": "123456789012"}
             return None
         self.pub.find_on_spotify = find
+        self.real_token = self.pub.spotify_token
         self.pub.spotify_token = lambda: "token"
         self.pub._book = lambda: None
 
@@ -74,6 +75,13 @@ class FillLive(unittest.TestCase):
         self.assertEqual((a["isrc"], a["upc"], a["url"]), ("QZDZ00000001", "999", "https://music.apple.com/x"))
         self.assertEqual(self.p.state(self.b)["isrc"], "QZKEEP000001", "書いてある値は変えない")
         self.assertTrue(seen and not any(seen), "料金のかかる Web 検索は使わない")
+        self.assertTrue(self.pub.spotify_off(), "断られたことを覚える")
+        import os
+        os.environ["SPOTIFY_CLIENT_ID"], os.environ["SPOTIFY_CLIENT_SECRET"] = "x", "y"
+        try:
+            self.assertIsNone(self.real_token(), "覚えている間は、問い合わせない")
+        finally:
+            os.environ.pop("SPOTIFY_CLIENT_ID"), os.environ.pop("SPOTIFY_CLIENT_SECRET")
 
 
 if __name__ == "__main__":

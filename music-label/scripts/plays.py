@@ -226,6 +226,13 @@ def collect_spotify(d: dict, songs: list[dict], arts: dict, day: str) -> dict:
     """曲の人気度・組のフォロワー数と人気度。返り値：{"state": ok / need / error, "msg": …, "n": 集めた曲数}"""
     if not (os.environ.get("SPOTIFY_CLIENT_ID") and os.environ.get("SPOTIFY_CLIENT_SECRET")):
         return {"state": "need", "msg": "Spotify の鍵がありません（setup_keys.py --only spotify）"}
+    try:
+        import publish
+        off = publish.spotify_off()
+    except Exception:  # noqa: BLE001
+        off = ""
+    if off:   # Premium なしで使う（決定 180）
+        return {"state": "need", "msg": "Spotify の API は Premium が無いので使っていません（再生数は Spotify for Artists・YouTube などから集めます）"}
     tok = spotify_token()
     if not tok:
         return {"state": "error", "msg": "Spotify の鍵で入れませんでした（鍵を入れ直す：setup_keys.py --redo spotify）"}

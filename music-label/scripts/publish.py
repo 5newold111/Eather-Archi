@@ -1131,9 +1131,26 @@ def cmd_registered(args) -> int:
 
 # ---------------------------------------------------------------------------
 # Spotify で配信を確かめ、ISRC などを記録する
+SPOTIFY_OFF = OUT / "setup" / "spotify_refused.json"   # Spotify に断られた記録（Premium なしで使う。決定 180）
+SPOTIFY_OFF_DAYS = 30   # 断られたあと、問い合わせない日数（プランが変わったときのため、30 日ごとに 1 回だけ試す）
+
+
+def spotify_off() -> str:
+    """Spotify の問い合わせを休んでいるなら、その理由（休んでいなければ空）"""
+    if not SPOTIFY_OFF.exists():
+        return ""
+    d = read_json(SPOTIFY_OFF)
+    try:
+        if (date.today() - date.fromisoformat(str(d.get("at", ""))[:10])).days < SPOTIFY_OFF_DAYS:
+            return d.get("why") or "Spotify に断られています"
+    except ValueError:
+        pass
+    return ""
+
+
 def spotify_token() -> str | None:
     cid, sec = os.environ.get("SPOTIFY_CLIENT_ID"), os.environ.get("SPOTIFY_CLIENT_SECRET")
-    if not cid or not sec:
+    if not cid or not sec or spotify_off():   # 断られている間は、鍵が無いときと同じ（Apple Music・Deezer で確かめる）
         return None
     req = urllib.request.Request("https://accounts.spotify.com/api/token", data=b"grant_type=client_credentials",
                                  headers={"Authorization": "Basic " + base64.b64encode(f"{cid}:{sec}".encode()).decode(),
@@ -1143,7 +1160,16 @@ def spotify_token() -> str | None:
 
 
 class SpotifyRefused(RuntimeError):
-    """Spotify が問い合わせを断った（403）。鍵は通っているが、アプリの持ち主のプランなどの理由（決定 180）"""
+    """Spotify が問い合わせを断った（403）。鍵は通っているが、アプリの持ち主のプランなどの理由（決定 180）。
+    作ったときに、断られたことを覚える（しばらく問い合わせない。毎日同じ警告を出さない）"""
+
+    def __init__(self, text: str, why: str = "403"):
+        super().__init__(text)
+        try:
+            SPOTIFY_OFF.parent.mkdir(parents=True, exist_ok=True)
+            SPOTIFY_OFF.write_text(json.dumps({"at": date.today().isoformat(), "why": why}, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
 
 
 def spotify_get(token: str, path: str) -> dict:
@@ -1158,12 +1184,12 @@ def spotify_get(token: str, path: str) -> dict:
             msg = (json.loads(e.read() or b"{}").get("error") or {}).get("message", "")
         except (ValueError, AttributeError):
             msg = ""
-        raise SpotifyRefused(spotify_refused_text(msg)) from None
+        raise SpotifyRefused(spotify_refused_text(msg), msg or "403") from None
 
 
 def spotify_refused_text(msg: str = "") -> str:
-    return ("Spotify に断られました（403" + (f"：{msg}" if msg else "") + "）。開発者のアプリの持ち主のアカウントに Premium が要ることがあります"
-            "（2026-02 から）。それまでは、鍵の要らない確かめ方（Apple Music・Deezer）で進めます")
+    return ("Spotify に断られました（403" + (f"：{msg}" if msg else "") + "）。開発者のアプリの持ち主のアカウントに Premium が要ります"
+            f"（2026-02 から）。Premium なしで使う決まりなので、鍵の要らない確かめ方（Apple Music・Deezer）で進めます（{SPOTIFY_OFF_DAYS} 日ごとに 1 回だけ試し直します）")
 
 
 ARTIST_LINKS = OUT / "knowledge" / "artist_links.json"

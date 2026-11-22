@@ -250,11 +250,14 @@ def check_spotify():
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import publish
+        if publish.spotify_off():   # Premium なしで使う（決定 180）：断られているのは分かっているので、✕ にしない
+            return "none", ("Premium なしなので、Spotify の API は使っていません。配信の確認と ISRC などは Apple Music・Deezer で行います"
+                            "（これで問題ありません）")
         token = publish.spotify_token()
         publish.spotify_get(token, "search?q=track%3Ahello&type=track&limit=1")   # 鍵が通っても、曲を探すのを断られることがある（決定 180）
     except Exception as e:  # noqa: BLE001
-        if type(e).__name__ == "SpotifyRefused":
-            return "ng", str(e)[:300]
+        if type(e).__name__ == "SpotifyRefused":   # Premium なし（決定 180）
+            return "none", "Premium なしなので、Spotify の API は使いません。配信の確認と ISRC などは Apple Music・Deezer で行います（これで問題ありません）"
         return "ng", f"接続できません：{str(e)[:120]}"
     return "ok", "接続できました（配信の確認と ISRC の記録に使います）"
 
