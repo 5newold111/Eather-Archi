@@ -93,5 +93,40 @@ class LaunchdPython(unittest.TestCase):
             self.assertEqual(recover.plist_python_mismatch(agents, "jp.x", d / "none" / "python3"), "", "置き場が無ければ見ない")
 
 
+class SweepFixes(unittest.TestCase):
+    """全部を試しに流して見つけた所（決定 180）"""
+
+    def test_send_diag_help_does_not_send(self):
+        import subprocess
+        r = subprocess.run([sys.executable, str(SCRIPTS / "send_diag.py"), "--help"], capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("使い方", r.stdout)
+        self.assertNotIn("送りました", r.stdout + r.stderr)
+
+
+    def test_supabase_rows_without_take_no(self):
+        """SSD から戻した曲の記録（テイクの番号 take_no が無い）でも、データベースへの写しを組み立てられる"""
+        import json
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _fixture import Project
+        p = Project()
+        try:
+            k = p.weekly("hollowplan", p.week(-1), "A", stage="ready")
+            sel = p.out / "takes" / k / "selection.json"
+            d = json.loads(sel.read_text(encoding="utf-8"))
+            for t in d["takes"]:
+                t.pop("take_no", None)
+                t.pop("measure", None)
+            sel.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+            p.reload()
+            ss = p.mod("supabase_sync")
+            rows, _ = ss.week_rows(p.week(-1), False)
+            gens = [r for t, r, _ in rows if t == "generations"]
+            self.assertTrue(gens)
+            self.assertTrue(all(isinstance(g["take_no"], int) for g in gens))
+        finally:
+            p.close()
+
+
 if __name__ == "__main__":
     unittest.main()

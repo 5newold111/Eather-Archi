@@ -174,7 +174,10 @@ def week_rows(week: str, with_sources: bool) -> tuple[list, list]:
         chosen = (sel.get("decision") or {}).get("selected")
         gen_ref = None
         takes = sorted(sel.get("takes", []), key=lambda t: t["take"] == chosen)  # 選んだテイクを最後に（1 曲 1 選択の制約）
-        for t in takes:
+        for i, t in enumerate(takes, 1):   # SSD から戻した曲の記録には、テイクの番号（take_no）が無いことがある（決定 180）
+            m = re.search(r"(\d+)", Path(t.get("take", "")).stem.rsplit("_", 1)[-1])
+            t = {**t, "take_no": int(t.get("take_no") or (m.group(1) if m else i))}
+            t.setdefault("measure", {})
             is_sel = t["take"] == chosen
             ext = Path(t["take"]).suffix
             path = f"{b['week_start']}/{slug}/take_{t['take_no']:02d}{ext}"
@@ -183,7 +186,7 @@ def week_rows(week: str, with_sources: bool) -> tuple[list, list]:
             rows.append(("generations", {
                 "brief_id": brief_ref, "take_no": int(t["take_no"]),
                 "storage_path": f"generations/{path}" if is_sel else None,
-                "duration_sec": int(round(t["measure"]["duration_sec"])), "selected": is_sel,
+                "duration_sec": int(round((t.get("measure") or {}).get("duration_sec") or 0)), "selected": is_sel,
                 "listening_note": note,
             }, ["brief_id", "take_no"]))
             if is_sel:

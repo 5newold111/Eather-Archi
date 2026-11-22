@@ -267,7 +267,11 @@ def main() -> None:
     ap.add_argument("--reason", default="")
     a = ap.parse_args()
     if a.cmd == "list":
-        r = review()
+        try:
+            r = review()
+        except FileNotFoundError as e:   # SSD がつながっていない・管理表が無い（決定 180）
+            sys.exit(f"[案内] アーティストの管理表が見つかりません（{Path(e.filename or '').name or '管理表'}）。"
+                     "SSD をつないでから、もう一度実行してください")
         for x in r["acts"]:
             print(f"■ {x['name']}（{x['id']}・{x['label']}）{'— 全部決めました：デビューの承認待ち' if x['ready'] else ''}\n   {x['summary']}")
             for i in x["items"]:

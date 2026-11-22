@@ -108,4 +108,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    if any(x in ("-h", "--help") for x in sys.argv[1:]):   # 使い方だけを見ようとして、記録を作って送らないように（決定 180）
+        print(__doc__)
+        sys.exit(0)
     main()
