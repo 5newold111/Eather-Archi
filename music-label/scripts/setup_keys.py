@@ -250,8 +250,11 @@ def check_spotify():
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import publish
-        publish.spotify_token()
+        token = publish.spotify_token()
+        publish.spotify_get(token, "search?q=track%3Ahello&type=track&limit=1")   # 鍵が通っても、曲を探すのを断られることがある（決定 180）
     except Exception as e:  # noqa: BLE001
+        if type(e).__name__ == "SpotifyRefused":
+            return "ng", str(e)[:300]
         return "ng", f"接続できません：{str(e)[:120]}"
     return "ok", "接続できました（配信の確認と ISRC の記録に使います）"
 

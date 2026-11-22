@@ -48,6 +48,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta
@@ -1141,10 +1142,28 @@ def spotify_token() -> str | None:
         return json.loads(r.read())["access_token"]
 
 
+class SpotifyRefused(RuntimeError):
+    """Spotify が問い合わせを断った（403）。鍵は通っているが、アプリの持ち主のプランなどの理由（決定 180）"""
+
+
 def spotify_get(token: str, path: str) -> dict:
     req = urllib.request.Request("https://api.spotify.com/v1/" + path, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code != 403:
+            raise
+        try:
+            msg = (json.loads(e.read() or b"{}").get("error") or {}).get("message", "")
+        except (ValueError, AttributeError):
+            msg = ""
+        raise SpotifyRefused(spotify_refused_text(msg)) from None
+
+
+def spotify_refused_text(msg: str = "") -> str:
+    return ("Spotify に断られました（403" + (f"：{msg}" if msg else "") + "）。開発者のアプリの持ち主のアカウントに Premium が要ることがあります"
+            "（2026-02 から）。それまでは、鍵の要らない確かめ方（Apple Music・Deezer）で進めます")
 
 
 ARTIST_LINKS = OUT / "knowledge" / "artist_links.json"
@@ -1303,6 +1322,8 @@ def fill_live(token: str) -> bool:
             continue
         try:
             found = find_on_spotify(token, song)
+        except SpotifyRefused:
+            raise
         except Exception as e:  # noqa: BLE001
             print(f"   － {song['artist']}「{song['title']}」：ISRC などを確かめられませんでした（{e}）")
             continue
@@ -1322,6 +1343,41 @@ def fill_live(token: str) -> bool:
     return changed
 
 
+def fill_live_without_key() -> bool:
+    """配信中なのに ISRC・UPC・配信の住所が空の曲を、鍵の要らない確かめ方（Deezer・Apple Music）で埋める（決定 180）"""
+    import store_check
+    changed = False
+    for song in _songs.all_songs():
+        st = _songs.state(song)
+        if st.get("status") != "live" or all(st.get(k) for k in FILL_KEYS):
+            continue
+        last = str(st.get("fill_checked_at") or "")
+        if last and (date.today() - date.fromisoformat(last[:10])).days < 7:
+            continue
+        try:
+            r = store_check.check(song, web_search=False)   # 料金のかかる Web 検索は使わない
+        except Exception as e:  # noqa: BLE001
+            print(f"   － {song['artist']}「{song['title']}」：ISRC などを確かめられませんでした（{e}）")
+            continue
+        sp, ap, dz = r.get("spotify") or {}, r.get("apple") or {}, r.get("deezer") or {}
+        found = {"isrc": dz.get("isrc", ""), "upc": dz.get("upc", ""), "url": sp.get("url") or ap.get("url") or dz.get("url", ""),
+                 "apple_url": ap.get("url", ""), "deezer_url": dz.get("url", ""), "spotify_track_id": sp.get("track_id", "")}
+        add = {k: v for k, v in found.items() if v and not st.get(k)}
+        if not add:
+            st["fill_checked_at"] = date.today().isoformat()
+            _songs.save_state(song, st)
+            print(f"   ・{song['artist']}「{song['title']}」：Apple Music・Deezer で見つからず、ISRC などを埋められませんでした")
+            continue
+        st.update(add)
+        _songs.save_state(song, st)
+        changed = True
+        print(f"   ○ {song['artist']}「{song['title']}」：空いていた " + "・".join({"isrc": "ISRC", "upc": "UPC", "url": "配信の住所"}[k] for k in add if k in FILL_KEYS)
+              + " を埋めました（" + "・".join(n for n, x in (("Deezer", dz.get("url")), ("Apple Music", ap.get("url"))) if x) + " で確認）")
+    if changed:
+        _book()
+    return changed
+
+
 def cmd_track(args) -> int:
     waiting = [s for s in _songs.all_songs() if _songs.state(s).get("status") == "registered"]
     gaps = any(_songs.state(s).get("status") == "live" and not all(_songs.state(s).get(k) for k in FILL_KEYS) for s in _songs.all_songs())
@@ -1335,11 +1391,20 @@ def cmd_track(args) -> int:
         print(f"－ Spotify につながりませんでした：{e}")
         return 0
     if not token:   # 鍵が無いとき：Apple Music・Deezer・song.link・Spotify の曲のページ（・Claude の Web 検索）で確かめる（決定 57）
+        fill_live_without_key()
         return track_without_key(waiting, args) if waiting else 0
-    changed = fill_live(token)
+    try:
+        changed = fill_live(token)
+    except SpotifyRefused as e:   # 鍵は通るが、問い合わせを断られる：鍵の要らない確かめ方に切り替える（決定 180）
+        print(f"   － {e}")
+        fill_live_without_key()
+        return track_without_key(waiting, args) if waiting else 0
     for song in waiting:
         try:
             found = find_on_spotify(token, song)
+        except SpotifyRefused as e:
+            print(f"   － {e}")
+            return track_without_key([s for s in waiting if _songs.state(s).get("status") == "registered"], args)
         except Exception as e:  # noqa: BLE001
             print(f"   － {song['artist']}「{song['title']}」：確認できませんでした（{e}）")
             continue

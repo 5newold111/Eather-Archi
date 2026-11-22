@@ -51,8 +51,29 @@ class FillLive(unittest.TestCase):
 
     def test_without_key_does_nothing(self):
         self.pub.spotify_token = lambda: ""
+        self.p.mod("store_check").check = lambda song, web_search=True: {"live": False, "spotify": {}, "apple": {}, "deezer": {}, "notes": []}   # 外には出ない
         self.assertEqual(self.pub.cmd_track(types.SimpleNamespace(quiet=True)), 0)
         self.assertEqual(self.calls, [])
+
+
+    def test_spotify_refused_falls_back_to_stores(self):
+        """Spotify が問い合わせを断る（403。アプリの持ち主のプランなど）：鍵の要らない確かめ方（Deezer・Apple Music）で埋める（決定 180）"""
+        def refused(token, song):
+            raise self.pub.SpotifyRefused(self.pub.spotify_refused_text("Active premium subscription required"))
+        self.pub.find_on_spotify = refused
+        sc = self.p.mod("store_check")
+        seen = []
+
+        def check(song, web_search=True):
+            seen.append(web_search)
+            return {"live": True, "spotify": {}, "apple": {"url": "https://music.apple.com/x"},
+                    "deezer": {"isrc": "QZDZ00000001", "upc": "999", "url": "https://deezer.com/track/1"}, "notes": []}
+        sc.check = check
+        self.pub.cmd_track(types.SimpleNamespace(quiet=True))
+        a = self.p.state(self.a)
+        self.assertEqual((a["isrc"], a["upc"], a["url"]), ("QZDZ00000001", "999", "https://music.apple.com/x"))
+        self.assertEqual(self.p.state(self.b)["isrc"], "QZKEEP000001", "書いてある値は変えない")
+        self.assertTrue(seen and not any(seen), "料金のかかる Web 検索は使わない")
 
 
 if __name__ == "__main__":
