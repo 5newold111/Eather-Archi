@@ -248,6 +248,25 @@ class WholeTest(Base):
         self.assertEqual(f["fix"], "owner")
         self.assertIn("publish.py take", f["why"])
 
+    def test_inbox_file_of_released_song_is_not_unknown(self):
+        """配信済みの曲の音源が受け口に残っている（Mac を立て直して、扱った記録が無くなった）：見分けられないと言わない。
+        取り込みは、取り込まずに記録だけして、次からは見ない（決定 180）"""
+        p = self.p
+        k = p.weekly("hollowplan", p.week(-6), "After Nights", stage="registered", days_ago=20)
+        p.set_state(k, status="live", released="2026-10-21")
+        p.drop("After Nights_HOLLOWPLAN_2026-11-05.m4a", "ssd_inbox", age=3600)
+        p.reload()
+        self.h = p.mod("health")
+        self.assertFalse([x for x in self.ids() if x.startswith("inbox:")])
+        pub = p.mod("publish")
+        self.assertEqual(pub.released_song(pub.new_files()[0])["key"], k)
+        import contextlib, io, types
+        with contextlib.redirect_stdout(io.StringIO()) as out:
+            pub.cmd_scan(types.SimpleNamespace(no_open=True, quiet=True))
+        self.assertIn("取り込まずに記録だけします", out.getvalue())
+        self.assertEqual(pub.new_files(), [], "次からは見ない")
+        self.assertEqual(p.state(k)["status"], "live", "配信中の曲の記録は変えない")
+
     def test_inbox_fresh_file_waits_for_normal_intake(self):
         self.p.weekly("hollowplan", self.p.week(-1), "After Nights")
         self.p.drop("After Nights.wav", "ssd_inbox", age=120)

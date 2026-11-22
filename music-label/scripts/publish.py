@@ -219,9 +219,18 @@ def _clean(stem: str) -> str:
     return _songs.norm(s)
 
 
+def released_song(f: Path) -> dict | None:
+    """受け口のファイルが、もう登録済み・配信中の曲の音源なら、その曲（決定 180）。
+    Mac を立て直すと「扱ったファイルの記録」（imported.json）が無くなり、前に取り込んだ配信済みの曲の音源が
+    「どの曲か見分けられない」と出ていた。曲名がはっきり合うものだけ（名前が少し違うだけのものは、ここでは見ない）"""
+    done = [s for s in _songs.all_songs() if s.get("title") and _songs.state(s).get("status") in DONE]
+    song, why = match(f, done)
+    return song if song is not None and not why else None
+
+
 def match(f: Path, songs: list[dict]) -> tuple[dict | None, str]:
     """ファイル名（とフォルダ名）から曲を見分ける。(曲, 理由)"""
-    name = _clean(f.stem)
+    name = re.sub(r"\s+", " ", _clean(f.stem).replace("_", " ")).strip()   # 「<曲名>_<アーティスト名>_<日付>」（この仕組みが付ける名前）の _ も区切り（決定 180）
     folders = " ".join(_songs.norm(p) for p in f.parts[-4:-1])
     in_song = _songs.norm(f.parent.name)   # 曲名のフォルダの中なら、フォルダの名前が曲名（決定 151）
     best, best_score, ties = None, 0, []
@@ -875,6 +884,11 @@ def cmd_scan(args) -> int:
     for f in files:
         song, why = match(f, songs)
         if song is None:
+            done = released_song(f)
+            if done is not None:   # 配信済みの曲の音源：取り込まずに、扱った記録だけ残す（次からは見ない。決定 180）
+                print(f"   ・{f.name}：{done['artist']}「{done['title']}」（{'配信中' if _songs.state(done).get('status') == 'live' else '登録済み'}）の音源です。取り込まずに記録だけします")
+                reg[_sig(f)] = {"song": done["id"], "released": True, "at": datetime.now().isoformat(timespec="seconds")}
+                continue
             print(f"   ？ {f.name}：{why}")
             reg[_sig(f)] = {"song": None, "why": why, "at": datetime.now().isoformat(timespec="seconds")}
             continue

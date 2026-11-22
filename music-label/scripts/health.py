@@ -282,6 +282,8 @@ def check_inbox(songs: list[dict], now: datetime) -> list[dict]:
     for f in files:
         song, why = publish.match(f, waiting)
         if song is None:
+            if publish.released_song(f) is not None:   # 配信済みの曲の音源：次の取り込みが記録だけして片付ける（決定 180）
+                continue
             unknown.append((f, why))
         elif now.timestamp() - f.stat().st_mtime > IMPORT_STUCK_MIN * 60 and not _songs.state(song).get("manual_take"):
             known.append((f, song))
