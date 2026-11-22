@@ -543,7 +543,7 @@ def _fixed_today() -> list[dict]:
 
 def heal(deep: bool = False, dry: bool = False, quiet: bool = False) -> dict:
     """点検 → 自動で直す（同じ直しは 1 日 1 回）→ もう一度点検 → 記録。戻り値は status() と同じ形"""
-    say = (lambda *a: None) if quiet else print
+    say = (lambda *a, **k: None) if quiet else print
     today = date.today().isoformat()
     state = read_json(STATE) if STATE.exists() else {}
     tried = {k: v for k, v in (state.get("tried") or {}).items() if v == today}

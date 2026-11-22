@@ -108,6 +108,13 @@ class SongFilesTest(Base):
         self.heal()
         self.assertEqual(self.ran, [["publish.py", "back", k, "--to", "master"], ["schedule.py", "run", "intake"]])
 
+    def test_quiet_heal_with_something_to_fix(self):
+        """定期実行は --quiet で動く。直す物があるときに表示の関数で落ちていた（実機の 11/22 の失敗。決定 180）"""
+        k = self.p.weekly("hollowplan", self.p.week(-1), "A", stage="ready")
+        (self.p.out / "masters" / k / "master.wav").unlink()
+        self.heal(quiet=True)
+        self.assertIn(["publish.py", "back", k, "--to", "master"], self.ran)
+
     def test_waiting_cover_without_master_runs_intake(self):
         k = self.p.weekly("hollowplan", self.p.week(-1), "A", stage="mastered")
         (self.p.out / "masters" / k / "master.wav").unlink()

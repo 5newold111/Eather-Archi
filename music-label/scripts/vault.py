@@ -193,7 +193,7 @@ def _r2():
 
 def backup(if_changed: bool = False, quiet: bool = False) -> dict:
     """.env を暗号にして、手元（out/vault/env.enc）と R2 に置く。結果：{"ok", "uploaded", "skipped", "message"}"""
-    say = (lambda *_: None) if quiet else step
+    say = (lambda *_, **__: None) if quiet else step
     with _LOCK:
         if not ENV.exists():
             return {"ok": False, "message": ".env がまだありません"}
