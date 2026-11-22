@@ -90,12 +90,15 @@ def service_html(key: str, svc: dict, keys: list[dict], checks: dict) -> str:
 
 RECOVER = """<section class="card"><h2>Mac が壊れた・買い替えたとき</h2>
 <ol style="margin:4px 0;padding-left:1.4em;display:grid;gap:4px">
-<li>新しい Mac で、GitHub からこの仕組みを取ってくる：<code>git clone https://github.com/5newold111/Eather-Archi.git ~/Eather-Archi</code> → <code>cd ~/Eather-Archi/music-label</code></li>
-<li>部品を入れる：<code>python3 -m pip install --user -r requirements.txt</code>・<code>brew install ffmpeg</code></li>
-<li>鍵を戻す：<code>python3 scripts/vault.py restore</code>（「パスワード」アプリの復旧キットを見ながら入れる）</li>
-<li>記録と音源を戻す：<code>python3 scripts/restore_r2.py --dry-run</code> で確かめてから <code>python3 scripts/restore_r2.py</code></li>
+<li>ターミナルで、GitHub からこの仕組みを取ってくる：<code>git clone -b claude/jolly-edison-bzgnjf https://github.com/5newold111/Eather-Archi.git ~/Eather-Archi</code> → <code>cd ~/Eather-Archi/music-label</code></li>
+<li>道具と部品を入れる：<code>bash setup_mac.sh</code>（止まったら、表示された命令を流して、もう一度同じ命令。Homebrew・ffmpeg・Python・部品の置き場まで入ります）</li>
+<li>ターミナルの窓を開き直して <code>cd ~/Eather-Archi/music-label</code></li>
+<li>鍵を戻す：<code>python3 scripts/vault.py restore</code>（「パスワード」アプリの復旧キットを貼る）</li>
+<li>記録と音源を戻す：R2 から <code>python3 scripts/restore_r2.py --dry-run</code> → <code>python3 scripts/restore_r2.py</code>。
+  R2 に無いものは SSD から <code>python3 scripts/recover.py from-ssd</code>（見るだけ）→ <code>--apply</code></li>
 <li>定期実行とダッシュボードを登録する：<code>python3 scripts/schedule.py install</code></li>
-<li>Suno・DistroKid は、最初の自動入力のときに専用の Chrome でログインし直す</li>
+<li>全体の点検：<code>python3 scripts/recover.py check</code>（8 項目そろえば完了。足りなければ「次にすること」が 1 つ出ます）</li>
+<li>Suno・DistroKid・Spotify for Artists は、専用の Chrome でログインし直す</li>
 </ol>
 <p class="sub">DistroKid に登録済みの曲は、Mac が止まっていても予定どおり配信されます。止まるのは、新しい曲づくり・SNS の投稿・配信の確認です。</p></section>"""
 

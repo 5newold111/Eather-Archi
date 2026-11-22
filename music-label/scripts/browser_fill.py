@@ -33,7 +33,7 @@ Suno と DistroKid の入力を、システムが専用のブラウザで行う�
 「終わりました」は、作曲画面（登録画面）で、入れた欄を読み返して全部そろっていたときだけ（終了コード 0）。
 足りない欄・ログインが要るときは「まだ終わっていません」（終了コード 2）。最後の行の【結果】がダッシュボードに出る
 
-最初に 1 回：ダッシュボードの「ブラウザ入力の部品を入れる」を押す（中身は  python3 -m pip install --user playwright  と  python3 -m playwright install chromium ）
+最初に 1 回：ダッシュボードの「ブラウザ入力の部品を入れる」を押す（中身は  python3 -m pip install playwright  と  python3 -m playwright install chromium ）
 """
 from __future__ import annotations
 
@@ -336,7 +336,7 @@ class Session:
                     self.browser = pw.chromium.connect_over_cdp(f"http://127.0.0.1:{chrome_port()}")
                 except Exception as e2:  # noqa: BLE001
                     sys.exit("[案内] 専用の Chrome につなげませんでした。① 開いている Chrome をすべて ⌘Q で閉じる "
-                             "② ターミナルで  python3 -m pip install --user -U playwright  を実行する ③ もう一度押す。"
+                             "② ターミナルで  python3 -m pip install -U playwright  を実行する ③ もう一度押す。"
                              f"それでもだめなら、この文を Claude に貼ってください：{str(e2).splitlines()[0][:200]}")
             self.ctx = self.browser.contexts[0] if self.browser.contexts else self.browser.new_context()
         else:          # Chrome が無い：Playwright のブラウザ（Google でのログインは断られることがある）
@@ -3809,7 +3809,7 @@ def main() -> None:
         sys.exit("[案内] ブラウザで入力する部品（Playwright）が、この Python に入っていません：" + sys.executable + "\n"
                  "       （Python の版が上がると、前に入れた部品が見えなくなります）\n"
                  "       ターミナルに次をコピーして 1 回実行してください：\n"
-                 f"       {py} -m pip install --user playwright || {py} -m pip install --user --break-system-packages playwright\n"
+                 f"       {__import__('_common').pip_install(sys.executable, 'playwright')} && {py} -m playwright install chromium\n"
                  "       ダッシュボードのポップアップの「ブラウザ入力の部品を入れる」でも同じことができます")
     if a.what == "distrokid" and not a.args:
         sys.exit("[エラー] 曲 ID を付けてください（例 PDR-003。残りを続けて入れるときは all）")

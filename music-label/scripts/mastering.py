@@ -69,7 +69,7 @@ def need_tools() -> str:
         import scipy  # noqa: F401
         import soundfile  # noqa: F401
     except ImportError as e:
-        return f"音を処理する部品（{e.name}）がありません。ターミナルで  python3 -m pip install --user -r requirements.txt  を実行してください"
+        return f"音を処理する部品（{e.name}）がありません。ターミナルで  bash setup_mac.sh  を実行してください（足りない部品だけ入れます）"
     return ""
 
 

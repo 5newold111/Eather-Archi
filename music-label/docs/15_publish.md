@@ -69,7 +69,7 @@ python3 scripts/refresh_photos.py --list  # 写真の次の刷新日
 | Spotify の鍵と、作詞作曲者の欄の本名を入れる | `python3 scripts/setup_keys.py --only spotify,owner` |
 | 「ダウンロード」を自動の処理から読めるようにする | システム設定 → プライバシーとセキュリティ → フルディスクアクセス に python3 を追加 |
 | 定期実行に取り込み・配信の確認・ダッシュボードを加える | `python3 scripts/schedule.py install`（そのあと http://localhost:8765 をブックマーク） |
-| ブラウザで自動入力する部品を入れる | ダッシュボードの「ブラウザ入力の部品を入れる」（`python3 -m pip install --user playwright` と `python3 -m playwright install chromium`） |
+| ブラウザで自動入力する部品を入れる | ダッシュボードの「ブラウザ入力の部品を入れる」（`python3 -m pip install playwright` と `python3 -m playwright install chromium`） |
 | 専用のブラウザで Suno と DistroKid にログインしておく | ダッシュボードの「Suno にログイン（初回だけ）」「DistroKid にログイン（初回だけ）」（`browser_fill.py login suno`） |
 
 ## 7. Suno に入力する手順（システムが自動で。決定 22）

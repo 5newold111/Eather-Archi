@@ -565,7 +565,7 @@ def export_xlsx(out: Path | None = None) -> Path | None:
         from openpyxl import Workbook
         from openpyxl.styles import Font
     except ImportError:
-        print("   － SSD の収支.xlsx は書きませんでした：表計算の部品（openpyxl）が入っていません（python3 -m pip install --user openpyxl）")
+        print("   － SSD の収支.xlsx は書きませんでした：表計算の部品（openpyxl）が入っていません（bash setup_mac.sh で入ります）")
         return None
     entries, names = load(), _names()
     wb = Workbook()

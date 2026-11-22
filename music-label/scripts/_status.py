@@ -185,7 +185,7 @@ def system_blockers() -> list[tuple[str, str, str]]:
     from _guide import _has_playwright
     if not _has_playwright():
         out.append(("normal", "Suno・DistroKid に自動で入力する部品（Playwright）が入っていません（無くても、手でコピーして貼れば進められます）",
-                    "python3 -m pip install --user playwright && python3 -m playwright install chromium"))
+                    "python3 -m pip install playwright && python3 -m playwright install chromium"))
     owner = os.environ.get("OWNER_LEGAL_NAME", "").strip()
     if not owner:
         out.append(("ng", "DistroKid の Songwriter と Track credits の Producer に入れる本名が未設定です（無いと DistroKid に差し戻されます）",

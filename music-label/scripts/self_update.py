@@ -243,10 +243,10 @@ def apply(force: bool = False) -> int:
                       "files": len(files), "install_ok": ok, "requirements_changed": reqs})
     body = (log[0] if log else "更新") + (f" ほか {len(log) - 1} 件" if len(log) > 1 else "")
     if reqs:
-        body += "。部品の追加があります：ターミナルで python3 -m pip install --user -r requirements.txt"
+        body += "。部品の追加があります：ターミナルで bash setup_mac.sh"
     notify("システムを更新しました" if ok else "更新の反映で問題がありました", body[:200])
     print(("【結果】更新を反映しました" if ok else "【結果】更新は取り込みましたが、定期実行の登録で問題がありました（ターミナルで python3 scripts/schedule.py install）")
-          + ("（部品の追加があります：python3 -m pip install --user -r requirements.txt）" if reqs else ""))
+          + ("（部品の追加があります：bash setup_mac.sh）" if reqs else ""))
     return 0 if ok else 1
 
 

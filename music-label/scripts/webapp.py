@@ -47,6 +47,7 @@ from urllib.parse import parse_qs, quote, unquote, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _common import OUT, ROOT, all_artists, load_dotenv, read_json  # noqa: E402
+import _common  # noqa: E402  部品の入れ方（pip_install）
 
 load_dotenv()
 import _songs  # noqa: E402
@@ -618,18 +619,17 @@ TERMINAL = {"openai": [PY, "scripts/setup_keys.py", "--only", "openai"], "anthro
             "ntfy": [PY, "scripts/setup_keys.py", "--only", "ntfy"], "healthcheck": [PY, "scripts/setup_keys.py", "--only", "healthcheck"],
             "owner": [PY, "scripts/setup_keys.py", "--only", "owner"], "ffmpeg": ["brew", "install", "ffmpeg"],
             # ブラウザで自動入力する部品（Playwright）と、Chrome が無いとき用のブラウザ
-            # Homebrew の Python は --user だけだと断られるので、そのときは --break-system-packages を付けて入れ直す
-            "playwright": f"{{ {shlex.quote(PY)} -m pip install --user playwright || {shlex.quote(PY)} -m pip install --user --break-system-packages playwright; }}"
-                          f" && {shlex.quote(PY)} -m playwright install chromium",
+            # 入れ方は _common.pip_install（専用の置き場 .venv → --user → Homebrew の Python が断るときの書き方の順。決定 180）
+            "playwright": _common.pip_install(PY, "playwright") + f" && {shlex.quote(PY)} -m playwright install chromium",
             "schedule": [PY, "scripts/schedule.py", "install"],
             # 歌詞を聞き取る部品（決定 86）。最初の聞き取りのときに、モデル（約 500 MB）を自動でダウンロードする
             "whisper": (f"{shlex.quote(PY)} -m pip install av ctranslate2 tokenizers huggingface-hub tqdm && {shlex.quote(PY)} -m pip install --no-deps faster-whisper"
                         if sys.version_info >= (3, 15) else   # 3.15：onnxruntime（声の区間を見つける部品）にまだ 3.15 版が無いので外して入れる（決定 180）
-                        f"{{ {shlex.quote(PY)} -m pip install faster-whisper || {shlex.quote(PY)} -m pip install --user faster-whisper || {shlex.quote(PY)} -m pip install --user --break-system-packages faster-whisper; }}"),
+                        _common.pip_install(PY, "faster-whisper")),
             # メロディーを起こすときに歌を正確に取り出す部品（任意。約 2 GB。決定 90）
-            "demucs": f"{{ {shlex.quote(PY)} -m pip install --user demucs || {shlex.quote(PY)} -m pip install --user --break-system-packages demucs; }}",
+            "demucs": _common.pip_install(PY, "demucs"),
             # 曲を聞いて声・楽器・ジャンル・ムードを判定する部品（約 1 GB。判定モデル 約 350 MB は最初の判定のときに取ってくる。決定 103）
-            "tagger": f"{{ {shlex.quote(PY)} -m pip install --user torch transformers || {shlex.quote(PY)} -m pip install --user --break-system-packages torch transformers; }}",
+            "tagger": _common.pip_install(PY, "torch", "transformers"),
             # Claude Code（月額プランで、楽曲分析の調べ物を API の料金なしで。決定 103）。.env の鍵は渡さない（渡すと API の料金になる）
             "claude_code": "{ command -v claude >/dev/null || curl -fsSL https://claude.ai/install.sh | bash; } && echo && "
                            "echo 'Claude Code が起動したら /login で「Claude アカウント（Pro・Max）」を選んでください。終わったら /exit' && "
@@ -1312,7 +1312,7 @@ function render(){
    if(a){a.hidden=!n.songs_url;if(n.songs_url)a.href=n.songs_url}}
   {const u=DATA.update||{},el=document.getElementById("upd-info");   // 自動の更新（決定 108）
    el.innerHTML=`システムの版 ${E(DATA.version||"?")}`+(u.at?`・最後に自動で反映：${E(u.at.replace("T"," ").slice(0,16))}（${E((u.changes||[])[0]||"")}${(u.changes||[]).length>1?` ほか ${u.changes.length-1} 件`:""}）`:"")
-     +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>python3 -m pip install --user -r requirements.txt</code>`:"")
+     +(u.requirements_changed?`・<b>部品の追加があります</b>：ターミナルで <code>bash setup_mac.sh</code>`:"")
      +(u.skipped&&u.skipped.behind?`<br><b>新しい版（${u.skipped.behind} 件）の反映を見送っています</b>：${E((u.skipped.waiting||[]).join("・"))} が動いているため（${E(String(u.skipped.since||"").replace("T"," ").slice(5,16))} から）。「今すぐ更新を確かめる」を押すと、待たずに反映します`:"")
      +` <button class="ghost" data-act="self_update">今すぐ更新を確かめる</button>`}
   {const re0=DATA.ref_enrich||{},bl=document.getElementById("ref-lyrics"),bw=document.getElementById("ref-whisper");   // 歌詞の聞き取り（決定 86）

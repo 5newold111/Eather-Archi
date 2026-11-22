@@ -54,6 +54,14 @@ def ssl_context():
 _PY_WITH: dict[str, str | None] = {}
 
 
+def pip_install(py: str, *pkgs: str) -> str:
+    """部品を入れるシェルの命令（決定 180）。どの Python でも通る順に試す：
+    ふつうに入れる（この仕組み専用の置き場 .venv はこれで入る）→ 自分用の場所（--user）→ Homebrew の Python が断るときの書き方"""
+    import shlex
+    q, a = shlex.quote(py), " ".join(shlex.quote(x) for x in pkgs)
+    return (f"{{ {q} -m pip install {a} || {q} -m pip install --user {a} || {q} -m pip install --user --break-system-packages {a}; }}")
+
+
 def python_with(module: str = "playwright") -> str | None:
     """その部品（例 playwright）が入っている Python を探す（決定 59）。
     Python の版が上がる（3.13 → 3.14 など）と、版ごとの置き場所に入れた部品が新しい版から見えなくなるため、
