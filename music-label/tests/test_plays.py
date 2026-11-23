@@ -338,6 +338,19 @@ class Files(Base):
         daily = collect_metrics.load_daily()
         self.assertEqual(int(daily[("2026-10-11_hollowplan", "2026-11-01", "spotify")]["streams"]), 80)
 
+    def test_distrokid_statement_fills_isrc_and_upc(self):
+        """明細に載っている ISRC・UPC で、曲の記録の空いている欄を埋める（Spotify の API を使わないとき。決定 180）"""
+        song = plays._songs.by_id("PDR-002")
+        st = plays._songs.state(song)
+        st.pop("isrc", None)
+        st["upc"] = ""
+        plays._songs.save_state(song, st)
+        (self.inbox / "DistroKid_1234.tsv").write_text(self.DK, encoding="utf-8")
+        r = plays.collect_files(plays.load(), plays.released_songs(), self.day)
+        st = plays._songs.state(plays._songs.by_id("PDR-002"))
+        self.assertEqual((st.get("isrc"), st.get("upc")), ("QZAAA2600001", "1"))
+        self.assertIn("ISRC・UPC を 1 曲に記録しました", r["msg"])
+
     def test_same_file_twice_is_not_counted_twice(self):
         d = plays.load()
         (self.inbox / "DistroKid_a.tsv").write_text(self.DK, encoding="utf-8")

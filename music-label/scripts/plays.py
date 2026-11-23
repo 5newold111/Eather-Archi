@@ -704,6 +704,22 @@ def _metrics():
     return collect_metrics
 
 
+def fill_codes(codes: dict[str, dict]) -> int:
+    """{曲の key: {isrc, upc}} を、曲の記録の空いている欄に入れる（書いてある値は変えない）。入れた曲の数"""
+    n = 0
+    for key, v in codes.items():
+        song = _songs.by_key(key)
+        if song is None:
+            continue
+        st = _songs.state(song)
+        add = {k: x for k, x in v.items() if x and not st.get(k)}
+        if add:
+            st.update(add)
+            _songs.save_state(song, st)
+            n += 1
+    return n
+
+
 def collect_files(d: dict, songs: list[dict], day: str) -> dict:
     """DistroKid の明細・S4A の CSV を取り込む（同じ中身のファイルは 2 度入れない）"""
     files = find_files()
@@ -730,12 +746,18 @@ def collect_files(d: dict, songs: list[dict], day: str) -> dict:
         got = 0
         if kind == "distrokid":   # 明細は「いままでの全部」が入っているので、足さずに置き換える
             tot: dict[str, dict] = {}
+            codes: dict[str, dict] = {}   # 明細に載っている ISRC・UPC（曲の記録の空いている欄を埋める。決定 180）
             for r in rows_in:
                 if (r.get(cm.col(first, "song/album")) or "Song").lower().startswith("album"):
                     continue
                 rel = find(r.get(cm.col(first, "isrc")) or "", r.get(cm.col(first, "artist")) or "", r.get(cm.col(first, "title")) or "")
                 if not rel:
                     continue
+                for k in ("isrc", "upc"):
+                    c = cm.col(first, k)
+                    v = str(r.get(c) or "").strip() if c else ""
+                    if v:
+                        codes.setdefault(rel["release_id"], {})[k] = v.upper() if k == "isrc" else v
                 q = cm.num(r.get(cm.col(first, "quantity")))
                 t = tot.setdefault(rel["release_id"], {"dk_streams": 0, "dk_spotify": 0, "dk_month": ""})
                 t["dk_streams"] += q
@@ -745,6 +767,9 @@ def collect_files(d: dict, songs: list[dict], day: str) -> dict:
             for key, t in tot.items():
                 put(d, day, "songs", by_key[key]["id"], t, "files")
             got = len(tot)
+            filled = fill_codes(codes)
+            if filled:
+                msgs.append(f"ISRC・UPC を {filled} 曲に記録しました（DistroKid の明細から）")
         else:                     # S4A の「楽曲」の CSV（書き出したときに選んでいた期間の数字）
             c_title = cm.col(first, "song", "track", "title")
             for r in rows_in:

@@ -2496,3 +2496,7 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
 - Spotify の API は使わない（オーナーの決定 2026-11-22「プレミアムでなくていい」）：2026-02 から、開発者のアプリの持ち主に Premium が要り、
   曲を探すと 403 で断られる。断られたら覚えて 30 日は問い合わせず（30 日ごとに 1 回だけ試す）、配信の確認と ISRC・UPC・住所の補完は
   Apple Music・Deezer（鍵なし。料金のかかる Web 検索は使わない）で行う。鍵の確認でも ✕ にせず「使っていない（問題なし）」と出す
+- 配信の確認の実地（2026-11-23）：Apple Music では配信中の曲が見つかる（ただし検索の返事は日によってぶれる）。Deezer には 5 組の曲が 1 曲も無い
+  （DistroKid の配信先・反映待ちの可能性）。song.link（Odesli）の公開の窓口は廃止（401 PUBLIC_API_ACCESS_DEPRECATED）→ 使わない
+  → ISRC・UPC は DistroKid の明細（Bank → See excruciating detail → Download）から、曲の記録の空いている欄に入れる（plays.collect_files）。
+    publish.py track --refill で、1 週間あける決まりを無視して今すぐ確かめ直せる

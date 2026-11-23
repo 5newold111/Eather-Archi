@@ -1369,7 +1369,7 @@ def fill_live(token: str) -> bool:
     return changed
 
 
-def fill_live_without_key() -> bool:
+def fill_live_without_key(force: bool = False) -> bool:
     """配信中なのに ISRC・UPC・配信の住所が空の曲を、鍵の要らない確かめ方（Deezer・Apple Music）で埋める（決定 180）"""
     import store_check
     changed = False
@@ -1378,7 +1378,7 @@ def fill_live_without_key() -> bool:
         if st.get("status") != "live" or all(st.get(k) for k in FILL_KEYS):
             continue
         last = str(st.get("fill_checked_at") or "")
-        if last and (date.today() - date.fromisoformat(last[:10])).days < 7:
+        if last and not force and (date.today() - date.fromisoformat(last[:10])).days < 7:
             continue
         try:
             r = store_check.check(song, web_search=False)   # 料金のかかる Web 検索は使わない
@@ -1417,13 +1417,13 @@ def cmd_track(args) -> int:
         print(f"－ Spotify につながりませんでした：{e}")
         return 0
     if not token:   # 鍵が無いとき：Apple Music・Deezer・song.link・Spotify の曲のページ（・Claude の Web 検索）で確かめる（決定 57）
-        fill_live_without_key()
+        fill_live_without_key(bool(getattr(args, "refill", False)))
         return track_without_key(waiting, args) if waiting else 0
     try:
         changed = fill_live(token)
     except SpotifyRefused as e:   # 鍵は通るが、問い合わせを断られる：鍵の要らない確かめ方に切り替える（決定 180）
         print(f"   － {e}")
-        fill_live_without_key()
+        fill_live_without_key(bool(getattr(args, "refill", False)))
         return track_without_key(waiting, args) if waiting else 0
     for song in waiting:
         try:
@@ -1859,8 +1859,9 @@ def main() -> None:
     p = sub.add_parser("registered", help="DistroKid に登録したことを記録")
     p.add_argument("id")
     p.add_argument("--date", help="配信日（YYYY-MM-DD。省くと今日）")
-    p = sub.add_parser("track", help="配信が始まったかを Spotify で確かめ、ISRC などを記録")
+    p = sub.add_parser("track", help="配信が始まったかを確かめ、ISRC などを記録（Apple Music・Deezer。Spotify は鍵と Premium があるとき）")
     p.add_argument("--quiet", action="store_true")
+    p.add_argument("--refill", action="store_true", help="1 週間あける決まりを無視して、空いている ISRC・住所などを今すぐ確かめ直す")
     p = sub.add_parser("suno-request", help="Claude（デスクトップアプリ＋Claude in Chrome）に Suno の入力を頼む文を表示")
     p.add_argument("id", nargs="?", help="この曲だけ（省くと Suno で作る番の全曲）")
     p = sub.add_parser("artist-pages", help="デビューの配信確認：アーティストのページを記録する（Instagram・Facebook は任意。決定 141・145）")

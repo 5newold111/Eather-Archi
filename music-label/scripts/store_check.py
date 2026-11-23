@@ -5,9 +5,9 @@
 公開されている窓口だけを使う（どれも登録・鍵は要らない。読むだけで、何も書き換えない）：
   1 Apple Music … iTunes Search API（itunes.apple.com/search）。曲・Apple のアーティストの ID と住所
   2 Deezer      … Deezer の公開 API（api.deezer.com）。曲と ISRC（曲の番号）・UPC（作品の番号）
-  3 Spotify     … song.link（Odesli。曲の住所から、ほかのサイトの同じ曲の住所を教えてくれる）で Spotify の曲の住所を知り、
+  3 Spotify     … Claude に「Spotify 曲名 アーティスト名」で Web 検索させ（ANTHROPIC_API_KEY があるとき）、
                   Spotify の曲のページ（open.spotify.com/track/…）に書かれているアーティストのページの住所を読む
-                  見つからなければ、Claude に「Spotify 曲名 アーティスト名」で Web 検索させる（ANTHROPIC_API_KEY があるとき）
+                  （前は song.link〔Odesli〕で探していたが、公開の窓口が 2026-11 に廃止された。決定 180）
   曲名とアーティスト名がどちらも同じときだけ「見つかった」とする（同じ名前の別の人の曲を拾わないように）
 
 使い方：
@@ -129,16 +129,7 @@ def check(song: dict, web_search: bool = True) -> dict:
             out[name] = fn(song)
         except Exception as e:  # noqa: BLE001
             out["notes"].append(f"{name} を確かめられませんでした（{str(e)[:80]}）")
-    src = out["apple"].get("url") or out["deezer"].get("url")
-    sp_url = ""
-    if src:
-        try:
-            links = odesli(src)
-            sp_url = links.get("spotify", "")
-            out["youtube_music"] = links.get("youtubeMusic", "")
-            time.sleep(1)   # song.link は 1 分に 10 回まで
-        except Exception as e:  # noqa: BLE001
-            out["notes"].append(f"song.link を確かめられませんでした（{str(e)[:80]}）")
+    sp_url = ""   # song.link（Odesli）の公開の窓口は廃止された（2026-11 に 401 PUBLIC_API_ACCESS_DEPRECATED。決定 180）。使わない
     if not sp_url and web_search:
         sp_url = spotify_by_web_search(song)
     if sp_url:
