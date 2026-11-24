@@ -45,13 +45,22 @@ if [ -z "$TS" ]; then
 fi
 say "   ○ Tailscale のアプリ：${TS}"
 
-# 2 ログイン
-STATE="$("$TS" status --json 2>/dev/null | /usr/bin/python3 -c 'import sys, json; print(json.load(sys.stdin).get("BackendState", ""))' 2>/dev/null || true)"
+# 2 ログイン（Tailscale の返事をそのまま見て決める。読めなければ、返事を画面に出す）
+RAW="$("$TS" status --json 2>&1)"
+STATE="$(printf '%s' "$RAW" | /usr/bin/python3 -c 'import sys, json; print(json.load(sys.stdin).get("BackendState", ""))' 2>/dev/null || true)"
 if [ "$STATE" != "Running" ]; then
-  say "   ✕ Tailscale にログインしていないか、つながっていません（いまの状態：${STATE:-不明}）"
+  say "   ✕ Tailscale にログインしていないか、つながっていません（いまの状態：${STATE:-読めませんでした}）"
+  if [ -z "$STATE" ]; then
+    say "     Tailscale の返事（最初の 5 行）："
+    printf '%s\n' "$RAW" | head -5 | sed 's/^/       /'
+  fi
   [ $CHECK = 1 ] && exit 0
-  stop "メニューバーの Tailscale のマークから「Log in」して、つないでください（Google アカウントでよい）" \
-       "・スマホにも Tailscale のアプリを入れて、同じアカウントでログインしておく（あとで使います）"
+  [ "$(uname -s)" = "Darwin" ] && open -a Tailscale 2>/dev/null
+  stop "Tailscale のアプリを開いて、ログインしてつないでください（Google アカウントでよい）" \
+       "・画面の右上（メニューバー）に Tailscale のマークが出ます。押して「Log in」→ ブラウザでログイン → 「Connect」" \
+       "・マークが見えないときは、Launchpad か「アプリケーション」フォルダから Tailscale を開く" \
+       "・「VPN 構成の追加」「システム拡張機能」を聞かれたら許可する（システム設定 → 一般 → ログイン項目と機能拡張 でも許可できる）" \
+       "・スマホにも Tailscale のアプリを入れて、同じアカウントでログインしておく"
 fi
 NAME="$("$TS" status --json 2>/dev/null | /usr/bin/python3 -c 'import sys, json; print((json.load(sys.stdin).get("Self") or {}).get("DNSName", "").rstrip("."))' 2>/dev/null || true)"
 say "   ○ つながっています（この Mac の名前：${NAME:-不明}）"
