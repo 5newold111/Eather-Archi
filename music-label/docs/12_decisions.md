@@ -2500,3 +2500,5 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
   （DistroKid の配信先・反映待ちの可能性）。song.link（Odesli）の公開の窓口は廃止（401 PUBLIC_API_ACCESS_DEPRECATED）→ 使わない
   → ISRC・UPC は DistroKid の明細（Bank → See excruciating detail → Download）から、曲の記録の空いている欄に入れる（plays.collect_files）。
     publish.py track --refill で、1 週間あける決まりを無視して今すぐ確かめ直せる
+- 外出先のスマホから開く道（Tailscale。決定 28）は、初期化で消えていた → setup_tailscale.sh（アプリ・ログイン・tailscale serve・
+  WEBAPP_AWAKE=1・スマホの住所を順に。人の操作が要るところは案内して止まる）。ダッシュボードの「立て直し」の「外出先のスマホでつなぐ」からも流せる

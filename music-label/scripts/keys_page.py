@@ -99,6 +99,7 @@ RECOVER = """<section class="card"><h2>Mac が壊れた・買い替えたとき<
 <li>定期実行とダッシュボードを登録する：<code>python3 scripts/schedule.py install</code></li>
 <li>全体の点検：<code>python3 scripts/recover.py check</code>（8 項目そろえば完了。足りなければ「次にすること」が 1 つ出ます）</li>
 <li>Suno・DistroKid・Spotify for Artists は、専用の Chrome でログインし直す</li>
+<li>外出先のスマホから開く道（Tailscale）：<code>bash setup_tailscale.sh</code>（止まったら案内どおりにして、もう一度同じ命令）</li>
 </ol>
 <p class="sub">DistroKid に登録済みの曲は、Mac が止まっていても予定どおり配信されます。止まるのは、新しい曲づくり・SNS の投稿・配信の確認です。</p></section>"""
 
