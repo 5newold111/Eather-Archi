@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- 試験用：DistroKid の登録画面に似せた小さなページ（決定 173）。本物の画面でわかった欄の名前（name・class）だけをまねている。
+     ・Artist already in の丸は、最初に選んだ 1 回だけ「取り消す」（本物は検索が遅れて作り直すことがある。決定 71・157）
+     ・No を選ぶと確認の小窓（.swal2-popup）が出る
+     ・押してはいけないもの（Continue・宣誓のチェック・Extras）は、押されたら window.__touched に記録する -->
+<html lang="en"><head><meta charset="utf-8"><title>Upload music (test)</title>
+<style>body{font:14px sans-serif;margin:16px} fieldset{margin:8px 0} .swal2-popup{position:fixed;top:40px;left:40px;background:#fff;border:1px solid #333;padding:12px;display:none}
+.swal2-popup.swal2-show{display:block}</style></head><body>
+<form id="f" onsubmit="window.__touched.push('submit');return false">
+<fieldset><legend>Previously released?</legend>
+ <label><input type="radio" name="previouslyReleased_1" value="1" checked> Yes</label>
+ <label><input type="radio" name="previouslyReleased_1" value="0"> No</label></fieldset>
+
+<fieldset><label>Artist / band name</label>
+ <select name="bandname"><option value="">Choose…</option><option value="a1">DECLAN FAY</option><option value="a2">HOLLOWPLAN</option></select>
+ <a href="#" id="newartist">+ new artist</a></fieldset>
+
+<fieldset id="ids"><legend>Artist already in…?</legend>
+ <div class="q" data-svc="Spotify">
+  <label><input type="radio" name="spotifyArtistID" value="new"> No - this is the first release on Spotify</label>
+  <label><input type="radio" name="spotifyArtistID" value=""> Yes</label>
+  <input type="text" class="myCustomSpotifyUri" placeholder="Spotify artist URI"></div>
+ <div class="q" data-svc="Apple">
+  <label><input type="radio" name="appleArtistID" value="new"> No - new artist page</label>
+  <label><input type="radio" name="appleArtistID" value=""> Yes</label>
+  <input type="text" name="appleUrl" placeholder="Apple Artist URL"></div>
+ <div class="q" data-svc="YouTube">
+  <label><input type="radio" name="googleArtistID" value="new"> No - new artist page</label>
+  <label><input type="radio" name="googleArtistID" value=""> Yes</label>
+  <input type="text" name="ytChannel" placeholder="YouTube Music Channel ID"></div>
+ <div class="q" data-svc="Instagram">
+  <label><input type="radio" name="instagramProfileArtistID" value="new"> No - I don't have an Instagram profile for this artist</label>
+  <label><input type="radio" name="instagramProfileArtistID" value="" checked> Yes</label>
+  <input type="text" name="igUrl" placeholder="Instagram profile URL"></div>
+ <div class="q" data-svc="Facebook">
+  <label><input type="radio" name="facebookProfileArtistID" value="new"> No - I don't have a Facebook profile for this artist</label>
+  <label><input type="radio" name="facebookProfileArtistID" value="" checked> Yes</label>
+  <input type="text" name="fbUrl" placeholder="Facebook profile URL"></div>
+</fieldset>
+
+<fieldset><label>Release date <input type="date" name="releaseDate" min="2026-12-01"></label></fieldset>
+<fieldset><label>Language <select name="language"><option>English</option><option>Japanese</option><option>Instrumental</option></select></label></fieldset>
+<fieldset><label>Artwork <input type="file" name="artwork" accept="image/jpeg,image/png"></label>
+ <label><input type="radio" name="artworkAiGenerated" value="0" checked> No</label>
+ <label><input type="radio" name="artworkAiGenerated" value="1"> Yes</label></fieldset>
+<fieldset><label>Song title <input type="text" class="uploadFileTitle track_1" name="title_1"></label>
+ <label>Audio <input type="file" class="trackupload_1" accept="audio/wav,audio/mpeg,.flac"></label>
+ <label><input type="radio" name="explicit_1" value="1" checked> Explicit</label>
+ <label><input type="radio" name="explicit_1" value="0"> Not explicit</label>
+ <label><input type="radio" name="instrumental_1" value="0"> Has lyrics</label>
+ <label><input type="radio" name="instrumental_1" value="1"> Instrumental</label></fieldset>
+
+<fieldset id="extras"><legend>Extras</legend>
+ <label><input type="checkbox" name="extra_shazam" onchange="window.__touched.push('extra')"> Shazam & iPhone Siri ($0.99)</label>
+ <label><input type="checkbox" name="extra_discovery" onchange="window.__touched.push('extra')"> Discovery Pack</label></fieldset>
+<fieldset id="pledge"><legend>Important checkboxes</legend>
+ <label><input type="checkbox" class="areyousure" onchange="window.__touched.push('areyousure')"> I recorded this music, and am authorized to sell it</label>
+ <label><input type="checkbox" class="areyousure" onchange="window.__touched.push('areyousure')"> I'm not using any other artist's name</label></fieldset>
+<button type="button" id="done" onclick="window.__touched.push('continue')">Done</button>
+<input type="submit" value="Continue">
+</form>
+
+<script>
+window.__touched = [];        // 押してはいけないものが押された記録
+window.__confirmed = [];      // 確認の小窓で OK が押されたサービス
+window.__reverted = {};       // 1 回だけ取り消したサービス
+// 確認の小窓：本物（SweetAlert2）と同じく、出すときに作り、閉じたら画面から取り除く
+function showSwal(svc) {
+  const box = document.createElement('div');
+  box.className = 'swal2-popup swal2-show';
+  box.innerHTML = '<div>This will create a new artist page on ' + svc + '. Are you sure?</div>' +
+    '<button type="button" class="swal2-confirm">OK</button><button type="button" class="swal2-cancel">Cancel</button>';
+  box.querySelector('.swal2-confirm').addEventListener('click', () => { window.__confirmed.push(svc); box.remove(); });
+  box.querySelector('.swal2-cancel').addEventListener('click', () => box.remove());
+  document.body.appendChild(box);
+}
+for (const r of document.querySelectorAll('#ids input[type=radio][value=new]')) {
+  r.addEventListener('change', () => {
+    if (!r.checked) return;
+    const svc = r.closest('.q').dataset.svc;
+    if ((svc === 'Instagram') && !window.__reverted[svc]) {   // 最初の 1 回は、少しして取り消す（作り直しのまね）
+      window.__reverted[svc] = true;
+      setTimeout(() => { r.checked = false; r.closest('.q').querySelector('input[value=""]').checked = true; }, 60);
+      return;
+    }
+    showSwal(svc);
+  });
+}
+</script></body></html>

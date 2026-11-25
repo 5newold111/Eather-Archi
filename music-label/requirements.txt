@@ -1,0 +1,21 @@
+anthropic>=1.0
+certifi
+librosa>=0.10
+soundfile
+numpy
+scipy             # 仕上げ（マスタリング。決定 168）と音の解析
+openpyxl          # アーティスト台帳（artists.xlsx）の読み書き
+pillow            # ジャケットと写真を 3000×3000 に整える（kit_images.py・make_covers.py）
+fonttools         # ジャケットの文字入れで、書体に無い文字（□ になる字）を確かめる（cover_text.py）
+
+# 任意：アーティスト台帳を Google スプレッドシートで使うとき（サービスアカウントの署名）
+# cryptography
+
+# 歌詞の聞き取り（既存楽曲の歌詞を解析シートに入れる・テイクの歌詞照合）。初回にモデルを数百 MB ダウンロード（決定 86）
+faster-whisper; python_version < "3.15"
+# Python 3.15 では、faster-whisper が頼る onnxruntime（声の区間を見つける部品）にまだ 3.15 版が無いので、
+# 用意の台本（setup_mac.sh）が onnxruntime を外して入れる。聞き取りは onnxruntime が無くても動く（決定 180）
+
+# 任意：曲を聞いて声・楽器・ジャンル・ムードを判定する部品（約 1 GB。判定モデル 約 350 MB は初回に自動で取得。決定 103）
+# torch
+# transformers

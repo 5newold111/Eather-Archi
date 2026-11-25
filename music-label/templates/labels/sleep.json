@@ -1,0 +1,66 @@
+{
+  "_注意": "下書き。名前はすべて仮。重複確認（docs/03_artists.md）が終わるまで配信登録しない。",
+  "slug": "sleep",
+  "name": "SLACK WATER",
+  "name_status": "checked",
+  "parent": "etherarchi",
+  "scene": "眠る前・眠りの中",
+  "sound_center": [
+    "アンビエント",
+    "ソロピアノ",
+    "環境音"
+  ],
+  "expansion_path": [
+    "ニューエイジ",
+    "スローなギターアンビエント",
+    "雨音とハミングだけの曲",
+    "眠りのためのローファイ"
+  ],
+  "scene_spec": {
+    "bpm_min": 50,
+    "bpm_max": 75,
+    "length_sec_min": 240,
+    "length_sec_max": 480,
+    "hook_within_sec": 0,
+    "no_sudden_silence": true,
+    "_説明": "サビの概念を持たない。エネルギー曲線は 3 → 3 → 2 → 2 のように下がるだけ。終わりはフェード必須"
+  },
+  "automation_tier": "B",
+  "max_weekly_releases": 8,
+  "release_hour_et": 21,
+  "release_weekday": "sunday",
+  "_release": "日曜 21:00 ET（日本 月曜 10:00/11:00）。眠る前の時間帯に合わせる",
+  "accounts": {
+    "distrokid_email": "sleep-label",
+    "spotify_for_artists_team": "sleep-team",
+    "apple_music_for_artists_team": "",
+    "youtube_channel": "",
+    "instagram": "",
+    "tiktok": ""
+  },
+  "visual": {
+    "space_theme": "暗い寝室。窓から入る月光と、床に落ちる一筋の光だけ",
+    "palette": [
+      "ミッドナイトブルー",
+      "チャコール",
+      "ほのかな生成り"
+    ],
+    "cover_series_rule": "毎回同じ寝室。月の位置と光の幅だけ変える"
+  },
+  "artists": [],
+  "name_candidates": [
+    "SLACK WATER"
+  ],
+  "name_check": {
+    "method": "web_search（配信サービス・レーベル名・一般検索）",
+    "date": "2026-10-03",
+    "verdict": "clear",
+    "note": "旧名 LOW TIDE が衝突したため改名",
+    "manual_pending": [
+      "商標（J-PlatPat / USPTO / WIPO）",
+      "SNS ハンドル（Instagram / TikTok / YouTube）",
+      "Spotify 直接検索（API 鍵があれば check_names.py で自動）"
+    ]
+  },
+  "name_meaning": "潮の流れが止まる『憩流』の時間。眠りに入る直前の静けさ"
+}

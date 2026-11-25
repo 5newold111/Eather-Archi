@@ -1,0 +1,139 @@
+{
+ "_使い方": "Suno の作曲画面（「高度な」→「その他のオプション」）に、組ごとに入れる設定。suno_design.py が曲のイメージと合わせて設計図にし、browser_fill.py が入れる。Gon さんが自由に書き換えてよい。vocal_gender：male（男）・female（女）・null（選ばない）。variety：バラエティ 0〜4（高いほど予想外）。style_influence：スタイルの影響度（%）。weirdness：Weirdness（意外さ。%）。length_sec：間隔（曲の長さ）を「カスタム」にして秒で指定（10〜360。null なら「自動」）。max_mode：Max mode のオン・オフ。your_taste：あなたの好み（今は全部オフ。再生数が伸びた曲の知識がたまったら、out/knowledge/your_taste.json で組ごとにオンにする）。vocal_tag：スタイル欄の先頭近くに入れる声の説明（英語）。exclude：除外するスタイルに必ず入れる言葉（英語。設定書の禁止事項から）。extra_tags：設定書の毎曲の癖にタグが無いものの英語のタグと入れる位置",
+ "_variety": "バラエティ（0〜4）：高いほど予想外の展開・音色になる。毎回同じ声と音で通したい組は低め",
+ "_style_influence": "スタイルの影響度：高いほどスタイル欄の指定どおりになる。音の決まりが細かい組は高め",
+ "_length_sec": "間隔：設定書の曲の長さ（作曲の癖の『構成』と運転向けの長さ 150〜210 秒）のまん中",
+ "default": {
+  "max_mode": true,
+  "your_taste": false,
+  "use_reference_db": true,
+  "_why": "Max mode：音の質を最優先にするのでオン（Suno の使う量が増える場合は false に）。あなたの好み：知識がたまるまでオフ。use_reference_db：参考データベースでこの組に近い曲によく出る言葉を、スタイル欄のいちばん後ろに足す（止めるときは false。組ごとにも書ける）"
+ },
+ "declan_fay": {
+  "vocal_gender": "male",
+  "variety": 1,
+  "weirdness": 35,
+  "style_influence": 70,
+  "length_sec": 190,
+  "_why": "低い男声のクルーナーで固定（声の高さ F2〜C4）。80 年代の音色の指定が細かく、明るく弾む方向に崩れると世界観が壊れるので、バラエティは低め・スタイルは強め",
+  "_why_more": "静かな夜の語り。長さは 3 分〜3 分 20 秒のまん中",
+  "vocal_tag": "warm low male baritone crooner vocals",
+  "exclude": [
+   "sudden silence",
+   "EDM drop",
+   "four-on-the-floor",
+   "shouting",
+   "belting",
+   "guitar solo",
+   "saxophone solo",
+   "fast vibrato",
+   "heavy autotune",
+   "rap",
+   "growl",
+   "bright happy major"
+  ]
+ },
+ "hollowplan": {
+  "vocal_gender": null,
+  "variety": 2,
+  "weirdness": 55,
+  "style_influence": 65,
+  "length_sec": 180,
+  "_why": "歌うのではなく、息と声の切れ端だけ（性別の決まりなし）。性別を選ぶと文章の歌が入りやすいので選ばない。工房の実音などの質感の遊びが持ち味なので、バラエティは少し高め",
+  "_why_more": "質感の遊びが持ち味なのでバラエティは 2",
+  "vocal_tag": "wordless breathy vocal chops",
+  "exclude": [
+   "full sung verses",
+   "sudden silence",
+   "long riser build-up",
+   "EDM drop",
+   "supersaw lead",
+   "rap",
+   "pitched-up chipmunk vocals",
+   "heavy autotune",
+   "shouting"
+  ]
+ },
+ "nao_easterly": {
+  "vocal_gender": "female",
+  "variety": 1,
+  "weirdness": 30,
+  "style_influence": 70,
+  "length_sec": 190,
+  "_why": "VERNALIGHT。明るく高い女声で固定（G3〜F5）。運転中に聞き取れる歯切れのよさが命で、湿った歌い回しや夜の雰囲気に寄らないよう、バラエティは低め・スタイルは強め",
+  "_why_more": "朝の明るい音",
+  "vocal_tag": "bright clear high female vocals",
+  "exclude": [
+   "rap",
+   "sudden silence",
+   "distorted guitar",
+   "heavy autotune",
+   "sad ending",
+   "dark nightclub",
+   "whispered vocals",
+   "shouting",
+   "R&B vocal runs",
+   "trap hi-hats"
+  ]
+ },
+ "soft_cantilever": {
+  "vocal_gender": "male",
+  "variety": 2,
+  "weirdness": 40,
+  "style_influence": 65,
+  "length_sec": 175,
+  "_why": "男性のリードに女性のハモりが重なるバンド。主役は男声なので男性を選ぶ（ハモりはスタイル欄の male lead female harmony で出す）。ギターとベースの絡みに少し揺らぎがほしいので、バラエティは中くらい",
+  "_why_more": "バンドの揺らぎがほしいのでバラエティは 2。長さは 150〜200 秒のまん中",
+  "vocal_tag": "warm male lead vocals with female harmony",
+  "exclude": [
+   "sudden silence",
+   "EDM drop",
+   "autotune effect",
+   "heavy distorted guitar",
+   "horn section",
+   "shouting",
+   "deep vibrato",
+   "whispered vocals",
+   "ballad"
+  ],
+  "extra_tags": [
+   {
+    "tag": "Female vocal pickup, 2-3 words",
+    "where": "プリコーラスの最後の 1 小節",
+    "why": "女性ボーカルが短い言葉を先に歌い、男性リードが受けてサビに入る"
+   },
+   {
+    "tag": "Bass slides up an octave",
+    "where": "サビに入る直前の 1 拍",
+    "why": "ベースが 1 オクターブ上へスライドしてサビの 1 拍目でルートに戻る"
+   },
+   {
+    "tag": "Guitar and bass unison riff, drum hits",
+    "where": "2 回目のサビのあと・ブリッジの前",
+    "why": "ギターとベースが同じ 2 小節のリフをユニゾンで弾き、ドラムがキメで合わせる"
+   }
+  ]
+ },
+ "tidewool": {
+  "vocal_gender": null,
+  "variety": 1,
+  "weirdness": 35,
+  "style_influence": 60,
+  "length_sec": 180,
+  "_why": "男女 2 人の 3 度のハモりが持ち味。性別を 1 つ選ぶと片方の声だけになりやすいので選ばない。生楽器の自然な響きを残したいので、スタイルの効きは少しゆるめ",
+  "_why_more": "生楽器と小さな声。余韻を残す",
+  "vocal_tag": "male and female duet vocals, close harmony",
+  "exclude": [
+   "synth pads",
+   "electronic drop",
+   "sudden silence break",
+   "belting",
+   "autotune effect",
+   "stadium chant",
+   "gospel runs",
+   "deep vibrato",
+   "heavy drums"
+  ]
+ },
+ "_weirdness": "Weirdness（意外さ）：高いほど予想外の展開・音色になる。画面の音量の欄は無く、この欄がある（2026-10-21 画面の部品の一覧で確認）"
+}
