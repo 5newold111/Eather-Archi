@@ -2502,3 +2502,8 @@ YouTube は 1 プロジェクト 1 日 6 本までのアップロード枠もあ
     publish.py track --refill で、1 週間あける決まりを無視して今すぐ確かめ直せる
 - 外出先のスマホから開く道（Tailscale。決定 28）は、初期化で消えていた → setup_tailscale.sh（アプリ・ログイン・tailscale serve・
   WEBAPP_AWAKE=1・スマホの住所を順に。人の操作が要るところは案内して止まる）。ダッシュボードの「立て直し」の「外出先のスマホでつなぐ」からも流せる
+- スキル（決まった手順の手順書）を 2 つと、共通の決まりの書類を残す（オーナーの選んだもの 2026-11-25）：
+  `.claude/skills/finish-change`（変更の締め方：試験 → 本名の見張り → 決定の記録 → コミット → 送る → GitHub 側の試験）、
+  `.claude/skills/system-sweep`（全部を試しに流す点検：tests/sweep_static.py・sweep_jobs.py・sweep_web.py を、いつもの Python と 3.15 で）、
+  `CLAUDE.md`（日本語・初心者向け・鍵をチャットで聞かない・本名を書かない・合流しない・仕組みが押さないもの）。
+  本名の見張りは scripts/name_guard.py（本名は Mac の .env か環境変数 NAME_GUARD から読み、見張り自体には書かない）
